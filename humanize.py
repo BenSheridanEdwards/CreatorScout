@@ -20,3 +20,4 @@ async def mouse_wiggle(page):
         random.randint(200, 900), 
         steps=random.randint(15, 35)
     )
+

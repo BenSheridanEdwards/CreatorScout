@@ -18,3 +18,4 @@ def test_screenshots_dir_creation():
     import os
     os.makedirs("screenshots", exist_ok=True)
     assert os.path.isdir("screenshots")
+

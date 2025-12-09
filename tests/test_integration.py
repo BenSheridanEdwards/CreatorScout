@@ -110,3 +110,4 @@ class TestDatabaseIntegration:
         finally:
             database.DB = original_db
             os.remove(temp_path)
+

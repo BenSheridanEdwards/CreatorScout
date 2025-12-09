@@ -70,3 +70,4 @@ def is_confirmed_creator(image_path: str, threshold: int = 70) -> tuple[bool, di
     
     is_confirmed = data.get("is_adult_creator", False) and data.get("confidence", 0) >= threshold
     return is_confirmed, data
+

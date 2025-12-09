@@ -134,3 +134,4 @@ def is_likely_creator(bio: str, threshold: int = 40) -> tuple[bool, dict]:
     """
     result = calculate_score(bio)
     return result["score"] >= threshold, result
+

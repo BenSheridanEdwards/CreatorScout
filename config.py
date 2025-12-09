@@ -16,3 +16,4 @@ VISION_MODEL = "google/gemini-flash-1.5-exp"          # fastest + cheapest winne
 CONFIDENCE_THRESHOLD = 80
 MAX_DMS_PER_DAY      = 120
 DM_MESSAGE           = "Hey beautiful, loved your vibe — just followed you on OF too if you're there"  # change it
+

@@ -116,3 +116,4 @@ class TestIsLikelyCreator:
         
         assert is_likely_low is True
         # High threshold is stricter
+
