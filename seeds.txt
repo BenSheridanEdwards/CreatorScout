@@ -1,0 +1,5 @@
+# Add Instagram usernames here (one per line, no @ symbol)
+# These are your seed accounts to start discovering from
+# Example:
+# username1
+# username2
