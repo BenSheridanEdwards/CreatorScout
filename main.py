@@ -112,9 +112,18 @@ async def extract_following_usernames(page, start_index: int = 0, count: int = B
         await page.wait_for_selector('div[role="dialog"]', timeout=5000)
         await rnd(1, 2)
         
-        # Get all list items in the modal
-        # Instagram following modal uses a list structure
-        items = await page.query_selector_all('div[role="dialog"] a[role="link"][href^="/"]')
+        # Try multiple selectors for following modal
+        modal_selectors = [
+            'div[role="dialog"] a[role="link"][href^="/"]',  # Current
+            'div[role="dialog"] ul > li a[href^="/"]',       # Suggested
+            'div[role="dialog"] li a[href^="/"]',            # Generic
+        ]
+
+        items = []
+        for selector in modal_selectors:
+            items = await page.query_selector_all(selector)
+            if items:
+                break
         
         # Extract usernames from href attributes
         for i, item in enumerate(items):
@@ -153,12 +162,21 @@ async def scroll_modal(page, times: int = 3):
 
 async def check_dm_thread_empty(page) -> bool:
     """Check if DM thread is empty (no previous messages)."""
-    try:
-        # Look for message bubbles or "No messages" indicator
-        messages = await page.query_selector_all('div[role="row"]')
-        return len(messages) <= 1  # Just the input row
-    except:
-        return True  # Assume empty if we can't check
+    dm_selectors = [
+        'div[role="row"]',
+        'div[role="listitem"]',
+        'div[data-scope="messages_table"] > div',
+    ]
+    
+    for selector in dm_selectors:
+        try:
+            messages = await page.query_selector_all(selector)
+            if messages:
+                return len(messages) <= 1
+        except:
+            continue
+    
+    return True  # Assume empty if nothing found
 
 
 async def process_profile(username: str, page) -> dict:
