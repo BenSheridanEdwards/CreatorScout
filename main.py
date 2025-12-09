@@ -1,172 +1,149 @@
 import asyncio
+import random
 import os
-from datetime import datetime
+import datetime
+from database import init_db, queue_add, queue_next, db
+from browser_agent import new_page, login
+from vision import analyze
+from humanize import rnd, human_scroll, mouse_wiggle
+from utils import save_proof
+from config import CONFIDENCE_THRESHOLD, MAX_DMS_PER_DAY, DM_MESSAGE
 
-from database import (
-    init_db, add_to_queue, get_next_from_queue, 
-    save_profile, mark_dm_sent, was_dm_sent
-)
-from browser_agent import (
-    get_page, login, go_to_profile, 
-    open_followers, scroll_followers_modal, take_screenshot
-)
-from vision import analyze_screenshot, analyze_followers_screenshot
-from humanize import random_delay, human_scroll, human_mouse_move
-from utils import log, sanitize_username, is_valid_username, ensure_screenshots_dir
-from config import CONFIDENCE_THRESHOLD, MAX_DMS_PER_RUN
-
-# Initialize database on import
 init_db()
-ensure_screenshots_dir()
 
 
-async def process_profile(username: str, page) -> dict:
-    """
-    Process a single profile:
-    1. Visit their profile
-    2. Take a screenshot and analyze with vision
-    3. If promising, open their followers
-    4. Extract follower usernames and add to queue
-    """
-    result = {
-        "username": username,
-        "is_patreon": False,
-        "confidence": 0,
-        "followers_added": 0
-    }
+async def process_one(username: str, page):
+    print(f"→ {username}")
+    await page.goto(f"https://instagram.com/{username.strip('@')}/")
+    await rnd(2, 5)
+    await human_scroll(page, random.randint(2, 4))
     
-    try:
-        # Navigate to profile
-        await go_to_profile(page, username)
-        await human_scroll(page, times=2)
-        
-        # Take screenshot of profile
-        timestamp = int(datetime.now().timestamp())
-        profile_path = f"screenshots/profile_{username}_{timestamp}.png"
-        await take_screenshot(page, profile_path)
-        
-        # Analyze with vision AI
-        log(f"Analyzing profile screenshot for {username}")
-        profile_data = analyze_screenshot(profile_path)
-        
-        if profile_data:
-            result["is_patreon"] = profile_data.get("is_patreon", False)
-            result["confidence"] = profile_data.get("confidence", 0)
-            
-            # Save to database
-            save_profile(
-                username=username,
-                display_name=profile_data.get("display_name"),
-                bio_text=profile_data.get("bio"),
-                link_url=profile_data.get("link_url"),
-                is_patreon=result["is_patreon"],
-                confidence=result["confidence"]
-            )
-            
-            log(f"Profile {username}: Patreon={result['is_patreon']}, Confidence={result['confidence']}")
-        
-        # If this looks like a promising account, explore their followers
-        if result["confidence"] >= CONFIDENCE_THRESHOLD or result["is_patreon"]:
-            log(f"High confidence profile - exploring followers of {username}")
-            
-            if await open_followers(page):
-                await scroll_followers_modal(page, scroll_count=3)
-                
-                # Take screenshot of followers
-                followers_path = f"screenshots/followers_{username}_{timestamp}.png"
-                await take_screenshot(page, followers_path)
-                
-                # Analyze followers screenshot
-                followers_data = analyze_followers_screenshot(followers_path)
-                
-                if followers_data and followers_data.get("usernames"):
-                    for follower_username in followers_data["usernames"]:
-                        if is_valid_username(follower_username):
-                            clean = sanitize_username(follower_username)
-                            # Add to queue with higher priority for likely creators
-                            add_to_queue(clean, priority=15)
-                            result["followers_added"] += 1
-                    
-                    log(f"Added {result['followers_added']} followers to queue")
-                
-                # Close the modal by pressing Escape
-                await page.keyboard.press("Escape")
-                await random_delay(1, 2)
+    os.makedirs("screenshots", exist_ok=True)
     
-    except Exception as e:
-        log(f"Error processing {username}: {e}", "ERROR")
+    # === 1. Screenshot the PROFILE page first (for analysis) ===
+    profile_shot = f"screenshots/profile_{username}_{int(datetime.datetime.now().timestamp())}.png"
+    await page.screenshot(path=profile_shot, full_page=True)
     
-    return result
+    # Analyze the PROFILE screenshot
+    data = analyze(profile_shot)
+    if not data:
+        print(f"  Could not analyze profile for {username}")
+        return
+        
+    print(f"  Confidence: {data.get('confidence', 0)}%, Patreon: {data.get('is_patreon', False)}")
+    
+    if data.get("confidence", 0) < CONFIDENCE_THRESHOLD:
+        print(f"  Skipping - confidence below threshold")
+        return
+
+    # Save profile info
+    profile_username = data.get("username", username).lstrip("@") if data.get("username") else username
+    with db() as c:
+        c.execute("""INSERT OR REPLACE INTO profiles(username,display_name,bio_text,link_url,
+                     is_patreon,confidence,last_seen) VALUES(?,?,?,?,?,?,?)""",
+                  (profile_username, data.get("display_name"), data.get("bio"), data.get("link_url"),
+                   data.get("is_patreon"), data.get("confidence"), datetime.datetime.now().isoformat()))
+
+    if data.get("is_patreon") and data.get("confidence", 0) >= CONFIDENCE_THRESHOLD:
+        # === SEND DM ===
+        with db() as c:
+            row = c.execute("SELECT dm_sent FROM profiles WHERE username=?", (profile_username,)).fetchone()
+            sent = row[0] if row else False
+        
+        if not sent:
+            try:
+                # Click Message button on profile
+                await page.click('div[role="button"]:has-text("Message")', timeout=5000)
+                await rnd(2, 4)
+                await page.fill('textarea[placeholder*="Message"]', DM_MESSAGE)
+                await rnd(1, 3)
+                await page.keyboard.press("Enter")
+                await rnd(3, 6)
+                proof = await save_proof(profile_username, page)
+                with db() as c:
+                    c.execute("UPDATE profiles SET dm_sent=1, dm_sent_at=?, proof_path=? WHERE username=?",
+                              (datetime.datetime.now().isoformat(), proof, profile_username))
+                print(f"  ✓ DM sent to {profile_username} – proof saved")
+            except Exception as e:
+                print(f"  DM failed: {e}")
+        else:
+            print(f"  Already DMed {profile_username}, skipping")
+
+        # === EXPAND TREE – scrape followers of confirmed creators ===
+        try:
+            await page.click('a[href$="/followers/"]', timeout=10000)
+            await rnd(3, 7)
+            await human_scroll(page, random.randint(4, 7))
+            
+            # Mark this creator's followers as scraped
+            with db() as c:
+                c.execute("INSERT OR IGNORE INTO followers_scraped(username) VALUES(?)", (profile_username,))
+            
+            # Note: To actually extract follower usernames, you'd need another vision call
+            # or DOM scraping here. For now, we just re-queue the confirmed creator
+            # so the agent explores similar profiles
+            queue_add(profile_username, priority=20, source="confirmed_of")
+            
+            # Close modal
+            await page.keyboard.press("Escape")
+            await rnd(1, 2)
+        except Exception as e:
+            print(f"  Could not expand followers: {e}")
+
+    # Human-like sprinkle - occasionally follow
+    if random.random() < 0.12:
+        try:
+            await page.click('button:has-text("Follow")', timeout=3000)
+            print(f"  Followed {username}")
+            await rnd()
+        except:
+            pass
 
 
 async def main():
-    """Main entry point for the Scout agent."""
-    log("=" * 50)
-    log("Scout Agent Starting")
-    log("=" * 50)
+    print("=" * 50)
+    print("Scout Agent Starting")
+    print("=" * 50)
     
-    # Initialize browser
-    log("Connecting to browser...")
-    page, context, pw = await get_page()
+    page, ctx, pw = await new_page()
+    await login(page)
+    print("✓ Logged in to Instagram")
+
+    # Load seeds
+    if os.path.exists("seeds.txt"):
+        with open("seeds.txt") as f:
+            seeds_loaded = 0
+            for line in f.read().splitlines():
+                u = line.strip()
+                if u and not u.startswith("#"):
+                    queue_add(u, priority=100)
+                    seeds_loaded += 1
+            print(f"✓ Loaded {seeds_loaded} seeds from seeds.txt")
+    else:
+        print("⚠ Warning: seeds.txt not found - add usernames to process")
+
+    profiles_processed = 0
+    while profiles_processed < MAX_DMS_PER_DAY:
+        target = queue_next()
+        if not target:
+            print("Queue empty – sleeping 5 min")
+            await asyncio.sleep(300)
+            continue
+        
+        print(f"\n[{profiles_processed + 1}/{MAX_DMS_PER_DAY}] Processing: {target}")
+        await process_one(target, page)
+        profiles_processed += 1
+        
+        delay = random.uniform(40, 120)
+        print(f"  Waiting {delay:.0f}s before next profile...")
+        await asyncio.sleep(delay)
+
+    print("\n" + "=" * 50)
+    print(f"Session complete! Processed {profiles_processed} profiles")
+    print("=" * 50)
     
-    try:
-        # Login to Instagram
-        await login(page)
-        
-        # Load seed accounts from file
-        seed_file = "seeds.txt"
-        if os.path.exists(seed_file):
-            with open(seed_file) as f:
-                for line in f.read().splitlines():
-                    line = line.strip()
-                    if line and not line.startswith("#"):
-                        clean = sanitize_username(line)
-                        if is_valid_username(clean):
-                            add_to_queue(clean, priority=20)  # Seeds get high priority
-                            log(f"Added seed: {clean}")
-        else:
-            log("No seeds.txt found - please add seed usernames", "WARN")
-        
-        # Main processing loop
-        dms_sent = 0
-        profiles_processed = 0
-        
-        while dms_sent < MAX_DMS_PER_RUN:
-            username = get_next_from_queue()
-            
-            if not username:
-                log("Queue empty - done for now")
-                break
-            
-            log(f"\n--- Processing: {username} ({profiles_processed + 1}) ---")
-            
-            result = await process_profile(username, page)
-            profiles_processed += 1
-            
-            # Log summary
-            log(f"Completed: {username} | OF: {result['is_patreon']} | "
-                f"Conf: {result['confidence']} | New followers: {result['followers_added']}")
-            
-            # Be nice - random delay between profiles
-            delay = 30 + (60 * (profiles_processed % 5 == 0))  # Extra delay every 5 profiles
-            log(f"Waiting {delay}s before next profile...")
-            await random_delay(delay * 0.8, delay * 1.2)
-        
-        log("\n" + "=" * 50)
-        log(f"Session Complete!")
-        log(f"Profiles processed: {profiles_processed}")
-        log(f"DMs sent: {dms_sent}")
-        log("=" * 50)
-        
-    except Exception as e:
-        log(f"Fatal error: {e}", "ERROR")
-        raise
-    
-    finally:
-        # Cleanup
-        log("Closing browser...")
-        await context.close()
-        await pw.stop()
+    await ctx.close()
+    await pw.stop()
 
 
 if __name__ == "__main__":

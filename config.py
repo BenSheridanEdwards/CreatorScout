@@ -1,19 +1,18 @@
-import os
 from dotenv import load_dotenv
+import os
 
 load_dotenv()
 
-BROWSERLESS_TOKEN = os.getenv("BROWSERLESS_TOKEN")
-OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
-IG_USER = os.getenv("INSTAGRAM_USERNAME")
-IG_PASS = os.getenv("INSTAGRAM_PASSWORD")
+BROWSERLESS_TOKEN      = os.getenv("BROWSERLESS_TOKEN")
+OPENROUTER_API_KEY     = os.getenv("OPENROUTER_API_KEY")
+IG_USER                = os.getenv("INSTAGRAM_USERNAME")
+IG_PASS                = os.getenv("INSTAGRAM_PASSWORD")
 
-CONFIDENCE_THRESHOLD = int(os.getenv("CONFIDENCE_THRESHOLD", "80"))
-MAX_DMS_PER_RUN = int(os.getenv("MAX_DMS_PER_RUN", "999"))
+# <<< BEST MODEL RIGHT NOW (Dec 2025) >>>
+VISION_MODEL = "google/gemini-flash-1.5-exp"          # fastest + cheapest winner
+# VISION_MODEL = "google/gemini-pro-vision-2.5"       # max accuracy if you want
+# VISION_MODEL = "anthropic/claude-3-5-sonnet-20241022"
 
-# Change only if you know what you're doing
-VISION_MODEL = "google/gemini-flash-1.5"   # fastest & cheapest winner right now
-# Alternatives (just uncomment):
-# VISION_MODEL = "google/gemini-pro-vision-2.5"
-# VISION_MODEL = "anthropic/claude-3-5-sonnet"
-# VISION_MODEL = "openrouter/internvl3-78b"
+CONFIDENCE_THRESHOLD = 80
+MAX_DMS_PER_DAY      = 120
+DM_MESSAGE           = "Hey beautiful, loved your vibe — just followed you on OF too if you're there"  # change it
