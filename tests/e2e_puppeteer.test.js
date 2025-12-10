@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { performance } from 'node:perf_hooks';
+import fs from 'node:fs/promises';
 import dotenv from 'dotenv';
 import puppeteer from 'puppeteer';
 
@@ -15,7 +16,7 @@ dotenv.config({ path: path.join(__dirname, '..', '.env') });
 
 const IG_USER = process.env.INSTAGRAM_USERNAME;
 const IG_PASS = process.env.INSTAGRAM_PASSWORD;
-const TEST_PROFILE = process.env.TEST_PROFILE || 'instagram';
+const TEST_PROFILE = process.env.TEST_PROFILE || 'bensheridanedwards';
 
 if (!IG_USER || !IG_PASS) {
   throw new Error(
@@ -24,6 +25,14 @@ if (!IG_USER || !IG_PASS) {
 }
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+async function snapshot(page, label) {
+  await fs.mkdir('tmp', { recursive: true });
+  const ts = Date.now();
+  const file = `tmp/${label}-${ts}.png`;
+  await page.screenshot({ path: file, fullPage: true });
+  return file;
+}
 
 async function clickAny(page, texts) {
   for (const t of texts) {
@@ -112,8 +121,26 @@ async function getLinkFromBio(page) {
 }
 
 async function openFollowingModal(page) {
-  await page.click('a[href$="/following/"]', { timeout: 10000 });
-  await sleep(1500);
+  const selectors = [
+    'a[href$="/following/"]',
+    'a[href$="/following"]',
+    'a:has-text("following")',
+    'a[role="link"]:has-text("following")',
+    'button:has-text("following")',
+  ];
+  for (const sel of selectors) {
+    try {
+      const handle = await page.$(sel);
+      if (handle) {
+        await handle.click();
+        await sleep(1200);
+        return true;
+      }
+    } catch {
+      continue;
+    }
+  }
+  return false;
 }
 
 async function extractFollowingUsernames(page, count = 5) {
@@ -204,7 +231,13 @@ test('Puppeteer E2E suite', async (t) => {
       waitUntil: 'domcontentloaded',
     });
     try {
-      await openFollowingModal(page);
+      const opened = await openFollowingModal(page);
+      if (!opened) {
+        const shot = await snapshot(page, 'modal_usernames_fail');
+        assert.fail(
+          `Could not open following modal (usernames). Screenshot: ${shot}`
+        );
+      }
     } catch {
       t.diagnostic('Could not open following modal - skipping usernames test');
       return;
@@ -223,7 +256,13 @@ test('Puppeteer E2E suite', async (t) => {
       waitUntil: 'domcontentloaded',
     });
     try {
-      await openFollowingModal(page);
+      const opened = await openFollowingModal(page);
+      if (!opened) {
+        const shot = await snapshot(page, 'modal_scroll_fail');
+        assert.fail(
+          `Could not open following modal (scroll). Screenshot: ${shot}`
+        );
+      }
     } catch {
       t.diagnostic('Could not open following modal - skipping scroll test');
       return;
@@ -432,7 +471,13 @@ test('Puppeteer E2E suite', async (t) => {
       waitUntil: 'domcontentloaded',
     });
     try {
-      await openFollowingModal(page);
+      const opened = await openFollowingModal(page);
+      if (!opened) {
+        const shot = await snapshot(page, 'modal_traversal_fail');
+        assert.fail(
+          `Could not open following modal (traversal). Screenshot: ${shot}`
+        );
+      }
     } catch {
       t.diagnostic('Could not open following modal - skipping traversal');
       return;
