@@ -111,3 +111,59 @@ class TestDatabaseIntegration:
             database.DB = original_db
             os.remove(temp_path)
 
+
+class TestScrollAndQueuePersistence:
+    def test_scroll_index_persists_across_updates(self, tmp_path, monkeypatch):
+        import database
+
+        original_db = database.DB
+        database.DB = tmp_path / "test_scroll.db"
+        database.init_db()
+
+        # initial should be zero
+        assert database.get_scroll_index("seed1") == 0
+
+        # update and confirm persistence
+        database.update_scroll_index("seed1", 15)
+        assert database.get_scroll_index("seed1") == 15
+
+        database.update_scroll_index("seed1", 30)
+        assert database.get_scroll_index("seed1") == 30
+
+        # another user unaffected
+        assert database.get_scroll_index("seed2") == 0
+
+        database.DB = original_db
+
+    def test_queue_and_profiles_flow_no_browser(self, tmp_path, monkeypatch):
+        import database
+
+        original_db = database.DB
+        database.DB = tmp_path / "test_queue.db"
+        database.init_db()
+
+        # Seed queue
+        database.queue_add("seeduser", priority=100, source="seed")
+        database.queue_add("otheruser", priority=50, source="seed")
+        assert database.queue_count() == 2
+
+        # Dequeue highest priority
+        nxt = database.queue_next()
+        assert nxt == "seeduser"
+        assert database.queue_count() == 1
+
+        # Mark visits and creator path
+        database.mark_visited("seeduser", bio="Patreon 🔥", bio_score=85)
+        database.mark_as_creator("seeduser", confidence=90, proof_path="proof.png")
+        database.mark_dm_sent("seeduser", proof_path="dm.png")
+        database.mark_followed("seeduser")
+
+        # Stats reflect updates
+        stats = database.get_stats()
+        assert stats["confirmed_creators"] == 1
+        assert stats["dms_sent"] == 1
+        assert stats["total_visited"] == 1
+        assert stats["queue_size"] == 1
+
+        database.DB = original_db
+

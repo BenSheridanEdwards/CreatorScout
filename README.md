@@ -95,6 +95,8 @@ scout/
 ```bash
 # Install
 pip install -r requirements.txt
+# For Node Puppeteer E2E tests
+npm install
 
 # Configure
 cp .env.example .env  # Edit with your credentials

@@ -8,7 +8,11 @@ import { fileURLToPath } from 'node:url';
 import { performance } from 'node:perf_hooks';
 import fs from 'node:fs/promises';
 import dotenv from 'dotenv';
-import puppeteer from 'puppeteer';
+import puppeteer from 'puppeteer-extra';
+import StealthPlugin from 'puppeteer-extra-plugin-stealth';
+
+// Enable stealth mode to avoid bot detection
+puppeteer.use(StealthPlugin());
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -16,7 +20,7 @@ dotenv.config({ path: path.join(__dirname, '..', '.env') });
 
 const IG_USER = process.env.INSTAGRAM_USERNAME;
 const IG_PASS = process.env.INSTAGRAM_PASSWORD;
-const TEST_PROFILE = process.env.TEST_PROFILE || 'bensheridanedwards';
+const TEST_PROFILE = process.env.TEST_PROFILE || 'cristiano';
 
 if (!IG_USER || !IG_PASS) {
   throw new Error(
@@ -50,25 +54,54 @@ async function clickAny(page, texts) {
 
 async function login(page) {
   await page.goto('https://www.instagram.com/', {
-    waitUntil: 'domcontentloaded',
-    timeout: 20000,
+    waitUntil: 'networkidle2',
+    timeout: 15000,
   });
+
+  // Handle cookie banner (no delay needed)
   await clickAny(page, [
     'Allow all cookies',
     'Allow essential and optional cookies',
-    'Accept All',
-    'Accept',
-    'Allow',
     'Decline optional cookies',
   ]);
 
-  await page.waitForSelector('input[name="username"]', { timeout: 20000 });
-  await page.type('input[name="username"]', IG_USER, { delay: 10 });
-  await page.type('input[name="password"]', IG_PASS, { delay: 10 });
-  await page.click('button[type="submit"]');
-  await sleep(3500);
+  // Wait for login form or already logged in state
+  try {
+    await page.waitForSelector('input[name="username"]', { timeout: 5000 });
+  } catch {
+    // Check if already logged in
+    const loggedIn = await page.$('a[href="/direct/inbox/"]');
+    if (loggedIn) return;
+    throw new Error('Could not find login form');
+  }
 
-  await clickAny(page, ['Not Now', 'Not now', 'Cancel', 'Skip']);
+  // Enter credentials (minimal delay for stability)
+  await page.type('input[name="username"]', IG_USER, { delay: 5 });
+  await page.type('input[name="password"]', IG_PASS, { delay: 5 });
+  await page.click('button[type="submit"]');
+
+  // Wait for navigation after login - use waitForNavigation or selector
+  try {
+    await page.waitForSelector('a[href="/direct/inbox/"]', { timeout: 10000 });
+  } catch {
+    // Check for error or popup
+    const errorText = await page.evaluate(() => {
+      const el = document.body;
+      return (
+        el?.innerText?.includes("couldn't connect") ||
+        el?.innerText?.includes('incorrect') ||
+        el?.innerText?.includes('Sorry')
+      );
+    });
+    if (errorText) {
+      const shot = await snapshot(page, 'login_failed');
+      throw new Error(`Login failed - see ${shot}`);
+    }
+  }
+
+  // Dismiss popups quickly
+  await clickAny(page, ['Not Now', 'Not now', 'Skip']);
+  await clickAny(page, ['Not Now', 'Not now', 'Skip']);
 }
 
 async function getBioFromPage(page) {
@@ -122,36 +155,86 @@ async function getLinkFromBio(page) {
 }
 
 async function openFollowingModal(page) {
-  const selectors = [
-    'a[href$="/following/"]',
-    'a[href$="/following"]',
-    'a:has-text("following")',
-    'a[role="link"]:has-text("following")',
-    'button:has-text("following")',
-  ];
+  // Screenshot before attempt for debugging
+  await snapshot(page, 'before_modal_open');
+
+  // Try CSS selectors first - most reliable
+  const selectors = ['a[href$="/following/"]', 'a[href$="/following"]'];
   for (const sel of selectors) {
     try {
       const handle = await page.$(sel);
       if (handle) {
+        console.log(`Found following link with selector: ${sel}`);
         await handle.click();
-        await sleep(1200);
+        await sleep(3000);
         return true;
       }
-    } catch {
+    } catch (e) {
+      console.log(`Selector ${sel} failed: ${e.message}`);
       continue;
     }
   }
+
+  // Use page.evaluate to find and click following link - most reliable fallback
+  try {
+    const clicked = await page.evaluate(() => {
+      // Look for the stats section - Instagram puts followers/following there
+      const links = Array.from(document.querySelectorAll('a'));
+      for (const link of links) {
+        const href = link.getAttribute('href') || '';
+        if (href.includes('/following')) {
+          console.log('Found following link via href:', href);
+          link.click();
+          return true;
+        }
+      }
+      // Try text-based matching as fallback
+      for (const link of links) {
+        const text = link.textContent?.toLowerCase() || '';
+        if (text.includes('following') && !text.includes('followers')) {
+          console.log('Found following link via text:', link.textContent);
+          link.click();
+          return true;
+        }
+      }
+      return false;
+    });
+    if (clicked) {
+      await sleep(3000);
+      return true;
+    }
+  } catch (e) {
+    console.log(`Evaluate fallback failed: ${e.message}`);
+  }
+
+  // Screenshot after all attempts failed
+  await snapshot(page, 'modal_open_failed');
   return false;
 }
 
 async function extractFollowingUsernames(page, count = 5) {
+  // Wait for modal and some items to load
+  try {
+    await page.waitForSelector('div[role="dialog"] a[href^="/"]', {
+      timeout: 15000,
+    });
+  } catch {
+    console.log('[debug] Modal selector not found within timeout');
+    return [];
+  }
+
+  // Scroll a bit to load more items
+  await scrollModal(page, 1);
+
   const selectorVariants = [
+    'div[role="dialog"] a[href^="/"]', // General
     'div[role="dialog"] a[role="link"][href^="/"]',
     'div[role="dialog"] ul > li a[href^="/"]',
     'div[role="dialog"] li a[href^="/"]',
   ];
   for (const sel of selectorVariants) {
     const items = await page.$$(sel);
+    console.log(`[debug] Selector "${sel}" found ${items.length} items`);
     if (items?.length) {
       const usernames = [];
       for (const item of items) {
@@ -164,6 +247,9 @@ async function extractFollowingUsernames(page, count = 5) {
         }
         if (usernames.length >= count) break;
       }
+      console.log(
+        `[debug] Extracted ${usernames.length} usernames from "${sel}"`
+      );
       if (usernames.length) return usernames;
     }
   }
@@ -229,19 +315,33 @@ test('Puppeteer E2E suite', async (t) => {
 
   await t.test('following modal usernames', async () => {
     await page.goto(`https://www.instagram.com/${TEST_PROFILE}/`, {
-      waitUntil: 'domcontentloaded',
+      waitUntil: 'networkidle0',
     });
-    try {
-      const opened = await openFollowingModal(page);
-      if (!opened) {
-        const shot = await snapshot(page, 'modal_usernames_fail');
-        assert.fail(
-          `Could not open following modal (usernames). Screenshot: ${shot}`
-        );
-      }
-    } catch {
-      t.diagnostic('Could not open following modal - skipping usernames test');
-      return;
+    await sleep(2000);
+
+    // Verify logged in
+    const isLoggedIn = await page.evaluate(() => {
+      const hasInbox =
+        document.querySelector('a[href="/direct/inbox/"]') !== null;
+      const hasHomeIcon = Array.from(document.querySelectorAll('svg')).some(
+        (svg) => svg.getAttribute('aria-label') === 'Home'
+      );
+      const hasLoginButton = Array.from(
+        document.querySelectorAll('button')
+      ).some((btn) => btn.textContent?.includes('Log in'));
+      return hasInbox || hasHomeIcon || !hasLoginButton;
+    });
+    if (!isLoggedIn) {
+      const shot = await snapshot(page, 'not_logged_in_usernames');
+      assert.fail(`Not logged in for usernames test. Screenshot: ${shot}`);
+    }
+
+    const opened = await openFollowingModal(page);
+    if (!opened) {
+      const shot = await snapshot(page, 'modal_usernames_fail');
+      assert.fail(
+        `Could not open following modal (usernames). Screenshot: ${shot}`
+      );
     }
     const users = await extractFollowingUsernames(page, 5);
     assert.ok(Array.isArray(users));
@@ -254,19 +354,33 @@ test('Puppeteer E2E suite', async (t) => {
 
   await t.test('following modal scroll', async () => {
     await page.goto(`https://www.instagram.com/${TEST_PROFILE}/`, {
-      waitUntil: 'domcontentloaded',
+      waitUntil: 'networkidle0',
     });
-    try {
-      const opened = await openFollowingModal(page);
-      if (!opened) {
-        const shot = await snapshot(page, 'modal_scroll_fail');
-        assert.fail(
-          `Could not open following modal (scroll). Screenshot: ${shot}`
-        );
-      }
-    } catch {
-      t.diagnostic('Could not open following modal - skipping scroll test');
-      return;
+    await sleep(2000);
+
+    // Verify logged in
+    const isLoggedIn = await page.evaluate(() => {
+      const hasInbox =
+        document.querySelector('a[href="/direct/inbox/"]') !== null;
+      const hasHomeIcon = Array.from(document.querySelectorAll('svg')).some(
+        (svg) => svg.getAttribute('aria-label') === 'Home'
+      );
+      const hasLoginButton = Array.from(
+        document.querySelectorAll('button')
+      ).some((btn) => btn.textContent?.includes('Log in'));
+      return hasInbox || hasHomeIcon || !hasLoginButton;
+    });
+    if (!isLoggedIn) {
+      const shot = await snapshot(page, 'not_logged_in_scroll');
+      assert.fail(`Not logged in for scroll test. Screenshot: ${shot}`);
+    }
+
+    const opened = await openFollowingModal(page);
+    if (!opened) {
+      const shot = await snapshot(page, 'modal_scroll_fail');
+      assert.fail(
+        `Could not open following modal (scroll). Screenshot: ${shot}`
+      );
     }
     await scrollModal(page, 2);
     await page.keyboard.press('Escape');
@@ -287,6 +401,10 @@ test('Puppeteer E2E suite', async (t) => {
     const bio = await getBioFromPage(page);
     console.log('[bio]', bio || 'None');
     assert.ok(bio === null || typeof bio === 'string');
+  });
+
+  test.skip('vision flow (skipped)', () => {
+    // Placeholder for vision screenshot + analysis; kept skipped to avoid external call.
   });
 
   await t.test('patreon confirmation for svagtillstark', async () => {
@@ -473,28 +591,47 @@ test('Puppeteer E2E suite', async (t) => {
 
   await t.test('following traversal (read-only bios)', async () => {
     await page.goto(`https://www.instagram.com/${TEST_PROFILE}/`, {
-      waitUntil: 'domcontentloaded',
+      waitUntil: 'networkidle0',
     });
-    try {
-      const opened = await openFollowingModal(page);
-      if (!opened) {
-        const shot = await snapshot(page, 'modal_traversal_fail');
-        assert.fail(
-          `Could not open following modal (traversal). Screenshot: ${shot}`
-        );
-      }
-    } catch {
-      t.diagnostic('Could not open following modal - skipping traversal');
-      return;
+    await sleep(2000); // Wait for page to settle
+
+    // Verify we're still logged in before attempting modal
+    const isLoggedIn = await page.evaluate(() => {
+      const hasInbox =
+        document.querySelector('a[href="/direct/inbox/"]') !== null;
+      const hasHomeIcon = Array.from(document.querySelectorAll('svg')).some(
+        (svg) => svg.getAttribute('aria-label') === 'Home'
+      );
+      const hasLoginButton = Array.from(
+        document.querySelectorAll('button')
+      ).some((btn) => btn.textContent?.includes('Log in'));
+      return hasInbox || hasHomeIcon || !hasLoginButton;
+    });
+
+    if (!isLoggedIn) {
+      const shot = await snapshot(page, 'not_logged_in_traversal');
+      assert.fail(
+        `Not logged in when attempting traversal. Screenshot: ${shot}`
+      );
+    }
+
+    const opened = await openFollowingModal(page);
+    if (!opened) {
+      const shot = await snapshot(page, 'modal_traversal_fail');
+      assert.fail(
+        `Could not open following modal (traversal). Screenshot: ${shot}`
+      );
     }
 
     const usernames = await extractFollowingUsernames(page, 5);
-    await page.keyboard.press('Escape');
 
     if (!usernames.length) {
-      t.diagnostic('No usernames extracted from modal - skipping traversal');
-      return;
+      // Screenshot modal BEFORE closing for debugging
+      const shot = await snapshot(page, 'modal_no_usernames');
+      await page.keyboard.press('Escape');
+      assert.fail(`No usernames extracted from modal. Screenshot: ${shot}`);
     }
+    await page.keyboard.press('Escape');
 
     // Visit up to 2 profiles read-only and fetch bios
     const sample = usernames.slice(0, 2);

@@ -169,3 +169,4 @@ class TestCompleteWorkflow:
         assert stats["dms_sent"] == 1
         assert stats["queue_size"] == 1
 
+

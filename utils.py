@@ -9,4 +9,3 @@ async def save_proof(username: str, page):
     path = f"screenshots/DM_{username}_{ts}.png"
     await page.screenshot(path=path, full_page=True)
     return path
-

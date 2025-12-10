@@ -32,6 +32,7 @@ from browser_agent import new_page, login
 from bio_matcher import is_likely_creator, calculate_score
 from vision import is_confirmed_creator
 from humanize import rnd, human_scroll, mouse_wiggle
+from utils import save_proof
 from config import (
     MAX_DMS_PER_DAY,
     DM_MESSAGE,
@@ -234,7 +235,17 @@ async def process_profile(username: str, page) -> dict:
     await page.goto(f"https://instagram.com/{username}/")
     await rnd(2, 4)
     await mouse_wiggle(page)
-    
+
+    # Check if account is private
+    try:
+        private_text = await page.query_selector('text="This account is private"')
+        if private_text:
+            print(f"    Account is private, skipping")
+            mark_visited(username, bio_score=0)
+            return result
+    except:
+        pass
+
     # Extract bio
     bio = await get_bio_from_page(page)
     link_url = await get_link_from_bio(page)
@@ -324,8 +335,7 @@ async def process_profile(username: str, page) -> dict:
                     await rnd(2, 4)
                     
                     # Screenshot proof
-                    proof_path = f"screenshots/dm_{username}_{int(datetime.now().timestamp())}.png"
-                    await page.screenshot(path=proof_path)
+                    proof_path = await save_proof(username, page)
                     
                     mark_dm_sent(username, proof_path)
                     result["dm_sent"] = True
