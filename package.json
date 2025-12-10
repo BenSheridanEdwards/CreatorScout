@@ -4,7 +4,8 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "test:e2e": "node --test tests/e2e_puppeteer.test.js"
+    "test:e2e": "node --test tests/e2e_puppeteer.test.js",
+    "test:profile": "node --test tests/check_profile.test.js"
   },
   "dependencies": {
     "dotenv": "^17.2.3",
