@@ -95,7 +95,6 @@ scout/
 ```bash
 # Install
 pip install -r requirements.txt
-playwright install chromium
 
 # Configure
 cp .env.example .env  # Edit with your credentials
@@ -161,6 +160,9 @@ python -m pytest tests/ -v
 # - Database operations (13 tests)
 # - Integration (7 tests)
 # - Utils (2 tests)
+
+# Puppeteer E2E (Node test runner)
+node --test tests/e2e_puppeteer.test.js
 ```
 
 ## Safety Features

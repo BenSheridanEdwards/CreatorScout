@@ -32,15 +32,35 @@ from browser_agent import new_page, login
 from bio_matcher import is_likely_creator, calculate_score
 from vision import is_confirmed_creator
 from humanize import rnd, human_scroll, mouse_wiggle
-from config import MAX_DMS_PER_DAY, DM_MESSAGE, CONFIDENCE_THRESHOLD
+from config import (
+    MAX_DMS_PER_DAY,
+    DM_MESSAGE,
+    CONFIDENCE_THRESHOLD,
+    SKIP_VISION,
+    FAST_MODE,
+    SLEEP_SCALE,
+)
 
 init_db()
 
 BATCH_SIZE = 10  # Process 10 profiles at a time from following list
+LONG_SLEEP_SCALE = SLEEP_SCALE  # for readability
 
+
+def _log(msg):
+    print(msg, flush=True)
+
+
+async def click_selector(page, selector: str, timeout: int = 10000) -> bool:
+    el = await page.wait_for_selector(selector, timeout=timeout)
+    if el:
+        await el.click()
+        return True
+    return False
 
 async def get_bio_from_page(page) -> str | None:
     """Extract bio text from current profile page."""
+    _log("    [bio] Starting bio extraction...")
     try:
         # Instagram bio is typically in a span or div in the header section
         bio_selectors = [
@@ -50,24 +70,33 @@ async def get_bio_from_page(page) -> str | None:
             'section > div > span',
         ]
         
-        for selector in bio_selectors:
+        for i, selector in enumerate(bio_selectors):
+            _log(f"    [bio] Trying selector {i+1}/{len(bio_selectors)}: {selector[:40]}...")
             try:
                 element = await page.query_selector(selector)
                 if element:
+                    _log(f"    [bio] Found element, getting text...")
                     text = await element.inner_text()
                     if text and len(text) > 10:
+                        _log(f"    [bio] Got text: {text[:30]}...")
                         return text
-            except:
+                    _log(f"    [bio] Text too short or empty")
+            except Exception as e:
+                _log(f"    [bio] Selector failed: {e}")
                 continue
         
         # Fallback: get all text from header
+        _log("    [bio] Trying fallback: header text")
         header = await page.query_selector('header')
         if header:
-            return await header.inner_text()
+            text = await header.inner_text()
+            _log(f"    [bio] Got header text: {text[:30] if text else 'None'}...")
+            return text
             
     except Exception as e:
-        print(f"  Could not extract bio: {e}")
+        _log(f"    [bio] Error: {e}")
     
+    _log("    [bio] No bio found")
     return None
 
 
@@ -229,37 +258,40 @@ async def process_profile(username: str, page) -> dict:
     
     # === STEP 2: If promising and has link, explore with vision ===
     if link_url and match_data["score"] >= 40:
-        print(f"    Exploring linktree: {link_url[:50]}...")
-        
-        try:
-            # Click the link to open linktree
-            link_element = await page.query_selector(f'a[href="{link_url}"]')
-            if link_element:
-                await link_element.click()
-                await rnd(3, 5)
-                
-                # Screenshot the linktree page
-                os.makedirs("screenshots", exist_ok=True)
-                screenshot_path = f"screenshots/linktree_{username}_{int(datetime.now().timestamp())}.png"
-                await page.screenshot(path=screenshot_path)
-                
-                # Vision analysis
-                is_creator, vision_data = is_confirmed_creator(screenshot_path, threshold=CONFIDENCE_THRESHOLD)
-                
-                if vision_data:
-                    print(f"    Vision: creator={is_creator}, confidence={vision_data.get('confidence', 0)}")
-                    print(f"    Indicators: {vision_data.get('indicators', [])}")
-                
-                if is_creator:
-                    result["is_creator"] = True
-                    mark_as_creator(username, confidence=vision_data.get("confidence", 0), proof_path=screenshot_path)
+        if SKIP_VISION:
+            print("    FAST_MODE/SKIP_VISION enabled - skipping linktree vision step")
+        else:
+            print(f"    Exploring linktree: {link_url[:50]}...")
+            
+            try:
+                # Click the link to open linktree
+                link_element = await page.query_selector(f'a[href="{link_url}"]')
+                if link_element:
+                    await link_element.click()
+                    await rnd(3, 5)
                     
-                # Go back to profile
-                await page.go_back()
-                await rnd(2, 3)
-                
-        except Exception as e:
-            print(f"    Error exploring linktree: {e}")
+                    # Screenshot the linktree page
+                    os.makedirs("screenshots", exist_ok=True)
+                    screenshot_path = f"screenshots/linktree_{username}_{int(datetime.now().timestamp())}.png"
+                    await page.screenshot(path=screenshot_path)
+                    
+                    # Vision analysis
+                    is_creator, vision_data = is_confirmed_creator(screenshot_path, threshold=CONFIDENCE_THRESHOLD)
+                    
+                    if vision_data:
+                        print(f"    Vision: creator={is_creator}, confidence={vision_data.get('confidence', 0)}")
+                        print(f"    Indicators: {vision_data.get('indicators', [])}")
+                    
+                    if is_creator:
+                        result["is_creator"] = True
+                        mark_as_creator(username, confidence=vision_data.get("confidence", 0), proof_path=screenshot_path)
+                    
+                    # Go back to profile
+                    await page.go_back()
+                    await rnd(2, 3)
+                    
+            except Exception as e:
+                print(f"    Error exploring linktree: {e}")
     
     # High bio score alone can indicate creator (e.g., direct creator mention)
     elif match_data["score"] >= 70:
@@ -276,12 +308,17 @@ async def process_profile(username: str, page) -> dict:
         else:
             try:
                 # Click Message button
-                await page.click('div[role="button"]:has-text("Message")', timeout=5000)
+                handle = await page.wait_for_selector('div[role="button"]', timeout=5000)
+                if handle:
+                    await handle.click()
                 await rnd(2, 4)
                 
                 # Check if thread is empty
                 if await check_dm_thread_empty(page):
-                    await page.fill('textarea[placeholder*="Message"]', DM_MESSAGE)
+                    el = await page.wait_for_selector('textarea[placeholder*="Message"]', timeout=5000)
+                    if el:
+                        await el.click()
+                        await page.type('textarea[placeholder*="Message"]', DM_MESSAGE)
                     await rnd(1, 2)
                     await page.keyboard.press("Enter")
                     await rnd(2, 4)
@@ -306,7 +343,9 @@ async def process_profile(username: str, page) -> dict:
         # Follow if not already
         if not was_followed(username):
             try:
-                await page.click('button:has-text("Follow")', timeout=3000)
+                btn = await page.wait_for_selector('button', timeout=3000)
+                if btn:
+                    await btn.click()
                 mark_followed(username)
                 result["followed"] = True
                 print(f"    ✓ Followed!")
@@ -336,8 +375,11 @@ async def process_following_list(seed_username: str, page):
     
     # Click Following to open modal
     try:
-        await page.click('a[href$="/following/"]', timeout=10000)
+        ok = await click_selector(page, 'a[href$="/following/"]', timeout=10000)
         await rnd(2, 4)
+        if not ok:
+            print("Could not open following modal")
+            return
     except Exception as e:
         print(f"Could not open following modal: {e}")
         return
@@ -392,7 +434,7 @@ async def process_following_list(seed_username: str, page):
             # Re-open the following modal
             await page.goto(f"https://instagram.com/{seed_username}/")
             await rnd(2, 3)
-            await page.click('a[href$="/following/"]', timeout=10000)
+            await click_selector(page, 'a[href$="/following/"]', timeout=10000)
             await rnd(2, 3)
             
             # Scroll back to position
@@ -400,7 +442,7 @@ async def process_following_list(seed_username: str, page):
                 await scroll_modal(page, times=scroll_index // 5)
             
             # Random delay between profiles
-            await rnd(5, 15)
+            await rnd(2, 6)
         
         # Update pagination
         scroll_index += BATCH_SIZE
@@ -429,7 +471,7 @@ async def main():
     
     # Connect to browser
     print("\nConnecting to browser...")
-    page, ctx, pw = await new_page()
+    page, browser, _ = await new_page()
     
     # Login
     print("Logging in to Instagram...")
@@ -477,7 +519,7 @@ async def main():
         dms_sent = stats['dms_sent']
         
         # Long delay between seed profiles
-        delay = random.uniform(60, 180)
+        delay = random.uniform(60, 180) * LONG_SLEEP_SCALE
         print(f"\nWaiting {delay:.0f}s before next seed...")
         await asyncio.sleep(delay)
     
@@ -489,8 +531,7 @@ async def main():
     print(f"DMs sent: {stats['dms_sent']}")
     print("=" * 60)
     
-    await ctx.close()
-    await pw.stop()
+    await browser.close()
 
 
 if __name__ == "__main__":

@@ -3,6 +3,25 @@ import os
 
 load_dotenv()
 
+
+def _flag(name: str, default: bool = False) -> bool:
+    """Convert env flag to bool."""
+    val = os.getenv(name)
+    if val is None:
+        return default
+    return str(val).strip().lower() in {"1", "true", "yes", "y", "on"}
+
+
+# Feature flags / runtime tuning
+FAST_MODE = _flag("FAST_MODE", default=False)
+# Scale down sleeps when fast mode is on (lower = faster)
+SLEEP_SCALE = 0.2 if FAST_MODE else 1.0
+# Skip slow/paid vision calls when fast mode is on
+SKIP_VISION = _flag("SKIP_VISION", default=FAST_MODE)
+# Prefer local chromium instead of Browserless when fast mode is on
+LOCAL_BROWSER = _flag("LOCAL_BROWSER", default=FAST_MODE)
+
+
 BROWSERLESS_TOKEN      = os.getenv("BROWSERLESS_TOKEN")
 OPENROUTER_API_KEY     = os.getenv("OPENROUTER_API_KEY")
 IG_USER                = os.getenv("INSTAGRAM_USERNAME")

@@ -1,5 +1,6 @@
-playwright
-playwright-stealth
 openai>=1.50
 python-dotenv
 pillow
+pytest-asyncio
+pyppeteer
+pyppeteer-stealth
