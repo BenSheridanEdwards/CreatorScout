@@ -86,7 +86,8 @@ async function getBioFromPage(page) {
       const el = await page.$(sel);
       if (el) {
         const txt = await el.evaluate((node) => node.innerText);
-        if (txt && txt.trim()) return txt.trim();
+        const trimmed = txt?.trim();
+        if (trimmed) return trimmed;
       }
     } catch {
       continue;
@@ -151,11 +152,11 @@ async function extractFollowingUsernames(page, count = 5) {
   ];
   for (const sel of selectorVariants) {
     const items = await page.$$(sel);
-    if (items && items.length) {
+    if (items?.length) {
       const usernames = [];
       for (const item of items) {
         const href = await item.evaluate((node) => node.getAttribute('href'));
-        if (href && href.startsWith('/') && href.split('/').length === 3) {
+        if (href?.startsWith('/') && href.split('/').length === 3) {
           const username = href.replace(/\//g, '');
           if (username && !username.startsWith('explore')) {
             usernames.push(username);
@@ -189,7 +190,7 @@ async function checkDmThreadEmpty(page) {
   ];
   for (const sel of selectors) {
     const nodes = await page.$$(sel);
-    if (nodes && nodes.length) return nodes.length <= 1;
+    if (nodes?.length) return nodes.length <= 1;
   }
   return true;
 }
@@ -303,13 +304,17 @@ test('Puppeteer E2E suite', async (t) => {
     const headerHrefs = await page.$$eval('header a', (els) =>
       els.map((e) => e.getAttribute('href')).filter(Boolean)
     );
-    headerHrefs.forEach((h) => candidates.add(h));
+    headerHrefs.forEach((h) => {
+      candidates.add(h);
+    });
 
     const html = await page.content();
     const urlMatches = html.match(/https?:\/\/[^"'\\s]+/gi) || [];
     urlMatches
       .filter((u) => /linktr\.ee|patreon\.com|beacons\.ai|allmylinks/i.test(u))
-      .forEach((u) => candidates.add(u));
+      .forEach((u) => {
+        candidates.add(u);
+      });
 
     // external_url JSON field in page HTML
     const jsonLink = html.match(/\"external_url\":\"(https?:[^\"\\s]+)\"/i);
