@@ -4,7 +4,7 @@ from types import SimpleNamespace
 from pyppeteer import launch, connect
 from pyppeteer_stealth import stealth
 
-from humanize import rnd, human_scroll, mouse_wiggle
+from humanize import rnd, delay, get_timeout, human_scroll, mouse_wiggle
 from config import BROWSERLESS_TOKEN, IG_USER, IG_PASS, LOCAL_BROWSER
 
 
@@ -89,18 +89,18 @@ async def new_page():
 
 async def login(page):
     await page.goto("https://instagram.com")
-    await rnd(1.5, 3.5)
+    await delay("after_credentials")
     await page.type('input[name="username"]', IG_USER)
     await page.type('input[name="password"]', IG_PASS)
     await page.click('button[type="submit"]')
-    await rnd(4, 7)
+    await delay("after_login_submit")
     # skip save info / notifications
     for text in ["Not Now", "Turn On", "Cancel"]:
         try:
             btn = await page.querySelector(f'button:contains("{text}")')
             if btn:
                 await btn.click()
-                await rnd()
+                await delay("after_popup_dismiss")
         except:
             pass
 

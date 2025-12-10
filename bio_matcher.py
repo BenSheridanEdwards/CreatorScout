@@ -12,7 +12,7 @@ LINK_EMOJIS = {
 # Keywords that suggest OF/premium content
 KEYWORDS = [
     # Direct mentions
-    'patreon', 'creator link', 'ko-fi', 'fanvue', 'loyalfans',
+    'patreon', 'creator link', 'ko-fi', 'fanvue', 'loyalfans', 'fanfix', 'fanhouse',
     # Link hints
     'link in bio', 'linkinbio', 'linktr', 'linktree', 'beacons', 'allmylinks',
     'tap here', 'click here', 'link below', '⬇️ link', 'bio link',
@@ -20,13 +20,33 @@ KEYWORDS = [
     'exclusive', 'exclusive content', 'spicy', 'spicy content',
     'uncensored', 'uncut', 'explicit', 'xxx', 'x rated',
     'exclusive', '18 +', '+18', '🔞', 'nsfw', 'premium content',
+    'content creator', 'creator',
     # Subscription hints  
     'subscribe', 'subscription', 'premium', 'vip', 'free trial',
     'dm for', 'dm me', 'message for', 'collab', 'collabs',
+    '% off', 'discount', 'sale', 'limited', 'unlock', 'join me',
     # Link phrases
     'come play', 'come see', 'see more', 'want more', 'full videos',
     'full content', 'private content', 'private page', 'secret page',
     'naughty', 'bad girl', 'good girl', 'daddy', 'baby girl',
+]
+
+DISCOUNT_PATTERNS = [
+    r'\d{1,3}\s*%\s*off',
+    r'\bdiscount\b',
+    r'\bsale\b',
+    r'limited\s+offer',
+    r'limited\s+time',
+    r'special\s+offer',
+]
+
+EXCLUSIVE_PATTERNS = [
+    r'exclusive\s+content',
+    r'premium\s+content',
+    r'vip\s+access',
+    r'private\s+content',
+    r'uncensored',
+    r'unfiltered',
 ]
 
 # Patterns for links
@@ -37,6 +57,10 @@ LINK_PATTERNS = [
     r'patreon\.com/\w+',
     r'ko-fi\.com/\w+',
     r'fanvue\.com/\w+',
+    r'fanfix\.io/\w+',
+    r'fanhouse\.app/\w+',
+    r'loyalfans\.com/\w+',
+    r'manyvids\.com/\w+',
 ]
 
 
@@ -75,6 +99,9 @@ def calculate_score(bio: str) -> dict:
     emoji_count = count_link_emojis(bio)
     keywords = find_keywords(bio)
     links = extract_links(bio)
+    bio_lower = bio.lower()
+    has_discount = any(re.search(p, bio_lower) for p in DISCOUNT_PATTERNS)
+    has_exclusive = any(re.search(p, bio_lower) for p in EXCLUSIVE_PATTERNS)
     
     score = 0
     reasons = []
@@ -90,7 +117,7 @@ def calculate_score(bio: str) -> dict:
         score += 5
         reasons.append(f"{emoji_count} link emoji")
     
-    # Keyword scoring (max 50 points)
+    # Keyword scoring (max 50 points base + bonus heuristics)
     if 'patreon' in [k.lower() for k in keywords]:
         score += 50
         reasons.append("mentions Patreon directly")
@@ -106,6 +133,18 @@ def calculate_score(bio: str) -> dict:
     elif keywords:
         score += 10
         reasons.append(f"keywords: {', '.join(keywords[:3])}")
+
+    # Heuristic: exclusive content + discount language (strong signal even without explicit OF link)
+    # Adds up to 25 points but capped by overall max=100
+    if has_exclusive and has_discount:
+        score += 25
+        reasons.append("exclusive content + discount offer")
+    elif has_exclusive:
+        score += 10
+        reasons.append("exclusive content wording")
+    elif has_discount:
+        score += 8
+        reasons.append("discount/promo wording")
     
     # Link scoring (max 25 points)
     if any('patreon' in l.lower() for l in links):

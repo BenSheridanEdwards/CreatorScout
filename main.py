@@ -31,7 +31,7 @@ from database import (
 from browser_agent import new_page, login
 from bio_matcher import is_likely_creator, calculate_score
 from vision import is_confirmed_creator
-from humanize import rnd, human_scroll, mouse_wiggle
+from humanize import rnd, delay, get_delay, get_timeout, human_scroll, mouse_wiggle
 from utils import save_proof
 from config import (
     MAX_DMS_PER_DAY,
@@ -39,20 +39,20 @@ from config import (
     CONFIDENCE_THRESHOLD,
     SKIP_VISION,
     FAST_MODE,
-    SLEEP_SCALE,
 )
 
 init_db()
 
 BATCH_SIZE = 10  # Process 10 profiles at a time from following list
-LONG_SLEEP_SCALE = SLEEP_SCALE  # for readability
 
 
 def _log(msg):
     print(msg, flush=True)
 
 
-async def click_selector(page, selector: str, timeout: int = 10000) -> bool:
+async def click_selector(page, selector: str, timeout: int | None = None) -> bool:
+    if timeout is None:
+        timeout = get_timeout("element_default")
     el = await page.wait_for_selector(selector, timeout=timeout)
     if el:
         await el.click()
@@ -139,8 +139,8 @@ async def extract_following_usernames(page, start_index: int = 0, count: int = B
     
     try:
         # Wait for the modal to be present
-        await page.wait_for_selector('div[role="dialog"]', timeout=5000)
-        await rnd(1, 2)
+        await page.wait_for_selector('div[role="dialog"]', timeout=get_timeout("element_modal"))
+        await delay("after_modal_open")
         
         # Try multiple selectors for following modal
         modal_selectors = [
@@ -185,7 +185,7 @@ async def scroll_modal(page, times: int = 3):
                 const modal = document.querySelector('div[role="dialog"] div[style*="overflow"]');
                 if (modal) modal.scrollTop += 500;
             ''')
-            await rnd(0.5, 1.5)
+            await delay("after_scroll")
     except:
         pass
 
@@ -233,7 +233,7 @@ async def process_profile(username: str, page) -> dict:
     
     # Navigate to profile
     await page.goto(f"https://instagram.com/{username}/")
-    await rnd(2, 4)
+    await delay("after_navigate")
     await mouse_wiggle(page)
 
     # Check if account is private
@@ -279,7 +279,7 @@ async def process_profile(username: str, page) -> dict:
                 link_element = await page.query_selector(f'a[href="{link_url}"]')
                 if link_element:
                     await link_element.click()
-                    await rnd(3, 5)
+                    await delay("after_linktree_click")
                     
                     # Screenshot the linktree page
                     os.makedirs("screenshots", exist_ok=True)
@@ -299,7 +299,7 @@ async def process_profile(username: str, page) -> dict:
                     
                     # Go back to profile
                     await page.go_back()
-                    await rnd(2, 3)
+                    await delay("after_go_back")
                     
             except Exception as e:
                 print(f"    Error exploring linktree: {e}")
@@ -319,20 +319,20 @@ async def process_profile(username: str, page) -> dict:
         else:
             try:
                 # Click Message button
-                handle = await page.wait_for_selector('div[role="button"]', timeout=5000)
+                handle = await page.wait_for_selector('div[role="button"]', timeout=get_timeout("element_button"))
                 if handle:
                     await handle.click()
-                await rnd(2, 4)
+                await delay("after_message_open")
                 
                 # Check if thread is empty
                 if await check_dm_thread_empty(page):
-                    el = await page.wait_for_selector('textarea[placeholder*="Message"]', timeout=5000)
+                    el = await page.wait_for_selector('textarea[placeholder*="Message"]', timeout=get_timeout("element_input"))
                     if el:
                         await el.click()
                         await page.type('textarea[placeholder*="Message"]', DM_MESSAGE)
-                    await rnd(1, 2)
+                    await delay("after_dm_type")
                     await page.keyboard.press("Enter")
-                    await rnd(2, 4)
+                    await delay("after_dm_send")
                     
                     # Screenshot proof
                     proof_path = await save_proof(username, page)
@@ -345,7 +345,7 @@ async def process_profile(username: str, page) -> dict:
                 
                 # Go back to profile
                 await page.go_back()
-                await rnd(1, 2)
+                await delay("after_go_back")
                 
             except Exception as e:
                 print(f"    DM failed: {e}")
@@ -353,13 +353,13 @@ async def process_profile(username: str, page) -> dict:
         # Follow if not already
         if not was_followed(username):
             try:
-                btn = await page.wait_for_selector('button', timeout=3000)
+                btn = await page.wait_for_selector('button', timeout=get_timeout("follow"))
                 if btn:
                     await btn.click()
                 mark_followed(username)
                 result["followed"] = True
                 print(f"    ✓ Followed!")
-                await rnd(1, 2)
+                await delay("after_follow")
             except:
                 pass  # Might already be following
         
@@ -380,13 +380,13 @@ async def process_following_list(seed_username: str, page):
     
     # Navigate to seed profile
     await page.goto(f"https://instagram.com/{seed_username}/")
-    await rnd(2, 4)
+    await delay("after_navigate")
     await human_scroll(page, 2)
     
     # Click Following to open modal
     try:
-        ok = await click_selector(page, 'a[href$="/following/"]', timeout=10000)
-        await rnd(2, 4)
+        ok = await click_selector(page, 'a[href$="/following/"]', timeout=get_timeout("element_default"))
+        await delay("after_modal_open")
         if not ok:
             print("Could not open following modal")
             return
@@ -428,7 +428,7 @@ async def process_following_list(seed_username: str, page):
             
             # Close the modal before visiting profile
             await page.keyboard.press("Escape")
-            await rnd(1, 2)
+            await delay("after_modal_close")
             
             # Process this profile
             result = await process_profile(username, page)
@@ -443,16 +443,16 @@ async def process_following_list(seed_username: str, page):
             
             # Re-open the following modal
             await page.goto(f"https://instagram.com/{seed_username}/")
-            await rnd(2, 3)
-            await click_selector(page, 'a[href$="/following/"]', timeout=10000)
-            await rnd(2, 3)
+            await delay("after_navigate")
+            await click_selector(page, 'a[href$="/following/"]', timeout=get_timeout("element_default"))
+            await delay("after_modal_open")
             
             # Scroll back to position
             if scroll_index > 0:
                 await scroll_modal(page, times=scroll_index // 5)
             
             # Random delay between profiles
-            await rnd(2, 6)
+            await delay("between_profiles")
         
         # Update pagination
         scroll_index += BATCH_SIZE
@@ -466,7 +466,7 @@ async def process_following_list(seed_username: str, page):
         
         # Scroll modal for next batch
         await scroll_modal(page, times=2)
-        await rnd(2, 4)
+        await delay("after_scroll_batch")
     
     print(f"\nFinished {seed_username}: {new_profiles_found} new profiles, {creators_found} creators found")
     
@@ -511,8 +511,10 @@ async def main():
         target = queue_next()
         
         if not target:
-            print("\nQueue empty - sleeping 5 minutes...")
-            await asyncio.sleep(300)
+            wait_min, wait_max = get_delay("queue_empty")
+            wait_time = random.uniform(wait_min, wait_max)
+            print(f"\nQueue empty - sleeping {wait_time:.0f}s...")
+            await asyncio.sleep(wait_time)
             continue
         
         print(f"\n[Queue: {queue_count()} remaining]")
@@ -529,9 +531,10 @@ async def main():
         dms_sent = stats['dms_sent']
         
         # Long delay between seed profiles
-        delay = random.uniform(60, 180) * LONG_SLEEP_SCALE
-        print(f"\nWaiting {delay:.0f}s before next seed...")
-        await asyncio.sleep(delay)
+        seed_delay_min, seed_delay_max = get_delay("between_seeds")
+        seed_wait = random.uniform(seed_delay_min, seed_delay_max)
+        print(f"\nWaiting {seed_wait:.0f}s before next seed...")
+        await asyncio.sleep(seed_wait)
     
     print("\n" + "=" * 60)
     print(f"Session complete!")
