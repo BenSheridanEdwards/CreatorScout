@@ -1,0 +1,271 @@
+/**
+ * Bio matching logic - keyword and emoji detection.
+ */
+
+// Sexual/link emojis commonly used by creators
+const LINK_EMOJIS = new Set([
+  '🔥',
+  '💋',
+  '😈',
+  '👅',
+  '🍑',
+  '🍒',
+  '💦',
+  '🥵',
+  '😏',
+  '💕',
+  '❤️',
+  '🖤',
+  '💜',
+  '🤍',
+  '💗',
+  '🔞',
+  '⬇️',
+  '👇',
+  '📩',
+  '💌',
+  '🎀',
+  '🌹',
+  '💎',
+  '✨',
+  '⭐',
+  '🌟',
+  '💫',
+  '🦋',
+  '🐰',
+  '😘',
+  '🥰',
+  '💞',
+  '💓',
+  '💝',
+  '💖',
+  '❣️',
+  '💟',
+  '♥️',
+  '🫦',
+  '👀',
+]);
+
+// Keywords that suggest OF/premium content
+const KEYWORDS = [
+  // Direct mentions
+  'patreon',
+  'creator link',
+  'ko-fi',
+  'fanvue',
+  'loyalfans',
+  'fanfix',
+  'fanhouse',
+  // Link hints
+  'link in bio',
+  'linkinbio',
+  'linktr',
+  'linktree',
+  'beacons',
+  'allmylinks',
+  'tap here',
+  'click here',
+  'link below',
+  '⬇️ link',
+  'bio link',
+  // Content hints
+  'exclusive',
+  'exclusive content',
+  'spicy',
+  'spicy content',
+  'uncensored',
+  'uncut',
+  'explicit',
+  'xxx',
+  'x rated',
+  'exclusive',
+  '18 +',
+  '+18',
+  '🔞',
+  'nsfw',
+  'premium content',
+  'content creator',
+  'creator',
+  // Subscription hints
+  'subscribe',
+  'subscription',
+  'premium',
+  'vip',
+  'free trial',
+  'dm for',
+  'dm me',
+  'message for',
+  'collab',
+  'collabs',
+  '% off',
+  'discount',
+  'sale',
+  'limited',
+  'unlock',
+  'join me',
+  // Link phrases
+  'come play',
+  'come see',
+  'see more',
+  'want more',
+  'full videos',
+  'full content',
+  'private content',
+  'private page',
+  'secret page',
+  'naughty',
+  'bad girl',
+  'good girl',
+  'daddy',
+  'baby girl',
+];
+
+const DISCOUNT_PATTERNS = [
+  /\d{1,3}\s*%\s*off/i,
+  /\bdiscount\b/i,
+  /\bsale\b/i,
+  /limited\s+offer/i,
+  /limited\s+time/i,
+  /special\s+offer/i,
+];
+
+const EXCLUSIVE_PATTERNS = [
+  /exclusive\s+content/i,
+  /premium\s+content/i,
+  /vip\s+access/i,
+  /private\s+content/i,
+  /uncensored/i,
+  /unfiltered/i,
+];
+
+// Patterns for links
+const LINK_PATTERNS = [
+  /linktr\.ee\/\w+/i,
+  /beacons\.ai\/\w+/i,
+  /allmylinks\.com\/\w+/i,
+  /patreon\.com\/\w+/i,
+  /ko-fi\.com\/\w+/i,
+  /fanvue\.com\/\w+/i,
+  /fanfix\.io\/\w+/i,
+  /fanhouse\.app\/\w+/i,
+  /loyalfans\.com\/\w+/i,
+  /manyvids\.com\/\w+/i,
+];
+
+export function countLinkEmojis(text: string): number {
+  return Array.from(text).filter((char) => LINK_EMOJIS.has(char)).length;
+}
+
+export function findKeywords(text: string): string[] {
+  const textLower = text.toLowerCase();
+  return KEYWORDS.filter((kw) => textLower.includes(kw));
+}
+
+export function extractLinks(text: string): string[] {
+  const links: string[] = [];
+  for (const pattern of LINK_PATTERNS) {
+    const matches = text.match(new RegExp(pattern));
+    if (matches) {
+      links.push(...matches);
+    }
+  }
+  return links;
+}
+
+export interface BioScoreResult {
+  score: number;
+  reasons: string[];
+  emojis: number;
+  keywords: string[];
+  links: string[];
+}
+
+export function calculateScore(bio: string): BioScoreResult {
+  if (!bio) {
+    return { score: 0, reasons: [], emojis: 0, keywords: [], links: [] };
+  }
+
+  const emojiCount = countLinkEmojis(bio);
+  const keywords = findKeywords(bio);
+  const links = extractLinks(bio);
+  const bioLower = bio.toLowerCase();
+  const hasDiscount = DISCOUNT_PATTERNS.some((p) => p.test(bioLower));
+  const hasExclusive = EXCLUSIVE_PATTERNS.some((p) => p.test(bioLower));
+
+  let score = 0;
+  const reasons: string[] = [];
+
+  // Emoji scoring (max 25 points)
+  if (emojiCount >= 5) {
+    score += 25;
+    reasons.push(`${emojiCount} link emojis`);
+  } else if (emojiCount >= 3) {
+    score += 15;
+    reasons.push(`${emojiCount} link emojis`);
+  } else if (emojiCount >= 1) {
+    score += 5;
+    reasons.push(`${emojiCount} link emoji`);
+  }
+
+  // Keyword scoring (max 50 points base + bonus heuristics)
+  const keywordsLower = keywords.map((k) => k.toLowerCase());
+  if (keywordsLower.includes('patreon')) {
+    score += 50;
+    reasons.push('mentions Patreon directly');
+  } else if (
+    ['ko-fi', 'fanvue', 'loyalfans'].some((k) => keywordsLower.includes(k))
+  ) {
+    score += 45;
+    reasons.push('mentions adult platform');
+  } else if (
+    ['exclusive', 'exclusive', 'nsfw', 'spicy'].some((k) => keywordsLower.includes(k))
+  ) {
+    score += 30;
+    reasons.push('premium content keywords');
+  } else if (
+    ['link in bio', 'linktree', 'linktr'].some((k) => keywordsLower.includes(k))
+  ) {
+    score += 15;
+    reasons.push('link in bio hint');
+  } else if (keywords.length > 0) {
+    score += 10;
+    reasons.push(`keywords: ${keywords.slice(0, 3).join(', ')}`);
+  }
+
+  // Heuristic: exclusive content + discount language (strong signal even without explicit OF link)
+  if (hasExclusive && hasDiscount) {
+    score += 25;
+    reasons.push('exclusive content + discount offer');
+  } else if (hasExclusive) {
+    score += 10;
+    reasons.push('exclusive content wording');
+  } else if (hasDiscount) {
+    score += 8;
+    reasons.push('discount/promo wording');
+  }
+
+  // Link scoring (max 25 points)
+  if (links.some((l) => l.toLowerCase().includes('patreon'))) {
+    score += 25;
+    reasons.push('creator link in bio');
+  } else if (links.length > 0) {
+    score += 15;
+    reasons.push(`has linktree: ${links[0]}`);
+  }
+
+  return {
+    score: Math.min(score, 100),
+    reasons,
+    emojis: emojiCount,
+    keywords,
+    links,
+  };
+}
+
+export function isLikelyCreator(
+  bio: string,
+  threshold: number = 40
+): [boolean, BioScoreResult] {
+  const result = calculateScore(bio);
+  return [result.score >= threshold, result];
+}

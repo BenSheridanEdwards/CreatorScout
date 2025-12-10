@@ -212,7 +212,7 @@ async function runProfileCheck(username: string): Promise<ProfileCheckResult> {
           console.log(`      Screenshot saved: ${shot}`);
 
           console.log('      Running vision pipeline...');
-          const visionResult = classifyWithApp(shot);
+          const visionResult = await classifyWithApp(shot);
           if (visionResult.ok) {
             console.log(
               `      ✅ Vision detected creator (confidence: ${
