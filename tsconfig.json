@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "Node16",
+    "moduleResolution": "Node16",
+    "allowImportingTsExtensions": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "strict": false,
+    "isolatedModules": true,
+    "types": ["node", "jest"]
+  },
+  "include": ["scripts/**/*", "tests/**/*", "src/**/*", "functions/**/*"],
+  "exclude": ["node_modules", "dist"]
+}
