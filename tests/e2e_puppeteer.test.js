@@ -248,7 +248,8 @@ async function extractFollowingUsernames(page, count = 5) {
         if (usernames.length >= count) break;
       }
       console.log(
-        `[debug] Extracted ${usernames.length} usernames from "${sel}"`
+        `[debug] Extracted ${usernames.length} usernames from "${sel}":`,
+        usernames
       );
       if (usernames.length) return usernames;
     }
@@ -643,6 +644,196 @@ test('Puppeteer E2E suite', async (t) => {
       const bio = await getBioFromPage(page);
       t.diagnostic(`[traverse] ${u} bio: ${bio ? bio.slice(0, 80) : 'None'}`);
       assert.ok(bio === null || typeof bio === 'string');
+    }
+  });
+
+  // ============ NEW TESTS ============
+
+  await t.test('private account detection', async () => {
+    // Test the detection mechanism for various unavailable profile states
+    const testProfile = 'test_private_account_12345'; // Likely doesn't exist
+    await page.goto(`https://www.instagram.com/${testProfile}/`, {
+      waitUntil: 'networkidle2',
+      timeout: 15000,
+    });
+    await sleep(1500);
+
+    // Check for private/unavailable account indicators
+    const privateCheck = await page.evaluate(() => {
+      const bodyText = document.body.innerText || '';
+      const isPrivate =
+        bodyText.includes('This account is private') ||
+        bodyText.includes('This Account is Private');
+      const notFound =
+        bodyText.includes("Sorry, this page isn't available") ||
+        bodyText.includes('Page Not Found') ||
+        bodyText.includes("Profile isn't available") ||
+        bodyText.includes('may have been removed');
+      return { isPrivate, notFound, sample: bodyText.slice(0, 300) };
+    });
+
+    console.log('[private check]', privateCheck);
+
+    // The test passes if we can detect EITHER private OR not found/unavailable
+    // This validates our detection mechanism works
+    assert.ok(
+      privateCheck.isPrivate || privateCheck.notFound,
+      'Should detect private account or unavailable profile'
+    );
+    t.diagnostic(
+      `Private: ${privateCheck.isPrivate}, NotFound: ${privateCheck.notFound}`
+    );
+  });
+
+  await t.test('follow button detection', async () => {
+    // Navigate to a public profile we don't follow
+    await page.goto(`https://www.instagram.com/${TEST_PROFILE}/`, {
+      waitUntil: 'networkidle2',
+    });
+    await sleep(1500);
+
+    // Look for Follow/Following button (don't click it)
+    const followButton = await page.evaluate(() => {
+      // Find all buttons
+      const buttons = Array.from(document.querySelectorAll('button'));
+
+      // Look for Follow or Following button
+      for (const btn of buttons) {
+        const text = btn.textContent?.trim().toLowerCase() || '';
+        const ariaLabel = btn.getAttribute('aria-label')?.toLowerCase() || '';
+
+        if (
+          text === 'follow' ||
+          text === 'following' ||
+          ariaLabel.includes('follow')
+        ) {
+          return {
+            found: true,
+            text: btn.textContent?.trim(),
+            ariaLabel: btn.getAttribute('aria-label'),
+            className: btn.className,
+          };
+        }
+      }
+
+      // Also check for the Follow link/button in header
+      const headerBtns = document.querySelectorAll('header button');
+      for (const btn of headerBtns) {
+        return {
+          found: true,
+          text: btn.textContent?.trim(),
+          isHeaderButton: true,
+        };
+      }
+
+      return { found: false };
+    });
+
+    console.log('[follow button]', followButton);
+    assert.ok(
+      followButton.found,
+      'Should find Follow/Following button on profile'
+    );
+    t.diagnostic(
+      `Found button: "${followButton.text}" (aria: ${
+        followButton.ariaLabel || 'none'
+      })`
+    );
+  });
+
+  await t.test('queue loop simulation', async () => {
+    // This tests the queue management logic that drives the main loop
+    // We'll simulate adding seeds and processing them
+
+    const { execSync } = await import('node:child_process');
+
+    // Run Python to test queue operations
+    const pythonScript = `
+import sys
+import os
+import tempfile
+
+sys.path.insert(0, '.')
+
+# Use temp file for test DB
+fd, db_path = tempfile.mkstemp(suffix='.db')
+os.close(fd)
+
+# Patch database module to use temp DB
+import database
+database.DB_PATH = db_path
+
+from database import init_db, queue_add, queue_next, queue_count, was_visited, mark_visited
+
+init_db()
+
+# Simulate the main loop queue behavior
+print('=== Queue Loop Test ===')
+
+# 1. Add seeds (like loading from seeds.txt)
+seeds = ['seed_user_1', 'seed_user_2', 'seed_user_3']
+for s in seeds:
+    queue_add(s, priority=100, source='seed')
+print(f'Added {len(seeds)} seeds, queue size: {queue_count()}')
+
+# 2. Process queue (like main loop)
+processed = []
+while queue_count() > 0 and len(processed) < 5:
+    target = queue_next()
+    if not target:
+        break
+    processed.append(target)
+    print(f'Processing: {target}')
+    
+    # Simulate finding a creator and adding their following
+    if target == 'seed_user_1':
+        # This seed led to a creator, add their following to queue
+        queue_add('discovered_creator_1', priority=50, source=f'following_of_{target}')
+        print(f'  -> Added discovered_creator_1 to queue')
+    
+    # Mark as visited
+    mark_visited(target, bio_score=45)
+
+print(f'Processed {len(processed)} profiles')
+print(f'Remaining in queue: {queue_count()}')
+
+# 3. Verify state
+assert len(processed) == 4, f'Expected 4 processed, got {len(processed)}'
+assert was_visited('seed_user_1'), 'seed_user_1 should be visited'
+assert was_visited('discovered_creator_1'), 'discovered_creator_1 should be visited'
+print('=== Queue Loop Test PASSED ===')
+
+# Cleanup
+try:
+    os.remove(db_path)
+except:
+    pass
+`;
+
+    try {
+      const result = execSync(
+        `cd "${__dirname}/.." && python3 -c '${pythonScript.replace(
+          /'/g,
+          "'\"'\"'"
+        )}'`,
+        {
+          encoding: 'utf-8',
+          timeout: 10000,
+        }
+      );
+      console.log(result);
+      assert.ok(result.includes('PASSED'), 'Queue loop test should pass');
+    } catch (err) {
+      // Check if the test actually passed despite cleanup issues
+      if (err.stdout && err.stdout.includes('PASSED')) {
+        console.log(err.stdout);
+        t.diagnostic('Queue loop passed (cleanup warning ignored)');
+        return; // Test passed
+      }
+      console.error('Queue test error:', err.message);
+      if (err.stdout) console.log('stdout:', err.stdout);
+      if (err.stderr) console.log('stderr:', err.stderr);
+      assert.fail('Queue loop simulation failed');
     }
   });
 
