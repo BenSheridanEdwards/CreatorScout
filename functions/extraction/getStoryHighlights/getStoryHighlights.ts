@@ -3,6 +3,9 @@
  * Returns highlight titles and cover image URLs for analysis.
  */
 import type { ElementHandle, Page } from "puppeteer";
+import { createLogger } from "../../shared/logger/logger.ts";
+
+const logger = createLogger(process.env.DEBUG_LOGS === "true");
 
 export interface StoryHighlight {
 	title: string;
@@ -82,7 +85,7 @@ export async function getStoryHighlights(
 		}
 	} catch (err) {
 		const error = err instanceof Error ? err.message : String(err);
-		console.log(`Error extracting highlights: ${error}`);
+		logger.error("ERROR", `Error extracting highlights: ${error}`);
 	}
 
 	return highlights;

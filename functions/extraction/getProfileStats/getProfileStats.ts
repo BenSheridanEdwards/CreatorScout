@@ -2,6 +2,9 @@
  * Extract follower and following counts from Instagram profile.
  */
 import type { Page } from "puppeteer";
+import { createLogger } from "../../shared/logger/logger.ts";
+
+const logger = createLogger(process.env.DEBUG_LOGS === "true");
 
 export interface ProfileStats {
 	followers: number | null;
@@ -94,7 +97,7 @@ export async function getProfileStats(page: Page): Promise<ProfileStats> {
 			stats.ratio = stats.followers / stats.following;
 		}
 	} catch (error) {
-		console.log(`Error extracting profile stats: ${error}`);
+		logger.error("ERROR", `Error extracting profile stats: ${error}`);
 	}
 
 	return stats;

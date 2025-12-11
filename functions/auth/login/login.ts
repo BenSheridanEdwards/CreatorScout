@@ -5,11 +5,14 @@ import {
 	loadCookies,
 	saveCookies,
 } from "../sessionManager/sessionManager.ts";
+import { createLogger } from "../../shared/logger/logger.ts";
 
 export type Credentials = {
 	username: string;
 	password: string;
 };
+
+const logger = createLogger(process.env.DEBUG_LOGS === "true");
 
 export async function login(
 	page: Page,
@@ -32,7 +35,7 @@ export async function login(
 
 		const alreadyLoggedIn = await isLoggedIn(page);
 		if (alreadyLoggedIn) {
-			console.log("   ✅ Already logged in (using saved session)");
+			logger.info("ACTION", "Already logged in (using saved session)");
 			// Refresh cookies to extend expiration
 			await saveCookies(page);
 			return;
@@ -41,8 +44,9 @@ export async function login(
 
 	// If cookies were loaded but we're not logged in, they may be expired
 	if (cookiesLoaded) {
-		console.log(
-			"   ⚠️  Cookies loaded but session expired, logging in again...",
+		logger.warn(
+			"ACTION",
+			"Cookies loaded but session expired, logging in again...",
 		);
 	}
 
@@ -65,7 +69,7 @@ export async function login(
 		// Check if we're already logged in (maybe cookies worked)
 		const loggedIn = await page.$('a[href="/direct/inbox/"]');
 		if (loggedIn) {
-			console.log("   ✅ Already logged in (cookies restored session)");
+			logger.info("ACTION", "Already logged in (cookies restored session)");
 			// Save cookies again to refresh expiration
 			await saveCookies(page);
 			return;
@@ -73,23 +77,23 @@ export async function login(
 		throw new Error("Could not find login form");
 	}
 
-	console.log("   Filling in credentials...");
+	logger.info("ACTION", "Filling in credentials...");
 	await page.type('input[name="username"]', creds.username, { delay: 5 });
 	await page.type('input[name="password"]', creds.password, { delay: 5 });
-	console.log("   Submitting login form...");
+	logger.info("ACTION", "Submitting login form...");
 	await page.click('button[type="submit"]');
 
 	// Wait for navigation after login
-	console.log("   Waiting for login to complete...");
+	logger.info("ACTION", "Waiting for login to complete...");
 	try {
 		await page.waitForSelector('a[href="/direct/inbox/"]', { timeout: 15000 });
-		console.log("   Login successful - inbox link found");
+		logger.info("ACTION", "Login successful - inbox link found");
 
 		// Save cookies after successful login
 		await saveCookies(page);
 	} catch {
 		const currentUrl = page.url();
-		console.log(`   Login timeout - current URL: ${currentUrl}`);
+		logger.warn("ACTION", `Login timeout - current URL: ${currentUrl}`);
 
 		// Check if login failed with an error message
 		const errorText = await page.evaluate(() => {
@@ -116,8 +120,9 @@ export async function login(
 			currentUrl.includes("instagram.com") &&
 			!currentUrl.includes("/accounts/login")
 		) {
-			console.log(
-				"   ⚠️  Login may have succeeded but inbox link not found. Continuing anyway...",
+			logger.warn(
+				"ACTION",
+				"Login may have succeeded but inbox link not found. Continuing anyway...",
 			);
 			// Try to continue - might be logged in but UI changed
 			return;

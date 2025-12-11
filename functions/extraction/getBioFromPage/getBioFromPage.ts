@@ -1,5 +1,8 @@
 import type { Page } from "puppeteer";
+import { createLogger } from "../../shared/logger/logger.ts";
 import { snapshot } from "../../shared/snapshot/snapshot.ts";
+
+const logger = createLogger(process.env.DEBUG_LOGS === "true");
 
 export async function getBioFromPage(page: Page): Promise<string | null> {
 	const selectors = [
@@ -27,24 +30,28 @@ export async function getBioFromPage(page: Page): Promise<string | null> {
 				const trimmed = txt?.trim();
 				// Filter out very short text that's likely not the bio (usernames, etc.)
 				if (trimmed && trimmed.length > 10) {
-					console.log(
-						`   [bio] Found bio with selector ${i + 1}/${
-							selectors.length
-						}: ${sel.substring(0, 50)}`,
+					logger.info(
+						"ANALYSIS",
+						`Found bio with selector ${i + 1}/${selectors.length}: ${sel.substring(
+							0,
+							50,
+						)}`,
 					);
 					return trimmed;
 				} else if (trimmed) {
-					console.log(
-						`   [bio] Selector ${i + 1} found text but too short (${
-							trimmed.length
-						} chars): "${trimmed.substring(0, 30)}"`,
+					logger.debug(
+						"ANALYSIS",
+						`Selector ${i + 1} found text but too short (${trimmed.length} chars): "${trimmed.substring(
+							0,
+							30,
+						)}"`,
 					);
 				}
 			}
 		} catch (_e) {}
 	}
 
-	console.log("   [bio] All specific selectors failed, trying fallback...");
+	logger.debug("ANALYSIS", "All specific selectors failed, trying fallback...");
 
 	// Fallback: get all text from header and try to extract bio
 	try {
@@ -80,14 +87,15 @@ export async function getBioFromPage(page: Page): Promise<string | null> {
 	if (isLocal) {
 		try {
 			const screenshotPath = await snapshot(page, "bio_extraction_failed");
-			console.log(
-				`   [bio] ❌ Bio extraction failed - screenshot saved: ${screenshotPath}`,
+			logger.error(
+				"ERROR",
+				`Bio extraction failed - screenshot saved: ${screenshotPath}`,
 			);
 		} catch (e) {
-			console.log(`   [bio] Failed to take screenshot: ${e}`);
+			logger.error("ERROR", `Failed to take screenshot: ${e}`);
 		}
 	} else {
-		console.log("   [bio] ❌ Bio extraction failed");
+		logger.warn("ANALYSIS", "Bio extraction failed");
 	}
 
 	return null;

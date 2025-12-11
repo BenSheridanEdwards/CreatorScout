@@ -11,9 +11,11 @@ import {
 } from "node:fs";
 import { join } from "node:path";
 import type { Page } from "puppeteer";
+import { createLogger } from "../../shared/logger/logger.ts";
 
 const SESSION_DIR = join(process.cwd(), ".sessions");
 const COOKIES_FILE = join(SESSION_DIR, "instagram_cookies.json");
+const logger = createLogger(process.env.DEBUG_LOGS === "true");
 
 /**
  * Ensure session directory exists
@@ -32,9 +34,9 @@ export async function saveCookies(page: Page): Promise<void> {
 		ensureSessionDir();
 		const cookies = await page.cookies();
 		writeFileSync(COOKIES_FILE, JSON.stringify(cookies, null, 2));
-		console.log(`   💾 Saved ${cookies.length} cookies to session file`);
+		logger.info("ACTION", `Saved ${cookies.length} cookies to session file`);
 	} catch (error) {
-		console.log(`   ⚠️  Failed to save cookies: ${error}`);
+		logger.error("ERROR", `Failed to save cookies: ${error}`);
 	}
 }
 
@@ -56,10 +58,10 @@ export async function loadCookies(page: Page): Promise<boolean> {
 
 		// Set cookies before navigating
 		await page.setCookie(...cookies);
-		console.log(`   🔄 Loaded ${cookies.length} cookies from session file`);
+		logger.info("ACTION", `Loaded ${cookies.length} cookies from session file`);
 		return true;
 	} catch (error) {
-		console.log(`   ⚠️  Failed to load cookies: ${error}`);
+		logger.error("ERROR", `Failed to load cookies: ${error}`);
 		return false;
 	}
 }
@@ -93,11 +95,11 @@ export function clearCookies(): void {
 	try {
 		if (existsSync(COOKIES_FILE)) {
 			unlinkSync(COOKIES_FILE);
-			console.log("   🗑️  Cleared saved cookies");
+			logger.info("ACTION", "Cleared saved cookies");
 		}
 	} catch (error) {
 		const err = error instanceof Error ? error.message : String(error);
-		console.log(`   ⚠️  Failed to clear cookies: ${err}`);
+		logger.error("ERROR", `Failed to clear cookies: ${err}`);
 	}
 }
 

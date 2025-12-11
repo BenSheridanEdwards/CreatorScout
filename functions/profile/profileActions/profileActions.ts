@@ -13,8 +13,11 @@ import {
 	queueAdd,
 	wasVisited,
 } from "../../shared/database/database.ts";
+import { createLogger } from "../../shared/logger/logger.ts";
 import { snapshot } from "../../shared/snapshot/snapshot.ts";
 import { sleep } from "../../timing/sleep/sleep.ts";
+
+const logger = createLogger(process.env.DEBUG_LOGS === "true");
 
 /**
  * Check if a DM thread is empty (no previous messages).
@@ -67,8 +70,9 @@ export async function sendDMToUser(
 		// Check if conversation already has messages
 		const messages = await page.$$('div[role="textbox"]');
 		if (messages.length > 0) {
-			console.log(
-				`   ⚠️  Conversation with @${username} already exists, skipping DM`,
+			logger.warn(
+				"ACTION",
+				`Conversation with @${username} already exists, skipping DM`,
 			);
 			return false;
 		}
@@ -89,13 +93,13 @@ export async function sendDMToUser(
 			const proofPath = await snapshot(page, `dm_${username}`);
 			markDmSent(username, proofPath);
 
-			console.log(`   ✅ DM sent to @${username}`);
+			logger.info("ACTION", `DM sent to @${username}`);
 			return true;
 		}
 
 		return false;
 	} catch (err) {
-		console.log(`   ⚠️  Failed to send DM to @${username}: ${err}`);
+		logger.error("ERROR", `Failed to send DM to @${username}: ${err}`);
 		return false;
 	}
 }
@@ -130,14 +134,17 @@ export async function followUserAccount(
 			await page.click('button:has-text("Follow")');
 			await sleep(2000);
 			markFollowed(username);
-			console.log(`   ✅ Followed @${username}`);
+			logger.info("ACTION", `Followed @${username}`);
 			return true;
 		} else {
-			console.log(`   ℹ️  Already following @${username} or button not found`);
+			logger.info(
+				"ACTION",
+				`Already following @${username} or button not found`,
+			);
 			return false;
 		}
 	} catch (err) {
-		console.log(`   ⚠️  Failed to follow @${username}: ${err}`);
+		logger.error("ERROR", `Failed to follow @${username}: ${err}`);
 		return false;
 	}
 }
