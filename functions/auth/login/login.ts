@@ -28,7 +28,7 @@ export async function login(
 		 */
 		skipCookies?: boolean;
 	},
-): Promise<string | void> {
+): Promise<string | undefined> {
 	logger.info("ACTION", `Starting login process for user: ${creds.username}`);
 
 	// Navigate to Instagram first (required before setting cookies)
