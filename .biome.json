@@ -1,0 +1,10 @@
+{
+	"$schema": "https://biomejs.dev/schemas/1.9.0/schema.json",
+	"formatter": {
+		"enabled": true,
+		"indentStyle": "space",
+		"lineWidth": 100,
+		"quoteStyle": "double",
+		"jsxQuoteStyle": "double"
+	}
+}
