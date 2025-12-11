@@ -659,6 +659,227 @@ user2
 				"Navigation failed",
 			);
 		});
+
+		it("handles vision analysis that does not confirm creator", async () => {
+			const { processProfile } = await import("./scrape.ts");
+
+			mockAnalyzeProfileBasic.mockResolvedValue({
+				bio: "Test bio",
+				bioScore: 50,
+				linkFromBio: "https://linktr.ee/test",
+				isLikely: true,
+			});
+
+			mockAnalyzeLinkWithVision.mockResolvedValue({
+				isCreator: false,
+				confidence: 30,
+				indicators: [],
+			});
+
+			await processProfile("novisioncreator", mockPage, "test_source", mockLogger);
+
+			expect(mockAnalyzeLinkWithVision).toHaveBeenCalledWith(
+				mockPage,
+				"https://linktr.ee/test",
+				"novisioncreator",
+				"linktree",
+			);
+			expect(mockLogger.debug).toHaveBeenCalledWith(
+				"ANALYSIS",
+				"Vision did not confirm creator for @novisioncreator - Confidence: 30%",
+			);
+			expect(mockMarkAsCreator).not.toHaveBeenCalled();
+			expect(mockSendDMToUser).not.toHaveBeenCalled();
+		});
+
+		it("skips DM if already sent", async () => {
+			const { processProfile } = await import("./scrape.ts");
+
+			mockAnalyzeProfileBasic.mockResolvedValue({
+				bio: "Test bio",
+				bioScore: 90,
+				linkFromBio: null,
+				isLikely: true,
+			});
+			mockWasDmSent.mockReturnValue(true);
+			mockWasFollowed.mockReturnValue(false);
+
+			await processProfile("alreadydm", mockPage, "test_source", mockLogger);
+
+			expect(mockSendDMToUser).not.toHaveBeenCalled();
+			expect(mockLogger.debug).toHaveBeenCalledWith(
+				"ACTION",
+				"DM already sent to @alreadydm",
+			);
+			// Should still follow
+			expect(mockFollowUserAccount).toHaveBeenCalledWith(mockPage, "alreadydm");
+		});
+
+		it("skips follow if already following", async () => {
+			const { processProfile } = await import("./scrape.ts");
+
+			mockAnalyzeProfileBasic.mockResolvedValue({
+				bio: "Test bio",
+				bioScore: 90,
+				linkFromBio: null,
+				isLikely: true,
+			});
+			mockWasDmSent.mockReturnValue(false);
+			mockWasFollowed.mockReturnValue(true);
+
+			await processProfile("alreadyfollow", mockPage, "test_source", mockLogger);
+
+			expect(mockSendDMToUser).toHaveBeenCalledWith(mockPage, "alreadyfollow");
+			expect(mockFollowUserAccount).not.toHaveBeenCalled();
+			expect(mockLogger.debug).toHaveBeenCalledWith(
+				"ACTION",
+				"Already following @alreadyfollow",
+			);
+		});
+
+		it("handles low bio score that doesn't meet confidence threshold", async () => {
+			const { processProfile } = await import("./scrape.ts");
+
+			mockAnalyzeProfileBasic.mockResolvedValue({
+				bio: "Test bio",
+				bioScore: 35, // Below CONFIDENCE_THRESHOLD (50)
+				linkFromBio: null,
+				isLikely: true,
+			});
+
+			await processProfile("lowscore", mockPage, "test_source", mockLogger);
+
+			expect(mockLogger.debug).toHaveBeenCalledWith(
+				"ANALYSIS",
+				"Not confirmed (confidence: 35% < 50%)",
+			);
+			expect(mockMarkAsCreator).not.toHaveBeenCalled();
+			expect(mockSendDMToUser).not.toHaveBeenCalled();
+			expect(mockFollowUserAccount).not.toHaveBeenCalled();
+		});
+
+		it("handles bio score between 40-70 that meets threshold", async () => {
+			const { processProfile } = await import("./scrape.ts");
+
+			mockAnalyzeProfileBasic.mockResolvedValue({
+				bio: "Test bio",
+				bioScore: 60, // Above CONFIDENCE_THRESHOLD (40) but below 70
+				linkFromBio: null,
+				isLikely: true,
+			});
+			mockWasDmSent.mockReturnValue(false);
+			mockWasFollowed.mockReturnValue(false);
+
+			await processProfile("mediumscore", mockPage, "test_source", mockLogger);
+
+			expect(mockMarkAsCreator).toHaveBeenCalledWith("mediumscore", 60, null);
+			expect(mockSendDMToUser).toHaveBeenCalledWith(mockPage, "mediumscore");
+			expect(mockFollowUserAccount).toHaveBeenCalledWith(
+				mockPage,
+				"mediumscore",
+			);
+		});
+
+		it("takes screenshot for creators with links", async () => {
+			const { processProfile } = await import("./scrape.ts");
+
+			mockAnalyzeProfileBasic.mockResolvedValue({
+				bio: "Test bio",
+				bioScore: 50,
+				linkFromBio: "https://linktr.ee/creator",
+				isLikely: true,
+			});
+
+			mockAnalyzeLinkWithVision.mockResolvedValue({
+				isCreator: true,
+				confidence: 85,
+				indicators: ["subscription"],
+			});
+
+			mockSnapshot.mockResolvedValue("/path/to/screenshot.png");
+
+			await processProfile("screenshotuser", mockPage, "test_source", mockLogger);
+
+			expect(mockSnapshot).toHaveBeenCalledWith(
+				mockPage,
+				"creator_screenshotuser",
+			);
+			expect(mockMarkAsCreator).toHaveBeenCalledWith(
+				"screenshotuser",
+				85,
+				"/path/to/screenshot.png",
+			);
+			expect(mockLogger.info).toHaveBeenCalledWith(
+				"SCREENSHOT",
+				"Creator proof saved: /path/to/screenshot.png",
+			);
+		});
+
+		it("parses discovery depth correctly from source", async () => {
+			const { processProfile } = await import("./scrape.ts");
+
+			const mockMetricsTracker = {
+				recordProfileVisit: jest.fn(),
+			};
+
+			mockAnalyzeProfileBasic.mockResolvedValue({
+				bio: "Test bio",
+				bioScore: 45,
+				linkFromBio: null,
+				isLikely: true,
+			});
+
+			await processProfile(
+				"depthuser",
+				mockPage,
+				"following_of_following_of_seeduser", // 3 underscores = depth 4
+				mockLogger,
+				mockMetricsTracker,
+			);
+
+			expect(mockMetricsTracker.recordProfileVisit).toHaveBeenCalledWith(
+				"depthuser",
+				expect.any(Number),
+				"following_of_following_of_seeduser",
+				4, // depth
+				"seeduser", // source profile
+				[],
+				0,
+			);
+		});
+
+		it("handles empty source for discovery depth", async () => {
+			const { processProfile } = await import("./scrape.ts");
+
+			const mockMetricsTracker = {
+				recordProfileVisit: jest.fn(),
+			};
+
+			mockAnalyzeProfileBasic.mockResolvedValue({
+				bio: "Test bio",
+				bioScore: 45,
+				linkFromBio: null,
+				isLikely: true,
+			});
+
+			await processProfile(
+				"nosourceuser",
+				mockPage,
+				"seed", // no underscores
+				mockLogger,
+				mockMetricsTracker,
+			);
+
+			expect(mockMetricsTracker.recordProfileVisit).toHaveBeenCalledWith(
+				"nosourceuser",
+				expect.any(Number),
+				"seed",
+				0, // depth (0 underscores in "seed")
+				undefined, // no source profile
+				[],
+				0,
+			);
+		});
 	});
 
 	describe("processFollowingList", () => {

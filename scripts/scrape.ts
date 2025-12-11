@@ -193,7 +193,7 @@ export async function processProfile(
 	// Parse discovery source to extract depth and source profile
 	const discoveryDepth = source.split("_").length - 1; // Count underscores as depth
 	const sourceProfile = source.includes("_of_")
-		? source.split("_of_")[1]
+		? source.split("_of_").pop()
 		: undefined;
 
 	// Record profile visit metrics
