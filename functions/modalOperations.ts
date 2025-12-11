@@ -6,86 +6,122 @@ import { sleep } from './sleep.ts';
 
 /**
  * Open the "Following" modal for a profile.
+ * Uses multiple selector strategies and fallback logic for robustness.
  */
 export async function openFollowingModal(page: Page): Promise<boolean> {
-  try {
-    // Look for "Following" link/button
-    const followingSelector = 'a[href*="/following/"]';
-    await page.waitForSelector(followingSelector, { timeout: 5000 });
-    await page.click(followingSelector);
-    await sleep(2000); // Wait for modal to open
-    return true;
-  } catch {
-    return false;
+  const selectors = ['a[href$="/following/"]', 'a[href$="/following"]'];
+  for (const sel of selectors) {
+    try {
+      const handle = await page.$(sel);
+      if (handle) {
+        await handle.click();
+        await sleep(3000);
+        return true;
+      }
+    } catch {
+      continue;
+    }
   }
+
+  // Fallback: use page.evaluate to find and click
+  try {
+    const clicked = await page.evaluate(() => {
+      const links = Array.from(document.querySelectorAll('a'));
+      for (const link of links) {
+        const href = link.getAttribute('href') || '';
+        if (href.includes('/following')) {
+          link.click();
+          return true;
+        }
+      }
+      for (const link of links) {
+        const text = link.textContent?.toLowerCase() || '';
+        if (text.includes('following') && !text.includes('followers')) {
+          link.click();
+          return true;
+        }
+      }
+      return false;
+    });
+    if (clicked) {
+      await sleep(3000);
+      return true;
+    }
+  } catch {
+    // Ignore errors
+  }
+
+  return false;
 }
 
 /**
  * Extract usernames from the following modal.
  * Returns array of usernames (without @ symbol).
+ * Uses multiple selector variants for robustness.
  */
 export async function extractFollowingUsernames(
   page: Page,
   batchSize: number = 10
 ): Promise<string[]> {
-  const usernames: string[] = [];
-
   try {
-    // Wait for modal to be visible
-    await page.waitForSelector('div[role="dialog"]', { timeout: 5000 });
-
-    // Get all list items in the modal
-    const items = await page.$$('div[role="dialog"] ul li');
-
-    for (let i = 0; i < Math.min(items.length, batchSize); i++) {
-      try {
-        // Get the username from the link
-        const username = await items[i].evaluate((el) => {
-          const link = el.querySelector('a[href^="/"]');
-          if (link) {
-            const href = link.getAttribute('href') || '';
-            // Extract username from href like "/username/" or "/username"
-            const match = href.match(/^\/([^\/]+)/);
-            return match ? match[1] : null;
-          }
-          return null;
-        });
-
-        if (username && !usernames.includes(username)) {
-          usernames.push(username);
-        }
-      } catch {
-        // Skip this item if we can't extract username
-        continue;
-      }
-    }
+    await page.waitForSelector('div[role="dialog"] a[href^="/"]', {
+      timeout: 15000,
+    });
   } catch {
-    // Could not extract usernames
+    return [];
   }
 
-  return usernames;
+  // Small initial scroll to ensure content is loaded
+  await scrollFollowingModal(page, 600);
+
+  const selectorVariants = [
+    'div[role="dialog"] a[href^="/"]',
+    'div[role="dialog"] a[role="link"][href^="/"]',
+    'div[role="dialog"] ul > li a[href^="/"]',
+    'div[role="dialog"] li a[href^="/"]',
+  ];
+
+  for (const sel of selectorVariants) {
+    const items = await page.$$(sel);
+    if (items?.length) {
+      const usernames: string[] = [];
+      for (const item of items) {
+        const href = await item.evaluate((el: Element) =>
+          el.getAttribute('href')
+        );
+        if (href?.startsWith('/') && href.split('/').length === 3) {
+          const username = href.replace(/\//g, '');
+          if (username && !username.startsWith('explore')) {
+            usernames.push(username);
+          }
+        }
+        if (usernames.length >= batchSize) break;
+      }
+      if (usernames.length) return usernames;
+    }
+  }
+  return [];
 }
 
 /**
  * Scroll the following modal to load more profiles.
+ * @param page - Puppeteer page instance
+ * @param scrollAmount - Amount to scroll in pixels (default: 600)
  */
 export async function scrollFollowingModal(
   page: Page,
-  scrollAmount: number = 500
+  scrollAmount: number = 600
 ): Promise<void> {
   try {
-    const modalSelector = 'div[role="dialog"]';
-    await page.evaluate(
-      (selector, amount) => {
-        const modal = document.querySelector(selector);
-        if (modal) {
-          modal.scrollTop += amount;
-        }
-      },
-      modalSelector,
-      scrollAmount
-    );
-    await sleep(1500); // Wait for new profiles to load
+    await page.evaluate((amount) => {
+      const modal = document.querySelector(
+        'div[role="dialog"] div[style*="overflow"]'
+      );
+      if (modal) {
+        (modal as HTMLElement).scrollTop += amount;
+      }
+    }, scrollAmount);
+    await sleep(400);
   } catch {
     // Could not scroll modal
   }

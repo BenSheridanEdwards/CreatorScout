@@ -18,7 +18,7 @@
  */
 
 import { readFileSync, existsSync } from 'node:fs';
-import type { Page } from 'puppeteer';
+import type { Page, Browser } from 'puppeteer';
 import {
   initDb,
   queueAdd,
@@ -56,22 +56,24 @@ import {
   scrollFollowingModal,
 } from '../functions/modalOperations.ts';
 import { snapshot } from '../functions/snapshot.ts';
+import { createLogger, type Logger } from '../functions/logger.ts';
 
 initDb();
 
 /**
  * Process a single profile: visit, analyze, and take actions if creator.
  */
-async function processProfile(
+export async function processProfile(
   username: string,
   page: Page,
-  source: string
+  source: string,
+  logger: Logger
 ): Promise<void> {
-  console.log(`\n[${source}] Processing @${username}...`);
+  logger.info('PROFILE', `[${source}] Processing @${username}...`);
 
   // Skip if already visited
   if (wasVisited(username)) {
-    console.log(`   ⏭️  Already visited, skipping`);
+    logger.debug('PROFILE', `Already visited, skipping @${username}`);
     return;
   }
 
@@ -80,6 +82,10 @@ async function processProfile(
     const [profileDelayMin, profileDelayMax] = getDelay('profile_load');
     const profileDelay =
       profileDelayMin + Math.random() * (profileDelayMax - profileDelayMin);
+    logger.debug(
+      'DELAY',
+      `Waiting ${Math.floor(profileDelay)}s before profile load...`
+    );
     await sleep(profileDelay * 1000);
 
     const status = await navigateToProfileAndCheck(page, username, {
@@ -88,12 +94,13 @@ async function processProfile(
 
     // Check if profile is accessible
     if (status.notFound) {
-      console.log('   ❌ Profile not found');
+      logger.warn('PROFILE', `Profile not found: @${username}`);
       markVisited(username, undefined, undefined, 0);
       return;
     }
+
     if (status.isPrivate) {
-      console.log('   🔒 Profile is private');
+      logger.warn('PROFILE', `Profile is private: @${username}`);
       markVisited(username, undefined, undefined, 0);
       return;
     }
@@ -101,7 +108,13 @@ async function processProfile(
     // Ensure we're logged in
     await ensureLoggedIn(page);
   } catch (err) {
-    console.log(`   ❌ Failed to load profile: ${err}`);
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    await logger.errorWithScreenshot(
+      'ERROR',
+      `Failed to load profile @${username}: ${errorMessage}`,
+      page,
+      `profile_load_${username}`
+    );
     return;
   }
 
@@ -109,30 +122,32 @@ async function processProfile(
   const analysis = await analyzeProfileBasic(page, username);
 
   if (!analysis.bio) {
-    console.log('   ⚠️  No bio found');
+    logger.warn('ANALYSIS', `No bio found for @${username}`);
     markVisited(username, undefined, undefined, 0);
     return;
   }
 
-  console.log(
-    `   Bio: ${analysis.bio.substring(0, 100)}${
+  logger.info(
+    'ANALYSIS',
+    `Bio: ${analysis.bio.substring(0, 100)}${
       analysis.bio.length > 100 ? '...' : ''
     }`
   );
-  console.log(`   Bio score: ${analysis.bioScore}`);
+  logger.info('ANALYSIS', `Bio score: ${analysis.bioScore}`);
 
   // Mark as visited with bio and score
   markVisited(username, undefined, analysis.bio, analysis.bioScore);
 
   // If not promising, skip expensive vision analysis
   if (!analysis.isLikely) {
-    console.log(
-      `   ⏭️  Bio score too low (${analysis.bioScore} < 40), skipping`
+    logger.debug(
+      'ANALYSIS',
+      `Bio score too low (${analysis.bioScore} < 40), skipping @${username}`
     );
     return;
   }
 
-  console.log(`   Link in bio: ${analysis.linkFromBio || 'none'}`);
+  logger.info('ANALYSIS', `Link in bio: ${analysis.linkFromBio || 'none'}`);
 
   // If has linktree/link aggregator, do vision analysis
   let confirmedCreator = false;
@@ -149,11 +164,15 @@ async function processProfile(
     if (visionResult.isCreator) {
       confirmedCreator = true;
       confidence = visionResult.confidence || analysis.bioScore;
-      console.log(
-        `   ✅ Vision confirmed creator (confidence: ${confidence}%)`
+      logger.info(
+        'ANALYSIS',
+        `Vision confirmed creator (confidence: ${confidence}%)`
       );
     } else {
-      console.log(`   ❌ Vision did not confirm creator`);
+      logger.debug(
+        'ANALYSIS',
+        `Vision did not confirm creator for @${username}`
+      );
     }
   } else if (analysis.bioScore >= CONFIDENCE_THRESHOLD) {
     // High bio score alone can indicate creator
@@ -163,35 +182,40 @@ async function processProfile(
 
   // If confirmed creator, take actions
   if (confirmedCreator && confidence >= CONFIDENCE_THRESHOLD) {
-    console.log(`   🎯 CONFIRMED CREATOR (confidence: ${confidence}%)`);
+    logger.info('ACTION', `CONFIRMED CREATOR (confidence: ${confidence}%)`);
 
     // Mark in database
     const proofPath = analysis.linkFromBio
       ? await snapshot(page, `creator_${username}`)
       : null;
+    if (proofPath) {
+      logger.info('SCREENSHOT', `Creator proof saved: ${proofPath}`);
+    }
     markAsCreator(username, confidence, proofPath);
 
     // Send DM (if not already sent)
     if (!wasDmSent(username)) {
       const [dmDelayMin, dmDelayMax] = getDelay('before_dm');
       const dmWait = dmDelayMin + Math.random() * (dmDelayMax - dmDelayMin);
-      console.log(`   ⏳ Waiting ${Math.floor(dmWait)}s before DM...`);
+      logger.debug('DELAY', `Waiting ${Math.floor(dmWait)}s before DM...`);
       await sleep(dmWait * 1000);
 
       await sendDMToUser(page, username);
+      logger.info('ACTION', `DM sent to @${username}`);
     } else {
-      console.log(`   ℹ️  DM already sent to @${username}`);
+      logger.debug('ACTION', `DM already sent to @${username}`);
     }
 
     // Follow (if not already following)
     if (!wasFollowed(username)) {
       await followUserAccount(page, username);
+      logger.info('ACTION', `Followed @${username}`);
     } else {
-      console.log(`   ℹ️  Already following @${username}`);
+      logger.debug('ACTION', `Already following @${username}`);
     }
 
     // Add their following to queue for expansion
-    console.log(`   🌳 Adding @${username}'s following to queue...`);
+    logger.info('QUEUE', `Adding @${username}'s following to queue...`);
     const added = await addFollowingToQueue(
       page,
       username,
@@ -199,11 +223,12 @@ async function processProfile(
       20
     );
     if (added > 0) {
-      console.log(`   ✅ Added ${added} profiles to queue`);
+      logger.info('QUEUE', `Added ${added} profiles to queue`);
     }
   } else {
-    console.log(
-      `   ⏭️  Not confirmed (confidence: ${confidence}% < ${CONFIDENCE_THRESHOLD}%)`
+    logger.debug(
+      'ANALYSIS',
+      `Not confirmed (confidence: ${confidence}% < ${CONFIDENCE_THRESHOLD}%)`
     );
   }
 
@@ -211,8 +236,9 @@ async function processProfile(
   const [profileDelayMin, profileDelayMax] = getDelay('between_profiles');
   const profileWait =
     profileDelayMin + Math.random() * (profileDelayMax - profileDelayMin);
-  console.log(
-    `   ⏳ Waiting ${Math.floor(profileWait)}s before next profile...`
+  logger.debug(
+    'DELAY',
+    `Waiting ${Math.floor(profileWait)}s before next profile...`
   );
   await sleep(profileWait * 1000);
 }
@@ -220,13 +246,12 @@ async function processProfile(
 /**
  * Process the following list of a seed profile.
  */
-async function processFollowingList(
+export async function processFollowingList(
   seedUsername: string,
-  page: Page
+  page: Page,
+  logger: Logger
 ): Promise<void> {
-  console.log(`\n${'='.repeat(60)}`);
-  console.log(`Processing following list of @${seedUsername}`);
-  console.log('='.repeat(60));
+  logger.info('PROFILE', `Processing following list of @${seedUsername}`);
 
   // Navigate to seed profile
   try {
@@ -235,8 +260,9 @@ async function processFollowingList(
     });
 
     if (status.notFound || status.isPrivate) {
-      console.log(
-        `❌ Seed profile @${seedUsername} is ${
+      logger.warn(
+        'PROFILE',
+        `Seed profile @${seedUsername} is ${
           status.notFound ? 'not found' : 'private'
         }`
       );
@@ -246,24 +272,35 @@ async function processFollowingList(
     // Ensure we're logged in
     await ensureLoggedIn(page);
   } catch (err) {
-    console.log(`❌ Failed to load seed profile: ${err}`);
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    await logger.errorWithScreenshot(
+      'ERROR',
+      `Failed to load seed profile @${seedUsername}: ${errorMessage}`,
+      page,
+      `seed_profile_load_${seedUsername}`
+    );
     return;
   }
 
   // Open following modal
   const modalOpened = await openFollowingModal(page);
   if (!modalOpened) {
-    console.log('❌ Could not open following modal');
+    await logger.errorWithScreenshot(
+      'ERROR',
+      `Could not open following modal for @${seedUsername}`,
+      page,
+      `modal_open_${seedUsername}`
+    );
     return;
   }
 
   // Get current scroll index
   let scrollIndex = getScrollIndex(seedUsername);
-  console.log(`📍 Starting from scroll index: ${scrollIndex}`);
+  logger.debug('NAVIGATION', `Starting from scroll index: ${scrollIndex}`);
 
   // If we've scrolled before, scroll to that position
   if (scrollIndex > 0) {
-    console.log(`   Scrolling to position ${scrollIndex}...`);
+    logger.debug('NAVIGATION', `Scrolling to position ${scrollIndex}...`);
     for (let i = 0; i < Math.floor(scrollIndex / 500); i++) {
       await scrollFollowingModal(page, 500);
     }
@@ -278,13 +315,13 @@ async function processFollowingList(
     const usernames = await extractFollowingUsernames(page, batchSize);
 
     if (usernames.length === 0) {
-      console.log('   ℹ️  No more usernames in modal');
+      logger.debug('NAVIGATION', 'No more usernames in modal');
       break;
     }
 
-    console.log(`\n   📋 Batch of ${usernames.length} profiles:`);
+    logger.debug('QUEUE', `Batch of ${usernames.length} profiles`);
     for (const u of usernames) {
-      console.log(`      - @${u}`);
+      logger.debug('QUEUE', `  - @${u}`);
     }
 
     // Process each username
@@ -292,16 +329,24 @@ async function processFollowingList(
     for (const username of usernames) {
       if (!wasVisited(username)) {
         allVisited = false;
-        await processProfile(username, page, `following_of_${seedUsername}`);
+        await processProfile(
+          username,
+          page,
+          `following_of_${seedUsername}`,
+          logger
+        );
         processedInBatch++;
       } else {
-        console.log(`   ⏭️  @${username} already visited, skipping`);
+        logger.debug('PROFILE', `@${username} already visited, skipping`);
       }
     }
 
     // If all in batch were already visited, scroll for more
     if (allVisited) {
-      console.log('   ⬇️  All profiles in batch already visited, scrolling...');
+      logger.debug(
+        'NAVIGATION',
+        'All profiles in batch already visited, scrolling...'
+      );
       await scrollFollowingModal(page, 500);
       scrollIndex += 500;
       updateScrollIndex(seedUsername, scrollIndex);
@@ -313,50 +358,43 @@ async function processFollowingList(
 
     // Safety: don't process too many in one go
     if (processedInBatch >= 50) {
-      console.log('   ⚠️  Processed 50 profiles, pausing...');
+      logger.warn('PROFILE', 'Processed 50 profiles, pausing...');
       break;
     }
   }
 
-  console.log(`\n✅ Finished processing following list of @${seedUsername}`);
-  console.log(`   Processed ${processedInBatch} new profiles`);
+  logger.info(
+    'PROFILE',
+    `Finished processing following list of @${seedUsername}`
+  );
+  logger.info('PROFILE', `Processed ${processedInBatch} new profiles`);
 }
 
-async function main(): Promise<void> {
-  console.log('='.repeat(60));
-  console.log('  Scout - Instagram Patreon Creator Discovery Agent');
-  console.log('='.repeat(60));
-
-  // Connect to browser
-  console.log('\nConnecting to browser...');
-  const browser = await createBrowser({ headless: true });
-  const page = await createPage(browser);
-
-  // Login (will use saved session if available)
-  console.log('Logging in to Instagram...');
-  await ensureLoggedIn(page);
-  console.log('✓ Logged in!');
-
-  // Load seeds
-  if (existsSync('seeds.txt')) {
-    const seedsContent = readFileSync('seeds.txt', 'utf-8');
-    const lines = seedsContent.split('\n');
-    let seedsLoaded = 0;
-    for (const line of lines) {
-      const u = line.trim().toLowerCase();
-      if (u && !u.startsWith('#')) {
-        queueAdd(u, 100, 'seed');
-        seedsLoaded++;
-      }
-    }
-    console.log(`✓ Loaded ${seedsLoaded} seeds`);
-  } else {
-    console.log('⚠ No seeds.txt found!');
-    await browser.close();
-    return;
+/**
+ * Load seeds from file into queue
+ */
+export function loadSeeds(filePath: string = 'seeds.txt'): number {
+  if (!existsSync(filePath)) {
+    return 0;
   }
 
-  // Main processing loop
+  const seedsContent = readFileSync(filePath, 'utf-8');
+  const lines = seedsContent.split('\n');
+  let seedsLoaded = 0;
+  for (const line of lines) {
+    const u = line.trim().toLowerCase();
+    if (u && !u.startsWith('#')) {
+      queueAdd(u, 100, 'seed');
+      seedsLoaded++;
+    }
+  }
+  return seedsLoaded;
+}
+
+/**
+ * Run the main scrape loop
+ */
+export async function runScrapeLoop(page: Page, logger: Logger): Promise<void> {
   let dmsSent = 0;
 
   while (dmsSent < MAX_DMS_PER_DAY) {
@@ -366,20 +404,23 @@ async function main(): Promise<void> {
     if (!target) {
       const [waitMin, waitMax] = getDelay('queue_empty');
       const waitTime = waitMin + Math.random() * (waitMax - waitMin);
-      console.log(`\nQueue empty - sleeping ${Math.floor(waitTime)}s...`);
+      logger.debug(
+        'QUEUE',
+        `Queue empty - sleeping ${Math.floor(waitTime)}s...`
+      );
       await sleep(waitTime * 1000);
       continue;
     }
 
-    console.log(`\n[Queue: ${queueCount()} remaining]`);
+    logger.info('QUEUE', `Queue: ${queueCount()} remaining`);
 
     // Process their following list
-    await processFollowingList(target, page);
+    await processFollowingList(target, page, logger);
 
     // Print stats
     const stats = getStats();
-    console.log(`\n--- Stats ---`);
-    console.log(
+    logger.info(
+      'STATS',
       `Visited: ${stats.total_visited} | Creators: ${stats.confirmed_creators} | DMs: ${stats.dms_sent} | Queue: ${stats.queue_size}`
     );
 
@@ -389,26 +430,84 @@ async function main(): Promise<void> {
     const [seedDelayMin, seedDelayMax] = getDelay('between_seeds');
     const seedWait =
       seedDelayMin + Math.random() * (seedDelayMax - seedDelayMin);
-    console.log(`\nWaiting ${Math.floor(seedWait)}s before next seed...`);
+    logger.debug(
+      'DELAY',
+      `Waiting ${Math.floor(seedWait)}s before next seed...`
+    );
     await sleep(seedWait * 1000);
   }
 
-  console.log('\n' + '='.repeat(60));
-  console.log('Session complete!');
   const stats = getStats();
-  console.log(`Total visited: ${stats.total_visited}`);
-  console.log(`Confirmed creators: ${stats.confirmed_creators}`);
-  console.log(`DMs sent: ${stats.dms_sent}`);
-  console.log('='.repeat(60));
+  logger.info(
+    'STATS',
+    `Session complete! Total visited: ${stats.total_visited}`
+  );
+  logger.info('STATS', `Confirmed creators: ${stats.confirmed_creators}`);
+  logger.info('STATS', `DMs sent: ${stats.dms_sent}`);
+}
 
-  await browser.close();
+/**
+ * Main scrape function - does the full automation flow
+ * @param debug - If true, enables logging output
+ */
+export async function scrape(debug: boolean = false): Promise<void> {
+  const logger = createLogger(debug);
+
+  logger.info('ACTION', 'Scout - Instagram Patreon Creator Discovery Agent');
+
+  let browser: Browser | null = null;
+  try {
+    // Connect to browser
+    logger.info('ACTION', 'Connecting to browser...');
+    browser = await createBrowser({ headless: true });
+    const page = await createPage(browser);
+
+    // Login (will use saved session if available)
+    logger.info('ACTION', 'Logging in to Instagram...');
+    await ensureLoggedIn(page);
+    logger.info('ACTION', 'Logged in!');
+
+    // Load seeds
+    const seedsLoaded = loadSeeds();
+    if (seedsLoaded === 0) {
+      logger.warn('QUEUE', 'No seeds.txt found or no seeds loaded!');
+      await browser.close();
+      return;
+    }
+    logger.info('QUEUE', `Loaded ${seedsLoaded} seeds`);
+
+    // Run main processing loop
+    await runScrapeLoop(page, logger);
+
+    await browser.close();
+  } catch (err) {
+    if (browser) {
+      const page = await browser.newPage().catch(() => null);
+      if (page) {
+        const logger = createLogger(debug);
+        await logger.errorWithScreenshot(
+          'ERROR',
+          `Fatal error in scrape: ${
+            err instanceof Error ? err.message : String(err)
+          }`,
+          page,
+          'scrape_fatal_error'
+        );
+      }
+      await browser.close();
+    } else {
+      console.error('Fatal error before browser creation:', err);
+    }
+    throw err;
+  }
 }
 
 // Run if executed directly
 if (
   import.meta.url.endsWith(process.argv[1]?.replace(process.cwd(), '') || '')
 ) {
-  main().catch((err) => {
+  const debug = process.argv.includes('--debug') || process.argv.includes('-d');
+  scrape(debug).catch((err) => {
     console.error(err);
     process.exit(1);
   });

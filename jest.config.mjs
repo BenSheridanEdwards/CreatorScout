@@ -21,9 +21,10 @@ export default {
   },
   testMatch: [
     '**/tests/**/*.test.ts',
-    '!**/tests/**/e2e*.test.ts',
+    '!**/tests/e2e/**/*.test.ts', // Exclude all e2e tests
+    '!**/tests/**/*e2e*.test.ts', // Exclude any test with e2e in name
+    '!**/tests/**/*.puppeteer.test.ts', // Exclude all puppeteer tests
   ],
   collectCoverageFrom: ['functions/**/*.ts', 'scripts/**/*.ts'],
   transformIgnorePatterns: [],
 };
-

@@ -55,6 +55,24 @@ export async function checkProfileStatus(page: Page): Promise<ProfileStatus> {
 }
 
 /**
+ * Verify if user is logged in to Instagram.
+ * Returns true if logged in, false otherwise.
+ */
+export async function verifyLoggedIn(page: Page): Promise<boolean> {
+  return page.evaluate(() => {
+    const hasInbox =
+      document.querySelector('a[href="/direct/inbox/"]') !== null;
+    const hasHomeIcon = Array.from(document.querySelectorAll('svg')).some(
+      (svg) => svg.getAttribute('aria-label') === 'Home'
+    );
+    const hasLoginButton = Array.from(document.querySelectorAll('button')).some(
+      (btn) => btn.textContent?.includes('Log in')
+    );
+    return hasInbox || hasHomeIcon || !hasLoginButton;
+  });
+}
+
+/**
  * Ensure we're logged in, re-logging if necessary.
  */
 export async function ensureLoggedIn(page: Page): Promise<void> {

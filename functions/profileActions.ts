@@ -5,18 +5,28 @@ import type { Page } from 'puppeteer';
 import { DM_MESSAGE } from './config.ts';
 import { snapshot } from './snapshot.ts';
 import { sleep } from './sleep.ts';
-import {
-  markDmSent,
-  markFollowed,
-  wasDmSent,
-  wasFollowed,
-  queueAdd,
-  wasVisited,
-} from './database.ts';
+import { markDmSent, markFollowed, queueAdd, wasVisited } from './database.ts';
 import {
   openFollowingModal,
   extractFollowingUsernames,
 } from './modalOperations.ts';
+
+/**
+ * Check if a DM thread is empty (no previous messages).
+ * Returns true if thread is empty or has only one element (header).
+ */
+export async function checkDmThreadEmpty(page: Page): Promise<boolean> {
+  const selectors = [
+    'div[role="row"]',
+    'div[role="listitem"]',
+    'div[data-scope="messages_table"] > div',
+  ];
+  for (const sel of selectors) {
+    const nodes = await page.$$(sel);
+    if (nodes?.length) return nodes.length <= 1;
+  }
+  return true;
+}
 
 /**
  * Send a DM to a user.
@@ -133,7 +143,7 @@ export async function followUserAccount(
  */
 export async function addFollowingToQueue(
   page: Page,
-  username: string,
+  _username: string,
   source: string,
   batchSize: number = 20
 ): Promise<number> {
