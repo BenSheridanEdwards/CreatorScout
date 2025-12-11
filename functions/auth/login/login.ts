@@ -81,7 +81,10 @@ export async function login(
 		});
 		logger.info("ACTION", "Page reloaded successfully");
 	} else {
-		logger.info("ACTION", "No cookies loaded, proceeding with fresh login on current page");
+		logger.info(
+			"ACTION",
+			"No cookies loaded, proceeding with fresh login on current page",
+		);
 	}
 
 	logger.info("ACTION", "Handling cookie consent dialog");
