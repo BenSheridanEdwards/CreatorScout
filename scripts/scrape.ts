@@ -70,6 +70,27 @@ import { sleep } from "../functions/timing/sleep/sleep.ts";
 initDb();
 
 /**
+ * Load seeds from file into queue
+ */
+export function loadSeeds(filePath: string = "seeds.txt"): number {
+	if (!existsSync(filePath)) {
+		return 0;
+	}
+
+	const seedsContent = readFileSync(filePath, "utf-8");
+	const lines = seedsContent.split("\n");
+	let seedsLoaded = 0;
+	for (const line of lines) {
+		const u = line.trim().toLowerCase();
+		if (u && !u.startsWith("#")) {
+			queueAdd(u, 100, "seed");
+			seedsLoaded++;
+		}
+	}
+	return seedsLoaded;
+}
+
+/**
  * Process a single profile: visit, analyze, and take actions if creator.
  */
 export async function processProfile(
@@ -411,27 +432,6 @@ export async function processFollowingList(
 		`Finished processing following list of @${seedUsername}`,
 	);
 	logger.info("PROFILE", `Processed ${processedInBatch} new profiles`);
-}
-
-/**
- * Load seeds from file into queue
- */
-export function loadSeeds(filePath: string = "seeds.txt"): number {
-	if (!existsSync(filePath)) {
-		return 0;
-	}
-
-	const seedsContent = readFileSync(filePath, "utf-8");
-	const lines = seedsContent.split("\n");
-	let seedsLoaded = 0;
-	for (const line of lines) {
-		const u = line.trim().toLowerCase();
-		if (u && !u.startsWith("#")) {
-			queueAdd(u, 100, "seed");
-			seedsLoaded++;
-		}
-	}
-	return seedsLoaded;
 }
 
 /**

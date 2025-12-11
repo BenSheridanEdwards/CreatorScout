@@ -146,6 +146,17 @@ describe("scrape.ts", () => {
 		mockWasFollowed.mockReturnValue(false);
 	});
 
+	describe("loadSeeds", () => {
+		it("loads seeds from file", async () => {
+			const { loadSeeds } = await import("./scrape.ts");
+
+			const count = loadSeeds();
+
+			// Should load the seeds from seeds.txt
+			expect(typeof count).toBe("number");
+		});
+	});
+
 	describe("processProfile", () => {
 		it("calls mouseWiggle after navigation", async () => {
 			const { processProfile } = await import("./scrape.ts");
@@ -370,14 +381,4 @@ describe("scrape.ts", () => {
 		});
 	});
 
-	describe("loadSeeds", () => {
-		it("loads seeds from file", async () => {
-			const { loadSeeds } = await import("./scrape.ts");
-
-			const count = loadSeeds();
-
-			// Should load the seeds from seeds.txt
-			expect(typeof count).toBe("number");
-		});
-	});
 });
