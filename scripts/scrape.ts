@@ -64,8 +64,16 @@ import {
 	type Logger,
 } from "../functions/shared/logger/logger.ts";
 import { snapshot } from "../functions/shared/snapshot/snapshot.ts";
-import { getDelay, mouseWiggle } from "../functions/timing/humanize/humanize.ts";
+import {
+	getDelay,
+	mouseWiggle,
+} from "../functions/timing/humanize/humanize.ts";
 import { sleep } from "../functions/timing/sleep/sleep.ts";
+import {
+	MetricsTracker,
+	getGlobalMetricsTracker,
+	startTimer,
+} from "../functions/shared/metrics/metrics.ts";
 
 initDb();
 
@@ -98,12 +106,17 @@ export async function processProfile(
 	page: Page,
 	source: string,
 	logger: Logger,
+	metricsTracker?: MetricsTracker,
 ): Promise<void> {
 	logger.info("PROFILE", `[${source}] Processing @${username}...`);
+
+	// Start performance timer
+	const timer = startTimer(`Profile processing: @${username}`);
 
 	// Skip if already visited
 	if (wasVisited(username)) {
 		logger.debug("PROFILE", `Already visited, skipping @${username}`);
+		timer.end();
 		return;
 	}
 
@@ -148,6 +161,12 @@ export async function processProfile(
 			page,
 			`profile_load_${username}`,
 		);
+
+		// Record error in metrics
+		if (metricsTracker) {
+			metricsTracker.recordError(username, "profile_load_failed", errorMessage);
+		}
+
 		return;
 	}
 
@@ -170,6 +189,24 @@ export async function processProfile(
 
 	// Mark as visited with bio and score
 	markVisited(username, undefined, analysis.bio, analysis.bioScore);
+
+	// Parse discovery source to extract depth and source profile
+	const discoveryDepth = source.split('_').length - 1; // Count underscores as depth
+	const sourceProfile = source.includes('_of_') ? source.split('_of_')[1] : undefined;
+
+	// Record profile visit metrics
+	if (metricsTracker) {
+		const processingTime = timer.end(); // End timer here for initial processing
+		metricsTracker.recordProfileVisit(
+			username,
+			processingTime,
+			source,
+			discoveryDepth,
+			sourceProfile,
+			[], // contentCategories will be filled later if creator found
+			0   // visionApiCalls will be updated later
+		);
+	}
 
 	// If not promising, skip expensive vision analysis
 	if (!analysis.isLikely) {
@@ -199,23 +236,47 @@ export async function processProfile(
 			confidence = visionResult.confidence || analysis.bioScore;
 			logger.info(
 				"ANALYSIS",
-				`Vision confirmed creator (confidence: ${confidence}%) - Indicators: ${visionResult.indicators?.join(', ') || 'none'}`,
+				`Vision confirmed creator (confidence: ${confidence}%) - Indicators: ${visionResult.indicators?.join(", ") || "none"}`,
 			);
+
+			// Record vision API usage
+			if (metricsTracker) {
+				metricsTracker.recordVisionApiCall(0.001); // ~$0.001 per call
+				metricsTracker.recordCreatorFound(username, confidence, 1);
+			}
 		} else {
 			logger.debug(
 				"ANALYSIS",
 				`Vision did not confirm creator for @${username} - Confidence: ${visionResult.confidence || 0}%`,
 			);
+
+			// Still record vision API usage even if not a creator
+			if (metricsTracker) {
+				metricsTracker.recordVisionApiCall(0.001);
+			}
 		}
 	} else if (analysis.bioScore >= 70) {
 		// High bio score alone can indicate creator (e.g., direct creator mention)
 		confirmedCreator = true;
 		confidence = analysis.bioScore;
-		logger.info("ANALYSIS", `High bio score (${analysis.bioScore}) - likely creator without linktree`);
+		logger.info(
+			"ANALYSIS",
+			`High bio score (${analysis.bioScore}) - likely creator without linktree`,
+		);
+
+		// Record creator found without vision API
+		if (metricsTracker) {
+			metricsTracker.recordCreatorFound(username, confidence, 0);
+		}
 	} else if (analysis.bioScore >= CONFIDENCE_THRESHOLD) {
 		// Fallback for very high confidence scores
 		confirmedCreator = true;
 		confidence = analysis.bioScore;
+
+		// Record creator found
+		if (metricsTracker) {
+			metricsTracker.recordCreatorFound(username, confidence, 0);
+		}
 	}
 
 	// If confirmed creator, take actions
@@ -240,6 +301,11 @@ export async function processProfile(
 
 			await sendDMToUser(page, username);
 			logger.info("ACTION", `DM sent to @${username}`);
+
+			// Record DM sent
+			if (metricsTracker) {
+				metricsTracker.recordDMSent(username);
+			}
 		} else {
 			logger.debug("ACTION", `DM already sent to @${username}`);
 		}
@@ -248,6 +314,11 @@ export async function processProfile(
 		if (!wasFollowed(username)) {
 			await followUserAccount(page, username);
 			logger.info("ACTION", `Followed @${username}`);
+
+			// Record follow completed
+			if (metricsTracker) {
+				metricsTracker.recordFollowCompleted(username);
+			}
 		} else {
 			logger.debug("ACTION", `Already following @${username}`);
 		}
@@ -288,6 +359,7 @@ export async function processFollowingList(
 	seedUsername: string,
 	page: Page,
 	logger: Logger,
+	metricsTracker?: MetricsTracker,
 ): Promise<void> {
 	logger.info("PROFILE", `Processing following list of @${seedUsername}`);
 
@@ -379,6 +451,7 @@ export async function processFollowingList(
 					page,
 					`following_of_${seedUsername}`,
 					logger,
+					metricsTracker,
 				);
 				processedInBatch++;
 
@@ -391,7 +464,10 @@ export async function processFollowingList(
 
 					// Scroll back to position if needed
 					if (scrollIndex > 0) {
-						logger.debug("NAVIGATION", `Scrolling back to position ${scrollIndex}...`);
+						logger.debug(
+							"NAVIGATION",
+							`Scrolling back to position ${scrollIndex}...`,
+						);
 						for (let i = 0; i < Math.floor(scrollIndex / 500); i++) {
 							await scrollFollowingModal(page, 500);
 						}
@@ -437,7 +513,7 @@ export async function processFollowingList(
 /**
  * Run the main scrape loop
  */
-export async function runScrapeLoop(page: Page, logger: Logger): Promise<void> {
+export async function runScrapeLoop(page: Page, logger: Logger, metricsTracker?: MetricsTracker): Promise<void> {
 	let dmsSent = 0;
 
 	while (dmsSent < MAX_DMS_PER_DAY) {
@@ -458,7 +534,7 @@ export async function runScrapeLoop(page: Page, logger: Logger): Promise<void> {
 		logger.info("QUEUE", `Queue: ${queueCount()} remaining`);
 
 		// Process their following list
-		await processFollowingList(target, page, logger);
+		await processFollowingList(target, page, logger, metricsTracker);
 
 		// Print stats
 		const stats = getStats();
@@ -498,6 +574,10 @@ export async function scrape(debug: boolean = false): Promise<void> {
 
 	logger.info("ACTION", "Scout - Instagram Patreon Creator Discovery Agent");
 
+	// Initialize metrics tracking
+	const metricsTracker = getGlobalMetricsTracker();
+	logger.info("METRICS", `Started session tracking: ${metricsTracker.getSessionId()}`);
+
 	let browser: Browser | null = null;
 	try {
 		// Connect to browser
@@ -520,7 +600,12 @@ export async function scrape(debug: boolean = false): Promise<void> {
 		logger.info("QUEUE", `Loaded ${seedsLoaded} seeds`);
 
 		// Run main processing loop
-		await runScrapeLoop(page, logger);
+		await runScrapeLoop(page, logger, metricsTracker);
+
+		// End metrics session
+		metricsTracker.endSession();
+		const finalMetrics = metricsTracker.getSessionMetrics();
+		logger.info("METRICS", `Session completed - Profiles: ${finalMetrics.profilesVisited}, Creators: ${finalMetrics.creatorsFound}, DMs: ${finalMetrics.dmsSent}`);
 
 		await browser.close();
 	} catch (err) {

@@ -4,7 +4,7 @@
 import { jest } from "@jest/globals";
 
 // Mock all the dependencies
-const mockMouseWiggle = jest.fn().mockResolvedValue(undefined);
+const mockMouseWiggle = jest.fn<any>().mockResolvedValue(undefined);
 const mockNavigateToProfileAndCheck = jest.fn();
 const mockAnalyzeProfileBasic = jest.fn();
 const mockAnalyzeLinkWithVision = jest.fn();
@@ -30,6 +30,7 @@ const mockQueueCount = jest.fn();
 const mockQueueNext = jest.fn();
 const mockWasDmSent = jest.fn();
 const mockWasFollowed = jest.fn();
+const mockGetDailyMetrics = jest.fn();
 const mockCreateLogger = jest.fn();
 
 // Mock the modules
@@ -61,6 +62,7 @@ jest.unstable_mockModule("../functions/shared/snapshot/snapshot.ts", () => ({
 jest.unstable_mockModule("../functions/shared/database/database.ts", () => ({
 	getScrollIndex: mockGetScrollIndex,
 	getStats: mockGetStats,
+	getDailyMetrics: mockGetDailyMetrics,
 	initDb: mockInitDb,
 	markAsCreator: mockMarkAsCreator,
 	markVisited: mockMarkVisited,
@@ -97,6 +99,35 @@ jest.unstable_mockModule(
 
 jest.unstable_mockModule("../functions/shared/logger/logger.ts", () => ({
 	createLogger: mockCreateLogger,
+}));
+
+jest.unstable_mockModule("../functions/shared/metrics/metrics.ts", () => ({
+	getGlobalMetricsTracker: jest.fn(() => ({
+		recordProfileVisit: jest.fn(),
+		recordCreatorFound: jest.fn(),
+		recordVisionApiCall: jest.fn(),
+		recordDMSent: jest.fn(),
+		recordFollowCompleted: jest.fn(),
+		recordError: jest.fn(),
+		endSession: jest.fn(),
+		getSessionMetrics: jest.fn(() => ({
+			sessionId: 'test-session',
+			startTime: new Date(),
+			profilesVisited: 0,
+			creatorsFound: 0,
+			dmsSent: 0,
+			followsCompleted: 0,
+			errorsEncountered: 0,
+			rateLimitsHit: 0,
+			totalProcessingTime: 0,
+			visionApiCalls: 0,
+			visionApiCost: 0,
+		})),
+		getSessionId: jest.fn(() => 'test-session'),
+	})),
+	startTimer: jest.fn(() => ({
+		end: jest.fn(() => 1.5),
+	})),
 }));
 
 describe("scrape.ts", () => {
@@ -380,5 +411,4 @@ describe("scrape.ts", () => {
 			expect(mockOpenFollowingModal).toHaveBeenCalled();
 		});
 	});
-
 });
