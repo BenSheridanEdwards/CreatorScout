@@ -1069,8 +1069,18 @@ user2
 		it("handles empty following list", async () => {
 			const { processFollowingList } = await import("./scrape.ts");
 
-			// Override the default mock
+			// Clear mocks and set up for empty list
+			jest.clearAllMocks();
+			mockLogger = {
+				info: jest.fn<any>(),
+				debug: jest.fn<any>(),
+				warn: jest.fn<any>(),
+				error: jest.fn<any>(),
+				errorWithScreenshot: jest.fn<any>(),
+			};
+			mockCreateLogger.mockReturnValue(mockLogger);
 			mockExtractFollowingUsernames.mockResolvedValue([]);
+			mockOpenFollowingModal.mockResolvedValue(true);
 
 			await processFollowingList("emptyseed", mockPage, mockLogger);
 
@@ -1079,6 +1089,7 @@ user2
 				"No more usernames in modal",
 			);
 		});
+
 	});
 
 	describe("runScrapeLoop", () => {
