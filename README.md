@@ -78,34 +78,48 @@ By doing keyword matching first, Scout avoids expensive vision API calls on 80%+
 
 ```
 scout/
-├── main.py           # Main flow orchestration
-├── bio_matcher.py    # Keyword/emoji scoring (NEW - free matching)
-├── vision.py         # Vision AI for linktree analysis
-├── browser_agent.py  # Playwright browser automation
-├── database.py       # SQLite with visit/DM/follow tracking
-├── humanize.py       # Human-like delays and scrolling
-├── config.py         # Environment configuration
-├── utils.py          # Screenshot utilities
+├── functions/        # Modular TypeScript functions
+│   ├── auth/         # Authentication & login
+│   ├── extraction/   # Bio, links, and content extraction
+│   ├── navigation/   # Browser and page navigation
+│   ├── profile/      # Profile analysis and actions
+│   ├── shared/       # Database, config, utils, logger
+│   └── timing/       # Human-like delays and behavior
+├── scripts/          # Main execution scripts
+│   ├── scrape.ts     # Main scraper orchestration
+│   └── login_screenshot.ts
 ├── seeds.txt         # Seed usernames to start from
-└── tests/            # 43 tests covering all logic
+├── tests/            # 153 tests covering all logic
+└── functions/**/*.test.ts  # Collocated unit tests
 ```
 
 ## Quick Start
 
 ```bash
-# Install
-pip install -r requirements.txt
-# For Node Puppeteer E2E tests
+# Install dependencies
 npm install
 
-# Configure
+# Configure environment
 cp .env.example .env  # Edit with your credentials
 
 # Add seeds (known creator usernames to start exploring from)
 echo "somemodel" >> seeds.txt
 
-# Run
-python main.py
+# Run the scraper
+npm run scrape
+```
+
+## Development
+
+```bash
+# Run tests
+npm test
+
+# Run E2E tests
+npm run test:e2e
+
+# Development with debugging
+npm run scrape -- --debug
 ```
 
 ## Configuration
@@ -119,7 +133,7 @@ INSTAGRAM_USERNAME=your_ig_username
 INSTAGRAM_PASSWORD=your_ig_password
 ```
 
-### Config Options (`config.py`)
+### Config Options (`functions/shared/config/config.ts`)
 
 | Variable               | Default                       | Description                           |
 | ---------------------- | ----------------------------- | ------------------------------------- |
@@ -138,7 +152,7 @@ SQLite with WAL mode (`scout.db`):
 
 ## Bio Matching Keywords
 
-The `bio_matcher.py` module scores bios based on:
+The `functions/profile/bioMatcher/bioMatcher.ts` module scores bios based on:
 
 **Emojis** (25 points max):
 🔗 ✨ 👀 ⬇️ 👇 💕 ❤️
@@ -156,16 +170,23 @@ The `bio_matcher.py` module scores bios based on:
 ## Tests
 
 ```bash
-python -m pytest tests/ -v
-# 43 tests covering:
-# - Bio matching (21 tests)
-# - Database operations (13 tests)
-# - Integration (7 tests)
-# - Utils (2 tests)
+# Run all tests (153 tests)
+npm test
 
-# Puppeteer E2E (Node test runner)
-node --test tests/e2e_puppeteer.test.js
+# Run specific test suites
+npm run test:e2e:scrape      # E2E scrape tests
+npm run test:e2e:check-profile  # E2E profile checking
+
+# Test coverage
+npm run test:coverage
 ```
+
+Tests cover:
+- **Bio matching** (keyword/emoji scoring)
+- **Database operations** (SQLite with visit/DM/follow tracking)
+- **Browser automation** (navigation, modal operations)
+- **Profile analysis** (vision AI, creator detection)
+- **Integration flows** (end-to-end scraping workflows)
 
 ## Safety Features
 
