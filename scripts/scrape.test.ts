@@ -32,6 +32,7 @@ const mockWasDmSent = jest.fn();
 const mockWasFollowed = jest.fn();
 const mockGetDailyMetrics = jest.fn();
 const mockCreateLogger = jest.fn();
+const mockGetGlobalMetricsTracker = jest.fn();
 
 // Mock the modules
 jest.unstable_mockModule("node:fs", () => ({
@@ -110,29 +111,7 @@ jest.unstable_mockModule("../functions/shared/logger/logger.ts", () => ({
 }));
 
 jest.unstable_mockModule("../functions/shared/metrics/metrics.ts", () => ({
-	getGlobalMetricsTracker: jest.fn(() => ({
-		recordProfileVisit: jest.fn(),
-		recordCreatorFound: jest.fn(),
-		recordVisionApiCall: jest.fn(),
-		recordDMSent: jest.fn(),
-		recordFollowCompleted: jest.fn(),
-		recordError: jest.fn(),
-		endSession: jest.fn(),
-		getSessionMetrics: jest.fn(() => ({
-			sessionId: "test-session",
-			startTime: new Date(),
-			profilesVisited: 0,
-			creatorsFound: 0,
-			dmsSent: 0,
-			followsCompleted: 0,
-			errorsEncountered: 0,
-			rateLimitsHit: 0,
-			totalProcessingTime: 0,
-			visionApiCalls: 0,
-			visionApiCost: 0,
-		})),
-		getSessionId: jest.fn(() => "test-session"),
-	})),
+	getGlobalMetricsTracker: mockGetGlobalMetricsTracker,
 	startTimer: jest.fn(() => ({
 		end: jest.fn(() => 1.5),
 	})),
@@ -150,6 +129,7 @@ describe("scrape.ts", () => {
 			debug: jest.fn<any>(),
 			warn: jest.fn<any>(),
 			error: jest.fn<any>(),
+			errorWithScreenshot: jest.fn<any>(),
 		};
 		mockCreateLogger.mockReturnValue(mockLogger);
 
@@ -183,6 +163,31 @@ describe("scrape.ts", () => {
 		mockQueueNext.mockReturnValue(null);
 		mockWasDmSent.mockReturnValue(false);
 		mockWasFollowed.mockReturnValue(false);
+
+		// Set up default metrics tracker mock
+		mockGetGlobalMetricsTracker.mockReturnValue({
+			recordProfileVisit: jest.fn(),
+			recordCreatorFound: jest.fn(),
+			recordVisionApiCall: jest.fn(),
+			recordDMSent: jest.fn(),
+			recordFollowCompleted: jest.fn(),
+			recordError: jest.fn(),
+			endSession: jest.fn(),
+			getSessionMetrics: jest.fn(() => ({
+				sessionId: "test-session",
+				startTime: new Date(),
+				profilesVisited: 0,
+				creatorsFound: 0,
+				dmsSent: 0,
+				followsCompleted: 0,
+				errorsEncountered: 0,
+				rateLimitsHit: 0,
+				totalProcessingTime: 0,
+				visionApiCalls: 0,
+				visionApiCost: 0,
+			})),
+			getSessionId: jest.fn(() => "test-session"),
+		});
 	});
 
 	describe("loadSeeds", () => {
@@ -458,6 +463,201 @@ user2
 				"creatoruser",
 			);
 			expect(mockAddFollowingToQueue).toHaveBeenCalled();
+		});
+
+		it("handles navigation errors gracefully", async () => {
+			const { processProfile } = await import("./scrape.ts");
+
+			mockNavigateToProfileAndCheck.mockRejectedValue(
+				new Error("Network timeout"),
+			);
+
+			await processProfile("erroruser", mockPage, "test_source", mockLogger);
+
+			expect(mockLogger.errorWithScreenshot).toHaveBeenCalledWith(
+				"ERROR",
+				"Failed to load profile @erroruser: Network timeout",
+				mockPage,
+				"profile_load_erroruser",
+			);
+		});
+
+		it("handles DM sending errors", async () => {
+			const { processProfile } = await import("./scrape.ts");
+
+			mockAnalyzeProfileBasic.mockResolvedValue({
+				bio: "Test bio",
+				bioScore: 90,
+				linkFromBio: null,
+				isLikely: true,
+			});
+			mockSendDMToUser.mockResolvedValue(false); // DM fails
+			mockWasDmSent.mockReturnValue(false);
+			mockWasFollowed.mockReturnValue(false);
+
+			await processProfile("dmerror", mockPage, "test_source", mockLogger);
+
+			expect(mockSendDMToUser).toHaveBeenCalledWith(mockPage, "dmerror");
+			// Should still try to follow even if DM fails
+			expect(mockFollowUserAccount).toHaveBeenCalledWith(mockPage, "dmerror");
+		});
+
+		it("handles follow action errors", async () => {
+			const { processProfile } = await import("./scrape.ts");
+
+			mockAnalyzeProfileBasic.mockResolvedValue({
+				bio: "Test bio",
+				bioScore: 90,
+				linkFromBio: null,
+				isLikely: true,
+			});
+			mockSendDMToUser.mockResolvedValue(true); // DM succeeds
+			mockFollowUserAccount.mockResolvedValue(false); // Follow fails
+			mockWasDmSent.mockReturnValue(false);
+			mockWasFollowed.mockReturnValue(false);
+
+			await processProfile("followerror", mockPage, "test_source", mockLogger);
+
+			expect(mockSendDMToUser).toHaveBeenCalledWith(mockPage, "followerror");
+			expect(mockFollowUserAccount).toHaveBeenCalledWith(mockPage, "followerror");
+			// Should still mark as creator and add to queue even if follow fails
+			expect(mockMarkAsCreator).toHaveBeenCalledWith("followerror", 90, null);
+			expect(mockAddFollowingToQueue).toHaveBeenCalled();
+		});
+
+		it("handles following queue addition errors", async () => {
+			const { processProfile } = await import("./scrape.ts");
+
+			mockAnalyzeProfileBasic.mockResolvedValue({
+				bio: "Test bio",
+				bioScore: 90,
+				linkFromBio: null,
+				isLikely: true,
+			});
+			mockSendDMToUser.mockResolvedValue(true); // DM succeeds
+			mockFollowUserAccount.mockResolvedValue(true); // Follow succeeds
+			mockAddFollowingToQueue.mockResolvedValue(0); // Queue addition "fails" (returns 0)
+			mockWasDmSent.mockReturnValue(false);
+			mockWasFollowed.mockReturnValue(false);
+
+			await processProfile("queueerror", mockPage, "test_source", mockLogger);
+
+			expect(mockSendDMToUser).toHaveBeenCalledWith(mockPage, "queueerror");
+			expect(mockFollowUserAccount).toHaveBeenCalledWith(mockPage, "queueerror");
+			expect(mockMarkAsCreator).toHaveBeenCalledWith("queueerror", 90, null);
+			expect(mockAddFollowingToQueue).toHaveBeenCalled();
+		});
+
+		it("records metrics for profile visits", async () => {
+			const { processProfile } = await import("./scrape.ts");
+
+			const mockMetricsTracker = {
+				recordProfileVisit: jest.fn(),
+				recordCreatorFound: jest.fn(),
+				recordVisionApiCall: jest.fn(),
+				recordDMSent: jest.fn(),
+				recordFollowCompleted: jest.fn(),
+				recordError: jest.fn(),
+			};
+			mockGetGlobalMetricsTracker.mockReturnValue(mockMetricsTracker);
+
+			mockAnalyzeProfileBasic.mockResolvedValue({
+				bio: "Test bio with content",
+				bioScore: 45,
+				linkFromBio: null,
+				isLikely: true,
+			});
+
+			await processProfile(
+				"metricsuser",
+				mockPage,
+				"following_of_source",
+				mockLogger,
+				mockMetricsTracker,
+			);
+
+			expect(mockMetricsTracker.recordProfileVisit).toHaveBeenCalledWith(
+				"metricsuser",
+				expect.any(Number), // processing time
+				"following_of_source",
+				2, // discovery depth (following_of_ has 2 underscores)
+				"source", // source profile
+				[], // contentCategories will be filled later if creator found
+				0, // visionApiCalls will be updated later
+			);
+		});
+
+		it("records creator found metrics", async () => {
+			const { processProfile } = await import("./scrape.ts");
+
+			const mockMetricsTracker = {
+				recordProfileVisit: jest.fn(),
+				recordCreatorFound: jest.fn(),
+				recordVisionApiCall: jest.fn(),
+				recordDMSent: jest.fn(),
+				recordFollowCompleted: jest.fn(),
+				recordError: jest.fn(),
+			};
+			mockGetGlobalMetricsTracker.mockReturnValue(mockMetricsTracker);
+
+			mockAnalyzeProfileBasic.mockResolvedValue({
+				bio: "Test bio",
+				bioScore: 80,
+				linkFromBio: null,
+				isLikely: true,
+			});
+			mockWasDmSent.mockReturnValue(false);
+			mockWasFollowed.mockReturnValue(false);
+
+			await processProfile(
+				"creatoruser",
+				mockPage,
+				"test_source",
+				mockLogger,
+				mockMetricsTracker,
+			);
+
+			expect(mockMetricsTracker.recordCreatorFound).toHaveBeenCalledWith(
+				"creatoruser",
+				80,
+				0, // vision api calls
+			);
+			expect(mockMetricsTracker.recordDMSent).toHaveBeenCalledWith("creatoruser");
+			expect(mockMetricsTracker.recordFollowCompleted).toHaveBeenCalledWith(
+				"creatoruser",
+			);
+		});
+
+		it("records error metrics on navigation failure", async () => {
+			const { processProfile } = await import("./scrape.ts");
+
+			const mockMetricsTracker = {
+				recordProfileVisit: jest.fn(),
+				recordCreatorFound: jest.fn(),
+				recordVisionApiCall: jest.fn(),
+				recordDMSent: jest.fn(),
+				recordFollowCompleted: jest.fn(),
+				recordError: jest.fn(),
+			};
+			mockGetGlobalMetricsTracker.mockReturnValue(mockMetricsTracker);
+
+			mockNavigateToProfileAndCheck.mockRejectedValue(
+				new Error("Navigation failed"),
+			);
+
+			await processProfile(
+				"erroruser",
+				mockPage,
+				"test_source",
+				mockLogger,
+				mockMetricsTracker,
+			);
+
+			expect(mockMetricsTracker.recordError).toHaveBeenCalledWith(
+				"erroruser",
+				"profile_load_failed",
+				"Navigation failed",
+			);
 		});
 	});
 
