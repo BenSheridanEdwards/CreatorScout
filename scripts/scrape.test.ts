@@ -886,6 +886,7 @@ user2
 		beforeEach(() => {
 			mockExtractFollowingUsernames.mockResolvedValue(["user1", "user2"]);
 			mockOpenFollowingModal.mockResolvedValue(true);
+			mockWasVisited.mockReturnValue(false);
 		});
 
 		it("stops after consecutive all-visited batches", async () => {
@@ -947,6 +948,413 @@ user2
 				},
 			);
 			expect(mockOpenFollowingModal).toHaveBeenCalled();
+		});
+
+		it("handles seed profile not found", async () => {
+			const { processFollowingList } = await import("./scrape.ts");
+
+			mockNavigateToProfileAndCheck.mockResolvedValue({
+				notFound: true,
+				isPrivate: false,
+			});
+
+			await processFollowingList("notfoundseed", mockPage, mockLogger);
+
+			expect(mockLogger.warn).toHaveBeenCalledWith(
+				"PROFILE",
+				"Seed profile @notfoundseed is not found",
+			);
+			expect(mockOpenFollowingModal).not.toHaveBeenCalled();
+		});
+
+		it("handles private seed profile", async () => {
+			const { processFollowingList } = await import("./scrape.ts");
+
+			mockNavigateToProfileAndCheck.mockResolvedValue({
+				notFound: false,
+				isPrivate: true,
+			});
+
+			await processFollowingList("privateseed", mockPage, mockLogger);
+
+			expect(mockLogger.warn).toHaveBeenCalledWith(
+				"PROFILE",
+				"Seed profile @privateseed is private",
+			);
+			expect(mockOpenFollowingModal).not.toHaveBeenCalled();
+		});
+
+		it("handles seed profile navigation errors", async () => {
+			const { processFollowingList } = await import("./scrape.ts");
+
+			mockNavigateToProfileAndCheck.mockRejectedValue(
+				new Error("Navigation failed"),
+			);
+
+			await processFollowingList("errorseed", mockPage, mockLogger);
+
+			expect(mockLogger.errorWithScreenshot).toHaveBeenCalledWith(
+				"ERROR",
+				"Failed to load seed profile @errorseed: Navigation failed",
+				mockPage,
+				"seed_profile_load_errorseed",
+			);
+		});
+
+		it("handles modal opening failure", async () => {
+			const { processFollowingList } = await import("./scrape.ts");
+
+			mockOpenFollowingModal.mockResolvedValue(false);
+
+			await processFollowingList("modalerror", mockPage, mockLogger);
+
+			expect(mockLogger.errorWithScreenshot).toHaveBeenCalledWith(
+				"ERROR",
+				"Could not open following modal for @modalerror",
+				mockPage,
+				"modal_open_modalerror",
+			);
+		});
+
+		it("handles scroll index restoration", async () => {
+			const { processFollowingList } = await import("./scrape.ts");
+
+			mockGetScrollIndex.mockReturnValue(1000); // Already scrolled
+			mockWasVisited.mockReturnValue(false);
+			mockExtractFollowingUsernames.mockResolvedValue(["user1"]);
+
+			await processFollowingList("scrollseed", mockPage, mockLogger);
+
+			// Initial scroll to position: Math.floor(1000/500) = 2 scrolls
+			// After processing profile, scroll back: Math.floor(1000/500) = 2 scrolls
+			// Total: 4 scrolls
+			expect(mockScrollFollowingModal).toHaveBeenCalledTimes(4);
+		});
+
+		it("handles scroll restoration after profile processing", async () => {
+			const { processFollowingList } = await import("./scrape.ts");
+
+			mockGetScrollIndex.mockReturnValue(500);
+			mockWasVisited.mockReturnValue(false);
+			mockExtractFollowingUsernames.mockResolvedValue(["user1"]);
+
+			await processFollowingList("scrollrestore", mockPage, mockLogger);
+
+			// Should scroll back to position after processing profile
+			expect(mockNavigateToProfileAndCheck).toHaveBeenCalledWith(
+				mockPage,
+				"scrollrestore",
+				{ timeout: 15000 },
+			);
+			expect(mockOpenFollowingModal).toHaveBeenCalled();
+			// Scroll restoration: 500 / 500 = 1 scroll
+			expect(mockScrollFollowingModal).toHaveBeenCalledWith(mockPage, 500);
+		});
+
+		it("handles ensureLoggedIn errors", async () => {
+			const { processFollowingList } = await import("./scrape.ts");
+
+			mockEnsureLoggedIn.mockRejectedValue(new Error("Login failed"));
+
+			await processFollowingList("loginerror", mockPage, mockLogger);
+
+			expect(mockLogger.errorWithScreenshot).toHaveBeenCalledWith(
+				"ERROR",
+				"Failed to load seed profile @loginerror: Login failed",
+				mockPage,
+				"seed_profile_load_loginerror",
+			);
+		});
+
+		it("handles empty following list", async () => {
+			const { processFollowingList } = await import("./scrape.ts");
+
+			// Override the default mock
+			mockExtractFollowingUsernames.mockResolvedValue([]);
+
+			await processFollowingList("emptyseed", mockPage, mockLogger);
+
+			expect(mockLogger.debug).toHaveBeenCalledWith(
+				"NAVIGATION",
+				"No more usernames in modal",
+			);
+		});
+	});
+
+	describe("runScrapeLoop", () => {
+		beforeEach(() => {
+			mockQueueNext.mockReturnValue("testuser");
+			mockQueueCount.mockReturnValue(5);
+			mockGetStats.mockReturnValue({
+				total_visited: 10,
+				confirmed_creators: 3,
+				dms_sent: 2,
+				queue_size: 5,
+			});
+			mockProcessFollowingList.mockResolvedValue(undefined);
+		});
+
+		it("processes profiles from queue until DM limit reached", async () => {
+			const { runScrapeLoop } = await import("./scrape.ts");
+
+			// Set DM limit to 2, so it should process 2 profiles then stop
+			mockGetStats.mockReturnValue({
+				total_visited: 10,
+				confirmed_creators: 3,
+				dms_sent: 2,
+				queue_size: 5,
+			});
+
+			await runScrapeLoop(mockPage, mockLogger, mockGetGlobalMetricsTracker());
+
+			// Should call processFollowingList for the user
+			expect(mockProcessFollowingList).toHaveBeenCalledWith(
+				"testuser",
+				mockPage,
+				mockLogger,
+				expect.any(Object),
+			);
+		});
+
+		it("waits when queue is empty", async () => {
+			const { runScrapeLoop } = await import("./scrape.ts");
+
+			mockQueueNext
+				.mockReturnValueOnce("user1")
+				.mockReturnValueOnce(null); // Empty queue
+
+			mockGetStats.mockReturnValue({
+				total_visited: 10,
+				confirmed_creators: 3,
+				dms_sent: 25, // Over limit
+				queue_size: 0,
+			});
+
+			await runScrapeLoop(mockPage, mockLogger, mockGetGlobalMetricsTracker());
+
+			expect(mockSleep).toHaveBeenCalled();
+			expect(mockLogger.debug).toHaveBeenCalledWith(
+				"QUEUE",
+				expect.stringContaining("Queue empty - sleeping"),
+			);
+		});
+
+		it("reports stats after each profile processing", async () => {
+			const { runScrapeLoop } = await import("./scrape.ts");
+
+			mockQueueNext
+				.mockReturnValueOnce("user1")
+				.mockReturnValueOnce(null); // Stop after one
+
+			mockGetStats.mockReturnValue({
+				total_visited: 10,
+				confirmed_creators: 3,
+				dms_sent: 25, // Over limit to stop
+				queue_size: 0,
+			});
+
+			await runScrapeLoop(mockPage, mockLogger, mockGetGlobalMetricsTracker());
+
+			expect(mockLogger.info).toHaveBeenCalledWith(
+				"STATS",
+				"Visited: 10 | Creators: 3 | DMs: 25 | Queue: 0",
+			);
+		});
+
+		it("reports final stats when loop ends", async () => {
+			const { runScrapeLoop } = await import("./scrape.ts");
+
+			mockQueueNext.mockReturnValue(null); // Empty queue from start
+
+			mockGetStats.mockReturnValue({
+				total_visited: 100,
+				confirmed_creators: 15,
+				dms_sent: 25, // At limit
+				queue_size: 0,
+			});
+
+			await runScrapeLoop(mockPage, mockLogger, mockGetGlobalMetricsTracker());
+
+			expect(mockLogger.info).toHaveBeenCalledWith(
+				"STATS",
+				"Session complete! Total visited: 100",
+			);
+			expect(mockLogger.info).toHaveBeenCalledWith(
+				"STATS",
+				"Confirmed creators: 15",
+			);
+			expect(mockLogger.info).toHaveBeenCalledWith("STATS", "DMs sent: 25");
+		});
+
+		it("handles delays between seed profiles", async () => {
+			const { runScrapeLoop } = await import("./scrape.ts");
+
+			mockQueueNext
+				.mockReturnValueOnce("user1")
+				.mockReturnValueOnce("user2")
+				.mockReturnValueOnce(null);
+
+			mockGetStats
+				.mockReturnValueOnce({
+					total_visited: 10,
+					confirmed_creators: 3,
+					dms_sent: 1,
+					queue_size: 5,
+				})
+				.mockReturnValueOnce({
+					total_visited: 20,
+					confirmed_creators: 6,
+					dms_sent: 25, // Hit limit
+					queue_size: 3,
+				});
+
+			mockGetDelay.mockReturnValue([30, 60]); // 30-60 second delay
+
+			await runScrapeLoop(mockPage, mockLogger, mockGetGlobalMetricsTracker());
+
+			expect(mockSleep).toHaveBeenCalled();
+			expect(mockLogger.debug).toHaveBeenCalledWith(
+				"DELAY",
+				expect.stringContaining("Waiting"),
+			);
+		});
+	});
+
+	describe("scrape", () => {
+		let mockBrowser: any;
+		let mockCreateBrowser: jest.MockedFunction<any>;
+		let mockCreatePage: jest.MockedFunction<any>;
+
+		beforeEach(() => {
+			mockBrowser = {
+				close: jest.fn().mockResolvedValue(undefined),
+				newPage: jest.fn().mockResolvedValue({
+					// Mock page for error handling
+				}),
+			};
+			mockCreateBrowser = jest.fn().mockResolvedValue(mockBrowser);
+			mockCreatePage = jest.fn().mockResolvedValue(mockPage);
+
+			// Mock browser and page creation
+			jest.unstable_mockModule("../functions/navigation/browser/browser.ts", () => ({
+				createBrowser: mockCreateBrowser,
+				createPage: mockCreatePage,
+			}));
+
+			mockLoadSeeds.mockReturnValue(3); // Successfully loaded seeds
+			mockRunScrapeLoop.mockResolvedValue(undefined);
+			mockEnsureLoggedIn.mockResolvedValue(undefined);
+		});
+
+		it("runs successful scraping workflow", async () => {
+			const { scrape } = await import("./scrape.ts");
+
+			await scrape();
+
+			expect(mockCreateBrowser).toHaveBeenCalledWith({ headless: true });
+			expect(mockCreatePage).toHaveBeenCalledWith(mockBrowser);
+			expect(mockEnsureLoggedIn).toHaveBeenCalledWith(mockPage);
+			expect(mockLoadSeeds).toHaveBeenCalled();
+			expect(mockRunScrapeLoop).toHaveBeenCalledWith(
+				mockPage,
+				expect.any(Object), // logger
+				expect.any(Object), // metrics tracker
+			);
+			expect(mockBrowser.close).toHaveBeenCalled();
+		});
+
+		it("handles browser creation failure", async () => {
+			const { scrape } = await import("./scrape.ts");
+
+			mockCreateBrowser.mockRejectedValue(new Error("Browser failed"));
+
+			await expect(scrape()).rejects.toThrow("Browser failed");
+		});
+
+		it("handles login failure", async () => {
+			const { scrape } = await import("./scrape.ts");
+
+			mockEnsureLoggedIn.mockRejectedValue(new Error("Login failed"));
+
+			await expect(scrape()).rejects.toThrow("Login failed");
+
+			expect(mockBrowser.close).toHaveBeenCalled();
+		});
+
+		it("handles no seeds loaded", async () => {
+			const { scrape } = await import("./scrape.ts");
+
+			mockLoadSeeds.mockReturnValue(0);
+
+			await scrape();
+
+			expect(mockLogger.warn).toHaveBeenCalledWith(
+				"QUEUE",
+				"No seeds.txt found or no seeds loaded!",
+			);
+			expect(mockRunScrapeLoop).not.toHaveBeenCalled();
+			expect(mockBrowser.close).toHaveBeenCalled();
+		});
+
+		it("handles fatal error during scraping", async () => {
+			const { scrape } = await import("./scrape.ts");
+
+			mockRunScrapeLoop.mockRejectedValue(new Error("Scraping failed"));
+
+			await expect(scrape()).rejects.toThrow("Scraping failed");
+
+			expect(mockBrowser.close).toHaveBeenCalled();
+		});
+
+		it("handles debug mode", async () => {
+			const { scrape } = await import("./scrape.ts");
+
+			await scrape(true); // debug = true
+
+			expect(mockCreateLogger).toHaveBeenCalledWith(true);
+		});
+
+		it("handles browser close failure gracefully", async () => {
+			const { scrape } = await import("./scrape.ts");
+
+			mockBrowser.close.mockRejectedValue(new Error("Close failed"));
+
+			// Should not throw even if browser close fails
+			await expect(scrape()).resolves.not.toThrow();
+		});
+
+		it("initializes metrics tracker", async () => {
+			const { scrape } = await import("./scrape.ts");
+
+			await scrape();
+
+			expect(mockGetGlobalMetricsTracker).toHaveBeenCalled();
+			expect(mockLogger.info).toHaveBeenCalledWith(
+				"METRICS",
+				expect.stringContaining("Started session tracking"),
+			);
+		});
+
+		it("ends metrics session on completion", async () => {
+			const { scrape } = await import("./scrape.ts");
+
+			const mockMetricsTracker = {
+				endSession: jest.fn(),
+				getSessionMetrics: jest.fn(() => ({
+					profilesVisited: 100,
+					creatorsFound: 15,
+					dmsSent: 10,
+				})),
+			};
+			mockGetGlobalMetricsTracker.mockReturnValue(mockMetricsTracker);
+
+			await scrape();
+
+			expect(mockMetricsTracker.endSession).toHaveBeenCalled();
+			expect(mockLogger.info).toHaveBeenCalledWith(
+				"METRICS",
+				"Session completed - Profiles: 100, Creators: 15, DMs: 10",
+			);
 		});
 	});
 });
