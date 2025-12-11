@@ -12,7 +12,12 @@ import {
 } from '../../shared/config/config.ts';
 
 // Initialize puppeteer-extra with stealth plugin
-(puppeteer as any).use(StealthPlugin());
+const extra = puppeteer as unknown as {
+  use: (plugin: unknown) => void;
+  launch: (options: object) => Promise<Browser>;
+  connect: (options: object) => Promise<Browser>;
+};
+extra.use(StealthPlugin());
 
 export interface BrowserOptions {
   headless?: boolean;
@@ -41,7 +46,7 @@ export async function createBrowser(
         ? providedUserDataDir
         : getUserDataDir();
 
-    return await (puppeteer as any).launch({
+    return await extra.launch({
       headless,
       args: ['--no-sandbox', '--disable-dev-shm-usage'],
       userDataDir, // Persistent profile to save cookies
@@ -52,7 +57,7 @@ export async function createBrowser(
         'BROWSERLESS_TOKEN must be set when not using LOCAL_BROWSER'
       );
     }
-    return await (puppeteer as any).connect({
+    return await extra.connect({
       browserWSEndpoint: `wss://chrome.browserless.io?token=${BROWSERLESS_TOKEN}`,
     });
   }

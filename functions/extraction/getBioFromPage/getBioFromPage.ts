@@ -1,5 +1,5 @@
 import type { Page } from 'puppeteer';
-import { snapshot } from '../snapshot/snapshot.ts';
+import { snapshot } from '../../shared/snapshot/snapshot.ts';
 
 export async function getBioFromPage(page: Page): Promise<string | null> {
   const selectors = [
