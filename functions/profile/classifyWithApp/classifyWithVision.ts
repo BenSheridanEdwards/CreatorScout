@@ -2,10 +2,9 @@ import type { VisionData } from "../../shared/types/types.ts";
 import { isConfirmedCreator } from "../vision/vision.ts";
 
 /**
- * Call the TypeScript vision pipeline.
- * This replaces the Python version.
+ * Call the TypeScript vision pipeline for an image and return a normalized result.
  */
-export async function classifyWithApp(
+export async function classifyWithVision(
 	imagePath: string,
 	threshold: number = 70,
 ): Promise<{ ok: boolean; data: VisionData }> {

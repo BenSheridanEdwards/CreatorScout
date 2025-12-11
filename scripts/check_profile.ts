@@ -26,7 +26,7 @@ import {
 	ensureLoggedIn,
 	navigateToProfileAndCheck,
 } from "../functions/navigation/profileNavigation/profileNavigation.ts";
-import { classifyWithApp } from "../functions/profile/classifyWithApp/classifyWithApp.ts";
+import { classifyWithVision } from "../functions/profile/classifyWithApp/classifyWithVision.ts";
 import { analyzeProfileComprehensive } from "../functions/profile/profileAnalysis/profileAnalysis.ts";
 import { snapshot } from "../functions/shared/snapshot/snapshot.ts";
 import type { ProfileCheckResult } from "../functions/shared/types/types.ts";
@@ -196,7 +196,7 @@ async function runProfileCheck(username: string): Promise<ProfileCheckResult> {
 					console.log(`      Screenshot saved: ${shot}`);
 
 					console.log("      Running vision pipeline...");
-					const visionResult = await classifyWithApp(shot);
+					const visionResult = await classifyWithVision(shot);
 					if (visionResult.ok) {
 						console.log(
 							`      ✅ Vision detected creator (confidence: ${

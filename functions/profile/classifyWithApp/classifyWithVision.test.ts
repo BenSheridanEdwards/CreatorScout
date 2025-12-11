@@ -17,9 +17,9 @@ jest.unstable_mockModule("../vision/vision.ts", () => ({
 	isConfirmedCreator: isConfirmedCreatorMock,
 }));
 
-const { classifyWithApp } = await import("./classifyWithApp.ts");
+const { classifyWithVision } = await import("./classifyWithVision.ts");
 
-describe("classifyWithApp", () => {
+describe("classifyWithVision", () => {
 	beforeEach(() => {
 		jest.clearAllMocks();
 	});
@@ -27,7 +27,7 @@ describe("classifyWithApp", () => {
 	test("handles vision error gracefully", async () => {
 		isConfirmedCreatorMock.mockRejectedValue(new Error("boom"));
 
-		const res = await classifyWithApp("/nonexistent/image.png");
+		const res = await classifyWithVision("/nonexistent/image.png");
 
 		expect(res.ok).toBe(false);
 		expect(res.data.error).toContain("vision_error");
@@ -36,7 +36,7 @@ describe("classifyWithApp", () => {
 	test("returns ok false when vision returns null data", async () => {
 		isConfirmedCreatorMock.mockResolvedValue([false, null]);
 
-		const res = await classifyWithApp("path");
+		const res = await classifyWithVision("path");
 
 		expect(res.ok).toBe(false);
 		expect(res.data).toMatchObject({ error: "vision_analysis_failed" });
@@ -48,7 +48,7 @@ describe("classifyWithApp", () => {
 			{ confidence: 88, reason: "test", indicators: ["a"] },
 		]);
 
-		const res = await classifyWithApp("img", 70);
+		const res = await classifyWithVision("img", 70);
 
 		expect(isConfirmedCreatorMock).toHaveBeenCalledWith("img", 70);
 		expect(res.ok).toBe(true);
