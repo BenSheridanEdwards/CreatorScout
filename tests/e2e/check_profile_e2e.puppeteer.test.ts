@@ -63,7 +63,7 @@ testSuite("check_profile", () => {
 		}
 		if (res.indicators && res.indicators.length > 0) {
 			console.log(`   Indicators:`);
-			res.indicators.forEach((indicator, idx) => {
+			res.indicators.forEach((indicator) => {
 				console.log(`     - ${indicator}`);
 			});
 		}

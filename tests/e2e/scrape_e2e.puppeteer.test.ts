@@ -112,7 +112,7 @@ describe("Scout E2E Test Suite", () => {
 		if (!username || !password) {
 			throw new Error("Missing credentials");
 		}
-		await login(page, { username, password }, { skipIfLoggedIn: true });
+		await login(page, { username, password });
 	}, 60000);
 
 	afterEach(async () => {
