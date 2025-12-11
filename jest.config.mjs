@@ -22,6 +22,7 @@ export default {
 	testMatch: [
 		"**/functions/**/*.test.ts", // Collocated function tests
 		"**/tests/**/*.test.ts", // Legacy/unit tests
+		"**/scripts/**/*.test.ts", // Script tests
 	],
 	testPathIgnorePatterns: [
 		"/node_modules/",

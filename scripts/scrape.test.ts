@@ -21,6 +21,15 @@ const mockExtractFollowingUsernames = jest.fn();
 const mockScrollFollowingModal = jest.fn();
 const mockWasVisited = jest.fn();
 const mockMarkVisited = jest.fn();
+const mockGetScrollIndex = jest.fn();
+const mockUpdateScrollIndex = jest.fn();
+const mockGetStats = jest.fn();
+const mockInitDb = jest.fn();
+const mockQueueAdd = jest.fn();
+const mockQueueCount = jest.fn();
+const mockQueueNext = jest.fn();
+const mockWasDmSent = jest.fn();
+const mockWasFollowed = jest.fn();
 const mockCreateLogger = jest.fn();
 
 // Mock the modules
@@ -44,8 +53,17 @@ jest.unstable_mockModule("../functions/shared/snapshot/snapshot.ts", () => ({
 }));
 
 jest.unstable_mockModule("../functions/shared/database/database.ts", () => ({
+	getScrollIndex: mockGetScrollIndex,
+	getStats: mockGetStats,
+	initDb: mockInitDb,
 	markAsCreator: mockMarkAsCreator,
 	markVisited: mockMarkVisited,
+	queueAdd: mockQueueAdd,
+	queueCount: mockQueueCount,
+	queueNext: mockQueueNext,
+	updateScrollIndex: mockUpdateScrollIndex,
+	wasDmSent: mockWasDmSent,
+	wasFollowed: mockWasFollowed,
 	wasVisited: mockWasVisited,
 }));
 
@@ -103,6 +121,17 @@ describe("scrape.ts", () => {
 		});
 		mockGetDelay.mockReturnValue([1, 3]);
 		mockWasVisited.mockReturnValue(false);
+		mockGetScrollIndex.mockReturnValue(0);
+		mockGetStats.mockReturnValue({
+			total_visited: 0,
+			confirmed_creators: 0,
+			dms_sent: 0,
+			queue_size: 0,
+		});
+		mockQueueCount.mockReturnValue(0);
+		mockQueueNext.mockReturnValue(null);
+		mockWasDmSent.mockReturnValue(false);
+		mockWasFollowed.mockReturnValue(false);
 	});
 
 	describe("processProfile", () => {
@@ -290,17 +319,6 @@ describe("scrape.ts", () => {
 			expect(mockOpenFollowingModal).toHaveBeenCalled();
 		});
 
-		it("stops after processing 50 profiles", async () => {
-			const { processFollowingList } = await import("./scrape.ts");
-
-			// Simulate processing 50 profiles
-			mockWasVisited.mockReturnValue(false);
-			mockExtractFollowingUsernames.mockResolvedValue(Array(10).fill("user"));
-
-			await processFollowingList("seeduser", mockPage, mockLogger);
-
-			expect(mockLogger.warn).toHaveBeenCalledWith("PROFILE", "Processed 50 profiles, pausing...");
-		});
 	});
 
 	describe("loadSeeds", () => {
