@@ -326,8 +326,10 @@ export async function processFollowingList(
 
 	let processedInBatch = 0;
 	const batchSize = 10;
+	let consecutiveAllVisited = 0;
+	const maxConsecutiveAllVisited = 3;
 
-	while (true) {
+	while (consecutiveAllVisited < maxConsecutiveAllVisited) {
 		// Extract usernames from modal
 		const usernames = await extractFollowingUsernames(page, batchSize);
 
@@ -360,15 +362,17 @@ export async function processFollowingList(
 
 		// If all in batch were already visited, scroll for more
 		if (allVisited) {
+			consecutiveAllVisited++;
 			logger.debug(
 				"NAVIGATION",
-				"All profiles in batch already visited, scrolling...",
+				`All profiles in batch already visited (${consecutiveAllVisited}/${maxConsecutiveAllVisited})`,
 			);
 			await scrollFollowingModal(page, 500);
 			scrollIndex += 500;
 			updateScrollIndex(seedUsername, scrollIndex);
 			await sleep(2000);
 		} else {
+			consecutiveAllVisited = 0;
 			// Processed new profiles, continue with next batch
 			break;
 		}
