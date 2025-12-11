@@ -24,6 +24,9 @@ const { IG_USER, IG_PASS } = await import(
 	"../functions/shared/config/config.ts"
 );
 
+// Check if inspect mode is enabled
+const inspectMode = process.env.INSPECT_MODE === "true";
+
 async function main() {
 	const username = IG_USER || process.env.INSTAGRAM_USERNAME;
 	const password = IG_PASS || process.env.INSTAGRAM_PASSWORD;
@@ -61,8 +64,8 @@ async function main() {
 			},
 		);
 	} finally {
-		// Only close browser automatically for headless/browserless mode
-		if (!usingLocalBrowser) {
+		// Close browser automatically for headless/browserless mode, or when inspect mode is disabled
+		if (!usingLocalBrowser || !inspectMode) {
 			await browser.close();
 		} else {
 			console.log(

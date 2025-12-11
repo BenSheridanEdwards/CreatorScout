@@ -133,12 +133,12 @@ describe("browser helpers", () => {
 		} as unknown as Page;
 		const mockBrowser = {
 			newPage: jest.fn<() => Promise<Page>>().mockResolvedValue(mockPage),
+			pages: jest.fn<() => Promise<Page[]>>().mockResolvedValue([mockPage]),
 		} as unknown as Browser;
 
 		const { createPage } = await loadBrowserModule();
 		await createPage(mockBrowser);
 
-		expect(mockBrowser.newPage).toHaveBeenCalled();
 		expect(mockPage.setDefaultNavigationTimeout).toHaveBeenCalledWith(20000);
 		expect(mockPage.setDefaultTimeout).toHaveBeenCalledWith(12000);
 		expect(mockPage.setViewport).toHaveBeenCalledWith({
@@ -157,6 +157,7 @@ describe("browser helpers", () => {
 		} as unknown as Page;
 		const mockBrowser = {
 			newPage: jest.fn<() => Promise<Page>>().mockResolvedValue(mockPage),
+			pages: jest.fn<() => Promise<Page[]>>().mockResolvedValue([mockPage]),
 		} as unknown as Browser;
 
 		const { createPage } = await loadBrowserModule();

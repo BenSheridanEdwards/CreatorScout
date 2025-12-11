@@ -56,14 +56,6 @@ export async function createBrowser(
 			userDataDir, // Persistent profile to save cookies
 		});
 
-		// Close any existing pages to start fresh (avoids multiple tabs from previous sessions)
-		const pages = await browser.pages();
-		for (const page of pages) {
-			if (page.url() !== "about:blank") {
-				await page.close();
-			}
-		}
-
 		return browser;
 	} else {
 		if (!BROWSERLESS_TOKEN) {
@@ -91,7 +83,18 @@ export async function createPage(
 		userAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
 	} = options;
 
-	const page = await browser.newPage();
+	// Close any extra pages from previous sessions to avoid multiple tabs
+	const pages = await browser.pages();
+	for (let i = 1; i < pages.length; i++) {
+		await pages[i].close();
+	}
+
+	// Use the first (remaining) page, or create a new one if none exist
+	let page: Page = pages[0];
+	if (!page) {
+		page = await browser.newPage();
+	}
+
 	page.setDefaultNavigationTimeout(defaultNavigationTimeout);
 	page.setDefaultTimeout(defaultTimeout);
 	await page.setViewport(viewport);
