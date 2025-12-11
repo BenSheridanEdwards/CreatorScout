@@ -129,3 +129,17 @@ class LoggerImpl implements Logger {
 export function createLogger(debug: boolean = false): Logger {
 	return new LoggerImpl(debug);
 }
+
+// Re-export enhanced logging functionality
+export { createEnhancedLogger, type EnhancedLogger } from "./enhancedLogger.ts";
+export {
+	CycleManager,
+	type CycleContext,
+	type CycleError,
+	type CycleWarning,
+} from "./cycleManager.ts";
+export {
+	createLoggingIntegration,
+	createLoggerWithCycleTracking,
+	type LoggingConfig,
+} from "./loggingIntegration.ts";
