@@ -348,6 +348,11 @@ export async function processFollowingList(
 		for (const username of usernames) {
 			if (!wasVisited(username)) {
 				allVisited = false;
+
+				// Close the modal before visiting profile
+				await page.keyboard.press("Escape");
+				await sleep(1000); // brief delay after modal close
+
 				await processProfile(
 					username,
 					page,
@@ -355,6 +360,23 @@ export async function processFollowingList(
 					logger,
 				);
 				processedInBatch++;
+
+				// Re-open the following modal
+				const status = await navigateToProfileAndCheck(page, seedUsername, {
+					timeout: 15000,
+				});
+				if (!status.notFound && !status.isPrivate) {
+					await openFollowingModal(page);
+
+					// Scroll back to position if needed
+					if (scrollIndex > 0) {
+						logger.debug("NAVIGATION", `Scrolling back to position ${scrollIndex}...`);
+						for (let i = 0; i < Math.floor(scrollIndex / 500); i++) {
+							await scrollFollowingModal(page, 500);
+						}
+						await sleep(2000);
+					}
+				}
 			} else {
 				logger.debug("PROFILE", `@${username} already visited, skipping`);
 			}
