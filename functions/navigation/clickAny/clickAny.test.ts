@@ -3,10 +3,13 @@ import {
 	createPageMock,
 	createPageWithElementMock,
 } from "../../__test__/testUtils.ts";
-import { clickAny } from "./clickAny.ts";
 
-const sleepMock = jest.fn<any>();
-jest.mock("../../timing/sleep/sleep.ts", () => ({ sleep: sleepMock }));
+const sleepMock = jest.fn<() => Promise<void>>();
+jest.unstable_mockModule("../../timing/sleep/sleep.ts", () => ({
+	sleep: sleepMock,
+}));
+
+const { clickAny } = await import("./clickAny.ts");
 
 describe("clickAny", () => {
 	beforeEach(() => {
@@ -43,16 +46,34 @@ describe("clickAny", () => {
 			expect(page.$).toHaveBeenCalledWith(
 				'xpath//button[contains(normalize-space(), "clickable")]',
 			);
+			expect(sleepMock).toHaveBeenCalledWith(200);
+		});
+
+		test("passes click delay and waits once", async () => {
+			const clickMock = jest
+				.fn<() => Promise<void>>()
+				.mockResolvedValue(undefined);
+			const page = createPageMock({
+				$: jest
+					.fn<() => Promise<{ click: () => Promise<void> } | null>>()
+					.mockResolvedValue({ click: clickMock }),
+			});
+
+			const result = await clickAny(page, ["text"]);
+
+			expect(result).toBe(true);
+			expect(clickMock).toHaveBeenCalledWith({ delay: 10 });
+			expect(sleepMock).toHaveBeenCalledTimes(1);
 		});
 
 		test("tries multiple selectors until one succeeds", async () => {
 			const page = createPageMock({
 				$: jest
-					.fn<any>()
+					.fn<() => Promise<{ click: () => Promise<void> } | null>>()
 					.mockResolvedValueOnce(null) // First selector fails
 					.mockResolvedValueOnce(null) // Second selector fails
 					.mockResolvedValue({
-						click: jest.fn<any>().mockResolvedValue(undefined),
+						click: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
 					}), // Third succeeds
 			});
 
