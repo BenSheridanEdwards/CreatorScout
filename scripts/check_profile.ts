@@ -26,7 +26,7 @@ import {
 	ensureLoggedIn,
 	navigateToProfileAndCheck,
 } from "../functions/navigation/profileNavigation/profileNavigation.ts";
-import { classifyWithVision } from "../functions/profile/classifyWithApp/classifyWithVision.ts";
+import { classifyWithVision } from "../functions/profile/classifyWithVision/classifyWithVision.ts";
 import { analyzeProfileComprehensive } from "../functions/profile/profileAnalysis/profileAnalysis.ts";
 import { snapshot } from "../functions/shared/snapshot/snapshot.ts";
 import type { ProfileCheckResult } from "../functions/shared/types/types.ts";
