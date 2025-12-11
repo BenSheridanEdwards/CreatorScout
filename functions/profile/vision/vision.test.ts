@@ -1,3 +1,4 @@
+import { jest } from "@jest/globals";
 import { mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { analyzeLinktree, isConfirmedCreator } from "./vision.ts";
 
@@ -19,6 +20,10 @@ describe("vision", () => {
 			"base64",
 		);
 		writeFileSync(mockImagePath, minimalPng);
+	});
+
+	afterEach(() => {
+		jest.restoreAllMocks();
 	});
 
 	afterAll(() => {
