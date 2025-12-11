@@ -1,16 +1,29 @@
 import { jest } from "@jest/globals";
 import type { Page } from "puppeteer";
-import { saveProof } from "./utils.ts";
 
-jest.mock("node:fs", () => ({ mkdirSync: jest.fn<any>() }));
+const mkdirSync = jest.fn();
+jest.unstable_mockModule("node:fs", () => ({ mkdirSync }));
 
-const screenshot = jest.fn<any>().mockResolvedValue(undefined);
+const screenshot = jest.fn<() => Promise<void>>().mockResolvedValue(undefined);
 const page = { screenshot } as unknown as Page;
 
+const { saveProof } = await import("./utils.ts");
+
 describe("utils", () => {
-	test("saveProof returns path and calls screenshot", async () => {
-		const path = await saveProof("user", page);
-		expect(typeof path).toBe("string");
-		expect(screenshot).toHaveBeenCalled();
+	beforeEach(() => {
+		jest.clearAllMocks();
+	});
+
+	test("saveProof creates screenshots dir and captures with full page", async () => {
+		const path = await saveProof("user123", page);
+
+		expect(mkdirSync).toHaveBeenCalledWith("screenshots", { recursive: true });
+		expect(screenshot).toHaveBeenCalledWith(
+			expect.objectContaining({
+				path: expect.stringContaining("DM_user123_"),
+				fullPage: true,
+			}),
+		);
+		expect(path).toContain("screenshots/DM_user123_");
 	});
 });

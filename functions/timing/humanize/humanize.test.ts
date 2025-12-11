@@ -1,12 +1,18 @@
 import { jest } from "@jest/globals";
-import { delay, getDelay, getTimeout } from "./humanize.ts";
 
-// Mock sleep to avoid actual delays in tests
-jest.mock("../sleep/sleep.ts", () => ({
-	sleep: jest.fn(() => Promise.resolve()),
+const sleepFn = jest.fn<(ms: number) => Promise<void>>(() => Promise.resolve());
+jest.unstable_mockModule("../sleep/sleep.ts", () => ({
+	sleep: sleepFn,
 }));
 
+const { delay, getDelay, getTimeout, humanScroll, mouseWiggle, rnd } =
+	await import("./humanize.ts");
+
 describe("humanize", () => {
+	beforeEach(() => {
+		sleepFn.mockClear();
+	});
+
 	describe("getDelay", () => {
 		test("returns scaled delay tuple", () => {
 			const [min, max] = getDelay("after_navigate");
@@ -41,9 +47,68 @@ describe("humanize", () => {
 
 	describe("delay", () => {
 		test("returns without error", async () => {
-			// Just verify the function completes without error
-			// Actual sleep is mocked to resolve immediately
 			await expect(delay("after_navigate")).resolves.not.toThrow();
+		});
+	});
+
+	describe("rnd", () => {
+		test("uses scaled bounds and calls sleep once", async () => {
+			const originalRandom = Math.random;
+			try {
+				Math.random = () => 0; // determinism -> picks lower bound
+
+				await rnd(1, 2);
+
+				expect(sleepFn).toHaveBeenCalledTimes(1);
+				const ms = sleepFn.mock.calls[0]?.[0] as number | undefined;
+				expect(ms).toBeDefined();
+				expect(ms as number).toBeGreaterThanOrEqual(1000); // lower bound (1s) scaled
+			} finally {
+				Math.random = originalRandom;
+			}
+		});
+	});
+
+	describe("humanScroll", () => {
+		test("scrolls default times and calls delay between", async () => {
+			const page = {
+				evaluate: jest.fn<any>().mockResolvedValue(undefined),
+			} as unknown as import("puppeteer").Page;
+			const originalRandom = Math.random;
+			try {
+				Math.random = () => 0; // determinism: times = 3, scroll distance = min
+
+				await humanScroll(page);
+
+				expect(page.evaluate).toHaveBeenCalledTimes(3);
+				expect(sleepFn).toHaveBeenCalled();
+			} finally {
+				Math.random = originalRandom;
+			}
+		});
+	});
+
+	describe("mouseWiggle", () => {
+		test("moves mouse with step count", async () => {
+			const page = {
+				mouse: {
+					move: jest.fn<any>().mockResolvedValue(undefined),
+				},
+			} as unknown as import("puppeteer").Page;
+			const originalRandom = Math.random;
+			try {
+				Math.random = () => 0; // determinism -> min values and steps
+
+				await mouseWiggle(page);
+
+				expect(page.mouse.move).toHaveBeenCalledWith(
+					expect.any(Number),
+					expect.any(Number),
+					expect.objectContaining({ steps: expect.any(Number) }),
+				);
+			} finally {
+				Math.random = originalRandom;
+			}
 		});
 	});
 });
