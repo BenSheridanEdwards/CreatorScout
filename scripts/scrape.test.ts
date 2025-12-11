@@ -34,6 +34,14 @@ const mockGetDailyMetrics = jest.fn();
 const mockCreateLogger = jest.fn();
 
 // Mock the modules
+jest.unstable_mockModule("node:fs", () => ({
+	existsSync: jest.fn(),
+	readFileSync: jest.fn(),
+	mkdirSync: jest.fn(),
+	writeFileSync: jest.fn(),
+	unlinkSync: jest.fn(),
+}));
+
 jest.unstable_mockModule("../functions/timing/humanize/humanize.ts", () => ({
 	mouseWiggle: mockMouseWiggle,
 	getDelay: mockGetDelay,
@@ -185,6 +193,115 @@ describe("scrape.ts", () => {
 
 			// Should load the seeds from seeds.txt
 			expect(typeof count).toBe("number");
+		});
+
+		it("returns 0 when file does not exist", async () => {
+			// Mock fs for this test
+			const fs = await import("node:fs");
+			const mockExistsSync = fs.existsSync as jest.MockedFunction<any>;
+			mockExistsSync.mockReturnValue(false);
+
+			const { loadSeeds } = await import("./scrape.ts");
+
+			const count = loadSeeds("nonexistent.txt");
+
+			expect(count).toBe(0);
+			expect(mockExistsSync).toHaveBeenCalledWith("nonexistent.txt");
+		});
+
+		it("returns 0 for empty file", async () => {
+			const fs = await import("node:fs");
+			const mockExistsSync = fs.existsSync as jest.MockedFunction<any>;
+			const mockReadFileSync = fs.readFileSync as jest.MockedFunction<any>;
+			mockExistsSync.mockReturnValue(true);
+			mockReadFileSync.mockReturnValue("");
+
+			const { loadSeeds } = await import("./scrape.ts");
+
+			const count = loadSeeds("empty.txt");
+
+			expect(count).toBe(0);
+			expect(mockExistsSync).toHaveBeenCalledWith("empty.txt");
+			expect(mockReadFileSync).toHaveBeenCalledWith("empty.txt", "utf-8");
+		});
+
+		it("loads valid usernames and skips comments and empty lines", async () => {
+			const fs = await import("node:fs");
+			const mockExistsSync = fs.existsSync as jest.MockedFunction<any>;
+			const mockReadFileSync = fs.readFileSync as jest.MockedFunction<any>;
+			mockExistsSync.mockReturnValue(true);
+			mockReadFileSync.mockReturnValue(`# This is a comment
+user1
+   user2
+
+# Another comment
+user3
+`);
+
+			const { loadSeeds } = await import("./scrape.ts");
+
+			const count = loadSeeds("test.txt");
+
+			expect(count).toBe(3);
+			expect(mockQueueAdd).toHaveBeenCalledTimes(3);
+			expect(mockQueueAdd).toHaveBeenCalledWith("user1", 100, "seed");
+			expect(mockQueueAdd).toHaveBeenCalledWith("user2", 100, "seed");
+			expect(mockQueueAdd).toHaveBeenCalledWith("user3", 100, "seed");
+		});
+
+		it("trims whitespace and converts to lowercase", async () => {
+			const fs = await import("node:fs");
+			const mockExistsSync = fs.existsSync as jest.MockedFunction<any>;
+			const mockReadFileSync = fs.readFileSync as jest.MockedFunction<any>;
+			mockExistsSync.mockReturnValue(true);
+			mockReadFileSync.mockReturnValue("  USERNAME  \n  UserName2  ");
+
+			const { loadSeeds } = await import("./scrape.ts");
+
+			const count = loadSeeds("whitespace.txt");
+
+			expect(count).toBe(2);
+			expect(mockQueueAdd).toHaveBeenCalledWith("username", 100, "seed");
+			expect(mockQueueAdd).toHaveBeenCalledWith("username2", 100, "seed");
+		});
+
+		it("skips lines starting with # and empty lines", async () => {
+			const fs = await import("node:fs");
+			const mockExistsSync = fs.existsSync as jest.MockedFunction<any>;
+			const mockReadFileSync = fs.readFileSync as jest.MockedFunction<any>;
+			mockExistsSync.mockReturnValue(true);
+			mockReadFileSync.mockReturnValue(`
+# comment
+   # indented comment
+user1
+
+user2
+# another comment
+`);
+
+			const { loadSeeds } = await import("./scrape.ts");
+
+			const count = loadSeeds("comments.txt");
+
+			expect(count).toBe(2);
+			expect(mockQueueAdd).toHaveBeenCalledTimes(2);
+		});
+
+		it("handles custom file path", async () => {
+			const fs = await import("node:fs");
+			const mockExistsSync = fs.existsSync as jest.MockedFunction<any>;
+			const mockReadFileSync = fs.readFileSync as jest.MockedFunction<any>;
+			mockExistsSync.mockReturnValue(true);
+			mockReadFileSync.mockReturnValue("customuser");
+
+			const { loadSeeds } = await import("./scrape.ts");
+
+			const count = loadSeeds("custom/path/seeds.txt");
+
+			expect(count).toBe(1);
+			expect(mockExistsSync).toHaveBeenCalledWith("custom/path/seeds.txt");
+			expect(mockReadFileSync).toHaveBeenCalledWith("custom/path/seeds.txt", "utf-8");
+			expect(mockQueueAdd).toHaveBeenCalledWith("customuser", 100, "seed");
 		});
 	});
 
