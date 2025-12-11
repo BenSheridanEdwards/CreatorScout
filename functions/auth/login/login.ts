@@ -1,5 +1,5 @@
 import type { Page } from 'puppeteer';
-import { clickAny } from '../clickAny/clickAny.ts';
+import { clickAny } from '../../navigation/clickAny/clickAny.ts';
 import {
   loadCookies,
   saveCookies,

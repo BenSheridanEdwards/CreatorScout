@@ -9,7 +9,7 @@ import {
   DELAY_CATEGORIES,
   TIMEOUTS,
   TIMEOUT_SCALE,
-} from '../config/config.ts';
+} from '../../shared/config/config.ts';
 import { sleep } from '../sleep/sleep.ts';
 
 // ═══════════════════════════════════════════════════════════════════════════════

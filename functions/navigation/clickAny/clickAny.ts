@@ -1,5 +1,5 @@
 import type { Page } from 'puppeteer';
-import { sleep } from '../sleep/sleep.ts';
+import { sleep } from '../../timing/sleep/sleep.ts';
 
 /**
  * Click the first button that matches any provided text.

@@ -2,7 +2,7 @@
  * Instagram modal operations - following modal, username extraction, scrolling.
  */
 import type { Page } from 'puppeteer';
-import { sleep } from '../sleep/sleep.ts';
+import { sleep } from '../../timing/sleep/sleep.ts';
 
 /**
  * Open the "Following" modal for a profile.

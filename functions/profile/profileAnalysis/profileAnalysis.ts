@@ -2,23 +2,23 @@
  * Profile analysis functions - basic and comprehensive analysis.
  */
 import type { Page } from 'puppeteer';
-import { getBioFromPage } from '../getBioFromPage/getBioFromPage.ts';
-import { getLinkFromBio } from '../getLinkFromBio/getLinkFromBio.ts';
+import { getBioFromPage } from '../../extraction/getBioFromPage/getBioFromPage.ts';
+import { getLinkFromBio } from '../../extraction/getLinkFromBio/getLinkFromBio.ts';
 import { isLikelyCreator, findKeywords } from '../bioMatcher/bioMatcher.ts';
-import { getProfileStats } from '../getProfileStats/getProfileStats.ts';
+import { getProfileStats } from '../../extraction/getProfileStats/getProfileStats.ts';
 import {
   getStoryHighlights,
   isLinkInBioHighlight,
   getHighlightTitlesText,
-} from '../getStoryHighlights/getStoryHighlights.ts';
+} from '../../extraction/getStoryHighlights/getStoryHighlights.ts';
 import {
   buildUniqueLinks,
   hasDirectCreatorLink,
-} from '../linkExtraction/linkExtraction.ts';
+} from '../../extraction/linkExtraction/linkExtraction.ts';
 import { analyzeProfile, isConfirmedCreator } from '../vision/vision.ts';
-import { snapshot } from '../snapshot/snapshot.ts';
-import { sleep } from '../sleep/sleep.ts';
-import { SKIP_VISION } from '../config/config.ts';
+import { snapshot } from '../../shared/snapshot/snapshot.ts';
+import { sleep } from '../../timing/sleep/sleep.ts';
+import { SKIP_VISION } from '../../shared/config/config.ts';
 
 export interface BasicAnalysisResult {
   bio: string | null;

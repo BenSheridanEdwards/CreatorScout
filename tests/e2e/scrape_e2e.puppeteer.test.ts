@@ -31,25 +31,25 @@ import {
   markAsCreator,
   getScrollIndex,
   updateScrollIndex,
-} from '../../functions/database/database.ts';
-import { getBioFromPage } from '../../functions/getBioFromPage/getBioFromPage.ts';
-import { getLinkFromBio } from '../../functions/getLinkFromBio/getLinkFromBio.ts';
-import { parseProfileStatus } from '../../functions/profileStatus/profileStatus.ts';
+} from '../../functions/shared/database/database.ts';
+import { getBioFromPage } from '../../functions/extraction/getBioFromPage/getBioFromPage.ts';
+import { getLinkFromBio } from '../../functions/extraction/getLinkFromBio/getLinkFromBio.ts';
+import { parseProfileStatus } from '../../functions/profile/profileStatus/profileStatus.ts';
 import {
   buildUniqueLinks,
   hasDirectCreatorLink,
-} from '../../functions/linkExtraction/linkExtraction.ts';
-import { snapshot } from '../../functions/snapshot/snapshot.ts';
-import { sleep } from '../../functions/sleep/sleep.ts';
-import { login } from '../../functions/login/login.ts';
+} from '../../functions/extraction/linkExtraction/linkExtraction.ts';
+import { snapshot } from '../../functions/shared/snapshot/snapshot.ts';
+import { sleep } from '../../functions/timing/sleep/sleep.ts';
+import { login } from '../../functions/auth/login/login.ts';
 import { loadSeeds } from '../../scripts/scrape.ts';
 import {
   openFollowingModal,
   extractFollowingUsernames,
   scrollFollowingModal,
-} from '../../functions/modalOperations/modalOperations.ts';
-import { verifyLoggedIn } from '../../functions/profileNavigation/profileNavigation.ts';
-import { checkDmThreadEmpty } from '../../functions/profileActions/profileActions.ts';
+} from '../../functions/navigation/modalOperations/modalOperations.ts';
+import { verifyLoggedIn } from '../../functions/navigation/profileNavigation/profileNavigation.ts';
+import { checkDmThreadEmpty } from '../../functions/profile/profileActions/profileActions.ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -94,7 +94,7 @@ describe('Scout E2E Test Suite', () => {
 
     // Use persistent user data directory for e2e tests to reuse sessions
     const { getUserDataDir } = await import(
-      '../../functions/sessionManager/sessionManager.ts'
+      '../../functions/auth/sessionManager/sessionManager.ts'
     );
     const userDataDir = getUserDataDir();
 

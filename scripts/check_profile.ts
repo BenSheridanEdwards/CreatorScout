@@ -13,20 +13,23 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { Browser } from 'puppeteer';
 import dotenv from 'dotenv';
-import { snapshot } from '../functions/snapshot/snapshot.ts';
-import { classifyWithApp } from '../functions/classifyWithApp/classifyWithApp.ts';
+import { snapshot } from '../functions/shared/snapshot/snapshot.ts';
+import { classifyWithApp } from '../functions/profile/classifyWithApp/classifyWithApp.ts';
 import {
   collectAggregatorLinks,
   hasDirectCreatorLink,
   toSafeHttps,
-} from '../functions/linkExtraction/linkExtraction.ts';
-import type { ProfileCheckResult } from '../functions/types/types.ts';
-import { createBrowser, createPage } from '../functions/browser/browser.ts';
+} from '../functions/extraction/linkExtraction/linkExtraction.ts';
+import type { ProfileCheckResult } from '../functions/shared/types/types.ts';
+import {
+  createBrowser,
+  createPage,
+} from '../functions/navigation/browser/browser.ts';
 import {
   navigateToProfileAndCheck,
   ensureLoggedIn,
-} from '../functions/profileNavigation/profileNavigation.ts';
-import { analyzeProfileComprehensive } from '../functions/profileAnalysis/profileAnalysis.ts';
+} from '../functions/navigation/profileNavigation/profileNavigation.ts';
+import { analyzeProfileComprehensive } from '../functions/profile/profileAnalysis/profileAnalysis.ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

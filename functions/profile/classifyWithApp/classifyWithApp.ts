@@ -1,4 +1,4 @@
-import type { VisionData } from '../types/types.ts';
+import type { VisionData } from '../../shared/types/types.ts';
 import { isConfirmedCreator } from '../vision/vision.ts';
 
 /**
