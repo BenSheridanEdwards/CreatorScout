@@ -64,7 +64,7 @@ import {
 	type Logger,
 } from "../functions/shared/logger/logger.ts";
 import { snapshot } from "../functions/shared/snapshot/snapshot.ts";
-import { getDelay } from "../functions/timing/humanize/humanize.ts";
+import { getDelay, mouseWiggle } from "../functions/timing/humanize/humanize.ts";
 import { sleep } from "../functions/timing/sleep/sleep.ts";
 
 initDb();
