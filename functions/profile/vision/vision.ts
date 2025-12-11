@@ -1,16 +1,16 @@
 /**
  * Vision AI for analyzing linktree/link pages.
  */
-import { readFileSync } from 'node:fs';
-import { OpenAI } from 'openai';
+import { readFileSync } from "node:fs";
+import { OpenAI } from "openai";
 import {
-  OPENROUTER_API_KEY,
-  VISION_MODEL,
-} from '../../shared/config/config.ts';
+	OPENROUTER_API_KEY,
+	VISION_MODEL,
+} from "../../shared/config/config.ts";
 
 const client = new OpenAI({
-  baseURL: 'https://openrouter.ai/api/v1',
-  apiKey: OPENROUTER_API_KEY,
+	baseURL: "https://openrouter.ai/api/v1",
+	apiKey: OPENROUTER_API_KEY,
 });
 
 const LINKTREE_PROMPT = `You are analyzing a screenshot of a link page (linktree, beacons, allmylinks, etc.) for an Instagram user.
@@ -77,112 +77,112 @@ Return EXACTLY this JSON:
 }`;
 
 export interface VisionAnalysisResult {
-  is_adult_creator: boolean;
-  confidence: number;
-  platform_links: string[];
-  indicators: string[];
-  reason: string;
+	is_adult_creator: boolean;
+	confidence: number;
+	platform_links: string[];
+	indicators: string[];
+	reason: string;
 }
 
 export async function analyzeLinktree(
-  imagePath: string
+	imagePath: string,
 ): Promise<VisionAnalysisResult | null> {
-  try {
-    const imageBuffer = readFileSync(imagePath);
-    const base64 = imageBuffer.toString('base64');
+	try {
+		const imageBuffer = readFileSync(imagePath);
+		const base64 = imageBuffer.toString("base64");
 
-    const response = await client.chat.completions.create({
-      model: VISION_MODEL,
-      messages: [
-        {
-          role: 'user',
-          content: [
-            { type: 'text', text: LINKTREE_PROMPT },
-            {
-              type: 'image_url',
-              image_url: { url: `data:image/png;base64,${base64}` },
-            },
-          ],
-        },
-      ],
-      max_tokens: 400,
-      temperature: 0.0,
-    });
+		const response = await client.chat.completions.create({
+			model: VISION_MODEL,
+			messages: [
+				{
+					role: "user",
+					content: [
+						{ type: "text", text: LINKTREE_PROMPT },
+						{
+							type: "image_url",
+							image_url: { url: `data:image/png;base64,${base64}` },
+						},
+					],
+				},
+			],
+			max_tokens: 400,
+			temperature: 0.0,
+		});
 
-    let text = response.choices[0]?.message?.content || '';
-    text = text
-      .trim()
-      .replace(/^```json/, '')
-      .replace(/^```/, '')
-      .replace(/```$/, '');
+		let text = response.choices[0]?.message?.content || "";
+		text = text
+			.trim()
+			.replace(/^```json/, "")
+			.replace(/^```/, "")
+			.replace(/```$/, "");
 
-    return JSON.parse(text.trim()) as VisionAnalysisResult;
-  } catch (e) {
-    // Only log errors when not in test environment to keep test output clean
-    if (process.env.NODE_ENV !== 'test' && !process.env.JEST_WORKER_ID) {
-      console.error(`  Vision analysis failed: ${e}`);
-    }
-    return null;
-  }
+		return JSON.parse(text.trim()) as VisionAnalysisResult;
+	} catch (e) {
+		// Only log errors when not in test environment to keep test output clean
+		if (process.env.NODE_ENV !== "test" && !process.env.JEST_WORKER_ID) {
+			console.error(`  Vision analysis failed: ${e}`);
+		}
+		return null;
+	}
 }
 
 function _containsAny(text: string, patterns: string[]): boolean {
-  const lt = text.toLowerCase();
-  return patterns.some((p) => lt.includes(p.toLowerCase()));
+	const lt = text.toLowerCase();
+	return patterns.some((p) => lt.includes(p.toLowerCase()));
 }
 
 function _hasExclusiveDiscountSignal(data: VisionAnalysisResult): boolean {
-  const indicators = data.indicators || [];
-  const reason = data.reason || '';
-  const text = [...indicators, reason].join(' ').toLowerCase();
+	const indicators = data.indicators || [];
+	const reason = data.reason || "";
+	const text = [...indicators, reason].join(" ").toLowerCase();
 
-  const strong = _containsAny(text, [
-    'exclusive content',
-    'premium content',
-    'vip access',
-    'private content',
-    'uncensored',
-    'unfiltered',
-    'nsfw',
-    'exclusive',
-  ]);
+	const strong = _containsAny(text, [
+		"exclusive content",
+		"premium content",
+		"vip access",
+		"private content",
+		"uncensored",
+		"unfiltered",
+		"nsfw",
+		"exclusive",
+	]);
 
-  const discount = _containsAny(text, [
-    '% off',
-    'discount',
-    'sale',
-    'limited offer',
-  ]);
+	const discount = _containsAny(text, [
+		"% off",
+		"discount",
+		"sale",
+		"limited offer",
+	]);
 
-  return strong && discount;
+	return strong && discount;
 }
 
 export async function isConfirmedCreator(
-  imagePath: string,
-  threshold: number = 70
+	imagePath: string,
+	threshold: number = 70,
 ): Promise<[boolean, VisionAnalysisResult | null]> {
-  const data = await analyzeLinktree(imagePath);
-  if (!data) {
-    return [false, null];
-  }
+	const data = await analyzeLinktree(imagePath);
+	if (!data) {
+		return [false, null];
+	}
 
-  let isConfirmed = data.is_adult_creator && data.confidence >= threshold;
+	let isConfirmed = data.is_adult_creator && data.confidence >= threshold;
 
-  // Heuristic override: Exclusive content + discount language
-  if (!isConfirmed && _hasExclusiveDiscountSignal(data)) {
-    data.is_adult_creator = true;
-    data.confidence = Math.max(data.confidence, threshold);
-    const indicators = data.indicators || [];
-    if (
-      !indicators.some((i) => i.toLowerCase().includes('exclusive+discount'))
-    ) {
-      indicators.push('exclusive+discount offer');
-      data.indicators = indicators;
-    }
-    isConfirmed = true;
-  }
+	// Heuristic override: Exclusive content + discount language
+	if (!isConfirmed && _hasExclusiveDiscountSignal(data)) {
+		data.is_adult_creator = true;
+		data.confidence = Math.max(data.confidence, threshold);
+		const indicators = data.indicators || [];
+		if (
+			!indicators.some((i) => i.toLowerCase().includes("exclusive+discount"))
+		) {
+			indicators.push("exclusive+discount offer");
+			data.indicators = indicators;
+		}
+		isConfirmed = true;
+	}
 
-  return [isConfirmed, data];
+	return [isConfirmed, data];
 }
 
 /**
@@ -190,52 +190,52 @@ export async function isConfirmedCreator(
  * Uses PROFILE_PROMPT which is optimized for profile pages.
  */
 export async function analyzeProfile(
-  imagePath: string
+	imagePath: string,
 ): Promise<VisionAnalysisResult | null> {
-  try {
-    const imageBuffer = readFileSync(imagePath);
-    const base64 = imageBuffer.toString('base64');
+	try {
+		const imageBuffer = readFileSync(imagePath);
+		const base64 = imageBuffer.toString("base64");
 
-    const response = await client.chat.completions.create({
-      model: VISION_MODEL,
-      messages: [
-        {
-          role: 'user',
-          content: [
-            { type: 'text', text: PROFILE_PROMPT },
-            {
-              type: 'image_url',
-              image_url: { url: `data:image/png;base64,${base64}` },
-            },
-          ],
-        },
-      ],
-      max_tokens: 400,
-      temperature: 0.0,
-    });
+		const response = await client.chat.completions.create({
+			model: VISION_MODEL,
+			messages: [
+				{
+					role: "user",
+					content: [
+						{ type: "text", text: PROFILE_PROMPT },
+						{
+							type: "image_url",
+							image_url: { url: `data:image/png;base64,${base64}` },
+						},
+					],
+				},
+			],
+			max_tokens: 400,
+			temperature: 0.0,
+		});
 
-    let text = response.choices[0]?.message?.content || '';
-    text = text
-      .trim()
-      .replace(/^```json/, '')
-      .replace(/^```/, '')
-      .replace(/```$/, '');
+		let text = response.choices[0]?.message?.content || "";
+		text = text
+			.trim()
+			.replace(/^```json/, "")
+			.replace(/^```/, "")
+			.replace(/```$/, "");
 
-    try {
-      const parsed = JSON.parse(text) as VisionAnalysisResult;
-      return parsed;
-    } catch {
-      // Only log errors when not in test environment to keep test output clean
-      if (process.env.NODE_ENV !== 'test' && !process.env.JEST_WORKER_ID) {
-        console.error('Failed to parse vision response:', text);
-      }
-      return null;
-    }
-  } catch (error) {
-    // Only log errors when not in test environment to keep test output clean
-    if (process.env.NODE_ENV !== 'test' && !process.env.JEST_WORKER_ID) {
-      console.error('Vision analysis error:', error);
-    }
-    return null;
-  }
+		try {
+			const parsed = JSON.parse(text) as VisionAnalysisResult;
+			return parsed;
+		} catch {
+			// Only log errors when not in test environment to keep test output clean
+			if (process.env.NODE_ENV !== "test" && !process.env.JEST_WORKER_ID) {
+				console.error("Failed to parse vision response:", text);
+			}
+			return null;
+		}
+	} catch (error) {
+		// Only log errors when not in test environment to keep test output clean
+		if (process.env.NODE_ENV !== "test" && !process.env.JEST_WORKER_ID) {
+			console.error("Vision analysis error:", error);
+		}
+		return null;
+	}
 }

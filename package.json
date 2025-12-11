@@ -1,33 +1,32 @@
 {
-  "name": "scout",
-  "version": "1.0.0",
-  "type": "module",
-  "private": true,
-  "scripts": {
-    "test": "NODE_OPTIONS=--experimental-vm-modules jest",
-    "test:watch": "NODE_OPTIONS=--experimental-vm-modules jest --watch",
-    "test:coverage": "NODE_OPTIONS=--experimental-vm-modules jest --coverage",
-    "test:e2e": "NODE_OPTIONS=--experimental-vm-modules jest --testMatch='**/tests/e2e/**/*.puppeteer.test.ts' --testTimeout=120000",
-    "test:e2e:scrape": "NODE_OPTIONS=--experimental-vm-modules jest tests/e2e/scrape_e2e.puppeteer.test.ts --testTimeout=120000",
-    "test:e2e:check-profile": "NODE_OPTIONS=--experimental-vm-modules jest tests/e2e/check_profile_e2e.puppeteer.test.ts --testTimeout=120000",
-    "test:profile": "NODE_OPTIONS=--experimental-vm-modules jest tests/check_profile.test.ts"
-  },
-  "dependencies": {
-    "better-sqlite3": "^12.5.0",
-    "dotenv": "^17.2.3",
-    "openai": "^6.10.0",
-    "puppeteer": "^22.13.1",
-    "puppeteer-extra": "^3.3.6",
-    "puppeteer-extra-plugin-stealth": "^2.11.2"
-  },
-  "devDependencies": {
-    "@biomejs/biome": "^2.3.8",
-    "@types/jest": "^30.0.0",
-    "@types/node": "^24.10.2",
-    "@types/puppeteer": "^5.4.7",
-    "jest": "^30.2.0",
-    "ts-jest": "^29.4.6",
-    "tsx": "^4.21.0",
-    "typescript": "^5.9.3"
-  }
+	"name": "scout",
+	"version": "1.0.0",
+	"type": "module",
+	"private": true,
+	"scripts": {
+		"test": "NODE_OPTIONS=--experimental-vm-modules jest",
+		"test:watch": "NODE_OPTIONS=--experimental-vm-modules jest --watch",
+		"test:coverage": "NODE_OPTIONS=--experimental-vm-modules jest --coverage",
+		"test:e2e": "NODE_OPTIONS=--experimental-vm-modules jest --testMatch='**/*.puppeteer.test.ts' --testTimeout=120000",
+		"test:e2e:scrape": "NODE_OPTIONS=--experimental-vm-modules jest tests/e2e/scrape_e2e.puppeteer.test.ts --testTimeout=120000",
+		"test:e2e:check-profile": "NODE_OPTIONS=--experimental-vm-modules jest tests/e2e/check_profile_e2e.puppeteer.test.ts --testTimeout=120000"
+	},
+	"dependencies": {
+		"better-sqlite3": "^12.5.0",
+		"dotenv": "^17.2.3",
+		"openai": "^6.10.0",
+		"puppeteer": "^22.13.1",
+		"puppeteer-extra": "^3.3.6",
+		"puppeteer-extra-plugin-stealth": "^2.11.2"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "^2.3.8",
+		"@types/jest": "^30.0.0",
+		"@types/node": "^24.10.2",
+		"@types/puppeteer": "^5.4.7",
+		"jest": "^30.2.0",
+		"ts-jest": "^29.4.6",
+		"tsx": "^4.21.0",
+		"typescript": "^5.9.3"
+	}
 }

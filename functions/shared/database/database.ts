@@ -1,24 +1,24 @@
 /**
  * Database operations using SQLite.
  */
-import Database from 'better-sqlite3';
-import { existsSync, mkdirSync } from 'node:fs';
 
-const DB_PATH = 'scout.db';
+import Database from "better-sqlite3";
+
+const DB_PATH = "scout.db";
 
 let dbInstance: Database.Database | null = null;
 
 function getDb(): Database.Database {
-  if (!dbInstance) {
-    dbInstance = new Database(DB_PATH);
-    initDb();
-  }
-  return dbInstance;
+	if (!dbInstance) {
+		dbInstance = new Database(DB_PATH);
+		initDb();
+	}
+	return dbInstance;
 }
 
 export function initDb(): void {
-  const db = getDb();
-  db.exec(`
+	const db = getDb();
+	db.exec(`
     PRAGMA journal_mode=WAL;
     
     CREATE TABLE IF NOT EXISTS profiles (
@@ -59,61 +59,61 @@ export function initDb(): void {
 // === Queue Operations ===
 
 export function queueAdd(
-  username: string,
-  priority: number = 10,
-  source: string = 'seed'
+	username: string,
+	priority: number = 10,
+	source: string = "seed",
 ): void {
-  const db = getDb();
-  const stmt = db.prepare(
-    'INSERT OR IGNORE INTO queue(username, priority, source, added_at) VALUES(?, ?, ?, ?)'
-  );
-  stmt.run(
-    username.toLowerCase().trim(),
-    priority,
-    source,
-    new Date().toISOString()
-  );
+	const db = getDb();
+	const stmt = db.prepare(
+		"INSERT OR IGNORE INTO queue(username, priority, source, added_at) VALUES(?, ?, ?, ?)",
+	);
+	stmt.run(
+		username.toLowerCase().trim(),
+		priority,
+		source,
+		new Date().toISOString(),
+	);
 }
 
 export function queueNext(): string | null {
-  const db = getDb();
-  const stmt = db.prepare(
-    'SELECT username FROM queue ORDER BY priority DESC, added_at LIMIT 1'
-  );
-  const row = stmt.get() as { username: string } | undefined;
-  if (row) {
-    const deleteStmt = db.prepare('DELETE FROM queue WHERE username=?');
-    deleteStmt.run(row.username);
-    return row.username;
-  }
-  return null;
+	const db = getDb();
+	const stmt = db.prepare(
+		"SELECT username FROM queue ORDER BY priority DESC, added_at LIMIT 1",
+	);
+	const row = stmt.get() as { username: string } | undefined;
+	if (row) {
+		const deleteStmt = db.prepare("DELETE FROM queue WHERE username=?");
+		deleteStmt.run(row.username);
+		return row.username;
+	}
+	return null;
 }
 
 export function queueCount(): number {
-  const db = getDb();
-  const stmt = db.prepare('SELECT COUNT(*) as count FROM queue');
-  const row = stmt.get() as { count: number };
-  return row.count;
+	const db = getDb();
+	const stmt = db.prepare("SELECT COUNT(*) as count FROM queue");
+	const row = stmt.get() as { count: number };
+	return row.count;
 }
 
 // === Profile Operations ===
 
 export function wasVisited(username: string): boolean {
-  const db = getDb();
-  const stmt = db.prepare('SELECT 1 FROM profiles WHERE username=?');
-  const row = stmt.get(username.toLowerCase().trim());
-  return row !== undefined;
+	const db = getDb();
+	const stmt = db.prepare("SELECT 1 FROM profiles WHERE username=?");
+	const row = stmt.get(username.toLowerCase().trim());
+	return row !== undefined;
 }
 
 export function markVisited(
-  username: string,
-  displayName?: string | null,
-  bio?: string | null,
-  bioScore: number = 0,
-  linkUrl?: string | null
+	username: string,
+	displayName?: string | null,
+	bio?: string | null,
+	bioScore: number = 0,
+	linkUrl?: string | null,
 ): void {
-  const db = getDb();
-  const stmt = db.prepare(`
+	const db = getDb();
+	const stmt = db.prepare(`
     INSERT INTO profiles(username, display_name, bio_text, bio_score, link_url, visited_at)
     VALUES(?, ?, ?, ?, ?, ?)
     ON CONFLICT(username) DO UPDATE SET
@@ -123,23 +123,23 @@ export function markVisited(
         link_url = COALESCE(excluded.link_url, link_url),
         last_seen = CURRENT_TIMESTAMP
   `);
-  stmt.run(
-    username.toLowerCase().trim(),
-    displayName || null,
-    bio || null,
-    bioScore,
-    linkUrl || null,
-    new Date().toISOString()
-  );
+	stmt.run(
+		username.toLowerCase().trim(),
+		displayName || null,
+		bio || null,
+		bioScore,
+		linkUrl || null,
+		new Date().toISOString(),
+	);
 }
 
 export function markAsCreator(
-  username: string,
-  confidence: number = 0,
-  proofPath?: string | null
+	username: string,
+	confidence: number = 0,
+	proofPath?: string | null,
 ): void {
-  const db = getDb();
-  const stmt = db.prepare(`
+	const db = getDb();
+	const stmt = db.prepare(`
     UPDATE profiles SET 
         is_patreon = 1, 
         confidence = ?,
@@ -147,101 +147,100 @@ export function markAsCreator(
         last_seen = CURRENT_TIMESTAMP
     WHERE username = ?
   `);
-  stmt.run(confidence, proofPath || null, username.toLowerCase().trim());
+	stmt.run(confidence, proofPath || null, username.toLowerCase().trim());
 }
 
 export function wasDmSent(username: string): boolean {
-  const db = getDb();
-  const stmt = db.prepare('SELECT dm_sent FROM profiles WHERE username=?');
-  const row = stmt.get(username.toLowerCase().trim()) as
-    | { dm_sent: number }
-    | undefined;
-  return row ? Boolean(row.dm_sent) : false;
+	const db = getDb();
+	const stmt = db.prepare("SELECT dm_sent FROM profiles WHERE username=?");
+	const row = stmt.get(username.toLowerCase().trim()) as
+		| { dm_sent: number }
+		| undefined;
+	return row ? Boolean(row.dm_sent) : false;
 }
 
 export function markDmSent(username: string, proofPath?: string | null): void {
-  const db = getDb();
-  const stmt = db.prepare(`
+	const db = getDb();
+	const stmt = db.prepare(`
     UPDATE profiles SET 
         dm_sent = 1, 
         dm_sent_at = ?,
         proof_path = COALESCE(?, proof_path)
     WHERE username = ?
   `);
-  stmt.run(
-    new Date().toISOString(),
-    proofPath || null,
-    username.toLowerCase().trim()
-  );
+	stmt.run(
+		new Date().toISOString(),
+		proofPath || null,
+		username.toLowerCase().trim(),
+	);
 }
 
 export function wasFollowed(username: string): boolean {
-  const db = getDb();
-  const stmt = db.prepare('SELECT followed FROM profiles WHERE username=?');
-  const row = stmt.get(username.toLowerCase().trim()) as
-    | { followed: number }
-    | undefined;
-  return row ? Boolean(row.followed) : false;
+	const db = getDb();
+	const stmt = db.prepare("SELECT followed FROM profiles WHERE username=?");
+	const row = stmt.get(username.toLowerCase().trim()) as
+		| { followed: number }
+		| undefined;
+	return row ? Boolean(row.followed) : false;
 }
 
 export function markFollowed(username: string): void {
-  const db = getDb();
-  const stmt = db.prepare(
-    'UPDATE profiles SET followed = 1 WHERE username = ?'
-  );
-  stmt.run(username.toLowerCase().trim());
+	const db = getDb();
+	const stmt = db.prepare(
+		"UPDATE profiles SET followed = 1 WHERE username = ?",
+	);
+	stmt.run(username.toLowerCase().trim());
 }
 
 // === Following Scrape Tracking ===
 
 export function getScrollIndex(username: string): number {
-  const db = getDb();
-  const stmt = db.prepare(
-    'SELECT scroll_index FROM following_scraped WHERE username=?'
-  );
-  const row = stmt.get(username.toLowerCase().trim()) as
-    | { scroll_index: number }
-    | undefined;
-  return row ? row.scroll_index : 0;
+	const db = getDb();
+	const stmt = db.prepare(
+		"SELECT scroll_index FROM following_scraped WHERE username=?",
+	);
+	const row = stmt.get(username.toLowerCase().trim()) as
+		| { scroll_index: number }
+		| undefined;
+	return row ? row.scroll_index : 0;
 }
 
 export function updateScrollIndex(username: string, index: number): void {
-  const db = getDb();
-  const stmt = db.prepare(`
+	const db = getDb();
+	const stmt = db.prepare(`
     INSERT INTO following_scraped(username, scroll_index, scraped_at) 
     VALUES(?, ?, ?)
     ON CONFLICT(username) DO UPDATE SET 
         scroll_index = excluded.scroll_index,
         scraped_at = excluded.scraped_at
   `);
-  stmt.run(username.toLowerCase().trim(), index, new Date().toISOString());
+	stmt.run(username.toLowerCase().trim(), index, new Date().toISOString());
 }
 
 // === Stats ===
 
 export interface Stats {
-  total_visited: number;
-  confirmed_creators: number;
-  dms_sent: number;
-  queue_size: number;
+	total_visited: number;
+	confirmed_creators: number;
+	dms_sent: number;
+	queue_size: number;
 }
 
 export function getStats(): Stats {
-  const db = getDb();
-  const totalStmt = db.prepare('SELECT COUNT(*) as count FROM profiles');
-  const creatorsStmt = db.prepare(
-    'SELECT COUNT(*) as count FROM profiles WHERE is_patreon=1'
-  );
-  const dmsStmt = db.prepare(
-    'SELECT COUNT(*) as count FROM profiles WHERE dm_sent=1'
-  );
-  const queueStmt = db.prepare('SELECT COUNT(*) as count FROM queue');
+	const db = getDb();
+	const totalStmt = db.prepare("SELECT COUNT(*) as count FROM profiles");
+	const creatorsStmt = db.prepare(
+		"SELECT COUNT(*) as count FROM profiles WHERE is_patreon=1",
+	);
+	const dmsStmt = db.prepare(
+		"SELECT COUNT(*) as count FROM profiles WHERE dm_sent=1",
+	);
+	const queueStmt = db.prepare("SELECT COUNT(*) as count FROM queue");
 
-  return {
-    total_visited: (totalStmt.get() as { count: number }).count,
-    confirmed_creators: (creatorsStmt.get() as { count: number }).count,
-    dms_sent: (dmsStmt.get() as { count: number }).count,
-    queue_size: (queueStmt.get() as { count: number }).count,
-  };
+	return {
+		total_visited: (totalStmt.get() as { count: number }).count,
+		confirmed_creators: (creatorsStmt.get() as { count: number }).count,
+		dms_sent: (dmsStmt.get() as { count: number }).count,
+		queue_size: (queueStmt.get() as { count: number }).count,
+	};
 }
-
