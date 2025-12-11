@@ -9,8 +9,8 @@ import {
   DELAY_CATEGORIES,
   TIMEOUTS,
   TIMEOUT_SCALE,
-} from './config.ts';
-import { sleep } from './sleep.ts';
+} from '../config/config.ts';
+import { sleep } from '../sleep/sleep.ts';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // DELAY HELPERS
@@ -86,4 +86,3 @@ export async function mouseWiggle(page: Page): Promise<void> {
   const steps = DELAY_SCALE < 1 ? randomInt(8, 21) : randomInt(15, 36);
   await page.mouse.move(randomInt(200, 1601), randomInt(200, 901), { steps });
 }
-

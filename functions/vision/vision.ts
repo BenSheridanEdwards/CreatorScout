@@ -3,7 +3,7 @@
  */
 import { readFileSync } from 'node:fs';
 import { OpenAI } from 'openai';
-import { OPENROUTER_API_KEY, VISION_MODEL } from './config.ts';
+import { OPENROUTER_API_KEY, VISION_MODEL } from '../config/config.ts';
 
 const client = new OpenAI({
   baseURL: 'https://openrouter.ai/api/v1',

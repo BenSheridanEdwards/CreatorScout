@@ -13,20 +13,20 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { Browser } from 'puppeteer';
 import dotenv from 'dotenv';
-import { snapshot } from '../functions/snapshot.ts';
-import { classifyWithApp } from '../functions/classifyWithApp.ts';
+import { snapshot } from '../functions/snapshot/snapshot.ts';
+import { classifyWithApp } from '../functions/classifyWithApp/classifyWithApp.ts';
 import {
   collectAggregatorLinks,
   hasDirectCreatorLink,
   toSafeHttps,
-} from '../functions/linkExtraction.ts';
-import type { ProfileCheckResult } from '../functions/types.ts';
-import { createBrowser, createPage } from '../functions/browser.ts';
+} from '../functions/linkExtraction/linkExtraction.ts';
+import type { ProfileCheckResult } from '../functions/types/types.ts';
+import { createBrowser, createPage } from '../functions/browser/browser.ts';
 import {
   navigateToProfileAndCheck,
   ensureLoggedIn,
-} from '../functions/profileNavigation.ts';
-import { analyzeProfileComprehensive } from '../functions/profileAnalysis.ts';
+} from '../functions/profileNavigation/profileNavigation.ts';
+import { analyzeProfileComprehensive } from '../functions/profileAnalysis/profileAnalysis.ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

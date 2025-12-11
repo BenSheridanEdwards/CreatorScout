@@ -13,7 +13,7 @@ import {
   getScrollIndex,
   updateScrollIndex,
   getStats,
-} from '../functions/database.ts';
+} from './database.ts';
 
 beforeAll(() => {
   initDb();
@@ -139,4 +139,3 @@ describe('database', () => {
     });
   });
 });
-

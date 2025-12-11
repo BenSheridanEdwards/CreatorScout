@@ -4,7 +4,7 @@ import {
   extractLinks,
   calculateScore,
   isLikelyCreator,
-} from '../functions/bioMatcher.ts';
+} from './bioMatcher.ts';
 
 describe('bioMatcher', () => {
   describe('countLinkEmojis', () => {
@@ -117,4 +117,3 @@ describe('bioMatcher', () => {
     });
   });
 });
-

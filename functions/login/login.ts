@@ -1,6 +1,10 @@
 import type { Page } from 'puppeteer';
-import { clickAny } from './clickAny.js';
-import { loadCookies, saveCookies, isLoggedIn } from './sessionManager.ts';
+import { clickAny } from '../clickAny/clickAny.ts';
+import {
+  loadCookies,
+  saveCookies,
+  isLoggedIn,
+} from '../sessionManager/sessionManager.ts';
 
 export type Credentials = {
   username: string;

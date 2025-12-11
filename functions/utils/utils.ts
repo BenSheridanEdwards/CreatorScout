@@ -3,7 +3,7 @@
  */
 import { mkdirSync } from 'node:fs';
 import type { Page } from 'puppeteer';
-import { snapshot } from './snapshot.ts';
+import { snapshot } from '../snapshot/snapshot.ts';
 
 export async function saveProof(username: string, page: Page): Promise<string> {
   mkdirSync('screenshots', { recursive: true });
@@ -12,4 +12,3 @@ export async function saveProof(username: string, page: Page): Promise<string> {
   await page.screenshot({ path, fullPage: true });
   return path;
 }
-

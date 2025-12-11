@@ -3,7 +3,7 @@ import {
   collectAggregatorLinks,
   hasDirectCreatorLink,
   toSafeHttps,
-} from '../functions/linkExtraction.ts';
+} from './linkExtraction.ts';
 
 const sampleHtml = `
   <a href="https://linktr.ee/example"></a>

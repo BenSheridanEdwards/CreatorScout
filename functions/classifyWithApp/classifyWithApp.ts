@@ -1,5 +1,5 @@
-import type { VisionData } from './types.ts';
-import { isConfirmedCreator } from './vision.ts';
+import type { VisionData } from '../types/types.ts';
+import { isConfirmedCreator } from '../vision/vision.ts';
 
 /**
  * Call the TypeScript vision pipeline.

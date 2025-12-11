@@ -1,4 +1,4 @@
-import { parseProfileStatus } from '../functions/profileStatus.ts';
+import { parseProfileStatus } from './profileStatus.ts';
 
 describe('parseProfileStatus', () => {
   test('parseProfileStatus detects private accounts', () => {

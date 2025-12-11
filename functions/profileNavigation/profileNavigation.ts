@@ -2,10 +2,10 @@
  * Profile navigation and status checking utilities.
  */
 import type { Page } from 'puppeteer';
-import { login } from './login.ts';
-import { parseProfileStatus } from './profileStatus.ts';
-import { IG_USER, IG_PASS } from './config.ts';
-import { sleep } from './sleep.ts';
+import { login } from '../login/login.ts';
+import { parseProfileStatus } from '../profileStatus/profileStatus.ts';
+import { IG_USER, IG_PASS } from '../config/config.ts';
+import { sleep } from '../sleep/sleep.ts';
 
 export interface ProfileStatus {
   isPrivate: boolean;

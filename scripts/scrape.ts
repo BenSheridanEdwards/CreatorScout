@@ -32,31 +32,34 @@ import {
   getScrollIndex,
   updateScrollIndex,
   getStats,
-} from '../functions/database.ts';
-import { getDelay } from '../functions/humanize.ts';
-import { MAX_DMS_PER_DAY, CONFIDENCE_THRESHOLD } from '../functions/config.ts';
-import { sleep } from '../functions/sleep.ts';
-import { createBrowser, createPage } from '../functions/browser.ts';
+} from '../functions/database/database.ts';
+import { getDelay } from '../functions/humanize/humanize.ts';
+import {
+  MAX_DMS_PER_DAY,
+  CONFIDENCE_THRESHOLD,
+} from '../functions/config/config.ts';
+import { sleep } from '../functions/sleep/sleep.ts';
+import { createBrowser, createPage } from '../functions/browser/browser.ts';
 import {
   navigateToProfileAndCheck,
   ensureLoggedIn,
-} from '../functions/profileNavigation.ts';
+} from '../functions/profileNavigation/profileNavigation.ts';
 import {
   analyzeProfileBasic,
   analyzeLinkWithVision,
-} from '../functions/profileAnalysis.ts';
+} from '../functions/profileAnalysis/profileAnalysis.ts';
 import {
   sendDMToUser,
   followUserAccount,
   addFollowingToQueue,
-} from '../functions/profileActions.ts';
+} from '../functions/profileActions/profileActions.ts';
 import {
   openFollowingModal,
   extractFollowingUsernames,
   scrollFollowingModal,
-} from '../functions/modalOperations.ts';
-import { snapshot } from '../functions/snapshot.ts';
-import { createLogger, type Logger } from '../functions/logger.ts';
+} from '../functions/modalOperations/modalOperations.ts';
+import { snapshot } from '../functions/snapshot/snapshot.ts';
+import { createLogger, type Logger } from '../functions/logger/logger.ts';
 
 initDb();
 

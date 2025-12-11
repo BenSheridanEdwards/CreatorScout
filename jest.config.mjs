@@ -20,10 +20,14 @@ export default {
     ],
   },
   testMatch: [
-    '**/tests/**/*.test.ts',
-    '!**/tests/e2e/**/*.test.ts', // Exclude all e2e tests
-    '!**/tests/**/*e2e*.test.ts', // Exclude any test with e2e in name
-    '!**/tests/**/*.puppeteer.test.ts', // Exclude all puppeteer tests
+    '**/functions/**/*.test.ts', // Collocated function tests
+    '**/tests/**/*.test.ts', // Legacy/unit tests
+  ],
+  testPathIgnorePatterns: [
+    '/node_modules/',
+    '/tests/e2e/',
+    'e2e.*\\.test\\.ts$',
+    '\\.puppeteer\\.test\\.ts$',
   ],
   collectCoverageFrom: ['functions/**/*.ts', 'scripts/**/*.ts'],
   transformIgnorePatterns: [],

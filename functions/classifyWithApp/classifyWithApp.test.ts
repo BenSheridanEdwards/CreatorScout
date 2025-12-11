@@ -1,4 +1,4 @@
-import { classifyWithApp } from '../functions/classifyWithApp.ts';
+import { classifyWithApp } from './classifyWithApp.ts';
 
 // Note: These are integration tests that require OPENROUTER_API_KEY
 // For unit tests with mocking, ESM mocking in Jest is complex

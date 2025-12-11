@@ -5,8 +5,8 @@
 import type { Browser, Page } from 'puppeteer';
 import puppeteer from 'puppeteer-extra';
 import StealthPlugin from 'puppeteer-extra-plugin-stealth';
-import { getUserDataDir } from './sessionManager.ts';
-import { LOCAL_BROWSER, BROWSERLESS_TOKEN } from './config.ts';
+import { getUserDataDir } from '../sessionManager/sessionManager.ts';
+import { LOCAL_BROWSER, BROWSERLESS_TOKEN } from '../config/config.ts';
 
 // Initialize puppeteer-extra with stealth plugin
 (puppeteer as any).use(StealthPlugin());

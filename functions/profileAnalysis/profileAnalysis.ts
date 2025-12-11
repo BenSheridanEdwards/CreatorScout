@@ -2,20 +2,23 @@
  * Profile analysis functions - basic and comprehensive analysis.
  */
 import type { Page } from 'puppeteer';
-import { getBioFromPage } from './getBioFromPage.ts';
-import { getLinkFromBio } from './getLinkFromBio.ts';
-import { isLikelyCreator, findKeywords } from './bioMatcher.ts';
-import { getProfileStats } from './getProfileStats.ts';
+import { getBioFromPage } from '../getBioFromPage/getBioFromPage.ts';
+import { getLinkFromBio } from '../getLinkFromBio/getLinkFromBio.ts';
+import { isLikelyCreator, findKeywords } from '../bioMatcher/bioMatcher.ts';
+import { getProfileStats } from '../getProfileStats/getProfileStats.ts';
 import {
   getStoryHighlights,
   isLinkInBioHighlight,
   getHighlightTitlesText,
-} from './getStoryHighlights.ts';
-import { buildUniqueLinks, hasDirectCreatorLink } from './linkExtraction.ts';
-import { analyzeProfile, isConfirmedCreator } from './vision.ts';
-import { snapshot } from './snapshot.ts';
-import { sleep } from './sleep.ts';
-import { SKIP_VISION } from './config.ts';
+} from '../getStoryHighlights/getStoryHighlights.ts';
+import {
+  buildUniqueLinks,
+  hasDirectCreatorLink,
+} from '../linkExtraction/linkExtraction.ts';
+import { analyzeProfile, isConfirmedCreator } from '../vision/vision.ts';
+import { snapshot } from '../snapshot/snapshot.ts';
+import { sleep } from '../sleep/sleep.ts';
+import { SKIP_VISION } from '../config/config.ts';
 
 export interface BasicAnalysisResult {
   bio: string | null;

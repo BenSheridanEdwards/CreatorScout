@@ -1,5 +1,5 @@
 import type { Page } from 'puppeteer';
-import { sleep } from './sleep.js';
+import { sleep } from '../sleep/sleep.ts';
 
 /**
  * Click the first button that matches any provided text.
@@ -17,4 +17,3 @@ export async function clickAny(page: Page, texts: string[]): Promise<boolean> {
   }
   return false;
 }
-

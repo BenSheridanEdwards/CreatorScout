@@ -1,9 +1,9 @@
 import { jest } from '@jest/globals';
-import { getDelay, getTimeout, delay } from '../functions/humanize.ts';
-import * as sleepModule from '../functions/sleep.ts';
+import { getDelay, getTimeout, delay } from './humanize.ts';
+import * as sleepModule from '../sleep/sleep.ts';
 
 // Mock sleep to avoid actual delays in tests
-jest.mock('../functions/sleep.ts', () => ({
+jest.mock('../sleep/sleep.ts', () => ({
   sleep: jest.fn(() => Promise.resolve()),
 }));
 
@@ -48,4 +48,3 @@ describe('humanize', () => {
     });
   });
 });
-

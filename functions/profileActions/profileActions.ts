@@ -2,14 +2,19 @@
  * Profile actions - DM sending, following, queue expansion.
  */
 import type { Page } from 'puppeteer';
-import { DM_MESSAGE } from './config.ts';
-import { snapshot } from './snapshot.ts';
-import { sleep } from './sleep.ts';
-import { markDmSent, markFollowed, queueAdd, wasVisited } from './database.ts';
+import { DM_MESSAGE } from '../config/config.ts';
+import { snapshot } from '../snapshot/snapshot.ts';
+import { sleep } from '../sleep/sleep.ts';
+import {
+  markDmSent,
+  markFollowed,
+  queueAdd,
+  wasVisited,
+} from '../database/database.ts';
 import {
   openFollowingModal,
   extractFollowingUsernames,
-} from './modalOperations.ts';
+} from '../modalOperations/modalOperations.ts';
 
 /**
  * Check if a DM thread is empty (no previous messages).

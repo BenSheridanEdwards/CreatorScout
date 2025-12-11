@@ -1,4 +1,4 @@
-import { analyzeLinktree, isConfirmedCreator } from '../functions/vision.ts';
+import { analyzeLinktree, isConfirmedCreator } from './vision.ts';
 import { writeFileSync, unlinkSync, mkdirSync } from 'node:fs';
 import { readFileSync } from 'node:fs';
 
@@ -73,4 +73,3 @@ describe('vision', () => {
     });
   });
 });
-
