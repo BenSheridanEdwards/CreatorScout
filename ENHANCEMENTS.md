@@ -20,12 +20,14 @@ Enhanced the profile detection system to identify influencers with monetization 
 ### 1. Username Keyword Detection (`functions/bioMatcher.ts`)
 
 **Added:**
+
 - `USERNAME_KEYWORDS` array with terms like "mistress", "goddess", "princess", etc.
 - Username keyword scoring (up to 20 points)
 - Updated `calculateScore()` to accept `username` parameter
 - Updated `isLikelyCreator()` to accept `username` parameter
 
 **Usage:**
+
 ```typescript
 const [isLikely, bioScore] = isLikelyCreator(bio, 40, username);
 ```
@@ -33,11 +35,13 @@ const [isLikely, bioScore] = isLikelyCreator(bio, 40, username);
 ### 2. Bio Pattern Detection (`functions/bioMatcher.ts`)
 
 **Added:**
+
 - "check my highlight" pattern detection
 - Link emoji (🔗) detection combined with highlight hints
 - Highlight hint scoring (up to 15 points)
 
 **Keywords added:**
+
 - `check my highlight`
 - `check highlight`
 - `see highlight`
@@ -46,10 +50,12 @@ const [isLikely, bioScore] = isLikelyCreator(bio, 40, username);
 ### 3. Story Highlights Extraction (`functions/getStoryHighlights.ts`)
 
 **New file:**
+
 - `getStoryHighlights(page)` - extracts highlight titles and cover image URLs
 - `isLinkInBioHighlight(title)` - checks if highlight title suggests premium content
 
 **Features:**
+
 - Extracts highlight titles from profile page
 - Gets cover image URLs for vision analysis
 - Identifies link highlights (e.g., "My 🔗", "Official Accounts")
@@ -57,11 +63,13 @@ const [isLikely, bioScore] = isLikelyCreator(bio, 40, username);
 ### 4. Profile Statistics (`functions/getProfileStats.ts`)
 
 **New file:**
+
 - `getProfileStats(page)` - extracts follower/following counts and calculates ratio
 - Handles Instagram's number formats (K, M, B)
 - Calculates follower/following ratio
 
 **Usage:**
+
 ```typescript
 const stats = await getProfileStats(page);
 if (stats.ratio && stats.ratio > 100) {
@@ -72,6 +80,7 @@ if (stats.ratio && stats.ratio > 100) {
 ### 5. Enhanced Profile Check (`scripts/check_profile.ts`)
 
 **New steps added:**
+
 - **Step 6**: Bio analysis with username keywords
 - **Step 7**: Profile statistics (follower ratio)
 - **Step 8**: Story highlights extraction and analysis
@@ -83,13 +92,15 @@ if (stats.ratio && stats.ratio > 100) {
 - **Step 11**: Final decision based on combined signals
 
 **Vision Analysis of Highlights:**
+
 - Downloads highlight cover images
 - Sends to vision AI for analysis
 - Flags profiles if highlight covers contain link content
 
-### 6. Main Script Update (`scripts/main.ts`)
+### 6. Main Script Update (`scripts/scrape.ts`)
 
 **Updated:**
+
 - `processProfile()` now passes `username` to `isLikelyCreator()`
 
 ## Scoring System
