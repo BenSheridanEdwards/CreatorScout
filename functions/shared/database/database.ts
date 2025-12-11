@@ -323,61 +323,64 @@ export function startSessionMetrics(sessionId: string): void {
 		VALUES (?, ?, ?)
 	`);
 	stmt.run(
-		new Date().toISOString().split('T')[0], // YYYY-MM-DD
+		new Date().toISOString().split("T")[0], // YYYY-MM-DD
 		sessionId,
-		new Date().toISOString()
+		new Date().toISOString(),
 	);
 }
 
-export function updateSessionMetrics(sessionId: string, metrics: Partial<SessionMetrics>): void {
+export function updateSessionMetrics(
+	sessionId: string,
+	metrics: Partial<SessionMetrics>,
+): void {
 	const db = getDb();
 	const updates = [];
 	const values = [];
 
 	if (metrics.profilesVisited !== undefined) {
-		updates.push('profiles_visited = ?');
+		updates.push("profiles_visited = ?");
 		values.push(metrics.profilesVisited);
 	}
 	if (metrics.creatorsFound !== undefined) {
-		updates.push('creators_found = ?');
+		updates.push("creators_found = ?");
 		values.push(metrics.creatorsFound);
 	}
 	if (metrics.dmsSent !== undefined) {
-		updates.push('dms_sent = ?');
+		updates.push("dms_sent = ?");
 		values.push(metrics.dmsSent);
 	}
 	if (metrics.followsCompleted !== undefined) {
-		updates.push('follows_completed = ?');
+		updates.push("follows_completed = ?");
 		values.push(metrics.followsCompleted);
 	}
 	if (metrics.avgBioScore !== undefined) {
-		updates.push('avg_bio_score = ?');
+		updates.push("avg_bio_score = ?");
 		values.push(metrics.avgBioScore);
 	}
 	if (metrics.avgConfidence !== undefined) {
-		updates.push('avg_confidence = ?');
+		updates.push("avg_confidence = ?");
 		values.push(metrics.avgConfidence);
 	}
 	if (metrics.visionApiCost !== undefined) {
-		updates.push('vision_api_cost = ?');
+		updates.push("vision_api_cost = ?");
 		values.push(metrics.visionApiCost);
 	}
 	if (metrics.avgProcessingTime !== undefined) {
-		updates.push('avg_processing_time_seconds = ?');
+		updates.push("avg_processing_time_seconds = ?");
 		values.push(metrics.avgProcessingTime);
 	}
 	if (metrics.errorsEncountered !== undefined) {
-		updates.push('errors_encountered = ?');
+		updates.push("errors_encountered = ?");
 		values.push(metrics.errorsEncountered);
 	}
 	if (metrics.rateLimitsHit !== undefined) {
-		updates.push('rate_limits_hit = ?');
+		updates.push("rate_limits_hit = ?");
 		values.push(metrics.rateLimitsHit);
 	}
 
 	if (updates.length > 0) {
 		const stmt = db.prepare(`
-			UPDATE metrics SET ${updates.join(', ')} WHERE session_id = ?
+			UPDATE metrics SET ${updates.join(", ")} WHERE session_id = ?
 		`);
 		values.push(sessionId);
 		stmt.run(...values);
@@ -386,7 +389,7 @@ export function updateSessionMetrics(sessionId: string, metrics: Partial<Session
 
 export function getDailyMetrics(date?: string): DailyMetrics | null {
 	const db = getDb();
-	const targetDate = date || new Date().toISOString().split('T')[0];
+	const targetDate = date || new Date().toISOString().split("T")[0];
 
 	const stmt = db.prepare(`
 		SELECT
@@ -434,61 +437,69 @@ export function recordProfileMetrics(
 		contentCategories?: string[];
 		visionApiCalls?: number;
 		sourceProfile?: string;
-	}
+	},
 ): void {
 	const db = getDb();
 	const updates = [];
 	const values = [];
 
 	if (metrics.processingTimeSeconds !== undefined) {
-		updates.push('processing_time_seconds = ?');
+		updates.push("processing_time_seconds = ?");
 		values.push(metrics.processingTimeSeconds);
 	}
 	if (metrics.discoverySource !== undefined) {
-		updates.push('discovery_source = ?');
+		updates.push("discovery_source = ?");
 		values.push(metrics.discoverySource);
 	}
 	if (metrics.discoveryDepth !== undefined) {
-		updates.push('discovery_depth = ?');
+		updates.push("discovery_depth = ?");
 		values.push(metrics.discoveryDepth);
 	}
 	if (metrics.sessionId !== undefined) {
-		updates.push('session_id = ?');
+		updates.push("session_id = ?");
 		values.push(metrics.sessionId);
 	}
 	if (metrics.contentCategories !== undefined) {
-		updates.push('content_categories = ?');
+		updates.push("content_categories = ?");
 		values.push(JSON.stringify(metrics.contentCategories));
 	}
 	if (metrics.visionApiCalls !== undefined) {
-		updates.push('vision_api_calls = ?');
+		updates.push("vision_api_calls = ?");
 		values.push(metrics.visionApiCalls);
 	}
 	if (metrics.sourceProfile !== undefined) {
-		updates.push('source_profile = ?');
+		updates.push("source_profile = ?");
 		values.push(metrics.sourceProfile);
 	}
 
 	if (updates.length > 0) {
 		const stmt = db.prepare(`
-			UPDATE profiles SET ${updates.join(', ')} WHERE username = ?
+			UPDATE profiles SET ${updates.join(", ")} WHERE username = ?
 		`);
 		values.push(username.toLowerCase().trim());
 		stmt.run(...values);
 	}
 }
 
-export function recordError(username: string, errorType: string, errorMessage?: string): void {
+export function recordError(
+	username: string,
+	errorType: string,
+	errorMessage?: string,
+): void {
 	const db = getDb();
 	const errorData = {
 		type: errorType,
-		message: errorMessage || '',
-		timestamp: new Date().toISOString()
+		message: errorMessage || "",
+		timestamp: new Date().toISOString(),
 	};
 
 	// Get existing errors
-	const getStmt = db.prepare('SELECT errors_encountered FROM profiles WHERE username = ?');
-	const row = getStmt.get(username.toLowerCase().trim()) as { errors_encountered: string } | undefined;
+	const getStmt = db.prepare(
+		"SELECT errors_encountered FROM profiles WHERE username = ?",
+	);
+	const row = getStmt.get(username.toLowerCase().trim()) as
+		| { errors_encountered: string }
+		| undefined;
 
 	let errors = [];
 	if (row?.errors_encountered) {
@@ -511,6 +522,6 @@ export function recordError(username: string, errorType: string, errorMessage?: 
 	updateStmt.run(
 		JSON.stringify(errors),
 		new Date().toISOString(),
-		username.toLowerCase().trim()
+		username.toLowerCase().trim(),
 	);
 }

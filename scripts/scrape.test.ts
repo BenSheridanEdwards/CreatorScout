@@ -111,7 +111,7 @@ jest.unstable_mockModule("../functions/shared/metrics/metrics.ts", () => ({
 		recordError: jest.fn(),
 		endSession: jest.fn(),
 		getSessionMetrics: jest.fn(() => ({
-			sessionId: 'test-session',
+			sessionId: "test-session",
 			startTime: new Date(),
 			profilesVisited: 0,
 			creatorsFound: 0,
@@ -123,7 +123,7 @@ jest.unstable_mockModule("../functions/shared/metrics/metrics.ts", () => ({
 			visionApiCalls: 0,
 			visionApiCost: 0,
 		})),
-		getSessionId: jest.fn(() => 'test-session'),
+		getSessionId: jest.fn(() => "test-session"),
 	})),
 	startTimer: jest.fn(() => ({
 		end: jest.fn(() => 1.5),
@@ -138,16 +138,16 @@ describe("scrape.ts", () => {
 		jest.clearAllMocks();
 
 		mockLogger = {
-			info: jest.fn(),
-			debug: jest.fn(),
-			warn: jest.fn(),
-			error: jest.fn(),
+			info: jest.fn<any>(),
+			debug: jest.fn<any>(),
+			warn: jest.fn<any>(),
+			error: jest.fn<any>(),
 		};
 		mockCreateLogger.mockReturnValue(mockLogger);
 
 		mockPage = {
 			keyboard: {
-				press: jest.fn().mockResolvedValue(undefined),
+				press: jest.fn<any>().mockResolvedValue(undefined),
 			},
 		};
 

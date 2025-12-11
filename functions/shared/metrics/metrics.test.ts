@@ -58,7 +58,9 @@ describe("Metrics System Documentation", () => {
 			const tracker = new MetricsTracker("custom-session-123");
 
 			expect(tracker.getSessionId()).toBe("custom-session-123");
-			expect(mockStartSessionMetrics).toHaveBeenCalledWith("custom-session-123");
+			expect(mockStartSessionMetrics).toHaveBeenCalledWith(
+				"custom-session-123",
+			);
 		});
 
 		it("provides global metrics tracker singleton", () => {
@@ -94,7 +96,7 @@ describe("Metrics System Documentation", () => {
 				0, // depth 0 (direct seed)
 				undefined, // no source profile
 				["fitness", "lifestyle"], // content categories
-				0 // no vision API calls yet
+				0, // no vision API calls yet
 			);
 
 			expect(mockRecordProfileMetrics).toHaveBeenCalledWith("testuser", {
@@ -127,7 +129,7 @@ describe("Metrics System Documentation", () => {
 				2, // 2 hops deep
 				"creator1", // discovered via creator1's following
 				["creator", "influencer"],
-				1 // 1 vision API call
+				1, // 1 vision API call
 			);
 
 			expect(mockRecordProfileMetrics).toHaveBeenCalledWith("discovered_user", {
@@ -149,39 +151,59 @@ describe("Metrics System Documentation", () => {
 			tracker.recordProfileVisit("user2", 2.0, "seed", 0, undefined, [], 0);
 
 			// Third profile
-			tracker.recordProfileVisit("user3", 1.5, "following_of_user1", 1, "user1", [], 0);
+			tracker.recordProfileVisit(
+				"user3",
+				1.5,
+				"following_of_user1",
+				1,
+				"user1",
+				[],
+				0,
+			);
 
 			expect(mockUpdateSessionMetrics).toHaveBeenCalledTimes(3);
-			expect(mockUpdateSessionMetrics).toHaveBeenNthCalledWith(1, "test-session", {
-				profilesVisited: 1,
-				creatorsFound: 0,
-				dmsSent: 0,
-				followsCompleted: 0,
-				avgProcessingTime: 1.0,
-				errorsEncountered: 0,
-				rateLimitsHit: 0,
-				visionApiCost: 0,
-			});
-			expect(mockUpdateSessionMetrics).toHaveBeenNthCalledWith(2, "test-session", {
-				profilesVisited: 2,
-				creatorsFound: 0,
-				dmsSent: 0,
-				followsCompleted: 0,
-				avgProcessingTime: 1.5,
-				errorsEncountered: 0,
-				rateLimitsHit: 0,
-				visionApiCost: 0,
-			});
-			expect(mockUpdateSessionMetrics).toHaveBeenNthCalledWith(3, "test-session", {
-				profilesVisited: 3,
-				creatorsFound: 0,
-				dmsSent: 0,
-				followsCompleted: 0,
-				avgProcessingTime: 1.5,
-				errorsEncountered: 0,
-				rateLimitsHit: 0,
-				visionApiCost: 0,
-			});
+			expect(mockUpdateSessionMetrics).toHaveBeenNthCalledWith(
+				1,
+				"test-session",
+				{
+					profilesVisited: 1,
+					creatorsFound: 0,
+					dmsSent: 0,
+					followsCompleted: 0,
+					avgProcessingTime: 1.0,
+					errorsEncountered: 0,
+					rateLimitsHit: 0,
+					visionApiCost: 0,
+				},
+			);
+			expect(mockUpdateSessionMetrics).toHaveBeenNthCalledWith(
+				2,
+				"test-session",
+				{
+					profilesVisited: 2,
+					creatorsFound: 0,
+					dmsSent: 0,
+					followsCompleted: 0,
+					avgProcessingTime: 1.5,
+					errorsEncountered: 0,
+					rateLimitsHit: 0,
+					visionApiCost: 0,
+				},
+			);
+			expect(mockUpdateSessionMetrics).toHaveBeenNthCalledWith(
+				3,
+				"test-session",
+				{
+					profilesVisited: 3,
+					creatorsFound: 0,
+					dmsSent: 0,
+					followsCompleted: 0,
+					avgProcessingTime: 1.5,
+					errorsEncountered: 0,
+					rateLimitsHit: 0,
+					visionApiCost: 0,
+				},
+			);
 		});
 	});
 
@@ -227,36 +249,48 @@ describe("Metrics System Documentation", () => {
 			tracker.recordCreatorFound("creator2", 90, 1);
 			tracker.recordCreatorFound("creator3", 75, 0); // No vision API
 
-			expect(mockUpdateSessionMetrics).toHaveBeenNthCalledWith(1, "test-session", {
-				profilesVisited: 0,
-				creatorsFound: 1,
-				dmsSent: 0,
-				followsCompleted: 0,
-				avgProcessingTime: 0,
-				errorsEncountered: 0,
-				rateLimitsHit: 0,
-				visionApiCost: 0,
-			});
-			expect(mockUpdateSessionMetrics).toHaveBeenNthCalledWith(2, "test-session", {
-				profilesVisited: 0,
-				creatorsFound: 2,
-				dmsSent: 0,
-				followsCompleted: 0,
-				avgProcessingTime: 0,
-				errorsEncountered: 0,
-				rateLimitsHit: 0,
-				visionApiCost: 0,
-			});
-			expect(mockUpdateSessionMetrics).toHaveBeenNthCalledWith(3, "test-session", {
-				profilesVisited: 0,
-				creatorsFound: 3,
-				dmsSent: 0,
-				followsCompleted: 0,
-				avgProcessingTime: 0,
-				errorsEncountered: 0,
-				rateLimitsHit: 0,
-				visionApiCost: 0,
-			});
+			expect(mockUpdateSessionMetrics).toHaveBeenNthCalledWith(
+				1,
+				"test-session",
+				{
+					profilesVisited: 0,
+					creatorsFound: 1,
+					dmsSent: 0,
+					followsCompleted: 0,
+					avgProcessingTime: 0,
+					errorsEncountered: 0,
+					rateLimitsHit: 0,
+					visionApiCost: 0,
+				},
+			);
+			expect(mockUpdateSessionMetrics).toHaveBeenNthCalledWith(
+				2,
+				"test-session",
+				{
+					profilesVisited: 0,
+					creatorsFound: 2,
+					dmsSent: 0,
+					followsCompleted: 0,
+					avgProcessingTime: 0,
+					errorsEncountered: 0,
+					rateLimitsHit: 0,
+					visionApiCost: 0,
+				},
+			);
+			expect(mockUpdateSessionMetrics).toHaveBeenNthCalledWith(
+				3,
+				"test-session",
+				{
+					profilesVisited: 0,
+					creatorsFound: 3,
+					dmsSent: 0,
+					followsCompleted: 0,
+					avgProcessingTime: 0,
+					errorsEncountered: 0,
+					rateLimitsHit: 0,
+					visionApiCost: 0,
+				},
+			);
 		});
 	});
 
@@ -304,56 +338,76 @@ describe("Metrics System Documentation", () => {
 			tracker.recordFollowCompleted("creator2");
 			tracker.recordFollowCompleted("creator3"); // Follow without DM
 
-			expect(mockUpdateSessionMetrics).toHaveBeenNthCalledWith(1, "test-session", {
-				profilesVisited: 0,
-				creatorsFound: 0,
-				dmsSent: 1,
-				followsCompleted: 0,
-				avgProcessingTime: 0,
-				errorsEncountered: 0,
-				rateLimitsHit: 0,
-				visionApiCost: 0,
-			});
-			expect(mockUpdateSessionMetrics).toHaveBeenNthCalledWith(2, "test-session", {
-				profilesVisited: 0,
-				creatorsFound: 0,
-				dmsSent: 1,
-				followsCompleted: 1,
-				avgProcessingTime: 0,
-				errorsEncountered: 0,
-				rateLimitsHit: 0,
-				visionApiCost: 0,
-			});
-			expect(mockUpdateSessionMetrics).toHaveBeenNthCalledWith(3, "test-session", {
-				profilesVisited: 0,
-				creatorsFound: 0,
-				dmsSent: 2,
-				followsCompleted: 1,
-				avgProcessingTime: 0,
-				errorsEncountered: 0,
-				rateLimitsHit: 0,
-				visionApiCost: 0,
-			});
-			expect(mockUpdateSessionMetrics).toHaveBeenNthCalledWith(4, "test-session", {
-				profilesVisited: 0,
-				creatorsFound: 0,
-				dmsSent: 2,
-				followsCompleted: 2,
-				avgProcessingTime: 0,
-				errorsEncountered: 0,
-				rateLimitsHit: 0,
-				visionApiCost: 0,
-			});
-			expect(mockUpdateSessionMetrics).toHaveBeenNthCalledWith(5, "test-session", {
-				profilesVisited: 0,
-				creatorsFound: 0,
-				dmsSent: 2,
-				followsCompleted: 3,
-				avgProcessingTime: 0,
-				errorsEncountered: 0,
-				rateLimitsHit: 0,
-				visionApiCost: 0,
-			});
+			expect(mockUpdateSessionMetrics).toHaveBeenNthCalledWith(
+				1,
+				"test-session",
+				{
+					profilesVisited: 0,
+					creatorsFound: 0,
+					dmsSent: 1,
+					followsCompleted: 0,
+					avgProcessingTime: 0,
+					errorsEncountered: 0,
+					rateLimitsHit: 0,
+					visionApiCost: 0,
+				},
+			);
+			expect(mockUpdateSessionMetrics).toHaveBeenNthCalledWith(
+				2,
+				"test-session",
+				{
+					profilesVisited: 0,
+					creatorsFound: 0,
+					dmsSent: 1,
+					followsCompleted: 1,
+					avgProcessingTime: 0,
+					errorsEncountered: 0,
+					rateLimitsHit: 0,
+					visionApiCost: 0,
+				},
+			);
+			expect(mockUpdateSessionMetrics).toHaveBeenNthCalledWith(
+				3,
+				"test-session",
+				{
+					profilesVisited: 0,
+					creatorsFound: 0,
+					dmsSent: 2,
+					followsCompleted: 1,
+					avgProcessingTime: 0,
+					errorsEncountered: 0,
+					rateLimitsHit: 0,
+					visionApiCost: 0,
+				},
+			);
+			expect(mockUpdateSessionMetrics).toHaveBeenNthCalledWith(
+				4,
+				"test-session",
+				{
+					profilesVisited: 0,
+					creatorsFound: 0,
+					dmsSent: 2,
+					followsCompleted: 2,
+					avgProcessingTime: 0,
+					errorsEncountered: 0,
+					rateLimitsHit: 0,
+					visionApiCost: 0,
+				},
+			);
+			expect(mockUpdateSessionMetrics).toHaveBeenNthCalledWith(
+				5,
+				"test-session",
+				{
+					profilesVisited: 0,
+					creatorsFound: 0,
+					dmsSent: 2,
+					followsCompleted: 3,
+					avgProcessingTime: 0,
+					errorsEncountered: 0,
+					rateLimitsHit: 0,
+					visionApiCost: 0,
+				},
+			);
 		});
 	});
 
@@ -365,12 +419,16 @@ describe("Metrics System Documentation", () => {
 		});
 
 		it("records profile loading errors", () => {
-			tracker.recordError("problematic_user", "profile_load_failed", "Page timeout");
+			tracker.recordError(
+				"problematic_user",
+				"profile_load_failed",
+				"Page timeout",
+			);
 
 			expect(mockRecordError).toHaveBeenCalledWith(
 				"problematic_user",
 				"profile_load_failed",
-				"Page timeout"
+				"Page timeout",
 			);
 			expect(mockUpdateSessionMetrics).toHaveBeenCalledWith("test-session", {
 				profilesVisited: 0,
@@ -406,56 +464,76 @@ describe("Metrics System Documentation", () => {
 			tracker.recordRateLimit();
 			tracker.recordRateLimit();
 
-			expect(mockUpdateSessionMetrics).toHaveBeenNthCalledWith(1, "test-session", {
-				profilesVisited: 0,
-				creatorsFound: 0,
-				dmsSent: 0,
-				followsCompleted: 0,
-				avgProcessingTime: 0,
-				errorsEncountered: 1,
-				rateLimitsHit: 0,
-				visionApiCost: 0,
-			});
-			expect(mockUpdateSessionMetrics).toHaveBeenNthCalledWith(2, "test-session", {
-				profilesVisited: 0,
-				creatorsFound: 0,
-				dmsSent: 0,
-				followsCompleted: 0,
-				avgProcessingTime: 0,
-				errorsEncountered: 1,
-				rateLimitsHit: 1,
-				visionApiCost: 0,
-			});
-			expect(mockUpdateSessionMetrics).toHaveBeenNthCalledWith(3, "test-session", {
-				profilesVisited: 0,
-				creatorsFound: 0,
-				dmsSent: 0,
-				followsCompleted: 0,
-				avgProcessingTime: 0,
-				errorsEncountered: 2,
-				rateLimitsHit: 1,
-				visionApiCost: 0,
-			});
-			expect(mockUpdateSessionMetrics).toHaveBeenNthCalledWith(4, "test-session", {
-				profilesVisited: 0,
-				creatorsFound: 0,
-				dmsSent: 0,
-				followsCompleted: 0,
-				avgProcessingTime: 0,
-				errorsEncountered: 2,
-				rateLimitsHit: 2,
-				visionApiCost: 0,
-			});
-			expect(mockUpdateSessionMetrics).toHaveBeenNthCalledWith(5, "test-session", {
-				profilesVisited: 0,
-				creatorsFound: 0,
-				dmsSent: 0,
-				followsCompleted: 0,
-				avgProcessingTime: 0,
-				errorsEncountered: 2,
-				rateLimitsHit: 3,
-				visionApiCost: 0,
-			});
+			expect(mockUpdateSessionMetrics).toHaveBeenNthCalledWith(
+				1,
+				"test-session",
+				{
+					profilesVisited: 0,
+					creatorsFound: 0,
+					dmsSent: 0,
+					followsCompleted: 0,
+					avgProcessingTime: 0,
+					errorsEncountered: 1,
+					rateLimitsHit: 0,
+					visionApiCost: 0,
+				},
+			);
+			expect(mockUpdateSessionMetrics).toHaveBeenNthCalledWith(
+				2,
+				"test-session",
+				{
+					profilesVisited: 0,
+					creatorsFound: 0,
+					dmsSent: 0,
+					followsCompleted: 0,
+					avgProcessingTime: 0,
+					errorsEncountered: 1,
+					rateLimitsHit: 1,
+					visionApiCost: 0,
+				},
+			);
+			expect(mockUpdateSessionMetrics).toHaveBeenNthCalledWith(
+				3,
+				"test-session",
+				{
+					profilesVisited: 0,
+					creatorsFound: 0,
+					dmsSent: 0,
+					followsCompleted: 0,
+					avgProcessingTime: 0,
+					errorsEncountered: 2,
+					rateLimitsHit: 1,
+					visionApiCost: 0,
+				},
+			);
+			expect(mockUpdateSessionMetrics).toHaveBeenNthCalledWith(
+				4,
+				"test-session",
+				{
+					profilesVisited: 0,
+					creatorsFound: 0,
+					dmsSent: 0,
+					followsCompleted: 0,
+					avgProcessingTime: 0,
+					errorsEncountered: 2,
+					rateLimitsHit: 2,
+					visionApiCost: 0,
+				},
+			);
+			expect(mockUpdateSessionMetrics).toHaveBeenNthCalledWith(
+				5,
+				"test-session",
+				{
+					profilesVisited: 0,
+					creatorsFound: 0,
+					dmsSent: 0,
+					followsCompleted: 0,
+					avgProcessingTime: 0,
+					errorsEncountered: 2,
+					rateLimitsHit: 3,
+					visionApiCost: 0,
+				},
+			);
 		});
 	});
 
@@ -501,26 +579,34 @@ describe("Metrics System Documentation", () => {
 			tracker.recordVisionApiCall(0.0015);
 			tracker.recordVisionApiCall(0.002);
 
-			expect(mockUpdateSessionMetrics).toHaveBeenNthCalledWith(1, "test-session", {
-				profilesVisited: 0,
-				creatorsFound: 0,
-				dmsSent: 0,
-				followsCompleted: 0,
-				avgProcessingTime: 0,
-				errorsEncountered: 0,
-				rateLimitsHit: 0,
-				visionApiCost: 0.001,
-			});
-			expect(mockUpdateSessionMetrics).toHaveBeenNthCalledWith(2, "test-session", {
-				profilesVisited: 0,
-				creatorsFound: 0,
-				dmsSent: 0,
-				followsCompleted: 0,
-				avgProcessingTime: 0,
-				errorsEncountered: 0,
-				rateLimitsHit: 0,
-				visionApiCost: 0.0025,
-			});
+			expect(mockUpdateSessionMetrics).toHaveBeenNthCalledWith(
+				1,
+				"test-session",
+				{
+					profilesVisited: 0,
+					creatorsFound: 0,
+					dmsSent: 0,
+					followsCompleted: 0,
+					avgProcessingTime: 0,
+					errorsEncountered: 0,
+					rateLimitsHit: 0,
+					visionApiCost: 0.001,
+				},
+			);
+			expect(mockUpdateSessionMetrics).toHaveBeenNthCalledWith(
+				2,
+				"test-session",
+				{
+					profilesVisited: 0,
+					creatorsFound: 0,
+					dmsSent: 0,
+					followsCompleted: 0,
+					avgProcessingTime: 0,
+					errorsEncountered: 0,
+					rateLimitsHit: 0,
+					visionApiCost: 0.0025,
+				},
+			);
 			// Check that the 3rd call has visionApiCost close to 0.0045 (floating point precision)
 			const thirdCall = mockUpdateSessionMetrics.mock.calls[2][1];
 			expect(thirdCall.visionApiCost).toBeCloseTo(0.0045);
@@ -593,7 +679,7 @@ describe("Metrics System Documentation", () => {
 			const timer = startTimer("async test");
 
 			// Simulate async work
-			await new Promise(resolve => setTimeout(resolve, 10));
+			await new Promise((resolve) => setTimeout(resolve, 10));
 
 			const duration = timer.end();
 
@@ -612,7 +698,7 @@ describe("Metrics System Documentation", () => {
 				totalFollowsCompleted: 12,
 				avgBioScore: 45.2,
 				avgConfidence: 78.5,
-				totalVisionApiCost: 0.150,
+				totalVisionApiCost: 0.15,
 				totalErrors: 5,
 				totalRateLimits: 2,
 			});
@@ -628,7 +714,7 @@ describe("Metrics System Documentation", () => {
 				totalFollowsCompleted: 12,
 				avgBioScore: 45.2,
 				avgConfidence: 78.5,
-				totalVisionApiCost: 0.150,
+				totalVisionApiCost: 0.15,
 				totalErrors: 5,
 				totalRateLimits: 2,
 			});
@@ -644,7 +730,7 @@ describe("Metrics System Documentation", () => {
 				totalFollowsCompleted: 10,
 				avgBioScore: 50.0,
 				avgConfidence: 80.0,
-				totalVisionApiCost: 0.100,
+				totalVisionApiCost: 0.1,
 				totalErrors: 3,
 				totalRateLimits: 1,
 			});
@@ -682,10 +768,26 @@ describe("Metrics System Documentation", () => {
 			const tracker = new MetricsTracker("workflow-session");
 
 			// Process seed profile
-			tracker.recordProfileVisit("seed_user", 1.2, "seed", 0, undefined, ["fitness"], 0);
+			tracker.recordProfileVisit(
+				"seed_user",
+				1.2,
+				"seed",
+				0,
+				undefined,
+				["fitness"],
+				0,
+			);
 
 			// Discover creator through seed's following
-			tracker.recordProfileVisit("creator1", 2.1, "following_of_seed_user", 1, "seed_user", ["creator", "influencer"], 1);
+			tracker.recordProfileVisit(
+				"creator1",
+				2.1,
+				"following_of_seed_user",
+				1,
+				"seed_user",
+				["creator", "influencer"],
+				1,
+			);
 			tracker.recordCreatorFound("creator1", 85, 1);
 
 			// Send DM and follow
@@ -693,11 +795,27 @@ describe("Metrics System Documentation", () => {
 			tracker.recordFollowCompleted("creator1");
 
 			// Process another profile with error
-			tracker.recordProfileVisit("problem_user", 0.5, "following_of_creator1", 2, "creator1", [], 0);
+			tracker.recordProfileVisit(
+				"problem_user",
+				0.5,
+				"following_of_creator1",
+				2,
+				"creator1",
+				[],
+				0,
+			);
 			tracker.recordError("problem_user", "private_account");
 
 			// Discover another creator
-			tracker.recordProfileVisit("creator2", 1.8, "following_of_creator1", 2, "creator1", ["lifestyle"], 0);
+			tracker.recordProfileVisit(
+				"creator2",
+				1.8,
+				"following_of_creator1",
+				2,
+				"creator1",
+				["lifestyle"],
+				0,
+			);
 			tracker.recordCreatorFound("creator2", 92, 0); // High bio score, no vision needed
 
 			// Hit rate limit

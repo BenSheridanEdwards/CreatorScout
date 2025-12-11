@@ -1,16 +1,16 @@
 /**
  * Metrics tracking utilities for Scout
  */
-import { v4 as uuidv4 } from 'uuid';
+import { v4 as uuidv4 } from "uuid";
 import {
-	SessionMetrics,
-	DailyMetrics,
+	type SessionMetrics,
+	type DailyMetrics,
 	startSessionMetrics,
 	updateSessionMetrics,
 	recordProfileMetrics,
 	recordError,
-	getDailyMetrics
-} from '../database/database.ts';
+	getDailyMetrics,
+} from "../database/database.ts";
 
 export class MetricsTracker {
 	private sessionId: string;
@@ -46,7 +46,7 @@ export class MetricsTracker {
 		discoveryDepth: number,
 		sourceProfile?: string,
 		contentCategories?: string[],
-		visionApiCalls: number = 0
+		visionApiCalls: number = 0,
 	): void {
 		this.sessionMetrics.profilesVisited++;
 		this.sessionMetrics.totalProcessingTime += processingTimeSeconds;
@@ -65,7 +65,11 @@ export class MetricsTracker {
 	}
 
 	// Creator discovery metrics
-	recordCreatorFound(username: string, confidence: number, visionApiCalls: number = 0): void {
+	recordCreatorFound(
+		username: string,
+		confidence: number,
+		visionApiCalls: number = 0,
+	): void {
 		this.sessionMetrics.creatorsFound++;
 		this.sessionMetrics.visionApiCalls += visionApiCalls;
 		this.updateSessionMetrics();
@@ -83,7 +87,11 @@ export class MetricsTracker {
 	}
 
 	// Error tracking
-	recordError(username: string, errorType: string, errorMessage?: string): void {
+	recordError(
+		username: string,
+		errorType: string,
+		errorMessage?: string,
+	): void {
 		this.sessionMetrics.errorsEncountered++;
 		recordError(username, errorType, errorMessage);
 		this.updateSessionMetrics();
@@ -95,7 +103,8 @@ export class MetricsTracker {
 	}
 
 	// Vision API tracking
-	recordVisionApiCall(cost: number = 0.001): void { // Default ~$0.001 per call
+	recordVisionApiCall(cost: number = 0.001): void {
+		// Default ~$0.001 per call
 		this.sessionMetrics.visionApiCalls++;
 		this.sessionMetrics.visionApiCost += cost;
 		this.updateSessionMetrics();
@@ -119,7 +128,10 @@ export class MetricsTracker {
 	// Calculate averages
 	getAverageProcessingTime(): number {
 		if (this.sessionMetrics.profilesVisited === 0) return 0;
-		return this.sessionMetrics.totalProcessingTime / this.sessionMetrics.profilesVisited;
+		return (
+			this.sessionMetrics.totalProcessingTime /
+			this.sessionMetrics.profilesVisited
+		);
 	}
 
 	getAverageBioScore(): number {
@@ -184,17 +196,21 @@ export function getMetricsSummary(date?: string): {
 		};
 	}
 
-	const sessionSuccessRate = dailyMetrics.totalSessions > 0
-		? (dailyMetrics.totalProfilesVisited / dailyMetrics.totalSessions)
-		: 0;
+	const sessionSuccessRate =
+		dailyMetrics.totalSessions > 0
+			? dailyMetrics.totalProfilesVisited / dailyMetrics.totalSessions
+			: 0;
 
-	const creatorConversionRate = dailyMetrics.totalProfilesVisited > 0
-		? (dailyMetrics.totalCreatorsFound / dailyMetrics.totalProfilesVisited) * 100
-		: 0;
+	const creatorConversionRate =
+		dailyMetrics.totalProfilesVisited > 0
+			? (dailyMetrics.totalCreatorsFound / dailyMetrics.totalProfilesVisited) *
+				100
+			: 0;
 
-	const dmSuccessRate = dailyMetrics.totalCreatorsFound > 0
-		? (dailyMetrics.totalDmsSent / dailyMetrics.totalCreatorsFound) * 100
-		: 0;
+	const dmSuccessRate =
+		dailyMetrics.totalCreatorsFound > 0
+			? (dailyMetrics.totalDmsSent / dailyMetrics.totalCreatorsFound) * 100
+			: 0;
 
 	return {
 		daily: dailyMetrics,

@@ -191,8 +191,10 @@ export async function processProfile(
 	markVisited(username, undefined, analysis.bio, analysis.bioScore);
 
 	// Parse discovery source to extract depth and source profile
-	const discoveryDepth = source.split('_').length - 1; // Count underscores as depth
-	const sourceProfile = source.includes('_of_') ? source.split('_of_')[1] : undefined;
+	const discoveryDepth = source.split("_").length - 1; // Count underscores as depth
+	const sourceProfile = source.includes("_of_")
+		? source.split("_of_")[1]
+		: undefined;
 
 	// Record profile visit metrics
 	if (metricsTracker) {
@@ -204,7 +206,7 @@ export async function processProfile(
 			discoveryDepth,
 			sourceProfile,
 			[], // contentCategories will be filled later if creator found
-			0   // visionApiCalls will be updated later
+			0, // visionApiCalls will be updated later
 		);
 	}
 
@@ -513,7 +515,11 @@ export async function processFollowingList(
 /**
  * Run the main scrape loop
  */
-export async function runScrapeLoop(page: Page, logger: Logger, metricsTracker?: MetricsTracker): Promise<void> {
+export async function runScrapeLoop(
+	page: Page,
+	logger: Logger,
+	metricsTracker?: MetricsTracker,
+): Promise<void> {
 	let dmsSent = 0;
 
 	while (dmsSent < MAX_DMS_PER_DAY) {
@@ -576,7 +582,10 @@ export async function scrape(debug: boolean = false): Promise<void> {
 
 	// Initialize metrics tracking
 	const metricsTracker = getGlobalMetricsTracker();
-	logger.info("METRICS", `Started session tracking: ${metricsTracker.getSessionId()}`);
+	logger.info(
+		"METRICS",
+		`Started session tracking: ${metricsTracker.getSessionId()}`,
+	);
 
 	let browser: Browser | null = null;
 	try {
@@ -605,7 +614,10 @@ export async function scrape(debug: boolean = false): Promise<void> {
 		// End metrics session
 		metricsTracker.endSession();
 		const finalMetrics = metricsTracker.getSessionMetrics();
-		logger.info("METRICS", `Session completed - Profiles: ${finalMetrics.profilesVisited}, Creators: ${finalMetrics.creatorsFound}, DMs: ${finalMetrics.dmsSent}`);
+		logger.info(
+			"METRICS",
+			`Session completed - Profiles: ${finalMetrics.profilesVisited}, Creators: ${finalMetrics.creatorsFound}, DMs: ${finalMetrics.dmsSent}`,
+		);
 
 		await browser.close();
 	} catch (err) {
