@@ -178,16 +178,21 @@ export async function processProfile(
 			confidence = visionResult.confidence || analysis.bioScore;
 			logger.info(
 				"ANALYSIS",
-				`Vision confirmed creator (confidence: ${confidence}%)`,
+				`Vision confirmed creator (confidence: ${confidence}%) - Indicators: ${visionResult.indicators?.join(', ') || 'none'}`,
 			);
 		} else {
 			logger.debug(
 				"ANALYSIS",
-				`Vision did not confirm creator for @${username}`,
+				`Vision did not confirm creator for @${username} - Confidence: ${visionResult.confidence || 0}%`,
 			);
 		}
+	} else if (analysis.bioScore >= 70) {
+		// High bio score alone can indicate creator (e.g., direct creator mention)
+		confirmedCreator = true;
+		confidence = analysis.bioScore;
+		logger.info("ANALYSIS", `High bio score (${analysis.bioScore}) - likely creator without linktree`);
 	} else if (analysis.bioScore >= CONFIDENCE_THRESHOLD) {
-		// High bio score alone can indicate creator
+		// Fallback for very high confidence scores
 		confirmedCreator = true;
 		confidence = analysis.bioScore;
 	}
