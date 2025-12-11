@@ -46,6 +46,43 @@ const LINK_EMOJIS = new Set([
   '👀',
 ]);
 
+// Username keywords that suggest OF/premium content
+const USERNAME_KEYWORDS = [
+  'mistress',
+  'goddess',
+  'princess',
+  'queen',
+  'baby',
+  'daddy',
+  'slave',
+  'sub',
+  'dom',
+  'domme',
+  'kink',
+  'fetish',
+  'sugar',
+  'escort',
+  'model',
+  'content',
+  'creator',
+  'spicy',
+  'naughty',
+  'bad',
+  'good',
+  'sweet',
+  'hot',
+  'sexy',
+  'babe',
+  'honey',
+  'angel',
+  'devil',
+  'sin',
+  'lust',
+  'desire',
+  'tempt',
+  'seduce',
+];
+
 // Keywords that suggest OF/premium content
 const KEYWORDS = [
   // Direct mentions
@@ -68,6 +105,20 @@ const KEYWORDS = [
   'link below',
   '⬇️ link',
   'bio link',
+  // Highlight hints
+  'check my highlight',
+  'check highlight',
+  'see highlight',
+  'highlight',
+  'highlights',
+  'my link',
+  'my 🔗',
+  'link in highlight',
+  'official',
+  'official account',
+  'official accounts',
+  'all my links',
+  'all links',
   // Content hints
   'exclusive',
   'exclusive content',
@@ -118,6 +169,28 @@ const KEYWORDS = [
   'good girl',
   'daddy',
   'baby girl',
+  'what you need',
+  'all you need',
+  'your girl',
+  'your babe',
+  'your queen',
+  'your goddess',
+  'custom',
+  'custom content',
+  'custom video',
+  'rates',
+  'menu',
+  'pricing',
+  'tip',
+  'tips',
+  'cashapp',
+  'venmo',
+  'paypal',
+  'booking',
+  'available',
+  'open',
+  'dm open',
+  'dms open',
 ];
 
 const DISCOUNT_PATTERNS = [
@@ -180,7 +253,10 @@ export interface BioScoreResult {
   links: string[];
 }
 
-export function calculateScore(bio: string): BioScoreResult {
+export function calculateScore(
+  bio: string,
+  username?: string
+): BioScoreResult {
   if (!bio) {
     return { score: 0, reasons: [], emojis: 0, keywords: [], links: [] };
   }
@@ -189,11 +265,36 @@ export function calculateScore(bio: string): BioScoreResult {
   const keywords = findKeywords(bio);
   const links = extractLinks(bio);
   const bioLower = bio.toLowerCase();
+  const usernameLower = username?.toLowerCase() || '';
   const hasDiscount = DISCOUNT_PATTERNS.some((p) => p.test(bioLower));
   const hasExclusive = EXCLUSIVE_PATTERNS.some((p) => p.test(bioLower));
+  
+  // Check for username keywords
+  const usernameKeyword = USERNAME_KEYWORDS.find((kw) =>
+    usernameLower.includes(kw)
+  );
+  
+  // Check for "check my highlight" pattern with link emoji
+  const hasHighlightHint =
+    (bioLower.includes('check my highlight') ||
+      bioLower.includes('check highlight') ||
+      bioLower.includes('see highlight')) &&
+    (bio.includes('🔗') || bio.includes('link'));
 
   let score = 0;
   const reasons: string[] = [];
+
+  // Username keyword scoring (max 20 points)
+  if (usernameKeyword) {
+    score += 20;
+    reasons.push(`Username contains "${usernameKeyword}"`);
+  }
+
+  // Highlight hint scoring (max 15 points)
+  if (hasHighlightHint) {
+    score += 15;
+    reasons.push('Bio directs to highlights for links');
+  }
 
   // Emoji scoring (max 25 points)
   if (emojiCount >= 5) {
@@ -264,8 +365,10 @@ export function calculateScore(bio: string): BioScoreResult {
 
 export function isLikelyCreator(
   bio: string,
-  threshold: number = 40
+  threshold: number = 40,
+  username?: string
 ): [boolean, BioScoreResult] {
-  const result = calculateScore(bio);
+  const result = calculateScore(bio, username);
   return [result.score >= threshold, result];
 }
+

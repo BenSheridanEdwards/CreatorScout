@@ -12,3 +12,4 @@ export async function saveProof(username: string, page: Page): Promise<string> {
   await page.screenshot({ path, fullPage: true });
   return path;
 }
+

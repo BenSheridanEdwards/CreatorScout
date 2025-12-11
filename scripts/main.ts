@@ -237,7 +237,7 @@ async function processProfile(
   }
 
   // === STEP 1: Keyword/emoji matching (cheap) ===
-  const [isLikely, matchData] = isLikelyCreator(bio, 40);
+  const [isLikely, matchData] = isLikelyCreator(bio, 40, username);
   result.bio_score = matchData.score;
 
   console.log(
@@ -530,9 +530,14 @@ async function main(): Promise<void> {
   let page: Page;
 
   if (LOCAL_BROWSER) {
+    // Use persistent user data directory to save cookies between sessions
+    const { getUserDataDir } = await import('../functions/sessionManager.ts');
+    const userDataDir = getUserDataDir();
+
     browser = await (puppeteer as any).launch({
       headless: true,
       args: ['--no-sandbox', '--disable-dev-shm-usage'],
+      userDataDir, // Persistent profile to save cookies
     });
     page = await browser.newPage();
   } else {
@@ -552,9 +557,13 @@ async function main(): Promise<void> {
     'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
   );
 
-  // Login
+  // Login (will use saved session if available)
   console.log('Logging in to Instagram...');
-  await login(page, { username: IG_USER!, password: IG_PASS! });
+  await login(
+    page,
+    { username: IG_USER!, password: IG_PASS! },
+    { skipIfLoggedIn: true }
+  );
   console.log('✓ Logged in!');
 
   // Load seeds

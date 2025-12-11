@@ -86,3 +86,4 @@ export async function mouseWiggle(page: Page): Promise<void> {
   const steps = DELAY_SCALE < 1 ? randomInt(8, 21) : randomInt(15, 36);
   await page.mouse.move(randomInt(200, 1601), randomInt(200, 901), { steps });
 }
+

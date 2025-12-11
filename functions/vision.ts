@@ -38,6 +38,41 @@ Return EXACTLY this JSON:
   "reason": "brief explanation (max 15 words)"
 }`;
 
+const PROFILE_PROMPT = `You are analyzing a screenshot of an Instagram profile page. This includes the bio, story highlights, and profile header.
+
+Determine if this person is an Patreon/premium content creator.
+
+STRONG INDICATORS (high confidence if present):
+- Story highlight titles like: "My 🔗", "Official Accounts", "Links", "Menu", "Rates", "Custom", "DM"
+- Bio text directing to highlights: "Check my highlight 🔗", "See highlights for links"
+- Link highlight cover images (lingerie, swimwear, revealing clothing, provocative poses)
+- Bio keywords: "Patreon", "Ko-fi", "Exclusive Content", "Premium", "VIP", "Custom Content"
+- Username contains: "mistress", "goddess", "princess", "model", "creator"
+- High follower count relative to following count
+
+MODERATE INDICATORS (consider with other factors):
+- Link emojis in bio or highlights: 🔥💋🍑🍒💦😈👅🥵🖤
+- Highlight titles with link emoji (🔗) combined with link imagery
+- Bio mentions: "DM for", "Custom", "Rates", "Menu", "Available", "Booking"
+- Multiple story highlights suggesting multiple platforms/accounts
+- Category label: "Blogger", "Creator", "Model"
+
+VISUAL ANALYSIS:
+- Look at story highlight cover images for link content (lingerie, revealing clothing, provocative poses)
+- Check if highlight titles match link cover images
+- Look for text overlays on highlight covers (e.g., "what you need", "all you need")
+
+IMPORTANT: A profile with "Check my highlight 🔗" + link highlight covers + high follower ratio = HIGH confidence even without explicit creator link in bio.
+
+Return EXACTLY this JSON:
+{
+  "is_adult_creator": true or false,
+  "confidence": 0-100,
+  "platform_links": [] or ["patreon.com/xxx"] if visible,
+  "indicators": ["Link highlight covers", "Bio directs to highlights", "High follower ratio", ...] or [],
+  "reason": "brief explanation (max 15 words)"
+}`;
+
 export interface VisionAnalysisResult {
   is_adult_creator: boolean;
   confidence: number;
@@ -80,7 +115,10 @@ export async function analyzeLinktree(
 
     return JSON.parse(text.trim()) as VisionAnalysisResult;
   } catch (e) {
-    console.error(`  Vision analysis failed: ${e}`);
+    // Only log errors when not in test environment to keep test output clean
+    if (process.env.NODE_ENV !== 'test' && !process.env.JEST_WORKER_ID) {
+      console.error(`  Vision analysis failed: ${e}`);
+    }
     return null;
   }
 }
@@ -142,4 +180,59 @@ export async function isConfirmedCreator(
   }
 
   return [isConfirmed, data];
+}
+
+/**
+ * Analyze an Instagram profile screenshot (includes bio, highlights, header).
+ * Uses PROFILE_PROMPT which is optimized for profile pages.
+ */
+export async function analyzeProfile(
+  imagePath: string
+): Promise<VisionAnalysisResult | null> {
+  try {
+    const imageBuffer = readFileSync(imagePath);
+    const base64 = imageBuffer.toString('base64');
+
+    const response = await client.chat.completions.create({
+      model: VISION_MODEL,
+      messages: [
+        {
+          role: 'user',
+          content: [
+            { type: 'text', text: PROFILE_PROMPT },
+            {
+              type: 'image_url',
+              image_url: { url: `data:image/png;base64,${base64}` },
+            },
+          ],
+        },
+      ],
+      max_tokens: 400,
+      temperature: 0.0,
+    });
+
+    let text = response.choices[0]?.message?.content || '';
+    text = text
+      .trim()
+      .replace(/^```json/, '')
+      .replace(/^```/, '')
+      .replace(/```$/, '');
+
+    try {
+      const parsed = JSON.parse(text) as VisionAnalysisResult;
+      return parsed;
+    } catch {
+      // Only log errors when not in test environment to keep test output clean
+      if (process.env.NODE_ENV !== 'test' && !process.env.JEST_WORKER_ID) {
+        console.error('Failed to parse vision response:', text);
+      }
+      return null;
+    }
+  } catch (error) {
+    // Only log errors when not in test environment to keep test output clean
+    if (process.env.NODE_ENV !== 'test' && !process.env.JEST_WORKER_ID) {
+      console.error('Vision analysis error:', error);
+    }
+    return null;
+  }
 }

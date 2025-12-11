@@ -1,12 +1,48 @@
 import type { Page } from 'puppeteer';
 import { clickAny } from './clickAny.js';
+import { loadCookies, saveCookies, isLoggedIn } from './sessionManager.ts';
 
 export type Credentials = {
   username: string;
   password: string;
 };
 
-export async function login(page: Page, creds: Credentials): Promise<void> {
+export async function login(
+  page: Page,
+  creds: Credentials,
+  options?: { skipIfLoggedIn?: boolean }
+): Promise<void> {
+  // Navigate to Instagram first (required before setting cookies)
+  await page.goto('https://www.instagram.com/', {
+    waitUntil: 'domcontentloaded',
+    timeout: 15000,
+  });
+
+  // Try to load saved cookies after navigation
+  const cookiesLoaded = await loadCookies(page);
+
+  // Check if we're already logged in (either from cookies or previous session)
+  if (options?.skipIfLoggedIn !== false) {
+    // Wait a moment for cookies to take effect
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+
+    const alreadyLoggedIn = await isLoggedIn(page);
+    if (alreadyLoggedIn) {
+      console.log('   ✅ Already logged in (using saved session)');
+      // Refresh cookies to extend expiration
+      await saveCookies(page);
+      return;
+    }
+  }
+
+  // If cookies were loaded but we're not logged in, they may be expired
+  if (cookiesLoaded) {
+    console.log(
+      '   ⚠️  Cookies loaded but session expired, logging in again...'
+    );
+  }
+
+  // Reload page to ensure we're on the login page
   await page.goto('https://www.instagram.com/', {
     waitUntil: 'networkidle2',
     timeout: 15000,
@@ -22,8 +58,14 @@ export async function login(page: Page, creds: Credentials): Promise<void> {
   try {
     await page.waitForSelector('input[name="username"]', { timeout: 5000 });
   } catch {
+    // Check if we're already logged in (maybe cookies worked)
     const loggedIn = await page.$('a[href="/direct/inbox/"]');
-    if (loggedIn) return;
+    if (loggedIn) {
+      console.log('   ✅ Already logged in (cookies restored session)');
+      // Save cookies again to refresh expiration
+      await saveCookies(page);
+      return;
+    }
     throw new Error('Could not find login form');
   }
 
@@ -38,6 +80,9 @@ export async function login(page: Page, creds: Credentials): Promise<void> {
   try {
     await page.waitForSelector('a[href="/direct/inbox/"]', { timeout: 15000 });
     console.log('   Login successful - inbox link found');
+
+    // Save cookies after successful login
+    await saveCookies(page);
   } catch {
     const currentUrl = page.url();
     console.log(`   Login timeout - current URL: ${currentUrl}`);

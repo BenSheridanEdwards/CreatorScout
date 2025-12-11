@@ -1,51 +1,41 @@
-# Environment variables (NEVER commit)
-.env
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
 
-# Database
-*.db
-scout.db
-
-# Screenshots
-screenshots/
-tmp/
-
-# Python
+# Testing
+coverage/
+.nyc_output/
 __pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
 
-# Virtual environments
-venv/
-ENV/
-env/
-.venv/
+
+# Production
+build/
+dist/
+
+# Misc
+.DS_Store
+*.log
+.env
+.env.local
+.env.*.local
+
+# Session data (contains cookies - DO NOT COMMIT)
+.sessions/
+*.db
+*.db-journal
+scout.db
+scout.db-journal
+
+# Screenshots and temp files
+tmp/
+*.png
+*.jpg
+*.jpeg
 
 # IDE
-.idea/
 .vscode/
+.idea/
 *.swp
 *.swo
 *~
-
-# OS
-.DS_Store
-Thumbs.db
-
-node_modules/

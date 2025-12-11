@@ -7,7 +7,7 @@
     "test": "NODE_OPTIONS=--experimental-vm-modules jest",
     "test:watch": "NODE_OPTIONS=--experimental-vm-modules jest --watch",
     "test:coverage": "NODE_OPTIONS=--experimental-vm-modules jest --coverage",
-    "test:e2e": "node --test tests/e2e_puppeteer.test.js",
+    "test:e2e": "NODE_OPTIONS=--experimental-vm-modules jest --testMatch='**/tests/**/e2e*.test.ts' --testTimeout=120000",
     "test:profile": "NODE_OPTIONS=--experimental-vm-modules jest tests/check_profile.test.ts"
   },
   "dependencies": {

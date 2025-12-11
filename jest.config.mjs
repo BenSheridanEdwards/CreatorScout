@@ -19,7 +19,11 @@ export default {
       },
     ],
   },
-  testMatch: ['**/tests/**/*.test.ts'],
+  testMatch: [
+    '**/tests/**/*.test.ts',
+    '!**/tests/**/e2e*.test.ts',
+  ],
   collectCoverageFrom: ['functions/**/*.ts', 'scripts/**/*.ts'],
   transformIgnorePatterns: [],
 };
+

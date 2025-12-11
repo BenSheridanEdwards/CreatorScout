@@ -1,0 +1,109 @@
+/**
+ * Session management for Instagram - saves and reuses cookies to avoid repeated logins.
+ * This helps prevent Instagram from flagging the account for suspicious activity.
+ */
+import {
+  readFileSync,
+  writeFileSync,
+  existsSync,
+  mkdirSync,
+  unlinkSync,
+} from 'node:fs';
+import { join } from 'node:path';
+import type { Page } from 'puppeteer';
+
+const SESSION_DIR = join(process.cwd(), '.sessions');
+const COOKIES_FILE = join(SESSION_DIR, 'instagram_cookies.json');
+
+/**
+ * Ensure session directory exists
+ */
+function ensureSessionDir(): void {
+  if (!existsSync(SESSION_DIR)) {
+    mkdirSync(SESSION_DIR, { recursive: true });
+  }
+}
+
+/**
+ * Save cookies from a page to disk
+ */
+export async function saveCookies(page: Page): Promise<void> {
+  try {
+    ensureSessionDir();
+    const cookies = await page.cookies();
+    writeFileSync(COOKIES_FILE, JSON.stringify(cookies, null, 2));
+    console.log(`   💾 Saved ${cookies.length} cookies to session file`);
+  } catch (error) {
+    console.log(`   ⚠️  Failed to save cookies: ${error}`);
+  }
+}
+
+/**
+ * Load cookies from disk and set them on a page
+ */
+export async function loadCookies(page: Page): Promise<boolean> {
+  try {
+    if (!existsSync(COOKIES_FILE)) {
+      return false;
+    }
+
+    const cookiesJson = readFileSync(COOKIES_FILE, 'utf-8');
+    const cookies = JSON.parse(cookiesJson);
+
+    if (!Array.isArray(cookies) || cookies.length === 0) {
+      return false;
+    }
+
+    // Set cookies before navigating
+    await page.setCookie(...cookies);
+    console.log(`   🔄 Loaded ${cookies.length} cookies from session file`);
+    return true;
+  } catch (error) {
+    console.log(`   ⚠️  Failed to load cookies: ${error}`);
+    return false;
+  }
+}
+
+/**
+ * Check if we're already logged in by checking for inbox link
+ */
+export async function isLoggedIn(page: Page): Promise<boolean> {
+  try {
+    // Navigate to Instagram home to check login status
+    await page.goto('https://www.instagram.com/', {
+      waitUntil: 'domcontentloaded',
+      timeout: 10000,
+    });
+
+    // Wait a bit for page to load
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+
+    // Check for inbox link (indicates logged in)
+    const inboxLink = await page.$('a[href="/direct/inbox/"]');
+    return inboxLink !== null;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Clear saved cookies (useful when session expires)
+ */
+export function clearCookies(): void {
+  try {
+    if (existsSync(COOKIES_FILE)) {
+      unlinkSync(COOKIES_FILE);
+      console.log('   🗑️  Cleared saved cookies');
+    }
+  } catch (error) {
+    const err = error instanceof Error ? error.message : String(error);
+    console.log(`   ⚠️  Failed to clear cookies: ${err}`);
+  }
+}
+
+/**
+ * Get user data directory path for persistent browser profile
+ */
+export function getUserDataDir(): string {
+  return join(SESSION_DIR, 'browser_profile');
+}

@@ -244,3 +244,4 @@ export function getStats(): Stats {
     queue_size: (queueStmt.get() as { count: number }).count,
   };
 }
+

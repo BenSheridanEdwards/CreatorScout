@@ -154,3 +154,4 @@ export const CONFIDENCE_THRESHOLD = 80;
 export const MAX_DMS_PER_DAY = 120;
 export const DM_MESSAGE =
   "Hey beautiful, loved your vibe — just followed you on OF too if you're there"; // change it
+
