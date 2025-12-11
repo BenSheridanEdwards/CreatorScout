@@ -87,11 +87,7 @@ export async function ensureLoggedIn(page: Page): Promise<void> {
 		throw new Error("Instagram credentials not configured");
 	}
 
-	await login(
-		page,
-		{ username: IG_USER, password: IG_PASS },
-		{ skipIfLoggedIn: false },
-	);
+	await login(page, { username: IG_USER, password: IG_PASS });
 }
 
 /**
