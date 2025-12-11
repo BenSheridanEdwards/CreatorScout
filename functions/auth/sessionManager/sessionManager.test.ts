@@ -1,7 +1,7 @@
 import { jest } from "@jest/globals";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import type { Page } from "puppeteer";
+import type { ElementHandle, Page } from "puppeteer";
 import {
 	clearCookies,
 	getUserDataDir,
@@ -15,8 +15,15 @@ const COOKIES_FILE = "instagram_cookies.json";
 const sessionDirFromModule = path.dirname(getUserDataDir());
 const cookiesFilePath = path.join(sessionDirFromModule, COOKIES_FILE);
 
+type MockPage = Page & {
+	setCookie: jest.MockedFunction<Page["setCookie"]>;
+	cookies: jest.MockedFunction<Page["cookies"]>;
+	goto: jest.MockedFunction<Page["goto"]>;
+	$: jest.MockedFunction<Page["$"]>;
+};
+
 describe("sessionManager", () => {
-	let page: Page;
+	let page: MockPage;
 
 	beforeEach(() => {
 		jest.useFakeTimers();
@@ -25,11 +32,11 @@ describe("sessionManager", () => {
 		fs.rmSync(sessionDirFromModule, { recursive: true, force: true });
 
 		page = {
-			setCookie: jest.fn<any>().mockResolvedValue(undefined),
-			cookies: jest.fn<any>().mockResolvedValue([]),
-			goto: jest.fn<any>().mockResolvedValue(undefined),
-			$: jest.fn<any>().mockResolvedValue(null),
-		} as unknown as Page;
+			setCookie: jest.fn<Page["setCookie"]>().mockResolvedValue(undefined),
+			cookies: jest.fn<Page["cookies"]>().mockResolvedValue([]),
+			goto: jest.fn<Page["goto"]>().mockResolvedValue(null),
+			$: jest.fn<Page["$"]>().mockResolvedValue(null),
+		} as unknown as MockPage;
 	});
 
 	afterEach(() => {
@@ -49,12 +56,21 @@ describe("sessionManager", () => {
 
 	describe("saveCookies", () => {
 		test("saves cookies to file when page has cookies", async () => {
-			const mockCookies = [
-				{ name: "sessionid", value: "abc123", domain: ".instagram.com" },
-				{ name: "csrftoken", value: "xyz789", domain: ".instagram.com" },
+			type PageCookies = Awaited<ReturnType<Page["cookies"]>>;
+			const mockCookies: PageCookies = [
+				{
+					name: "sessionid",
+					value: "abc123",
+					domain: ".instagram.com",
+				} as PageCookies[number],
+				{
+					name: "csrftoken",
+					value: "xyz789",
+					domain: ".instagram.com",
+				} as PageCookies[number],
 			];
 
-			(page.cookies as jest.Mock).mockResolvedValue(mockCookies);
+			page.cookies.mockResolvedValue(mockCookies);
 
 			await saveCookies(page);
 
@@ -65,7 +81,7 @@ describe("sessionManager", () => {
 		});
 
 		test("creates session directory if it does not exist", async () => {
-			(page.cookies as jest.Mock).mockResolvedValue([]);
+			page.cookies.mockResolvedValue([]);
 
 			await saveCookies(page);
 
@@ -73,7 +89,7 @@ describe("sessionManager", () => {
 		});
 
 		test("does not create directory if it already exists", async () => {
-			(page.cookies as jest.Mock).mockResolvedValue([]);
+			page.cookies.mockResolvedValue([]);
 			fs.mkdirSync(sessionDirFromModule, { recursive: true });
 
 			await saveCookies(page);
@@ -82,9 +98,7 @@ describe("sessionManager", () => {
 		});
 
 		test("handles errors gracefully", async () => {
-			(page.cookies as jest.Mock).mockRejectedValue(
-				new Error("Failed to get cookies"),
-			);
+			page.cookies.mockRejectedValue(new Error("Failed to get cookies"));
 
 			await expect(saveCookies(page)).resolves.not.toThrow();
 		});
@@ -135,7 +149,7 @@ describe("sessionManager", () => {
 
 			fs.mkdirSync(sessionDirFromModule, { recursive: true });
 			fs.writeFileSync(cookiesFilePath, JSON.stringify(mockCookies));
-			(page.setCookie as jest.Mock).mockResolvedValue(undefined);
+			page.setCookie.mockResolvedValue(undefined);
 
 			const result = await loadCookies(page);
 
@@ -149,9 +163,11 @@ describe("sessionManager", () => {
 
 	describe("isLoggedIn", () => {
 		test("returns true when inbox link is found", async () => {
-			const mockInboxElement = { click: jest.fn() };
-			(page.goto as jest.Mock).mockResolvedValue(undefined);
-			(page.$ as jest.Mock).mockResolvedValue(mockInboxElement);
+			const mockInboxElement = {
+				click: jest.fn(),
+			} as unknown as ElementHandle<Element>;
+			page.goto.mockResolvedValue(null);
+			page.$.mockResolvedValue(mockInboxElement);
 
 			const resultPromise = isLoggedIn(page);
 
@@ -168,8 +184,8 @@ describe("sessionManager", () => {
 		});
 
 		test("returns false when inbox link is not found", async () => {
-			(page.goto as jest.Mock).mockResolvedValue(undefined);
-			(page.$ as jest.Mock).mockResolvedValue(null);
+			page.goto.mockResolvedValue(null);
+			page.$.mockResolvedValue(null);
 
 			const resultPromise = isLoggedIn(page);
 
@@ -183,9 +199,7 @@ describe("sessionManager", () => {
 		});
 
 		test("returns false when navigation fails", async () => {
-			(page.goto as jest.Mock).mockRejectedValue(
-				new Error("Navigation timeout"),
-			);
+			page.goto.mockRejectedValue(new Error("Navigation timeout"));
 
 			const result = await isLoggedIn(page);
 
@@ -193,9 +207,11 @@ describe("sessionManager", () => {
 		});
 
 		test("waits for page to load before checking", async () => {
-			const mockInboxElement = { click: jest.fn() };
-			(page.goto as jest.Mock).mockResolvedValue(undefined);
-			(page.$ as jest.Mock).mockResolvedValue(mockInboxElement);
+			const mockInboxElement = {
+				click: jest.fn(),
+			} as unknown as ElementHandle<Element>;
+			page.goto.mockResolvedValue(null);
+			page.$.mockResolvedValue(mockInboxElement);
 
 			const resultPromise = isLoggedIn(page);
 
