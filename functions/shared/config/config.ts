@@ -150,7 +150,7 @@ export const VISION_MODEL = "google/gemini-flash-1.5-exp"; // fastest + cheapest
 // export const VISION_MODEL = 'google/gemini-pro-vision-2.5'; // max accuracy if you want
 // export const VISION_MODEL = 'anthropic/claude-3-5-sonnet-20241022';
 
-export const CONFIDENCE_THRESHOLD = 80;
+export const CONFIDENCE_THRESHOLD = 50;
 export const MAX_DMS_PER_DAY = 120;
 export const DM_MESSAGE =
 	"Hey beautiful, loved your vibe — just followed you on OF too if you're there"; // change it

@@ -38,15 +38,21 @@ jest.unstable_mockModule("../functions/timing/humanize/humanize.ts", () => ({
 	getDelay: mockGetDelay,
 }));
 
-jest.unstable_mockModule("../functions/navigation/profileNavigation/profileNavigation.ts", () => ({
-	navigateToProfileAndCheck: mockNavigateToProfileAndCheck,
-	ensureLoggedIn: mockEnsureLoggedIn,
-}));
+jest.unstable_mockModule(
+	"../functions/navigation/profileNavigation/profileNavigation.ts",
+	() => ({
+		navigateToProfileAndCheck: mockNavigateToProfileAndCheck,
+		ensureLoggedIn: mockEnsureLoggedIn,
+	}),
+);
 
-jest.unstable_mockModule("../functions/profile/profileAnalysis/profileAnalysis.ts", () => ({
-	analyzeProfileBasic: mockAnalyzeProfileBasic,
-	analyzeLinkWithVision: mockAnalyzeLinkWithVision,
-}));
+jest.unstable_mockModule(
+	"../functions/profile/profileAnalysis/profileAnalysis.ts",
+	() => ({
+		analyzeProfileBasic: mockAnalyzeProfileBasic,
+		analyzeLinkWithVision: mockAnalyzeLinkWithVision,
+	}),
+);
 
 jest.unstable_mockModule("../functions/shared/snapshot/snapshot.ts", () => ({
 	snapshot: mockSnapshot,
@@ -67,21 +73,27 @@ jest.unstable_mockModule("../functions/shared/database/database.ts", () => ({
 	wasVisited: mockWasVisited,
 }));
 
-jest.unstable_mockModule("../functions/profile/profileActions/profileActions.ts", () => ({
-	sendDMToUser: mockSendDMToUser,
-	followUserAccount: mockFollowUserAccount,
-	addFollowingToQueue: mockAddFollowingToQueue,
-}));
+jest.unstable_mockModule(
+	"../functions/profile/profileActions/profileActions.ts",
+	() => ({
+		sendDMToUser: mockSendDMToUser,
+		followUserAccount: mockFollowUserAccount,
+		addFollowingToQueue: mockAddFollowingToQueue,
+	}),
+);
 
 jest.unstable_mockModule("../functions/timing/sleep/sleep.ts", () => ({
 	sleep: mockSleep,
 }));
 
-jest.unstable_mockModule("../functions/navigation/modalOperations/modalOperations.ts", () => ({
-	openFollowingModal: mockOpenFollowingModal,
-	extractFollowingUsernames: mockExtractFollowingUsernames,
-	scrollFollowingModal: mockScrollFollowingModal,
-}));
+jest.unstable_mockModule(
+	"../functions/navigation/modalOperations/modalOperations.ts",
+	() => ({
+		openFollowingModal: mockOpenFollowingModal,
+		extractFollowingUsernames: mockExtractFollowingUsernames,
+		scrollFollowingModal: mockScrollFollowingModal,
+	}),
+);
 
 jest.unstable_mockModule("../functions/shared/logger/logger.ts", () => ({
 	createLogger: mockCreateLogger,
@@ -147,9 +159,13 @@ describe("scrape.ts", () => {
 
 			await processProfile("testuser", mockPage, "test_source", mockLogger);
 
-			expect(mockNavigateToProfileAndCheck).toHaveBeenCalledWith(mockPage, "testuser", {
-				timeout: 15000,
-			});
+			expect(mockNavigateToProfileAndCheck).toHaveBeenCalledWith(
+				mockPage,
+				"testuser",
+				{
+					timeout: 15000,
+				},
+			);
 			expect(mockMouseWiggle).toHaveBeenCalledWith(mockPage);
 		});
 
@@ -163,8 +179,16 @@ describe("scrape.ts", () => {
 
 			await processProfile("privateuser", mockPage, "test_source", mockLogger);
 
-			expect(mockLogger.warn).toHaveBeenCalledWith("PROFILE", "Profile is private: @privateuser");
-			expect(mockMarkVisited).toHaveBeenCalledWith("privateuser", undefined, undefined, 0);
+			expect(mockLogger.warn).toHaveBeenCalledWith(
+				"PROFILE",
+				"Profile is private: @privateuser",
+			);
+			expect(mockMarkVisited).toHaveBeenCalledWith(
+				"privateuser",
+				undefined,
+				undefined,
+				0,
+			);
 		});
 
 		it("handles not found profiles", async () => {
@@ -177,8 +201,16 @@ describe("scrape.ts", () => {
 
 			await processProfile("notfounduser", mockPage, "test_source", mockLogger);
 
-			expect(mockLogger.warn).toHaveBeenCalledWith("PROFILE", "Profile not found: @notfounduser");
-			expect(mockMarkVisited).toHaveBeenCalledWith("notfounduser", undefined, undefined, 0);
+			expect(mockLogger.warn).toHaveBeenCalledWith(
+				"PROFILE",
+				"Profile not found: @notfounduser",
+			);
+			expect(mockMarkVisited).toHaveBeenCalledWith(
+				"notfounduser",
+				undefined,
+				undefined,
+				0,
+			);
 		});
 
 		it("skips already visited profiles", async () => {
@@ -188,7 +220,10 @@ describe("scrape.ts", () => {
 
 			await processProfile("visiteduser", mockPage, "test_source", mockLogger);
 
-			expect(mockLogger.debug).toHaveBeenCalledWith("PROFILE", "Already visited, skipping @visiteduser");
+			expect(mockLogger.debug).toHaveBeenCalledWith(
+				"PROFILE",
+				"Already visited, skipping @visiteduser",
+			);
 			expect(mockNavigateToProfileAndCheck).not.toHaveBeenCalled();
 		});
 
@@ -202,9 +237,17 @@ describe("scrape.ts", () => {
 				isLikely: true,
 			});
 
-			await processProfile("highscoreuser", mockPage, "test_source", mockLogger);
+			await processProfile(
+				"highscoreuser",
+				mockPage,
+				"test_source",
+				mockLogger,
+			);
 
-			expect(mockLogger.info).toHaveBeenCalledWith("ANALYSIS", "High bio score (75) - likely creator without linktree");
+			expect(mockLogger.info).toHaveBeenCalledWith(
+				"ANALYSIS",
+				"High bio score (75) - likely creator without linktree",
+			);
 			expect(mockMarkAsCreator).toHaveBeenCalledWith("highscoreuser", 75, null);
 		});
 
@@ -230,11 +273,11 @@ describe("scrape.ts", () => {
 				mockPage,
 				"https://linktr.ee/test",
 				"visionuser",
-				"linktree"
+				"linktree",
 			);
 			expect(mockLogger.info).toHaveBeenCalledWith(
 				"ANALYSIS",
-				"Vision confirmed creator (confidence: 85%) - Indicators: subscription, exclusive content"
+				"Vision confirmed creator (confidence: 85%) - Indicators: subscription, exclusive content",
 			);
 		});
 
@@ -251,7 +294,10 @@ describe("scrape.ts", () => {
 			await processProfile("creatoruser", mockPage, "test_source", mockLogger);
 
 			expect(mockSendDMToUser).toHaveBeenCalledWith(mockPage, "creatoruser");
-			expect(mockFollowUserAccount).toHaveBeenCalledWith(mockPage, "creatoruser");
+			expect(mockFollowUserAccount).toHaveBeenCalledWith(
+				mockPage,
+				"creatoruser",
+			);
 			expect(mockAddFollowingToQueue).toHaveBeenCalled();
 		});
 	});
@@ -275,7 +321,7 @@ describe("scrape.ts", () => {
 			expect(mockScrollFollowingModal).toHaveBeenCalledTimes(3);
 			expect(mockLogger.debug).toHaveBeenCalledWith(
 				"NAVIGATION",
-				"All profiles in batch already visited (3/3)"
+				"All profiles in batch already visited (3/3)",
 			);
 		});
 
@@ -313,12 +359,15 @@ describe("scrape.ts", () => {
 			expect(mockPage.keyboard.press).toHaveBeenCalledWith("Escape");
 
 			// Should navigate back to seed profile and reopen modal
-			expect(mockNavigateToProfileAndCheck).toHaveBeenCalledWith(mockPage, "seeduser", {
-				timeout: 15000,
-			});
+			expect(mockNavigateToProfileAndCheck).toHaveBeenCalledWith(
+				mockPage,
+				"seeduser",
+				{
+					timeout: 15000,
+				},
+			);
 			expect(mockOpenFollowingModal).toHaveBeenCalled();
 		});
-
 	});
 
 	describe("loadSeeds", () => {
