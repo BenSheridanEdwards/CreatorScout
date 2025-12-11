@@ -101,6 +101,9 @@ export async function processProfile(
 			timeout: 15000,
 		});
 
+		// Add mouse wiggling for human-like behavior
+		await mouseWiggle(page);
+
 		// Check if profile is accessible
 		if (status.notFound) {
 			logger.warn("PROFILE", `Profile not found: @${username}`);
