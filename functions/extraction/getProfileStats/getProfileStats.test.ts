@@ -7,130 +7,128 @@ describe("getProfileStats", () => {
 		jest.clearAllMocks();
 	});
 
-	describe("when profile stats are found", () => {
-		test("extracts all stats successfully", async () => {
-			const page = createPageMock({
-				evaluate: jest.fn<any>().mockResolvedValue({
-					followers: 1200, // Already parsed
-					following: 345,
-					posts: 67,
-				}),
-			});
+	describe("happy path", () => {
+		test("returns parsed counts and ratio when evaluate succeeds", async () => {
+			const evaluateMock = jest
+				.fn<
+					() => Promise<{ followers: number; following: number; posts: number }>
+				>()
+				.mockResolvedValue({
+					followers: 1200,
+					following: 300,
+					posts: 42,
+				});
+			const page = createPageMock({ evaluate: evaluateMock });
 
 			const stats = await getProfileStats(page);
-			expect(stats.followers).toBe(1200);
-			expect(stats.following).toBe(345);
-			expect(stats.posts).toBe(67);
-			expect(stats.ratio).toBeCloseTo(3.48, 2); // 1200/345
+
+			expect(evaluateMock).toHaveBeenCalledTimes(1);
+			expect(stats).toEqual({
+				followers: 1200,
+				following: 300,
+				posts: 42,
+				ratio: 4,
+			});
 		});
 
-		test("handles different number formats", async () => {
+		test("leaves ratio null when following is zero", async () => {
 			const page = createPageMock({
-				evaluate: jest.fn<any>().mockResolvedValue({
-					followers: 1234,
-					following: 5600,
-					posts: 789,
-				}),
+				evaluate: jest
+					.fn<
+						() => Promise<{
+							followers: number;
+							following: number;
+							posts: number;
+						}>
+					>()
+					.mockResolvedValue({
+						followers: 100,
+						following: 0,
+						posts: 10,
+					}),
 			});
 
 			const stats = await getProfileStats(page);
-			expect(stats.followers).toBe(1234);
-			expect(stats.following).toBe(5600);
-			expect(stats.posts).toBe(789);
+
+			expect(stats).toEqual({
+				followers: 100,
+				following: 0,
+				posts: 10,
+				ratio: null,
+			});
 		});
 
-		test("calculates ratio correctly", async () => {
+		test("leaves ratio null when any count is null", async () => {
 			const page = createPageMock({
-				evaluate: jest.fn<any>().mockResolvedValue({
-					followers: 1000,
-					following: 100,
-					posts: 50,
-				}),
+				evaluate: jest
+					.fn<
+						() => Promise<{
+							followers: number | null;
+							following: number | null;
+							posts: number | null;
+						}>
+					>()
+					.mockResolvedValue({
+						followers: 500,
+						following: null,
+						posts: 20,
+					}),
 			});
 
 			const stats = await getProfileStats(page);
-			expect(stats.ratio).toBe(10); // 1000/100
+
+			expect(stats).toEqual({
+				followers: 500,
+				following: null,
+				posts: 20,
+				ratio: null,
+			});
 		});
 	});
 
-	describe("when stats are missing or malformed", () => {
-		test("returns nulls when selectors fail", async () => {
+	describe("error and malformed responses", () => {
+		test("returns null stats when evaluate throws", async () => {
 			const page = createPageMock({
 				evaluate: jest
-					.fn<any>()
+					.fn<() => Promise<never>>()
 					.mockRejectedValue(new Error("Selector failed")),
 			});
 
 			const stats = await getProfileStats(page);
-			expect(stats.followers).toBeNull();
-			expect(stats.following).toBeNull();
-			expect(stats.posts).toBeNull();
-			expect(stats.ratio).toBeNull();
+
+			expect(stats).toEqual({
+				followers: null,
+				following: null,
+				posts: null,
+				ratio: null,
+			});
 		});
 
-		test("handles null values in response", async () => {
+		test("passes through nulls from evaluate", async () => {
 			const page = createPageMock({
-				evaluate: jest.fn<any>().mockResolvedValue({
-					followers: null,
-					following: null,
-					posts: null,
-				}),
+				evaluate: jest
+					.fn<
+						() => Promise<{
+							followers: number | null;
+							following: number | null;
+							posts: number | null;
+						}>
+					>()
+					.mockResolvedValue({
+						followers: null,
+						following: null,
+						posts: null,
+					}),
 			});
 
 			const stats = await getProfileStats(page);
-			expect(stats.followers).toBeNull();
-			expect(stats.following).toBeNull();
-			expect(stats.posts).toBeNull();
-			expect(stats.ratio).toBeNull();
-		});
 
-		test("handles null values", async () => {
-			const page = createPageMock({
-				evaluate: jest.fn<any>().mockResolvedValue({
-					followers: null,
-					following: null,
-					posts: null,
-				}),
+			expect(stats).toEqual({
+				followers: null,
+				following: null,
+				posts: null,
+				ratio: null,
 			});
-
-			const stats = await getProfileStats(page);
-			expect(stats.followers).toBeNull();
-			expect(stats.following).toBeNull();
-			expect(stats.posts).toBeNull();
-			expect(stats.ratio).toBeNull();
-		});
-	});
-
-	describe("edge cases", () => {
-		test("handles zero following count", async () => {
-			const page = createPageMock({
-				evaluate: jest.fn<any>().mockResolvedValue({
-					followers: 100,
-					following: 0,
-					posts: 10,
-				}),
-			});
-
-			const stats = await getProfileStats(page);
-			expect(stats.followers).toBe(100);
-			expect(stats.following).toBe(0);
-			expect(stats.posts).toBe(10);
-			expect(stats.ratio).toBeNull(); // Division by zero
-		});
-
-		test("handles very large numbers", async () => {
-			const page = createPageMock({
-				evaluate: jest.fn<any>().mockResolvedValue({
-					followers: 1500000,
-					following: 10000,
-					posts: 500000,
-				}),
-			});
-
-			const stats = await getProfileStats(page);
-			expect(stats.followers).toBe(1500000);
-			expect(stats.following).toBe(10000);
-			expect(stats.posts).toBe(500000);
 		});
 	});
 });
