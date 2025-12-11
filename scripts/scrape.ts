@@ -18,9 +18,7 @@
  */
 
 import { readFileSync, existsSync } from 'node:fs';
-import type { Browser, Page } from 'puppeteer';
-import puppeteer from 'puppeteer-extra';
-import StealthPlugin from 'puppeteer-extra-plugin-stealth';
+import type { Page } from 'puppeteer';
 import {
   initDb,
   queueAdd,
@@ -30,239 +28,36 @@ import {
   markVisited,
   markAsCreator,
   wasDmSent,
-  markDmSent,
   wasFollowed,
-  markFollowed,
   getScrollIndex,
   updateScrollIndex,
   getStats,
 } from '../functions/database.ts';
-import { login } from '../functions/login.ts';
-import { isLikelyCreator } from '../functions/bioMatcher.ts';
-import { isConfirmedCreator } from '../functions/vision.ts';
 import { getDelay } from '../functions/humanize.ts';
-import {
-  MAX_DMS_PER_DAY,
-  DM_MESSAGE,
-  CONFIDENCE_THRESHOLD,
-  SKIP_VISION,
-  LOCAL_BROWSER,
-  BROWSERLESS_TOKEN,
-  IG_USER,
-  IG_PASS,
-} from '../functions/config.ts';
-import { getBioFromPage } from '../functions/getBioFromPage.ts';
-import { getLinkFromBio } from '../functions/getLinkFromBio.ts';
-import { snapshot } from '../functions/snapshot.ts';
+import { MAX_DMS_PER_DAY, CONFIDENCE_THRESHOLD } from '../functions/config.ts';
 import { sleep } from '../functions/sleep.ts';
-
-// puppeteer-extra typings don't expose .use; cast to any for plugin registration.
-(puppeteer as any).use(StealthPlugin());
+import { createBrowser, createPage } from '../functions/browser.ts';
+import {
+  navigateToProfileAndCheck,
+  ensureLoggedIn,
+} from '../functions/profileNavigation.ts';
+import {
+  analyzeProfileBasic,
+  analyzeLinkWithVision,
+} from '../functions/profileAnalysis.ts';
+import {
+  sendDMToUser,
+  followUserAccount,
+  addFollowingToQueue,
+} from '../functions/profileActions.ts';
+import {
+  openFollowingModal,
+  extractFollowingUsernames,
+  scrollFollowingModal,
+} from '../functions/modalOperations.ts';
+import { snapshot } from '../functions/snapshot.ts';
 
 initDb();
-
-/**
- * Extract usernames from the following modal.
- * Returns array of usernames (without @ symbol).
- */
-async function extractFollowingUsernames(
-  page: Page,
-  batchSize: number = 10
-): Promise<string[]> {
-  const usernames: string[] = [];
-
-  try {
-    // Wait for modal to be visible
-    await page.waitForSelector('div[role="dialog"]', { timeout: 5000 });
-
-    // Get all list items in the modal
-    const items = await page.$$('div[role="dialog"] ul li');
-
-    for (let i = 0; i < Math.min(items.length, batchSize); i++) {
-      try {
-        // Get the username from the link
-        const username = await items[i].evaluate((el) => {
-          const link = el.querySelector('a[href^="/"]');
-          if (link) {
-            const href = link.getAttribute('href') || '';
-            // Extract username from href like "/username/" or "/username"
-            const match = href.match(/^\/([^\/]+)/);
-            return match ? match[1] : null;
-          }
-          return null;
-        });
-
-        if (username && !usernames.includes(username)) {
-          usernames.push(username);
-        }
-      } catch {
-        // Skip this item if we can't extract username
-        continue;
-      }
-    }
-  } catch {
-    console.log('   ⚠️  Could not extract usernames from modal');
-  }
-
-  return usernames;
-}
-
-/**
- * Open the "Following" modal for a profile.
- */
-async function openFollowingModal(page: Page): Promise<boolean> {
-  try {
-    // Look for "Following" link/button
-    const followingSelector = 'a[href*="/following/"]';
-    await page.waitForSelector(followingSelector, { timeout: 5000 });
-    await page.click(followingSelector);
-    await sleep(2000); // Wait for modal to open
-    return true;
-  } catch {
-    console.log('   ⚠️  Could not open following modal');
-    return false;
-  }
-}
-
-/**
- * Scroll the following modal to load more profiles.
- */
-async function scrollFollowingModal(
-  page: Page,
-  scrollAmount: number = 500
-): Promise<void> {
-  try {
-    const modalSelector = 'div[role="dialog"]';
-    await page.evaluate(
-      (selector, amount) => {
-        const modal = document.querySelector(selector);
-        if (modal) {
-          modal.scrollTop += amount;
-        }
-      },
-      modalSelector,
-      scrollAmount
-    );
-    await sleep(1500); // Wait for new profiles to load
-  } catch {
-    console.log('   ⚠️  Could not scroll modal');
-  }
-}
-
-/**
- * Check if we're logged in by looking for inbox link.
- */
-async function verifyLoggedIn(page: Page): Promise<boolean> {
-  try {
-    const inboxLink = await page.$('a[href="/direct/inbox/"]');
-    return inboxLink !== null;
-  } catch {
-    return false;
-  }
-}
-
-/**
- * Send a DM to a user.
- */
-async function sendDM(page: Page, username: string): Promise<boolean> {
-  try {
-    // Navigate to DM page
-    await page.goto(`https://www.instagram.com/direct/inbox/`, {
-      waitUntil: 'networkidle2',
-      timeout: 15000,
-    });
-
-    // Click "New Message" or search for user
-    await sleep(2000);
-
-    // Try to find existing conversation or start new one
-    const searchInput = await page.$('input[placeholder*="Search"]');
-    if (searchInput) {
-      await searchInput.type(username, { delay: 50 });
-      await sleep(2000);
-
-      // Click first result
-      const firstResult = await page.$('div[role="button"]');
-      if (firstResult) {
-        await firstResult.click();
-        await sleep(2000);
-      }
-    }
-
-    // Check if conversation already has messages
-    const messages = await page.$$('div[role="textbox"]');
-    if (messages.length > 0) {
-      console.log(
-        `   ⚠️  Conversation with @${username} already exists, skipping DM`
-      );
-      return false;
-    }
-
-    // Type message
-    const messageInput = await page.$('div[role="textbox"]');
-    if (messageInput) {
-      await messageInput.click();
-      await sleep(500);
-      await page.keyboard.type(DM_MESSAGE, { delay: 50 });
-      await sleep(1000);
-
-      // Send (Enter key or Send button)
-      await page.keyboard.press('Enter');
-      await sleep(2000);
-
-      // Take screenshot as proof
-      const proofPath = await snapshot(page, `dm_${username}`);
-      markDmSent(username, proofPath);
-
-      console.log(`   ✅ DM sent to @${username}`);
-      return true;
-    }
-
-    return false;
-  } catch (err) {
-    console.log(`   ⚠️  Failed to send DM to @${username}: ${err}`);
-    return false;
-  }
-}
-
-/**
- * Follow a user.
- */
-async function followUser(page: Page, username: string): Promise<boolean> {
-  try {
-    await page.goto(`https://www.instagram.com/${username}/`, {
-      waitUntil: 'networkidle2',
-      timeout: 15000,
-    });
-    await sleep(2000);
-
-    // Find follow button
-    const followButton = await page.evaluate(() => {
-      const buttons = Array.from(document.querySelectorAll('button'));
-      for (const btn of buttons) {
-        const text = btn.textContent?.trim().toLowerCase() || '';
-        if (text === 'follow') {
-          return true;
-        }
-      }
-      return false;
-    });
-
-    if (followButton) {
-      await page.click('button:has-text("Follow")');
-      await sleep(2000);
-      markFollowed(username);
-      console.log(`   ✅ Followed @${username}`);
-      return true;
-    } else {
-      console.log(`   ℹ️  Already following @${username} or button not found`);
-      return false;
-    }
-  } catch (err) {
-    console.log(`   ⚠️  Failed to follow @${username}: ${err}`);
-    return false;
-  }
-}
 
 /**
  * Process a single profile: visit, analyze, and take actions if creator.
@@ -280,106 +75,90 @@ async function processProfile(
     return;
   }
 
-  // Navigate to profile
+  // Navigate to profile and check status
   try {
-    await page.goto(`https://www.instagram.com/${username}/`, {
-      waitUntil: 'networkidle2',
-      timeout: 15000,
-    });
     const [profileDelayMin, profileDelayMax] = getDelay('profile_load');
     const profileDelay =
       profileDelayMin + Math.random() * (profileDelayMax - profileDelayMin);
     await sleep(profileDelay * 1000);
 
-    // Check if logged in
-    const isLoggedIn = await verifyLoggedIn(page);
-    if (!isLoggedIn) {
-      console.log('   ⚠️  Not logged in, re-logging...');
-      if (!IG_USER || !IG_PASS) {
-        throw new Error('Instagram credentials not configured');
-      }
-      await login(page, { username: IG_USER, password: IG_PASS });
-      await page.goto(`https://www.instagram.com/${username}/`, {
-        waitUntil: 'networkidle2',
-      });
-      await sleep(2000);
+    const status = await navigateToProfileAndCheck(page, username, {
+      timeout: 15000,
+    });
+
+    // Check if profile is accessible
+    if (status.notFound) {
+      console.log('   ❌ Profile not found');
+      markVisited(username, undefined, undefined, 0);
+      return;
     }
+    if (status.isPrivate) {
+      console.log('   🔒 Profile is private');
+      markVisited(username, undefined, undefined, 0);
+      return;
+    }
+
+    // Ensure we're logged in
+    await ensureLoggedIn(page);
   } catch (err) {
     console.log(`   ❌ Failed to load profile: ${err}`);
     return;
   }
 
-  // Extract bio
-  const bio = await getBioFromPage(page);
-  if (!bio) {
+  // Basic profile analysis
+  const analysis = await analyzeProfileBasic(page, username);
+
+  if (!analysis.bio) {
     console.log('   ⚠️  No bio found');
     markVisited(username, undefined, undefined, 0);
     return;
   }
 
   console.log(
-    `   Bio: ${bio.substring(0, 100)}${bio.length > 100 ? '...' : ''}`
+    `   Bio: ${analysis.bio.substring(0, 100)}${
+      analysis.bio.length > 100 ? '...' : ''
+    }`
   );
-
-  // Bio matching (cheap - no API call)
-  const [isLikely, scoreData] = isLikelyCreator(bio, 40, username);
-  const bioScore = scoreData.score;
-
-  console.log(`   Bio score: ${bioScore}`);
+  console.log(`   Bio score: ${analysis.bioScore}`);
 
   // Mark as visited with bio and score
-  markVisited(username, undefined, bio, bioScore);
+  markVisited(username, undefined, analysis.bio, analysis.bioScore);
 
   // If not promising, skip expensive vision analysis
-  if (!isLikely) {
-    console.log(`   ⏭️  Bio score too low (${bioScore} < 40), skipping`);
+  if (!analysis.isLikely) {
+    console.log(
+      `   ⏭️  Bio score too low (${analysis.bioScore} < 40), skipping`
+    );
     return;
   }
 
-  // Extract link from bio
-  const linkFromBio = await getLinkFromBio(page);
-  console.log(`   Link in bio: ${linkFromBio || 'none'}`);
+  console.log(`   Link in bio: ${analysis.linkFromBio || 'none'}`);
 
   // If has linktree/link aggregator, do vision analysis
   let confirmedCreator = false;
-  let confidence = bioScore;
+  let confidence = analysis.bioScore;
 
-  if (linkFromBio && !SKIP_VISION) {
-    try {
-      console.log('   🔍 Opening link for vision analysis...');
-      await page.goto(linkFromBio, {
-        waitUntil: 'networkidle2',
-        timeout: 15000,
-      });
-      await sleep(3000);
+  if (analysis.linkFromBio) {
+    const visionResult = await analyzeLinkWithVision(
+      page,
+      analysis.linkFromBio,
+      username,
+      'linktree'
+    );
 
-      // Take screenshot
-      const screenshotPath = await snapshot(page, `linktree_${username}`);
-      console.log(`   📸 Screenshot: ${screenshotPath}`);
-
-      // Vision analysis
-      console.log('   🤖 Running vision AI analysis...');
-      const [isCreator, visionData] = await isConfirmedCreator(screenshotPath);
-
-      if (isCreator && visionData) {
-        confirmedCreator = true;
-        confidence = visionData.confidence || bioScore;
-        console.log(
-          `   ✅ Vision confirmed creator (confidence: ${confidence}%)`
-        );
-      } else {
-        console.log(`   ❌ Vision did not confirm creator`);
-      }
-    } catch (err) {
-      console.log(`   ⚠️  Vision analysis failed: ${err}`);
-    }
-  } else if (SKIP_VISION) {
-    console.log('   ⏭️  Vision analysis skipped (SKIP_VISION=true)');
-    // If skipping vision, use bio score as confidence
-    if (bioScore >= CONFIDENCE_THRESHOLD) {
+    if (visionResult.isCreator) {
       confirmedCreator = true;
-      confidence = bioScore;
+      confidence = visionResult.confidence || analysis.bioScore;
+      console.log(
+        `   ✅ Vision confirmed creator (confidence: ${confidence}%)`
+      );
+    } else {
+      console.log(`   ❌ Vision did not confirm creator`);
     }
+  } else if (analysis.bioScore >= CONFIDENCE_THRESHOLD) {
+    // High bio score alone can indicate creator
+    confirmedCreator = true;
+    confidence = analysis.bioScore;
   }
 
   // If confirmed creator, take actions
@@ -387,7 +166,7 @@ async function processProfile(
     console.log(`   🎯 CONFIRMED CREATOR (confidence: ${confidence}%)`);
 
     // Mark in database
-    const proofPath = linkFromBio
+    const proofPath = analysis.linkFromBio
       ? await snapshot(page, `creator_${username}`)
       : null;
     markAsCreator(username, confidence, proofPath);
@@ -399,31 +178,28 @@ async function processProfile(
       console.log(`   ⏳ Waiting ${Math.floor(dmWait)}s before DM...`);
       await sleep(dmWait * 1000);
 
-      await sendDM(page, username);
+      await sendDMToUser(page, username);
     } else {
       console.log(`   ℹ️  DM already sent to @${username}`);
     }
 
     // Follow (if not already following)
     if (!wasFollowed(username)) {
-      await followUser(page, username);
+      await followUserAccount(page, username);
     } else {
       console.log(`   ℹ️  Already following @${username}`);
     }
 
     // Add their following to queue for expansion
     console.log(`   🌳 Adding @${username}'s following to queue...`);
-    const followingOpened = await openFollowingModal(page);
-    if (followingOpened) {
-      const followingUsernames = await extractFollowingUsernames(page, 20);
-      for (const followingUsername of followingUsernames) {
-        if (!wasVisited(followingUsername)) {
-          queueAdd(followingUsername, 50, `following_of_${username}`);
-        }
-      }
-      console.log(`   ✅ Added ${followingUsernames.length} profiles to queue`);
-      await page.keyboard.press('Escape'); // Close modal
-      await sleep(1000);
+    const added = await addFollowingToQueue(
+      page,
+      username,
+      `following_of_${username}`,
+      20
+    );
+    if (added > 0) {
+      console.log(`   ✅ Added ${added} profiles to queue`);
     }
   } else {
     console.log(
@@ -454,25 +230,21 @@ async function processFollowingList(
 
   // Navigate to seed profile
   try {
-    await page.goto(`https://www.instagram.com/${seedUsername}/`, {
-      waitUntil: 'networkidle2',
+    const status = await navigateToProfileAndCheck(page, seedUsername, {
       timeout: 15000,
     });
-    await sleep(2000);
 
-    // Check login
-    const isLoggedIn = await verifyLoggedIn(page);
-    if (!isLoggedIn) {
-      console.log('⚠️  Not logged in, re-logging...');
-      if (!IG_USER || !IG_PASS) {
-        throw new Error('Instagram credentials not configured');
-      }
-      await login(page, { username: IG_USER, password: IG_PASS });
-      await page.goto(`https://www.instagram.com/${seedUsername}/`, {
-        waitUntil: 'networkidle2',
-      });
-      await sleep(2000);
+    if (status.notFound || status.isPrivate) {
+      console.log(
+        `❌ Seed profile @${seedUsername} is ${
+          status.notFound ? 'not found' : 'private'
+        }`
+      );
+      return;
     }
+
+    // Ensure we're logged in
+    await ensureLoggedIn(page);
   } catch (err) {
     console.log(`❌ Failed to load seed profile: ${err}`);
     return;
@@ -557,47 +329,12 @@ async function main(): Promise<void> {
 
   // Connect to browser
   console.log('\nConnecting to browser...');
-  let browser: Browser;
-  let page: Page;
-
-  if (LOCAL_BROWSER) {
-    // Use persistent user data directory to save cookies between sessions
-    const { getUserDataDir } = await import('../functions/sessionManager.ts');
-    const userDataDir = getUserDataDir();
-
-    browser = await (puppeteer as any).launch({
-      headless: true,
-      args: ['--no-sandbox', '--disable-dev-shm-usage'],
-      userDataDir, // Persistent profile to save cookies
-    });
-    page = await browser.newPage();
-  } else {
-    if (!BROWSERLESS_TOKEN) {
-      throw new Error(
-        'BROWSERLESS_TOKEN must be set when not using LOCAL_BROWSER'
-      );
-    }
-    browser = await (puppeteer as any).connect({
-      browserWSEndpoint: `wss://chrome.browserless.io?token=${BROWSERLESS_TOKEN}`,
-    });
-    page = await browser.newPage();
-  }
-
-  await page.setViewport({ width: 1440, height: 900 });
-  await page.setUserAgent(
-    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-  );
+  const browser = await createBrowser({ headless: true });
+  const page = await createPage(browser);
 
   // Login (will use saved session if available)
   console.log('Logging in to Instagram...');
-  if (!IG_USER || !IG_PASS) {
-    throw new Error('Instagram credentials not configured');
-  }
-  await login(
-    page,
-    { username: IG_USER, password: IG_PASS },
-    { skipIfLoggedIn: true }
-  );
+  await ensureLoggedIn(page);
   console.log('✓ Logged in!');
 
   // Load seeds
