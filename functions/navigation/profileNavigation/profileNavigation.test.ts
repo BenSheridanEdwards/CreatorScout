@@ -184,11 +184,10 @@ describe("profileNavigation", () => {
 
 		await ensureLoggedIn(page);
 
-		expect(loginMock).toHaveBeenCalledWith(
-			page,
-			{ username: "u", password: "p" },
-			{ skipIfLoggedIn: false },
-		);
+		expect(loginMock).toHaveBeenCalledWith(page, {
+			username: "u",
+			password: "p",
+		});
 	});
 
 	test("navigateToProfileAndCheck chains navigate and status", async () => {

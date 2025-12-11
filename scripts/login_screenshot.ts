@@ -3,14 +3,17 @@ import dotenv from "dotenv";
 // Load env first so config picks up LOCAL_BROWSER/BROWSERLESS_TOKEN
 dotenv.config();
 
-// Enable logging for this script
-process.env.DEBUG_LOGS = "true";
-
 const hasBrowserless = Boolean(process.env.BROWSERLESS_TOKEN);
 // Prefer Browserless when token is present; otherwise force local headful
-if (!hasBrowserless) {
-	process.env.LOCAL_BROWSER = "true";
-}
+// if (!hasBrowserless) {
+// 	process.env.LOCAL_BROWSER = "true";
+// }
+
+// Log which browser we're using
+const usingLocalBrowser = process.env.LOCAL_BROWSER === "true";
+console.log(
+	`🌐 Using ${usingLocalBrowser ? "LOCAL BROWSER" : "BROWSERLESS"} ${usingLocalBrowser ? "(headful)" : "(headless)"}`,
+);
 
 // Dynamic imports so config reads the env we just set
 const { createBrowser, createPage } = await import(
@@ -30,9 +33,9 @@ async function main() {
 		);
 	}
 
-	// Headful locally so you can see the window; headless flag ignored for Browserless connect
+	// Headful locally so you can see the window; headless for Browserless
 	const browser = await createBrowser({
-		headless: hasBrowserless ? true : false,
+		headless: usingLocalBrowser ? false : true,
 	});
 
 	try {
@@ -40,15 +43,32 @@ async function main() {
 			viewport: { width: 1440, height: 900 },
 		});
 
+		// Wait for browser window to be visible before continuing
+		if (usingLocalBrowser) {
+			console.log("🖥️  Browser window should now be visible on your desktop!");
+			console.log("💡  Check ALL desktops/spaces if you don't see it");
+			console.log("⏳ Waiting 3 seconds for browser to fully load...");
+			await new Promise((resolve) => setTimeout(resolve, 3000));
+			console.log("✅ Continuing with login process...");
+		}
+
 		await login(
 			page,
 			{ username, password },
 			{
 				skipSubmit: true, // fill but don't log in
+				// skipCookies: true, // uncomment to skip loading saved cookies
 			},
 		);
 	} finally {
-		await browser.close();
+		// Only close browser automatically for headless/browserless mode
+		if (!usingLocalBrowser) {
+			await browser.close();
+		} else {
+			console.log(
+				"🖥️  Browser window left open for inspection. Press Ctrl+C to exit.",
+			);
+		}
 	}
 }
 

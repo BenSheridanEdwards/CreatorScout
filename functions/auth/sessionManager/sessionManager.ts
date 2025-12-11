@@ -71,16 +71,7 @@ export async function loadCookies(page: Page): Promise<boolean> {
  */
 export async function isLoggedIn(page: Page): Promise<boolean> {
 	try {
-		// Navigate to Instagram home to check login status
-		await page.goto("https://www.instagram.com/", {
-			waitUntil: "domcontentloaded",
-			timeout: 10000,
-		});
-
-		// Wait a bit for page to load
-		await new Promise((resolve) => setTimeout(resolve, 2000));
-
-		// Check for inbox link (indicates logged in)
+		// Check for inbox link (indicates logged in) without navigating
 		const inboxLink = await page.$('a[href="/direct/inbox/"]');
 		return inboxLink !== null;
 	} catch {

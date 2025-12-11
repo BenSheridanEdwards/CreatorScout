@@ -23,6 +23,10 @@ export async function login(
 		 * When true, fill credentials, optionally screenshot, and return without submitting.
 		 */
 		skipSubmit?: boolean;
+		/**
+		 * When true, skip loading saved cookies from persistent profile.
+		 */
+		skipCookies?: boolean;
 	},
 ): Promise<string | void> {
 	logger.info("ACTION", `Starting login process for user: ${creds.username}`);
@@ -35,10 +39,15 @@ export async function login(
 	});
 	logger.info("ACTION", "Successfully navigated to Instagram homepage");
 
-	// Try to load saved cookies after navigation
-	logger.info("ACTION", "Attempting to load saved cookies");
-	const cookiesLoaded = await loadCookies(page);
-	logger.info("ACTION", `Cookies loaded: ${cookiesLoaded}`);
+	// Try to load saved cookies after navigation (unless skipped)
+	let cookiesLoaded = false;
+	if (!options?.skipCookies) {
+		logger.info("ACTION", "Attempting to load saved cookies");
+		cookiesLoaded = await loadCookies(page);
+		logger.info("ACTION", `Cookies loaded: ${cookiesLoaded}`);
+	} else {
+		logger.info("ACTION", "Skipping cookie loading as requested");
+	}
 
 	// Check if we're already logged in (either from cookies or previous session)
 	// Give cookies a moment to apply, then check current session
@@ -63,17 +72,17 @@ export async function login(
 	if (cookiesLoaded) {
 		logger.warn(
 			"ACTION",
-			"Cookies loaded but session expired, logging in again...",
+			"Cookies loaded but session expired, reloading page for fresh login...",
 		);
+		// Only reload if cookies were loaded but session expired
+		await page.goto("https://www.instagram.com/", {
+			waitUntil: "networkidle2",
+			timeout: 15000,
+		});
+		logger.info("ACTION", "Page reloaded successfully");
+	} else {
+		logger.info("ACTION", "No cookies loaded, proceeding with fresh login on current page");
 	}
-
-	// Reload page to ensure we're on the login page
-	logger.info("ACTION", "Reloading page to ensure login form is accessible");
-	await page.goto("https://www.instagram.com/", {
-		waitUntil: "networkidle2",
-		timeout: 15000,
-	});
-	logger.info("ACTION", "Page reloaded successfully");
 
 	logger.info("ACTION", "Handling cookie consent dialog");
 	await clickAny(page, [
@@ -122,6 +131,9 @@ export async function login(
 				"ACTION",
 				"Not logged in, taking screenshot before skip submit",
 			);
+			logger.info("ACTION", "Waiting 20 seconds before taking screenshot...");
+			await new Promise((resolve) => setTimeout(resolve, 20000));
+			logger.info("ACTION", "20 second wait completed, taking screenshot now");
 			const savedPath = await snapshot(
 				page,
 				`instagram-login-filled-${creds.username}-${Date.now()}`,

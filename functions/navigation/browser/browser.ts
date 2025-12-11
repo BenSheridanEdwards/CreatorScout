@@ -46,11 +46,25 @@ export async function createBrowser(
 				? providedUserDataDir
 				: getUserDataDir();
 
-		return await extra.launch({
+		const browser = await extra.launch({
 			headless,
-			args: ["--no-sandbox", "--disable-dev-shm-usage"],
+			args: [
+				"--no-sandbox",
+				"--disable-dev-shm-usage",
+				"--disable-features=VizDisplayCompositor", // Allow multiple instances
+			],
 			userDataDir, // Persistent profile to save cookies
 		});
+
+		// Close any existing pages to start fresh (avoids multiple tabs from previous sessions)
+		const pages = await browser.pages();
+		for (const page of pages) {
+			if (page.url() !== "about:blank") {
+				await page.close();
+			}
+		}
+
+		return browser;
 	} else {
 		if (!BROWSERLESS_TOKEN) {
 			throw new Error(

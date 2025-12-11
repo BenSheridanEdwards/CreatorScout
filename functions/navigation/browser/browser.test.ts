@@ -44,6 +44,7 @@ describe("browser helpers", () => {
 	test("createBrowser launches local browser with provided options", async () => {
 		const fakeBrowser = {
 			newPage: jest.fn<() => Promise<Page>>(),
+			pages: jest.fn<() => Promise<Page[]>>().mockResolvedValue([]),
 		} as unknown as Browser;
 		mockLaunch.mockResolvedValue(fakeBrowser);
 		const { createBrowser } = await loadBrowserModule();
@@ -51,7 +52,11 @@ describe("browser helpers", () => {
 
 		expect(mockLaunch).toHaveBeenCalledWith({
 			headless: false,
-			args: ["--no-sandbox", "--disable-dev-shm-usage"],
+			args: [
+				"--no-sandbox",
+				"--disable-dev-shm-usage",
+				"--disable-features=VizDisplayCompositor",
+			],
 			userDataDir: "/tmp/custom",
 		});
 	});
@@ -59,6 +64,7 @@ describe("browser helpers", () => {
 	test("createBrowser uses getUserDataDir when not provided", async () => {
 		const fakeBrowser = {
 			newPage: jest.fn<() => Promise<Page>>(),
+			pages: jest.fn<() => Promise<Page[]>>().mockResolvedValue([]),
 		} as unknown as Browser;
 		mockLaunch.mockResolvedValue(fakeBrowser);
 
@@ -68,6 +74,21 @@ describe("browser helpers", () => {
 		expect(mockGetUserDataDir).toHaveBeenCalled();
 		expect(mockLaunch).toHaveBeenCalledWith(
 			expect.objectContaining({ userDataDir: "/tmp/test-data" }),
+		);
+	});
+
+	test("createBrowser uses provided userDataDir", async () => {
+		const fakeBrowser = {
+			newPage: jest.fn<() => Promise<Page>>(),
+			pages: jest.fn<() => Promise<Page[]>>().mockResolvedValue([]),
+		} as unknown as Browser;
+		mockLaunch.mockResolvedValue(fakeBrowser);
+
+		const { createBrowser } = await loadBrowserModule();
+		await createBrowser({ userDataDir: "/tmp/custom" });
+
+		expect(mockLaunch).toHaveBeenCalledWith(
+			expect.objectContaining({ userDataDir: "/tmp/custom" }),
 		);
 	});
 

@@ -166,60 +166,41 @@ describe("sessionManager", () => {
 			const mockInboxElement = {
 				click: jest.fn(),
 			} as unknown as ElementHandle<Element>;
-			page.goto.mockResolvedValue(null);
 			page.$.mockResolvedValue(mockInboxElement);
 
-			const resultPromise = isLoggedIn(page);
-
-			await jest.runAllTimersAsync();
-
-			const result = await resultPromise;
+			const result = await isLoggedIn(page);
 
 			expect(result).toBe(true);
-			expect(page.goto).toHaveBeenCalledWith("https://www.instagram.com/", {
-				waitUntil: "domcontentloaded",
-				timeout: 10000,
-			});
 			expect(page.$).toHaveBeenCalledWith('a[href="/direct/inbox/"]');
 		});
 
 		test("returns false when inbox link is not found", async () => {
-			page.goto.mockResolvedValue(null);
 			page.$.mockResolvedValue(null);
 
-			const resultPromise = isLoggedIn(page);
-
-			await jest.runAllTimersAsync();
-
-			const result = await resultPromise;
+			const result = await isLoggedIn(page);
 
 			expect(result).toBe(false);
-			expect(page.goto).toHaveBeenCalled();
 			expect(page.$).toHaveBeenCalledWith('a[href="/direct/inbox/"]');
 		});
 
-		test("returns false when navigation fails", async () => {
-			page.goto.mockRejectedValue(new Error("Navigation timeout"));
+		test("returns false when selector fails", async () => {
+			page.$.mockRejectedValue(new Error("Selector error"));
 
 			const result = await isLoggedIn(page);
 
 			expect(result).toBe(false);
 		});
 
-		test("waits for page to load before checking", async () => {
+		test("checks for inbox element immediately", async () => {
 			const mockInboxElement = {
 				click: jest.fn(),
 			} as unknown as ElementHandle<Element>;
-			page.goto.mockResolvedValue(null);
 			page.$.mockResolvedValue(mockInboxElement);
 
-			const resultPromise = isLoggedIn(page);
-
-			await jest.runAllTimersAsync();
-
-			const result = await resultPromise;
+			const result = await isLoggedIn(page);
 
 			expect(result).toBe(true);
+			expect(page.$).toHaveBeenCalledWith('a[href="/direct/inbox/"]');
 		});
 	});
 
