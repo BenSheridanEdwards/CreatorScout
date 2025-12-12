@@ -32,6 +32,7 @@ const mockWasDmSent = jest.fn();
 const mockWasFollowed = jest.fn();
 const mockGetDailyMetrics = jest.fn();
 const mockCreateLogger = jest.fn();
+const mockCreateLoggerWithCycleTracking = jest.fn();
 const mockGetGlobalMetricsTracker = jest.fn();
 
 // Mock the modules
@@ -108,6 +109,7 @@ jest.unstable_mockModule(
 
 jest.unstable_mockModule("../functions/shared/logger/logger.ts", () => ({
 	createLogger: mockCreateLogger,
+	createLoggerWithCycleTracking: mockCreateLoggerWithCycleTracking,
 }));
 
 jest.unstable_mockModule("../functions/shared/metrics/metrics.ts", () => ({
@@ -120,9 +122,22 @@ jest.unstable_mockModule("../functions/shared/metrics/metrics.ts", () => ({
 describe("scrape.ts", () => {
 	let mockLogger: any;
 	let mockPage: any;
+	let mockCycleManager: any;
+	let mockStartCycle: any;
+	let mockEndCycle: any;
+	let mockRecordError: any;
+	let mockShouldContinue: any;
+	const setShouldContinueLimit = (limit: number) => {
+		let callCount = 0;
+		mockShouldContinue.mockImplementation(() => {
+			callCount++;
+			return callCount <= limit;
+		});
+	};
 
 	beforeEach(() => {
 		jest.clearAllMocks();
+		jest.resetModules();
 
 		mockLogger = {
 			info: jest.fn<any>(),
@@ -164,6 +179,26 @@ describe("scrape.ts", () => {
 		mockWasDmSent.mockReturnValue(false);
 		mockWasFollowed.mockReturnValue(false);
 
+		mockCycleManager = {
+			recordWarning: jest.fn<any>(),
+			recordProfileProcessed: jest.fn<any>(),
+			recordDMSent: jest.fn<any>(),
+			recordFollowCompleted: jest.fn<any>(),
+		};
+		mockStartCycle = jest.fn<any>();
+		mockEndCycle = jest.fn<any>();
+		mockRecordError = jest.fn<any>();
+		mockShouldContinue = jest.fn<any>();
+		setShouldContinueLimit(2);
+
+		mockCreateLoggerWithCycleTracking.mockReturnValue({
+			logger: mockLogger,
+			cycleManager: mockCycleManager,
+			startCycle: mockStartCycle,
+			endCycle: mockEndCycle,
+			recordError: mockRecordError,
+			shouldContinue: mockShouldContinue,
+		});
 		// Set up default metrics tracker mock
 		mockGetGlobalMetricsTracker.mockReturnValue({
 			recordProfileVisit: jest.fn(),
@@ -324,7 +359,7 @@ user2
 				isLikely: false,
 			});
 
-			await processProfile("testuser", mockPage, "test_source", mockLogger);
+			await processProfile("testuser", mockPage, "test_source");
 
 			expect(mockNavigateToProfileAndCheck).toHaveBeenCalledWith(
 				mockPage,
@@ -344,7 +379,7 @@ user2
 				isPrivate: true,
 			});
 
-			await processProfile("privateuser", mockPage, "test_source", mockLogger);
+			await processProfile("privateuser", mockPage, "test_source");
 
 			expect(mockLogger.warn).toHaveBeenCalledWith(
 				"PROFILE",
@@ -366,7 +401,7 @@ user2
 				isPrivate: false,
 			});
 
-			await processProfile("notfounduser", mockPage, "test_source", mockLogger);
+			await processProfile("notfounduser", mockPage, "test_source");
 
 			expect(mockLogger.warn).toHaveBeenCalledWith(
 				"PROFILE",
@@ -385,7 +420,7 @@ user2
 
 			mockWasVisited.mockReturnValue(true);
 
-			await processProfile("visiteduser", mockPage, "test_source", mockLogger);
+			await processProfile("visiteduser", mockPage, "test_source");
 
 			expect(mockLogger.debug).toHaveBeenCalledWith(
 				"PROFILE",
@@ -404,12 +439,7 @@ user2
 				isLikely: true,
 			});
 
-			await processProfile(
-				"highscoreuser",
-				mockPage,
-				"test_source",
-				mockLogger,
-			);
+			await processProfile("highscoreuser", mockPage, "test_source");
 
 			expect(mockLogger.info).toHaveBeenCalledWith(
 				"ANALYSIS",
@@ -434,7 +464,7 @@ user2
 				indicators: ["subscription", "exclusive content"],
 			});
 
-			await processProfile("visionuser", mockPage, "test_source", mockLogger);
+			await processProfile("visionuser", mockPage, "test_source");
 
 			expect(mockAnalyzeLinkWithVision).toHaveBeenCalledWith(
 				mockPage,
@@ -458,7 +488,7 @@ user2
 				isLikely: true,
 			});
 
-			await processProfile("creatoruser", mockPage, "test_source", mockLogger);
+			await processProfile("creatoruser", mockPage, "test_source");
 
 			expect(mockSendDMToUser).toHaveBeenCalledWith(mockPage, "creatoruser");
 			expect(mockFollowUserAccount).toHaveBeenCalledWith(
@@ -475,7 +505,7 @@ user2
 				new Error("Network timeout"),
 			);
 
-			await processProfile("erroruser", mockPage, "test_source", mockLogger);
+			await processProfile("erroruser", mockPage, "test_source");
 
 			expect(mockLogger.errorWithScreenshot).toHaveBeenCalledWith(
 				"ERROR",
@@ -498,7 +528,7 @@ user2
 			mockWasDmSent.mockReturnValue(false);
 			mockWasFollowed.mockReturnValue(false);
 
-			await processProfile("dmerror", mockPage, "test_source", mockLogger);
+			await processProfile("dmerror", mockPage, "test_source");
 
 			expect(mockSendDMToUser).toHaveBeenCalledWith(mockPage, "dmerror");
 			// Should still try to follow even if DM fails
@@ -519,7 +549,7 @@ user2
 			mockWasDmSent.mockReturnValue(false);
 			mockWasFollowed.mockReturnValue(false);
 
-			await processProfile("followerror", mockPage, "test_source", mockLogger);
+			await processProfile("followerror", mockPage, "test_source");
 
 			expect(mockSendDMToUser).toHaveBeenCalledWith(mockPage, "followerror");
 			expect(mockFollowUserAccount).toHaveBeenCalledWith(
@@ -546,7 +576,7 @@ user2
 			mockWasDmSent.mockReturnValue(false);
 			mockWasFollowed.mockReturnValue(false);
 
-			await processProfile("queueerror", mockPage, "test_source", mockLogger);
+			await processProfile("queueerror", mockPage, "test_source");
 
 			expect(mockSendDMToUser).toHaveBeenCalledWith(mockPage, "queueerror");
 			expect(mockFollowUserAccount).toHaveBeenCalledWith(
@@ -581,7 +611,6 @@ user2
 				"metricsuser",
 				mockPage,
 				"following_of_source",
-				mockLogger,
 				mockMetricsTracker,
 			);
 
@@ -622,7 +651,6 @@ user2
 				"creatoruser",
 				mockPage,
 				"test_source",
-				mockLogger,
 				mockMetricsTracker,
 			);
 
@@ -660,7 +688,6 @@ user2
 				"erroruser",
 				mockPage,
 				"test_source",
-				mockLogger,
 				mockMetricsTracker,
 			);
 
@@ -687,12 +714,7 @@ user2
 				indicators: [],
 			});
 
-			await processProfile(
-				"novisioncreator",
-				mockPage,
-				"test_source",
-				mockLogger,
-			);
+			await processProfile("novisioncreator", mockPage, "test_source");
 
 			expect(mockAnalyzeLinkWithVision).toHaveBeenCalledWith(
 				mockPage,
@@ -720,7 +742,7 @@ user2
 			mockWasDmSent.mockReturnValue(true);
 			mockWasFollowed.mockReturnValue(false);
 
-			await processProfile("alreadydm", mockPage, "test_source", mockLogger);
+			await processProfile("alreadydm", mockPage, "test_source");
 
 			expect(mockSendDMToUser).not.toHaveBeenCalled();
 			expect(mockLogger.debug).toHaveBeenCalledWith(
@@ -743,12 +765,7 @@ user2
 			mockWasDmSent.mockReturnValue(false);
 			mockWasFollowed.mockReturnValue(true);
 
-			await processProfile(
-				"alreadyfollow",
-				mockPage,
-				"test_source",
-				mockLogger,
-			);
+			await processProfile("alreadyfollow", mockPage, "test_source");
 
 			expect(mockSendDMToUser).toHaveBeenCalledWith(mockPage, "alreadyfollow");
 			expect(mockFollowUserAccount).not.toHaveBeenCalled();
@@ -768,7 +785,7 @@ user2
 				isLikely: true,
 			});
 
-			await processProfile("lowscore", mockPage, "test_source", mockLogger);
+			await processProfile("lowscore", mockPage, "test_source");
 
 			expect(mockLogger.debug).toHaveBeenCalledWith(
 				"ANALYSIS",
@@ -791,7 +808,7 @@ user2
 			mockWasDmSent.mockReturnValue(false);
 			mockWasFollowed.mockReturnValue(false);
 
-			await processProfile("mediumscore", mockPage, "test_source", mockLogger);
+			await processProfile("mediumscore", mockPage, "test_source");
 
 			expect(mockMarkAsCreator).toHaveBeenCalledWith("mediumscore", 60, null);
 			expect(mockSendDMToUser).toHaveBeenCalledWith(mockPage, "mediumscore");
@@ -819,12 +836,7 @@ user2
 
 			mockSnapshot.mockResolvedValue("/path/to/screenshot.png");
 
-			await processProfile(
-				"screenshotuser",
-				mockPage,
-				"test_source",
-				mockLogger,
-			);
+			await processProfile("screenshotuser", mockPage, "test_source");
 
 			expect(mockSnapshot).toHaveBeenCalledWith(
 				mockPage,
@@ -859,7 +871,6 @@ user2
 				"depthuser",
 				mockPage,
 				"following_of_following_of_seeduser", // 3 underscores = depth 4
-				mockLogger,
 				mockMetricsTracker,
 			);
 
@@ -892,7 +903,6 @@ user2
 				"nosourceuser",
 				mockPage,
 				"seed", // no underscores
-				mockLogger,
 				mockMetricsTracker,
 			);
 
@@ -921,8 +931,9 @@ user2
 			// All users already visited
 			mockWasVisited.mockReturnValue(true);
 			mockExtractFollowingUsernames.mockResolvedValue(["user1", "user2"]);
+			setShouldContinueLimit(3);
 
-			await processFollowingList("seeduser", mockPage, mockLogger);
+			await processFollowingList("seeduser", mockPage);
 
 			// Should call scroll 3 times (consecutive all-visited limit)
 			expect(mockScrollFollowingModal).toHaveBeenCalledTimes(3);
@@ -947,7 +958,7 @@ user2
 				.mockResolvedValueOnce(["user1", "user2"]) // batch 1: all visited
 				.mockResolvedValueOnce(["user3", "user4"]); // batch 2: new users
 
-			await processFollowingList("seeduser", mockPage, mockLogger);
+			await processFollowingList("seeduser", mockPage);
 
 			// Should process user3 and user4
 			expect(mockWasVisited).toHaveBeenCalledWith("user3");
@@ -960,7 +971,7 @@ user2
 			mockWasVisited.mockReturnValue(false); // New users
 			mockExtractFollowingUsernames.mockResolvedValue(["user1"]);
 
-			await processFollowingList("seeduser", mockPage, mockLogger);
+			await processFollowingList("seeduser", mockPage);
 
 			// Should press Escape to close modal
 			expect(mockPage.keyboard.press).toHaveBeenCalledWith("Escape");
@@ -984,7 +995,7 @@ user2
 				isPrivate: false,
 			});
 
-			await processFollowingList("notfoundseed", mockPage, mockLogger);
+			await processFollowingList("notfoundseed", mockPage);
 
 			expect(mockLogger.warn).toHaveBeenCalledWith(
 				"PROFILE",
@@ -1001,7 +1012,7 @@ user2
 				isPrivate: true,
 			});
 
-			await processFollowingList("privateseed", mockPage, mockLogger);
+			await processFollowingList("privateseed", mockPage);
 
 			expect(mockLogger.warn).toHaveBeenCalledWith(
 				"PROFILE",
@@ -1017,7 +1028,7 @@ user2
 				new Error("Navigation failed"),
 			);
 
-			await processFollowingList("errorseed", mockPage, mockLogger);
+			await processFollowingList("errorseed", mockPage);
 
 			expect(mockLogger.errorWithScreenshot).toHaveBeenCalledWith(
 				"ERROR",
@@ -1032,7 +1043,7 @@ user2
 
 			mockOpenFollowingModal.mockResolvedValue(false);
 
-			await processFollowingList("modalerror", mockPage, mockLogger);
+			await processFollowingList("modalerror", mockPage);
 
 			expect(mockLogger.errorWithScreenshot).toHaveBeenCalledWith(
 				"ERROR",
@@ -1045,11 +1056,12 @@ user2
 		it("handles scroll index restoration", async () => {
 			const { processFollowingList } = await import("./scrape.ts");
 
+			setShouldContinueLimit(1);
 			mockGetScrollIndex.mockReturnValue(1000); // Already scrolled
 			mockWasVisited.mockReturnValue(false);
 			mockExtractFollowingUsernames.mockResolvedValue(["user1"]);
 
-			await processFollowingList("scrollseed", mockPage, mockLogger);
+			await processFollowingList("scrollseed", mockPage);
 
 			// Initial scroll to position: Math.floor(1000/500) = 2 scrolls
 			// After processing profile, scroll back: Math.floor(1000/500) = 2 scrolls
@@ -1064,7 +1076,7 @@ user2
 			mockWasVisited.mockReturnValue(false);
 			mockExtractFollowingUsernames.mockResolvedValue(["user1"]);
 
-			await processFollowingList("scrollrestore", mockPage, mockLogger);
+			await processFollowingList("scrollrestore", mockPage);
 
 			// Should scroll back to position after processing profile
 			expect(mockNavigateToProfileAndCheck).toHaveBeenCalledWith(
@@ -1082,7 +1094,7 @@ user2
 
 			mockEnsureLoggedIn.mockRejectedValue(new Error("Login failed"));
 
-			await processFollowingList("loginerror", mockPage, mockLogger);
+			await processFollowingList("loginerror", mockPage);
 
 			expect(mockLogger.errorWithScreenshot).toHaveBeenCalledWith(
 				"ERROR",

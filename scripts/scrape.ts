@@ -273,6 +273,7 @@ export async function processProfile(
 	// If has linktree/link aggregator, do vision analysis
 	let confirmedCreator = false;
 	let confidence = analysis.bioScore;
+	let visionExplicitlyRejected = false;
 
 	if (analysis.linkFromBio) {
 		logger.debug(
@@ -301,6 +302,7 @@ export async function processProfile(
 					metricsTracker.recordCreatorFound(username, confidence, 1);
 				}
 			} else {
+				visionExplicitlyRejected = true;
 				logger.debug(
 					"ANALYSIS",
 					`Vision did not confirm creator for @${username} - Confidence: ${visionResult.confidence || 0}%`,
@@ -320,7 +322,11 @@ export async function processProfile(
 		}
 	}
 
-	if (analysis.bioScore >= 70) {
+	if (
+		!confirmedCreator &&
+		!visionExplicitlyRejected &&
+		analysis.bioScore >= 70
+	) {
 		// High bio score alone can indicate creator (e.g., direct creator mention)
 		confirmedCreator = true;
 		confidence = analysis.bioScore;
@@ -333,7 +339,11 @@ export async function processProfile(
 		if (metricsTracker) {
 			metricsTracker.recordCreatorFound(username, confidence, 0);
 		}
-	} else if (analysis.bioScore >= CONFIDENCE_THRESHOLD) {
+	} else if (
+		!confirmedCreator &&
+		!visionExplicitlyRejected &&
+		analysis.bioScore >= CONFIDENCE_THRESHOLD
+	) {
 		// Fallback for very high confidence scores
 		confirmedCreator = true;
 		confidence = analysis.bioScore;
