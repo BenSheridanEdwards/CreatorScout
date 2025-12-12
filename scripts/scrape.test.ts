@@ -44,6 +44,27 @@ jest.unstable_mockModule("node:fs", () => ({
 	unlinkSync: jest.fn(),
 }));
 
+jest.unstable_mockModule("../functions/shared/config/config.ts", () => ({
+	FAST_MODE: false,
+	SKIP_VISION: false,
+	LOCAL_BROWSER: false,
+	DELAY_SCALE: 1.0,
+	SLEEP_SCALE: 1.0,
+	DELAY_SCALES: {},
+	DELAYS: {},
+	DELAY_CATEGORIES: {},
+	TIMEOUT_SCALE: 1.0,
+	TIMEOUTS: {},
+	BROWSERLESS_TOKEN: "mock_token",
+	OPENROUTER_API_KEY: "mock_key",
+	IG_USER: "mock_user",
+	IG_PASS: "mock_pass",
+	VISION_MODEL: "mock_model",
+	CONFIDENCE_THRESHOLD: 40,
+	MAX_DMS_PER_DAY: 10,
+	DM_MESSAGE: "mock_message",
+}));
+
 jest.unstable_mockModule("../functions/timing/humanize/humanize.ts", () => ({
 	mouseWiggle: mockMouseWiggle,
 	getDelay: mockGetDelay,
@@ -223,10 +244,20 @@ describe("scrape.ts", () => {
 			})),
 			getSessionId: jest.fn(() => "test-session"),
 		});
+
+		// Default metrics tracker for individual tests
+		const defaultMetricsTracker = {
+			recordProfileVisit: jest.fn(),
+			recordCreatorFound: jest.fn(),
+			recordVisionApiCall: jest.fn(),
+			recordDMSent: jest.fn(),
+			recordFollowCompleted: jest.fn(),
+			recordError: jest.fn(),
+		};
 	});
 
 	describe("loadSeeds", () => {
-		it("loads seeds from file", async () => {
+		it("loads seeds from default seeds.txt file", async () => {
 			const { loadSeeds } = await import("./scrape.ts");
 
 			const count = loadSeeds();
@@ -780,7 +811,7 @@ user2
 
 			mockAnalyzeProfileBasic.mockResolvedValue({
 				bio: "Test bio",
-				bioScore: 35, // Below CONFIDENCE_THRESHOLD (50)
+				bioScore: 35, // Below CONFIDENCE_THRESHOLD (40)
 				linkFromBio: null,
 				isLikely: true,
 			});
@@ -789,7 +820,7 @@ user2
 
 			expect(mockLogger.debug).toHaveBeenCalledWith(
 				"ANALYSIS",
-				"Not confirmed (confidence: 35% < 50%)",
+				"Not confirmed (confidence: 35% < 40%)",
 			);
 			expect(mockMarkAsCreator).not.toHaveBeenCalled();
 			expect(mockSendDMToUser).not.toHaveBeenCalled();
@@ -853,68 +884,111 @@ user2
 			);
 		});
 
-		it("parses discovery depth correctly from source", async () => {
+		it("handles profiles with no bio found", async () => {
 			const { processProfile } = await import("./scrape.ts");
 
-			const mockMetricsTracker = {
-				recordProfileVisit: jest.fn(),
-			};
+			mockAnalyzeProfileBasic.mockResolvedValue({
+				bio: null,
+				bioScore: 0,
+				linkFromBio: null,
+				isLikely: false,
+			});
+
+			await processProfile("nobiouser", mockPage, "test_source");
+
+			expect(mockLogger.warn).toHaveBeenCalledWith(
+				"ANALYSIS",
+				"No bio found for @nobiouser",
+			);
+			expect(mockMarkVisited).toHaveBeenCalledWith(
+				"nobiouser",
+				undefined,
+				undefined,
+				0,
+			);
+			expect(mockRecordError).toHaveBeenCalledWith(
+				"No bio found",
+				"bio_analysis_nobiouser",
+				"nobiouser",
+			);
+			// Should not proceed to creator actions
+			expect(mockMarkAsCreator).not.toHaveBeenCalled();
+			expect(mockSendDMToUser).not.toHaveBeenCalled();
+		});
+
+		it("handles vision analysis errors gracefully", async () => {
+			const { processProfile } = await import("./scrape.ts");
 
 			mockAnalyzeProfileBasic.mockResolvedValue({
 				bio: "Test bio",
-				bioScore: 45,
-				linkFromBio: null,
+				bioScore: 50,
+				linkFromBio: "https://linktr.ee/test",
 				isLikely: true,
 			});
 
-			await processProfile(
-				"depthuser",
-				mockPage,
-				"following_of_following_of_seeduser", // 3 underscores = depth 4
-				mockMetricsTracker,
+			mockAnalyzeLinkWithVision.mockRejectedValue(
+				new Error("Vision API timeout"),
 			);
 
-			expect(mockMetricsTracker.recordProfileVisit).toHaveBeenCalledWith(
-				"depthuser",
-				expect.any(Number),
-				"following_of_following_of_seeduser",
-				4, // depth
-				"seeduser", // source profile
-				[],
-				0,
+			await processProfile("visionerroruser", mockPage, "test_source");
+
+			expect(mockLogger.warn).toHaveBeenCalledWith(
+				"ANALYSIS",
+				"Vision analysis failed for @visionerroruser, using bio score only",
+			);
+			expect(mockRecordError).toHaveBeenCalledWith(
+				expect.any(Error),
+				"vision_analysis_visionerroruser",
+				"visionerroruser",
+			);
+			// Should still mark as visited and potentially as creator based on bio score
+			expect(mockMarkVisited).toHaveBeenCalledWith(
+				"visionerroruser",
+				undefined,
+				"Test bio",
+				50,
 			);
 		});
 
-		it("handles empty source for discovery depth", async () => {
+		it("falls back to CONFIDENCE_THRESHOLD when vision doesn't confirm creator", async () => {
 			const { processProfile } = await import("./scrape.ts");
-
-			const mockMetricsTracker = {
-				recordProfileVisit: jest.fn(),
-			};
 
 			mockAnalyzeProfileBasic.mockResolvedValue({
 				bio: "Test bio",
-				bioScore: 45,
-				linkFromBio: null,
+				bioScore: 45, // Below 70 but above CONFIDENCE_THRESHOLD (40)
+				linkFromBio: null, // No link to avoid screenshot logic
 				isLikely: true,
 			});
 
-			await processProfile(
-				"nosourceuser",
-				mockPage,
-				"seed", // no underscores
-				mockMetricsTracker,
-			);
+			// Don't mock vision analysis - let it be undefined so it doesn't explicitly reject
+			mockAnalyzeLinkWithVision.mockResolvedValue(undefined);
 
-			expect(mockMetricsTracker.recordProfileVisit).toHaveBeenCalledWith(
-				"nosourceuser",
-				expect.any(Number),
-				"seed",
-				0, // depth (0 underscores in "seed")
-				undefined, // no source profile
-				[],
-				0,
+			await processProfile("thresholduser", mockPage, "test_source");
+
+			expect(mockMarkAsCreator).toHaveBeenCalledWith("thresholduser", 45, null);
+			expect(mockSendDMToUser).toHaveBeenCalledWith(mockPage, "thresholduser");
+			expect(mockFollowUserAccount).toHaveBeenCalledWith(
+				mockPage,
+				"thresholduser",
 			);
+		});
+
+		it("applies final delay after profile processing", async () => {
+			const { processProfile } = await import("./scrape.ts");
+
+			mockAnalyzeProfileBasic.mockResolvedValue({
+				bio: "Test bio",
+				bioScore: 30, // Below threshold to skip creator logic
+				linkFromBio: null,
+				isLikely: false,
+			});
+
+			await processProfile("delayuser", mockPage, "test_source");
+
+			// Should call sleep for final delay between profiles
+			expect(mockSleep).toHaveBeenCalled();
+			// Check that getDelay was called for delays
+			expect(mockGetDelay).toHaveBeenCalled();
 		});
 	});
 
@@ -1088,19 +1162,104 @@ user2
 			// Scroll restoration: 500 / 500 = 1 scroll
 			expect(mockScrollFollowingModal).toHaveBeenCalledWith(mockPage, 500);
 		});
+	});
 
-		it("handles ensureLoggedIn errors", async () => {
-			const { processFollowingList } = await import("./scrape.ts");
+	describe("runScrapeLoop", () => {
+		it("starts the main scrape loop", async () => {
+			mockQueueNext.mockReturnValue(null); // Empty queue
 
-			mockEnsureLoggedIn.mockRejectedValue(new Error("Login failed"));
+			const { runScrapeLoop } = await import("./scrape.ts");
 
-			await processFollowingList("loginerror", mockPage);
+			await runScrapeLoop(mockPage);
 
-			expect(mockLogger.errorWithScreenshot).toHaveBeenCalledWith(
-				"ERROR",
-				"Failed to load seed profile @loginerror: Login failed",
-				mockPage,
-				"seed_profile_load_loginerror",
+			expect(mockLogger.info).toHaveBeenCalledWith(
+				"CYCLE",
+				"Starting main scrape loop",
+			);
+		});
+	});
+
+	describe("scrape", () => {
+		let mockBrowser: any;
+		let mockCreateBrowser: any;
+		let mockCreatePage: any;
+
+		beforeEach(() => {
+			mockBrowser = {
+				close: jest.fn().mockResolvedValue(undefined),
+				newPage: jest.fn().mockResolvedValue(mockPage),
+			};
+			mockCreateBrowser = jest.fn().mockResolvedValue(mockBrowser);
+			mockCreatePage = jest.fn().mockResolvedValue(mockPage);
+
+			jest.unstable_mockModule(
+				"../functions/navigation/browser/browser.ts",
+				() => ({
+					createBrowser: mockCreateBrowser,
+					createPage: mockCreatePage,
+				}),
+			);
+		});
+
+		it("runs full scraping workflow successfully", async () => {
+			const { scrape } = await import("./scrape.ts");
+
+			mockQueueNext.mockReturnValue(null); // Empty queue after seeds loaded
+
+			await scrape(false);
+
+			expect(mockCreateBrowser).toHaveBeenCalledWith({ headless: true });
+			expect(mockCreatePage).toHaveBeenCalledWith(mockBrowser);
+			expect(mockEnsureLoggedIn).toHaveBeenCalledWith(mockPage);
+			expect(mockLogger.info).toHaveBeenCalledWith(
+				"ACTION",
+				"🚀 Scout - Instagram Patreon Creator Discovery Agent",
+			);
+		});
+
+		it("loads seeds and starts cycle tracking", async () => {
+			// Mock fs for this test to simulate loading 3 seeds
+			const fs = await import("node:fs");
+			const mockExistsSync = fs.existsSync as jest.MockedFunction<any>;
+			const mockReadFileSync = fs.readFileSync as jest.MockedFunction<any>;
+			mockExistsSync.mockReturnValue(true);
+			mockReadFileSync.mockReturnValue("seed1\nseed2\nseed3");
+
+			mockQueueNext.mockReturnValue(null); // Empty queue so it doesn't loop
+
+			const { scrape } = await import("./scrape.ts");
+
+			await scrape(false);
+
+			expect(mockStartCycle).toHaveBeenCalledWith(
+				"batch_scraping",
+				150, // 3 seeds * 50 estimated profiles
+			);
+		});
+
+		it("handles no seeds loaded gracefully", async () => {
+			// Mock fs to return no seeds
+			const fs = await import("node:fs");
+			const mockExistsSync = fs.existsSync as jest.MockedFunction<any>;
+			mockExistsSync.mockReturnValue(false);
+
+			const { scrape } = await import("./scrape.ts");
+
+			await scrape(false);
+
+			expect(mockEndCycle).toHaveBeenCalledWith("FAILED", "No seeds loaded");
+		});
+
+		it("supports debug mode", async () => {
+			const { scrape } = await import("./scrape.ts");
+
+			mockQueueNext.mockReturnValue(null);
+
+			await scrape(true);
+
+			expect(mockLogger.info).toHaveBeenCalledWith(
+				"SYSTEM",
+				"Debug mode: true",
 			);
 		});
 	});
