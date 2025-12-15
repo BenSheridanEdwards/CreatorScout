@@ -29,6 +29,8 @@ async function runProfileCheck(
 	const logger = createLogger(process.env.DEBUG_LOGS === "true" || debug);
 	const headless = process.env.HEADLESS !== "false";
 
+	// Note: Using unique user data directory for headed browsers to avoid conflicts
+
 	let browser: Browser | null = null;
 	const result: ProfileCheckResult = {
 		username,

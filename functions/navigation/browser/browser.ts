@@ -2,6 +2,7 @@
  * Browser setup and page creation utilities.
  * Provides unified browser creation with consistent configuration.
  */
+import { join } from "node:path";
 import type { Browser, Page } from "puppeteer";
 import puppeteer from "puppeteer-extra";
 import StealthPlugin from "puppeteer-extra-plugin-stealth";
@@ -32,6 +33,16 @@ export interface PageOptions {
 }
 
 /**
+ * Get a unique user data directory to prevent singleton lock conflicts.
+ * This allows multiple browser instances without affecting user browsers.
+ */
+export function getUniqueUserDataDir(prefix: string = "browser"): string {
+	const timestamp = Date.now();
+	const randomId = Math.random().toString(36).substring(2, 8);
+	return join(process.cwd(), ".sessions", `${prefix}_${timestamp}_${randomId}`);
+}
+
+/**
  * Create a browser instance with consistent configuration.
  */
 export async function createBrowser(
@@ -40,11 +51,14 @@ export async function createBrowser(
 	const { headless = true, userDataDir: providedUserDataDir } = options;
 
 	if (LOCAL_BROWSER) {
-		// Use persistent user data directory to save cookies between sessions
+		// For headed browsers, use unique directory to avoid singleton lock conflicts
+		// For headless browsers, use persistent directory to save cookies
 		const userDataDir =
 			providedUserDataDir !== undefined
 				? providedUserDataDir
-				: getUserDataDir();
+				: headless
+					? getUserDataDir()
+					: getUniqueUserDataDir();
 
 		const browser = await extra.launch({
 			headless,
