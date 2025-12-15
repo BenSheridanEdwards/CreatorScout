@@ -26,7 +26,7 @@ async function runProfileCheck(
 	username: string,
 	debug: boolean = false,
 ): Promise<ProfileCheckResult> {
-	const logger = createLogger(debug);
+	const logger = createLogger(process.env.DEBUG_LOGS === "true" || debug);
 	const headless = process.env.HEADLESS !== "false";
 
 	let browser: Browser | null = null;
@@ -97,10 +97,22 @@ async function runProfileCheck(
 		result.reason = analysis.reason;
 
 		if (result.isCreator) {
+			const keyIndicators = result.indicators.filter(
+				(indicator) =>
+					indicator.includes("platform icons") ||
+					indicator.includes("subscription") ||
+					indicator.includes("aggregator") ||
+					indicator.includes("creator keywords"),
+			);
+
 			logger.info(
 				"ACTION",
 				`🎯 CONFIRMED CREATOR (confidence: ${result.confidence}%, reason: ${result.reason})`,
 			);
+
+			if (keyIndicators.length > 0) {
+				logger.info("ACTION", `💡 Key evidence: ${keyIndicators.join(" | ")}`);
+			}
 		} else {
 			logger.info("ACTION", "Not confirmed as creator");
 		}
@@ -113,6 +125,12 @@ async function runProfileCheck(
 		return result;
 	} finally {
 		if (browser) {
+			// Give user time to check logs when running with visible browser
+			if (!headless) {
+				logger.info("ACTION", "Waiting 30 seconds before closing browser...");
+				await new Promise((resolve) => setTimeout(resolve, 30000));
+			}
+
 			await browser.close().catch(() => {});
 			logger.info("ACTION", "Browser closed");
 		}
