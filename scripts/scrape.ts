@@ -37,16 +37,12 @@ import {
 	followUserAccount,
 	sendDMToUser,
 } from "../functions/profile/profileActions/profileActions.ts";
-import {
-	analyzeLinkWithVision,
-	analyzeProfileBasic,
-} from "../functions/profile/profileAnalysis/profileAnalysis.ts";
+import { analyzeProfileComprehensive } from "../functions/profile/profileAnalysis/profileAnalysis.ts";
 import {
 	CONFIDENCE_THRESHOLD,
 	MAX_DMS_PER_DAY,
 } from "../functions/shared/config/config.ts";
 import {
-	getDb,
 	getScrollIndex,
 	getStats,
 	initDb,
@@ -227,22 +223,26 @@ export async function processProfile(
 		return;
 	}
 
-	// Basic profile analysis
-	logger.debug("ANALYSIS", `Starting bio analysis for @${username}`);
+	// Comprehensive profile analysis with advanced link detection
+	logger.debug("ANALYSIS", `Starting comprehensive analysis for @${username}`);
 	let analysis;
 	try {
-		analysis = await analyzeProfileBasic(page, username);
+		analysis = await analyzeProfileComprehensive(page, username);
 	} catch (analysisError) {
-		recordError(analysisError, `bio_analysis_error_${username}`, username);
+		recordError(
+			analysisError,
+			`comprehensive_analysis_error_${username}`,
+			username,
+		);
 		await logger.errorWithScreenshot(
 			"ERROR",
-			`Bio analysis failed for @${username}: ${
+			`Comprehensive analysis failed for @${username}: ${
 				analysisError instanceof Error
 					? analysisError.message
 					: String(analysisError)
 			}`,
 			page,
-			`bio_analysis_failed_${username}`,
+			`comprehensive_analysis_failed_${username}`,
 		);
 		return;
 	}
@@ -250,7 +250,7 @@ export async function processProfile(
 	if (!analysis.bio) {
 		logger.warn("ANALYSIS", `No bio found for @${username}`);
 		markVisited(username, undefined, undefined, 0);
-		recordError("No bio found", `bio_analysis_${username}`, username);
+		recordError("No bio found", `comprehensive_analysis_${username}`, username);
 		await logger.errorWithScreenshot(
 			"ERROR",
 			`No bio found for @${username} - profile may be empty or blocked`,
@@ -266,147 +266,80 @@ export async function processProfile(
 			analysis.bio.length > 100 ? "..." : ""
 		}`,
 	);
-	logger.info("ANALYSIS", `Bio score: ${analysis.bioScore}`);
-	logger.debug("ANALYSIS", `Bio is likely creator: ${analysis.isLikely}`);
+	logger.info("ANALYSIS", `Confidence: ${analysis.confidence}%`);
+	logger.debug("ANALYSIS", `Is creator: ${analysis.isCreator}`);
 
-	// Mark as visited with bio and score
-	markVisited(username, undefined, analysis.bio, analysis.bioScore);
+	// Mark as visited with bio and confidence score
+	markVisited(username, undefined, analysis.bio, analysis.confidence);
 
 	try {
-		// If not promising, skip expensive vision analysis
-		if (!analysis.isLikely) {
+		// Comprehensive analysis already includes advanced link detection
+		// Check if creator based on comprehensive analysis results
+		let confirmedCreator = analysis.isCreator;
+		let confidence = analysis.confidence;
+
+		// Log key indicators if creator was confirmed
+		if (confirmedCreator) {
+			const keyIndicators = analysis.indicators.filter(
+				(indicator) =>
+					indicator.includes("platform icons") ||
+					indicator.includes("subscription") ||
+					indicator.includes("aggregator") ||
+					indicator.includes("creator keywords"),
+			);
+
+			logger.info(
+				"ANALYSIS",
+				`🎯 CONFIRMED CREATOR (confidence: ${confidence}%, reason: ${analysis.reason})`,
+			);
+
+			if (keyIndicators.length > 0) {
+				logger.info(
+					"ANALYSIS",
+					`💡 Key evidence: ${keyIndicators.join(" | ")}`,
+				);
+			}
+
+			// Record metrics for confirmed creator
+			if (metricsTracker) {
+				// Count vision API calls from comprehensive analysis
+				const visionCalls = analysis.indicators.filter(
+					(indicator) =>
+						indicator.includes("screenshot") || indicator.includes("vision"),
+				).length;
+				for (let i = 0; i < visionCalls; i++) {
+					metricsTracker.recordVisionApiCall(0.001); // ~$0.001 per call
+				}
+				metricsTracker.recordCreatorFound(username, confidence, 1);
+			}
+		}
+
+		// If not a creator and confidence is too low, skip
+		if (!confirmedCreator && confidence < CONFIDENCE_THRESHOLD) {
 			logger.debug(
 				"ANALYSIS",
-				`Bio score too low (${analysis.bioScore} < 40), skipping @${username}`,
+				`Confidence too low (${confidence} < ${CONFIDENCE_THRESHOLD}), skipping @${username}`,
 			);
 			cycleManager.recordProfileProcessed(username, false);
 			return;
 		}
 
-		logger.info("ANALYSIS", `Link in bio: ${analysis.linkFromBio || "none"}`);
-
-		// If has linktree/link aggregator, do vision analysis
-		let confirmedCreator = false;
-		let confidence = analysis.bioScore;
-		let visionExplicitlyRejected = false;
-
-		if (analysis.linkFromBio) {
-			logger.info(
-				"LINK",
-				`🔗 CLICKING LINK in @${username}'s bio: ${analysis.linkFromBio}`,
-			);
-
-			// System notification for link following
-			try {
-				const { execSync } = await import("child_process");
-				execSync(
-					`osascript -e 'display notification "Following link: ${analysis.linkFromBio}" with title "Scout Discovery" subtitle "@${username}"'`,
-				);
-			} catch (e) {
-				// Ignore notification errors on non-macOS systems
-			}
-
-			try {
-				const visionResult = await analyzeLinkWithVision(
-					page,
-					analysis.linkFromBio,
-					username,
-					"linktree",
-				);
-
-				logger.info(
-					"VISION",
-					`📸 Screenshot taken for @${username} link analysis`,
-				);
-
-				if (visionResult.isCreator) {
-					confirmedCreator = true;
-					confidence = visionResult.confidence || analysis.bioScore;
-					logger.info(
-						"ANALYSIS",
-						`Vision confirmed creator (confidence: ${confidence}%) - Indicators: ${
-							visionResult.indicators?.join(", ") || "none"
-						}`,
-					);
-
-					// Record vision API usage
-					visionApiCalls++;
-					if (metricsTracker) {
-						metricsTracker.recordVisionApiCall(0.001); // ~$0.001 per call
-						metricsTracker.recordCreatorFound(username, confidence, 1);
-					}
-				} else {
-					visionExplicitlyRejected = true;
-					logger.debug(
-						"ANALYSIS",
-						`Vision did not confirm creator for @${username} - Confidence: ${
-							visionResult.confidence || 0
-						}%`,
-					);
-
-					// Still record vision API usage even if not a creator
-					visionApiCalls++;
-					if (metricsTracker) {
-						metricsTracker.recordVisionApiCall(0.001);
-					}
-				}
-			} catch (visionError) {
-				recordError(visionError, `vision_analysis_${username}`, username);
-				logger.warn(
-					"ANALYSIS",
-					`Vision analysis failed for @${username}, using bio score only`,
-				);
-				await logger.errorWithScreenshot(
-					"WARN",
-					`Vision analysis failed for @${username}, falling back to bio score: ${
-						visionError instanceof Error
-							? visionError.message
-							: String(visionError)
-					}`,
-					page,
-					`vision_failed_${username}`,
-				);
-			}
-		}
-
-		if (
-			!confirmedCreator &&
-			!visionExplicitlyRejected &&
-			analysis.bioScore >= 70
-		) {
-			// High bio score alone can indicate creator (e.g., direct creator mention)
-			confirmedCreator = true;
-			confidence = analysis.bioScore;
-			logger.info(
-				"ANALYSIS",
-				`High bio score (${analysis.bioScore}) - likely creator without linktree`,
-			);
-
-			// Record creator found without vision API
-			if (metricsTracker) {
-				metricsTracker.recordCreatorFound(username, confidence, 0);
-			}
-		} else if (
-			!confirmedCreator &&
-			!visionExplicitlyRejected &&
-			analysis.bioScore >= CONFIDENCE_THRESHOLD
-		) {
-			// Fallback for very high confidence scores
-			confirmedCreator = true;
-			confidence = analysis.bioScore;
-
-			// Record creator found
-			if (metricsTracker) {
-				metricsTracker.recordCreatorFound(username, confidence, 0);
-			}
+		// Log links found during analysis
+		if (analysis.links && analysis.links.length > 0) {
+			logger.info("ANALYSIS", `Links found: ${analysis.links.length}`);
 		}
 
 		// If confirmed creator, take actions
 		if (confirmedCreator && confidence >= CONFIDENCE_THRESHOLD) {
 			const dmStatus = sendDM ? "" : " - SKIPPING DM";
+			const visionCalls = analysis.indicators.filter(
+				(indicator) =>
+					indicator.includes("screenshot") || indicator.includes("vision"),
+			).length;
+
 			logger.info(
 				"ACTION",
-				`🎉 CONFIRMED CREATOR @${username} (confidence: ${confidence}%, source: ${source}, vision calls: ${visionApiCalls})${dmStatus}`,
+				`🎉 CONFIRMED CREATOR @${username} (confidence: ${confidence}%, source: ${source}, vision calls: ${visionCalls})${dmStatus}`,
 			);
 			cycleManager.recordProfileProcessed(username, true);
 
@@ -423,9 +356,10 @@ export async function processProfile(
 			// Mark in database
 			let proofPath = null;
 			try {
-				proofPath = analysis.linkFromBio
-					? await snapshot(page, `creator_${username}`)
-					: null;
+				proofPath =
+					analysis.links && analysis.links.length > 0
+						? await snapshot(page, `creator_${username}`)
+						: null;
 				if (proofPath) {
 					logger.info("SCREENSHOT", `Creator proof saved: ${proofPath}`);
 				}
