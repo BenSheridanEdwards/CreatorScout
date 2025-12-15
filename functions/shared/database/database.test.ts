@@ -1,4 +1,5 @@
 import {
+	clearQueue,
 	getScrollIndex,
 	getStats,
 	initDb,
@@ -32,6 +33,8 @@ describe("database", () => {
 		});
 
 		test("queueNext retrieves and removes from queue", () => {
+			// Clear queue to ensure clean state
+			clearQueue();
 			const username = getTestUsername();
 			queueAdd(username, 100, "test");
 			const next = queueNext();

@@ -10,7 +10,8 @@
 		"test:e2e": "NODE_OPTIONS=--experimental-vm-modules jest --testMatch='**/*.puppeteer.test.ts' --testTimeout=120000 --testPathIgnorePatterns='[]'",
 		"test:e2e:scrape": "NODE_OPTIONS=--experimental-vm-modules jest tests/e2e/scrape_e2e.puppeteer.test.ts --testTimeout=120000 --testPathIgnorePatterns='[]'",
 		"test:e2e:check-profile": "NODE_OPTIONS=--experimental-vm-modules jest tests/e2e/check_profile_e2e.puppeteer.test.ts --testTimeout=120000 --testPathIgnorePatterns='[]'",
-		"login:screenshot": "tsx scripts/login_screenshot.ts"
+		"login:screenshot": "tsx scripts/login_screenshot.ts",
+		"discover": "tsx scripts/discover.ts"
 	},
 	"dependencies": {
 		"better-sqlite3": "^12.5.0",

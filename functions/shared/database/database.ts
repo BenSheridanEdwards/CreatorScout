@@ -136,6 +136,12 @@ export function queueCount(): number {
 	return row.count;
 }
 
+export function clearQueue(): void {
+	const db = getDb();
+	const stmt = db.prepare("DELETE FROM queue");
+	stmt.run();
+}
+
 // === Profile Operations ===
 
 export function wasVisited(username: string): boolean {

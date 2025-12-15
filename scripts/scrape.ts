@@ -17,888 +17,939 @@
  * 5. Pagination: if all 10 visited, scroll modal and get next batch
  */
 
-import { existsSync, readFileSync } from 'node:fs';
-import type { Browser, Page } from 'puppeteer';
+import { existsSync, readFileSync } from "node:fs";
+import type { Browser, Page } from "puppeteer";
 import {
-  createBrowser,
-  createPage,
-} from '../functions/navigation/browser/browser.ts';
+	createBrowser,
+	createPage,
+} from "../functions/navigation/browser/browser.ts";
 import {
-  extractFollowingUsernames,
-  openFollowingModal,
-  scrollFollowingModal,
-} from '../functions/navigation/modalOperations/modalOperations.ts';
+	extractFollowingUsernames,
+	openFollowingModal,
+	scrollFollowingModal,
+} from "../functions/navigation/modalOperations/modalOperations.ts";
 import {
-  ensureLoggedIn,
-  navigateToProfileAndCheck,
-} from '../functions/navigation/profileNavigation/profileNavigation.ts';
+	ensureLoggedIn,
+	navigateToProfileAndCheck,
+} from "../functions/navigation/profileNavigation/profileNavigation.ts";
 import {
-  addFollowingToQueue,
-  followUserAccount,
-  sendDMToUser,
-} from '../functions/profile/profileActions/profileActions.ts';
+	addFollowingToQueue,
+	followUserAccount,
+	sendDMToUser,
+} from "../functions/profile/profileActions/profileActions.ts";
 import {
-  analyzeLinkWithVision,
-  analyzeProfileBasic,
-} from '../functions/profile/profileAnalysis/profileAnalysis.ts';
+	analyzeLinkWithVision,
+	analyzeProfileBasic,
+} from "../functions/profile/profileAnalysis/profileAnalysis.ts";
 import {
-  CONFIDENCE_THRESHOLD,
-  MAX_DMS_PER_DAY,
-} from '../functions/shared/config/config.ts';
+	CONFIDENCE_THRESHOLD,
+	MAX_DMS_PER_DAY,
+} from "../functions/shared/config/config.ts";
 import {
-  getScrollIndex,
-  getStats,
-  initDb,
-  markAsCreator,
-  markVisited,
-  queueAdd,
-  queueCount,
-  queueNext,
-  updateScrollIndex,
-  wasDmSent,
-  wasFollowed,
-  wasVisited,
-} from '../functions/shared/database/database.ts';
-import { snapshot } from '../functions/shared/snapshot/snapshot.ts';
+	getDb,
+	getScrollIndex,
+	getStats,
+	initDb,
+	markAsCreator,
+	markVisited,
+	queueAdd,
+	queueCount,
+	queueNext,
+	updateScrollIndex,
+	wasDmSent,
+	wasFollowed,
+	wasVisited,
+} from "../functions/shared/database/database.ts";
+import { snapshot } from "../functions/shared/snapshot/snapshot.ts";
 import {
-  getDelay,
-  mouseWiggle,
-} from '../functions/timing/humanize/humanize.ts';
-import { sleep } from '../functions/timing/sleep/sleep.ts';
+	getDelay,
+	mouseWiggle,
+} from "../functions/timing/humanize/humanize.ts";
+import { sleep } from "../functions/timing/sleep/sleep.ts";
 import {
-  MetricsTracker,
-  getGlobalMetricsTracker,
-  startTimer,
-} from '../functions/shared/metrics/metrics.ts';
+	MetricsTracker,
+	getGlobalMetricsTracker,
+	startTimer,
+} from "../functions/shared/metrics/metrics.ts";
 
 // Enhanced logging imports
-import { createLoggerWithCycleTracking } from '../functions/shared/logger/logger.ts';
+import { createLoggerWithCycleTracking } from "../functions/shared/logger/logger.ts";
 
 initDb();
 
 // Enhanced logging setup
 const {
-  logger,
-  cycleManager,
-  startCycle,
-  endCycle,
-  recordError,
-  shouldContinue,
-} = createLoggerWithCycleTracking(process.env.DEBUG_LOGS === 'true');
+	logger,
+	cycleManager,
+	startCycle,
+	endCycle,
+	recordError,
+	shouldContinue,
+} = createLoggerWithCycleTracking(process.env.DEBUG_LOGS === "true");
 
 /**
  * Load seeds from file into queue
  */
-export function loadSeeds(filePath: string = 'seeds.txt'): number {
-  try {
-    logger.debug('SEED', `Loading seeds from ${filePath}`);
+export function loadSeeds(filePath: string = "seeds.txt"): number {
+	try {
+		logger.debug("SEED", `Loading seeds from ${filePath}`);
 
-    if (!existsSync(filePath)) {
-      logger.warn('SEED', `Seeds file not found: ${filePath}`);
-      recordError(`Seeds file not found: ${filePath}`, 'loadSeeds', filePath);
-      return 0;
-    }
+		if (!existsSync(filePath)) {
+			logger.warn("SEED", `Seeds file not found: ${filePath}`);
+			recordError(`Seeds file not found: ${filePath}`, "loadSeeds", filePath);
+			return 0;
+		}
 
-    const seedsContent = readFileSync(filePath, 'utf-8');
-    const lines = seedsContent.split('\n');
-    let seedsLoaded = 0;
+		const seedsContent = readFileSync(filePath, "utf-8");
+		const lines = seedsContent.split("\n");
+		let seedsLoaded = 0;
 
-    for (const line of lines) {
-      const username = line.trim().toLowerCase();
-      if (username && !username.startsWith('#')) {
-        queueAdd(username, 100, 'seed');
-        seedsLoaded++;
-        logger.debug('SEED', `Loaded seed: @${username}`);
-      } else if (username.startsWith('#')) {
-        logger.debug('SEED', `Skipping comment: ${username}`);
-      }
-    }
+		for (const line of lines) {
+			const username = line.trim().toLowerCase();
+			if (username && !username.startsWith("#")) {
+				queueAdd(username, 100, "seed");
+				seedsLoaded++;
+				logger.debug("SEED", `Loaded seed: @${username}`);
+			} else if (username.startsWith("#")) {
+				logger.debug("SEED", `Skipping comment: ${username}`);
+			}
+		}
 
-    logger.info(
-      'SEED',
-      `Successfully loaded ${seedsLoaded} seeds from ${filePath}`
-    );
-    return seedsLoaded;
-  } catch (error) {
-    recordError(error, 'loadSeeds', filePath);
-    return 0;
-  }
+		logger.info(
+			"SEED",
+			`Successfully loaded ${seedsLoaded} seeds from ${filePath}`,
+		);
+		return seedsLoaded;
+	} catch (error) {
+		recordError(error, "loadSeeds", filePath);
+		return 0;
+	}
 }
 
 /**
  * Process a single profile: visit, analyze, and take actions if creator.
  */
 export async function processProfile(
-  username: string,
-  page: Page,
-  source: string,
-  metricsTracker?: MetricsTracker,
-  sendDM: boolean = true
+	username: string,
+	page: Page,
+	source: string,
+	metricsTracker?: MetricsTracker,
+	sendDM: boolean = true,
 ): Promise<void> {
-  logger.info('PROFILE', `[${source}] Processing @${username}...`);
+	logger.info("PROFILE", `[${source}] Processing @${username}...`);
 
-  // Start performance timer
-  const timer = startTimer(`Profile processing: @${username}`);
+	// Start performance timer
+	const timer = startTimer(`Profile processing: @${username}`);
 
-  // Track metrics throughout processing
-  let visionApiCalls = 0;
-  let contentCategories: string[] = [];
-  let profileProcessedSuccessfully = false;
+	// Track metrics throughout processing
+	let visionApiCalls = 0;
+	let contentCategories: string[] = [];
+	let profileProcessedSuccessfully = false;
 
-  // Parse discovery source to extract depth and source profile (moved outside try for finally block access)
-  const discoveryDepth = source.split('_').length - 1; // Count underscores as depth
-  const sourceProfile = source.includes('_of_')
-    ? source.split('_of_').pop()
-    : undefined;
+	// Parse discovery source to extract depth and source profile (moved outside try for finally block access)
+	const discoveryDepth = source.split("_").length - 1; // Count underscores as depth
+	const sourceProfile = source.includes("_of_")
+		? source.split("_of_").pop()
+		: undefined;
 
-  try {
-    // Skip if already visited
-    if (wasVisited(username)) {
-      logger.debug('PROFILE', `Already visited, skipping @${username}`);
-      cycleManager.recordWarning(
-        'PROFILE_NOT_FOUND',
-        'Already visited',
-        username
-      );
-      return;
-    }
+	try {
+		// Skip if already visited
+		if (wasVisited(username)) {
+			logger.debug("PROFILE", `Already visited, skipping @${username}`);
+			cycleManager.recordWarning(
+				"PROFILE_NOT_FOUND",
+				"Already visited",
+				username,
+			);
+			return;
+		}
 
-    // Navigate to profile and check status
-    const [profileDelayMin, profileDelayMax] = getDelay('profile_load');
-    const profileDelay =
-      profileDelayMin + Math.random() * (profileDelayMax - profileDelayMin);
-    logger.debug(
-      'DELAY',
-      `Waiting ${Math.floor(profileDelay)}s before profile load...`
-    );
-    await sleep(profileDelay * 1000);
+		// Navigate to profile and check status
+		const [profileDelayMin, profileDelayMax] = getDelay("profile_load");
+		const profileDelay =
+			profileDelayMin + Math.random() * (profileDelayMax - profileDelayMin);
+		logger.debug(
+			"DELAY",
+			`Waiting ${Math.floor(profileDelay)}s before profile load...`,
+		);
+		await sleep(profileDelay * 1000);
 
-    logger.debug('NAVIGATION', `Navigating to @${username} profile`);
-    const status = await navigateToProfileAndCheck(page, username, {
-      timeout: 15000,
-    });
+		logger.debug("NAVIGATION", `Navigating to @${username} profile`);
+		const status = await navigateToProfileAndCheck(page, username, {
+			timeout: 15000,
+		});
 
-    // Add mouse wiggling for human-like behavior
-    await mouseWiggle(page);
+		// Add mouse wiggling for human-like behavior
+		await mouseWiggle(page);
 
-    // Check if profile is accessible
-    if (status.notFound) {
-      logger.warn('PROFILE', `Profile not found: @${username}`);
-      markVisited(username, undefined, undefined, 0);
-      cycleManager.recordWarning(
-        'PROFILE_NOT_FOUND',
-        'Profile not found',
-        username
-      );
-      return;
-    }
+		// Check if profile is accessible
+		if (status.notFound) {
+			logger.warn("PROFILE", `Profile not found: @${username}`);
+			markVisited(username, undefined, undefined, 0);
+			cycleManager.recordWarning(
+				"PROFILE_NOT_FOUND",
+				"Profile not found",
+				username,
+			);
+			return;
+		}
 
-    if (status.isPrivate) {
-      logger.warn('PROFILE', `Profile is private: @${username}`);
-      markVisited(username, undefined, undefined, 0);
-      cycleManager.recordWarning(
-        'PROFILE_PRIVATE',
-        'Profile is private',
-        username
-      );
-      return;
-    }
+		if (status.isPrivate) {
+			logger.warn("PROFILE", `Profile is private: @${username}`);
+			markVisited(username, undefined, undefined, 0);
+			cycleManager.recordWarning(
+				"PROFILE_PRIVATE",
+				"Profile is private",
+				username,
+			);
+			return;
+		}
 
-    // Ensure we're logged in
-    await ensureLoggedIn(page);
-    logger.debug('AUTH', `Confirmed logged in for @${username}`);
-  } catch (err) {
-    const errorMessage = err instanceof Error ? err.message : String(err);
-    recordError(err, `profile_load_${username}`, username);
+		// Ensure we're logged in
+		await ensureLoggedIn(page);
+		logger.debug("AUTH", `Confirmed logged in for @${username}`);
+	} catch (err) {
+		const errorMessage = err instanceof Error ? err.message : String(err);
+		recordError(err, `profile_load_${username}`, username);
 
-    await logger.errorWithScreenshot(
-      'WARN',
-      `Failed to load profile @${username}: ${errorMessage}`,
-      page,
-      `profile_load_${username}`
-    );
+		await logger.errorWithScreenshot(
+			"WARN",
+			`Failed to load profile @${username}: ${errorMessage}`,
+			page,
+			`profile_load_${username}`,
+		);
 
-    // Record error in metrics
-    if (metricsTracker) {
-      metricsTracker.recordError(username, 'profile_load_failed', errorMessage);
-    }
+		// Record error in metrics
+		if (metricsTracker) {
+			metricsTracker.recordError(username, "profile_load_failed", errorMessage);
+		}
 
-    return;
-  }
+		return;
+	}
 
-  // Basic profile analysis
-  logger.debug('ANALYSIS', `Starting bio analysis for @${username}`);
-  let analysis;
-  try {
-    analysis = await analyzeProfileBasic(page, username);
-  } catch (analysisError) {
-    recordError(analysisError, `bio_analysis_error_${username}`, username);
-    await logger.errorWithScreenshot(
-      'ERROR',
-      `Bio analysis failed for @${username}: ${
-        analysisError instanceof Error
-          ? analysisError.message
-          : String(analysisError)
-      }`,
-      page,
-      `bio_analysis_failed_${username}`
-    );
-    return;
-  }
+	// Basic profile analysis
+	logger.debug("ANALYSIS", `Starting bio analysis for @${username}`);
+	let analysis;
+	try {
+		analysis = await analyzeProfileBasic(page, username);
+	} catch (analysisError) {
+		recordError(analysisError, `bio_analysis_error_${username}`, username);
+		await logger.errorWithScreenshot(
+			"ERROR",
+			`Bio analysis failed for @${username}: ${
+				analysisError instanceof Error
+					? analysisError.message
+					: String(analysisError)
+			}`,
+			page,
+			`bio_analysis_failed_${username}`,
+		);
+		return;
+	}
 
-  if (!analysis.bio) {
-    logger.warn('ANALYSIS', `No bio found for @${username}`);
-    markVisited(username, undefined, undefined, 0);
-    recordError('No bio found', `bio_analysis_${username}`, username);
-    await logger.errorWithScreenshot(
-      'ERROR',
-      `No bio found for @${username} - profile may be empty or blocked`,
-      page,
-      `no_bio_${username}`
-    );
-    return;
-  }
+	if (!analysis.bio) {
+		logger.warn("ANALYSIS", `No bio found for @${username}`);
+		markVisited(username, undefined, undefined, 0);
+		recordError("No bio found", `bio_analysis_${username}`, username);
+		await logger.errorWithScreenshot(
+			"ERROR",
+			`No bio found for @${username} - profile may be empty or blocked`,
+			page,
+			`no_bio_${username}`,
+		);
+		return;
+	}
 
-  logger.info(
-    'ANALYSIS',
-    `Bio: ${analysis.bio.substring(0, 100)}${
-      analysis.bio.length > 100 ? '...' : ''
-    }`
-  );
-  logger.info('ANALYSIS', `Bio score: ${analysis.bioScore}`);
-  logger.debug('ANALYSIS', `Bio is likely creator: ${analysis.isLikely}`);
+	logger.info(
+		"ANALYSIS",
+		`Bio: ${analysis.bio.substring(0, 100)}${
+			analysis.bio.length > 100 ? "..." : ""
+		}`,
+	);
+	logger.info("ANALYSIS", `Bio score: ${analysis.bioScore}`);
+	logger.debug("ANALYSIS", `Bio is likely creator: ${analysis.isLikely}`);
 
-  // Mark as visited with bio and score
-  markVisited(username, undefined, analysis.bio, analysis.bioScore);
+	// Mark as visited with bio and score
+	markVisited(username, undefined, analysis.bio, analysis.bioScore);
 
-  try {
-    // If not promising, skip expensive vision analysis
-    if (!analysis.isLikely) {
-      logger.debug(
-        'ANALYSIS',
-        `Bio score too low (${analysis.bioScore} < 40), skipping @${username}`
-      );
-      cycleManager.recordProfileProcessed(username, false);
-      return;
-    }
+	try {
+		// If not promising, skip expensive vision analysis
+		if (!analysis.isLikely) {
+			logger.debug(
+				"ANALYSIS",
+				`Bio score too low (${analysis.bioScore} < 40), skipping @${username}`,
+			);
+			cycleManager.recordProfileProcessed(username, false);
+			return;
+		}
 
-    logger.info('ANALYSIS', `Link in bio: ${analysis.linkFromBio || 'none'}`);
+		logger.info("ANALYSIS", `Link in bio: ${analysis.linkFromBio || "none"}`);
 
-    // If has linktree/link aggregator, do vision analysis
-    let confirmedCreator = false;
-    let confidence = analysis.bioScore;
-    let visionExplicitlyRejected = false;
+		// If has linktree/link aggregator, do vision analysis
+		let confirmedCreator = false;
+		let confidence = analysis.bioScore;
+		let visionExplicitlyRejected = false;
 
-    if (analysis.linkFromBio) {
-      logger.debug(
-        'VISION',
-        `Starting vision analysis for @${username} link: ${analysis.linkFromBio}`
-      );
-      try {
-        const visionResult = await analyzeLinkWithVision(
-          page,
-          analysis.linkFromBio,
-          username,
-          'linktree'
-        );
+		if (analysis.linkFromBio) {
+			logger.info(
+				"LINK",
+				`🔗 CLICKING LINK in @${username}'s bio: ${analysis.linkFromBio}`,
+			);
 
-        if (visionResult.isCreator) {
-          confirmedCreator = true;
-          confidence = visionResult.confidence || analysis.bioScore;
-          logger.info(
-            'ANALYSIS',
-            `Vision confirmed creator (confidence: ${confidence}%) - Indicators: ${
-              visionResult.indicators?.join(', ') || 'none'
-            }`
-          );
+			// System notification for link following
+			try {
+				const { execSync } = await import("child_process");
+				execSync(
+					`osascript -e 'display notification "Following link: ${analysis.linkFromBio}" with title "Scout Discovery" subtitle "@${username}"'`,
+				);
+			} catch (e) {
+				// Ignore notification errors on non-macOS systems
+			}
 
-          // Record vision API usage
-          visionApiCalls++;
-          if (metricsTracker) {
-            metricsTracker.recordVisionApiCall(0.001); // ~$0.001 per call
-            metricsTracker.recordCreatorFound(username, confidence, 1);
-          }
-        } else {
-          visionExplicitlyRejected = true;
-          logger.debug(
-            'ANALYSIS',
-            `Vision did not confirm creator for @${username} - Confidence: ${
-              visionResult.confidence || 0
-            }%`
-          );
+			try {
+				const visionResult = await analyzeLinkWithVision(
+					page,
+					analysis.linkFromBio,
+					username,
+					"linktree",
+				);
 
-          // Still record vision API usage even if not a creator
-          visionApiCalls++;
-          if (metricsTracker) {
-            metricsTracker.recordVisionApiCall(0.001);
-          }
-        }
-      } catch (visionError) {
-        recordError(visionError, `vision_analysis_${username}`, username);
-        logger.warn(
-          'ANALYSIS',
-          `Vision analysis failed for @${username}, using bio score only`
-        );
-        await logger.errorWithScreenshot(
-          'WARN',
-          `Vision analysis failed for @${username}, falling back to bio score: ${
-            visionError instanceof Error
-              ? visionError.message
-              : String(visionError)
-          }`,
-          page,
-          `vision_failed_${username}`
-        );
-      }
-    }
+				logger.info(
+					"VISION",
+					`📸 Screenshot taken for @${username} link analysis`,
+				);
 
-    if (
-      !confirmedCreator &&
-      !visionExplicitlyRejected &&
-      analysis.bioScore >= 70
-    ) {
-      // High bio score alone can indicate creator (e.g., direct creator mention)
-      confirmedCreator = true;
-      confidence = analysis.bioScore;
-      logger.info(
-        'ANALYSIS',
-        `High bio score (${analysis.bioScore}) - likely creator without linktree`
-      );
+				if (visionResult.isCreator) {
+					confirmedCreator = true;
+					confidence = visionResult.confidence || analysis.bioScore;
+					logger.info(
+						"ANALYSIS",
+						`Vision confirmed creator (confidence: ${confidence}%) - Indicators: ${
+							visionResult.indicators?.join(", ") || "none"
+						}`,
+					);
 
-      // Record creator found without vision API
-      if (metricsTracker) {
-        metricsTracker.recordCreatorFound(username, confidence, 0);
-      }
-    } else if (
-      !confirmedCreator &&
-      !visionExplicitlyRejected &&
-      analysis.bioScore >= CONFIDENCE_THRESHOLD
-    ) {
-      // Fallback for very high confidence scores
-      confirmedCreator = true;
-      confidence = analysis.bioScore;
+					// Record vision API usage
+					visionApiCalls++;
+					if (metricsTracker) {
+						metricsTracker.recordVisionApiCall(0.001); // ~$0.001 per call
+						metricsTracker.recordCreatorFound(username, confidence, 1);
+					}
+				} else {
+					visionExplicitlyRejected = true;
+					logger.debug(
+						"ANALYSIS",
+						`Vision did not confirm creator for @${username} - Confidence: ${
+							visionResult.confidence || 0
+						}%`,
+					);
 
-      // Record creator found
-      if (metricsTracker) {
-        metricsTracker.recordCreatorFound(username, confidence, 0);
-      }
-    }
+					// Still record vision API usage even if not a creator
+					visionApiCalls++;
+					if (metricsTracker) {
+						metricsTracker.recordVisionApiCall(0.001);
+					}
+				}
+			} catch (visionError) {
+				recordError(visionError, `vision_analysis_${username}`, username);
+				logger.warn(
+					"ANALYSIS",
+					`Vision analysis failed for @${username}, using bio score only`,
+				);
+				await logger.errorWithScreenshot(
+					"WARN",
+					`Vision analysis failed for @${username}, falling back to bio score: ${
+						visionError instanceof Error
+							? visionError.message
+							: String(visionError)
+					}`,
+					page,
+					`vision_failed_${username}`,
+				);
+			}
+		}
 
-    // If confirmed creator, take actions
-    if (confirmedCreator && confidence >= CONFIDENCE_THRESHOLD) {
-      const dmStatus = sendDM ? '' : ' - SKIPPING DM';
-      logger.info(
-        'ACTION',
-        `🎉 CONFIRMED CREATOR @${username} (confidence: ${confidence}%, source: ${source}, vision calls: ${visionApiCalls})${dmStatus}`
-      );
-      cycleManager.recordProfileProcessed(username, true);
+		if (
+			!confirmedCreator &&
+			!visionExplicitlyRejected &&
+			analysis.bioScore >= 70
+		) {
+			// High bio score alone can indicate creator (e.g., direct creator mention)
+			confirmedCreator = true;
+			confidence = analysis.bioScore;
+			logger.info(
+				"ANALYSIS",
+				`High bio score (${analysis.bioScore}) - likely creator without linktree`,
+			);
 
-      // Mark in database
-      let proofPath = null;
-      try {
-        proofPath = analysis.linkFromBio
-          ? await snapshot(page, `creator_${username}`)
-          : null;
-        if (proofPath) {
-          logger.info('SCREENSHOT', `Creator proof saved: ${proofPath}`);
-        }
-      } catch (snapshotError) {
-        logger.warn(
-          'SCREENSHOT',
-          `Failed to take creator proof screenshot for @${username}`
-        );
-        await logger.errorWithScreenshot(
-          'ERROR',
-          `Creator proof screenshot failed for @${username}: ${
-            snapshotError instanceof Error
-              ? snapshotError.message
-              : String(snapshotError)
-          }`,
-          page,
-          `snapshot_failed_${username}`
-        );
-      }
-      markAsCreator(username, confidence, proofPath);
+			// Record creator found without vision API
+			if (metricsTracker) {
+				metricsTracker.recordCreatorFound(username, confidence, 0);
+			}
+		} else if (
+			!confirmedCreator &&
+			!visionExplicitlyRejected &&
+			analysis.bioScore >= CONFIDENCE_THRESHOLD
+		) {
+			// Fallback for very high confidence scores
+			confirmedCreator = true;
+			confidence = analysis.bioScore;
 
-      // Send DM (if not already sent and DM sending is enabled)
-      if (sendDM && !wasDmSent(username)) {
-        const [dmDelayMin, dmDelayMax] = getDelay('before_dm');
-        const dmWait = dmDelayMin + Math.random() * (dmDelayMax - dmDelayMin);
-        logger.debug('DELAY', `Waiting ${Math.floor(dmWait)}s before DM...`);
-        await sleep(dmWait * 1000);
+			// Record creator found
+			if (metricsTracker) {
+				metricsTracker.recordCreatorFound(username, confidence, 0);
+			}
+		}
 
-        try {
-          await sendDMToUser(page, username);
-          logger.info('ACTION', `💬 DM sent to @${username}`);
-          cycleManager.recordDMSent(username);
+		// If confirmed creator, take actions
+		if (confirmedCreator && confidence >= CONFIDENCE_THRESHOLD) {
+			const dmStatus = sendDM ? "" : " - SKIPPING DM";
+			logger.info(
+				"ACTION",
+				`🎉 CONFIRMED CREATOR @${username} (confidence: ${confidence}%, source: ${source}, vision calls: ${visionApiCalls})${dmStatus}`,
+			);
+			cycleManager.recordProfileProcessed(username, true);
 
-          // Record DM sent
-          if (metricsTracker) {
-            metricsTracker.recordDMSent(username);
-          }
-        } catch (dmError) {
-          recordError(dmError, `dm_send_${username}`, username);
-          await logger.errorWithScreenshot(
-            'ERROR',
-            `DM send failed for @${username}: ${
-              dmError instanceof Error ? dmError.message : String(dmError)
-            }`,
-            page,
-            `dm_failed_${username}`
-          );
-        }
-      } else if (!sendDM) {
-        logger.debug('ACTION', `DM sending disabled for @${username}`);
-      } else {
-        logger.debug('ACTION', `DM already sent to @${username}`);
-        cycleManager.recordWarning(
-          'DM_ALREADY_SENT',
-          'DM already sent',
-          username
-        );
-      }
+			// System notification for creator found
+			try {
+				const { execSync } = await import("child_process");
+				execSync(
+					`osascript -e 'display notification "Creator found with ${confidence}% confidence" with title "Scout Discovery" subtitle "@${username}" sound name "Glass"'`,
+				);
+			} catch (e) {
+				// Ignore notification errors on non-macOS systems
+			}
 
-      // Follow (if not already following)
-      if (!wasFollowed(username)) {
-        try {
-          await followUserAccount(page, username);
-          logger.info('ACTION', `👥 Followed @${username}`);
-          cycleManager.recordFollowCompleted(username);
+			// Mark in database
+			let proofPath = null;
+			try {
+				proofPath = analysis.linkFromBio
+					? await snapshot(page, `creator_${username}`)
+					: null;
+				if (proofPath) {
+					logger.info("SCREENSHOT", `Creator proof saved: ${proofPath}`);
+				}
+			} catch (snapshotError) {
+				logger.warn(
+					"SCREENSHOT",
+					`Failed to take creator proof screenshot for @${username}`,
+				);
+				await logger.errorWithScreenshot(
+					"ERROR",
+					`Creator proof screenshot failed for @${username}: ${
+						snapshotError instanceof Error
+							? snapshotError.message
+							: String(snapshotError)
+					}`,
+					page,
+					`snapshot_failed_${username}`,
+				);
+			}
+			markAsCreator(username, confidence, proofPath);
+			logger.info(
+				"DATABASE",
+				`💾 Creator @${username} saved to database (confidence: ${confidence}%)`,
+			);
 
-          // Record follow completed
-          if (metricsTracker) {
-            metricsTracker.recordFollowCompleted(username);
-          }
-        } catch (followError) {
-          recordError(followError, `follow_${username}`, username);
-          await logger.errorWithScreenshot(
-            'ERROR',
-            `Follow action failed for @${username}: ${
-              followError instanceof Error
-                ? followError.message
-                : String(followError)
-            }`,
-            page,
-            `follow_failed_${username}`
-          );
-        }
-      } else {
-        logger.debug('ACTION', `Already following @${username}`);
-        cycleManager.recordWarning(
-          'ALREADY_FOLLOWING',
-          'Already following',
-          username
-        );
-      }
+			// System notification for database save
+			try {
+				const { execSync } = await import("child_process");
+				execSync(
+					`osascript -e 'display notification "Saved @${username} to database" with title "Scout Discovery" subtitle "${confidence}% confidence"'`,
+				);
+			} catch (e) {
+				// Ignore notification errors on non-macOS systems
+			}
 
-      // Add their following to queue for expansion
-      logger.info('QUEUE', `Adding @${username}'s following to queue...`);
-      try {
-        const added = await addFollowingToQueue(
-          page,
-          username,
-          `following_of_${username}`,
-          20
-        );
-        if (added > 0) {
-          logger.info('QUEUE', `Added ${added} profiles to queue`);
-        }
-      } catch (queueError) {
-        recordError(queueError, `queue_expansion_${username}`, username);
-        await logger.errorWithScreenshot(
-          'ERROR',
-          `Queue expansion failed for @${username}: ${
-            queueError instanceof Error
-              ? queueError.message
-              : String(queueError)
-          }`,
-          page,
-          `queue_expansion_failed_${username}`
-        );
-      }
-    } else {
-      logger.debug(
-        'ANALYSIS',
-        `Not confirmed (confidence: ${confidence}% < ${CONFIDENCE_THRESHOLD}%)`
-      );
-      cycleManager.recordProfileProcessed(username, false);
-    }
+			// Send DM (if not already sent and DM sending is enabled)
+			if (sendDM && !wasDmSent(username)) {
+				const [dmDelayMin, dmDelayMax] = getDelay("before_dm");
+				const dmWait = dmDelayMin + Math.random() * (dmDelayMax - dmDelayMin);
+				logger.debug("DELAY", `Waiting ${Math.floor(dmWait)}s before DM...`);
+				await sleep(dmWait * 1000);
 
-    // Mark profile as processed successfully
-    profileProcessedSuccessfully = true;
+				try {
+					await sendDMToUser(page, username);
+					logger.info("ACTION", `💬 DM sent to @${username}`);
+					cycleManager.recordDMSent(username);
 
-    // Human-like delay before next profile
-    const [profileDelayMin, profileDelayMax] = getDelay('between_profiles');
-    const profileWait =
-      profileDelayMin + Math.random() * (profileDelayMax - profileDelayMin);
-    logger.debug(
-      'DELAY',
-      `Waiting ${Math.floor(profileWait)}s before next profile...`
-    );
-    await sleep(profileWait * 1000);
-  } catch (err) {
-    const errorMessage = err instanceof Error ? err.message : String(err);
-    recordError(err, `profile_processing_${username}`, username);
+					// Record DM sent
+					if (metricsTracker) {
+						metricsTracker.recordDMSent(username);
+					}
+				} catch (dmError) {
+					recordError(dmError, `dm_send_${username}`, username);
+					await logger.errorWithScreenshot(
+						"ERROR",
+						`DM send failed for @${username}: ${
+							dmError instanceof Error ? dmError.message : String(dmError)
+						}`,
+						page,
+						`dm_failed_${username}`,
+					);
+				}
+			} else if (!sendDM) {
+				logger.debug("ACTION", `DM sending disabled for @${username}`);
+			} else {
+				logger.debug("ACTION", `DM already sent to @${username}`);
+				cycleManager.recordWarning(
+					"DM_ALREADY_SENT",
+					"DM already sent",
+					username,
+				);
+			}
 
-    if (metricsTracker) {
-      metricsTracker.recordError(
-        username,
-        'profile_processing_failed',
-        errorMessage
-      );
-    }
+			// Follow (if not already following)
+			if (!wasFollowed(username)) {
+				try {
+					await followUserAccount(page, username);
+					logger.info("ACTION", `👥 Followed @${username}`);
+					cycleManager.recordFollowCompleted(username);
 
-    await logger.errorWithScreenshot(
-      'ERROR',
-      `Critical error processing @${username}: ${errorMessage}`,
-      page,
-      `profile_critical_error_${username}`
-    );
+					// System notification for follow completed
+					try {
+						const { execSync } = await import("child_process");
+						execSync(
+							`osascript -e 'display notification "Followed @${username}" with title "Scout Discovery" sound name "Blow"'`,
+						);
+					} catch (e) {
+						// Ignore notification errors on non-macOS systems
+					}
 
-    throw err; // Re-throw to let caller handle
-  } finally {
-    // Record profile visit metrics with complete data
-    if (metricsTracker) {
-      const finalProcessingTime = timer.end();
-      metricsTracker.recordProfileVisit(
-        username,
-        finalProcessingTime,
-        source,
-        discoveryDepth,
-        sourceProfile,
-        contentCategories,
-        visionApiCalls
-      );
-    } else {
-      timer.end();
-    }
-  }
+					// Record follow completed
+					if (metricsTracker) {
+						metricsTracker.recordFollowCompleted(username);
+					}
+				} catch (followError) {
+					recordError(followError, `follow_${username}`, username);
+					await logger.errorWithScreenshot(
+						"ERROR",
+						`Follow action failed for @${username}: ${
+							followError instanceof Error
+								? followError.message
+								: String(followError)
+						}`,
+						page,
+						`follow_failed_${username}`,
+					);
+				}
+			} else {
+				logger.debug("ACTION", `Already following @${username}`);
+				cycleManager.recordWarning(
+					"ALREADY_FOLLOWING",
+					"Already following",
+					username,
+				);
+			}
+
+			// Add their following to queue for expansion
+			logger.info("QUEUE", `Adding @${username}'s following to queue...`);
+			try {
+				const added = await addFollowingToQueue(
+					page,
+					username,
+					`following_of_${username}`,
+					20,
+				);
+				if (added > 0) {
+					logger.info("QUEUE", `Added ${added} profiles to queue`);
+				}
+			} catch (queueError) {
+				recordError(queueError, `queue_expansion_${username}`, username);
+				await logger.errorWithScreenshot(
+					"ERROR",
+					`Queue expansion failed for @${username}: ${
+						queueError instanceof Error
+							? queueError.message
+							: String(queueError)
+					}`,
+					page,
+					`queue_expansion_failed_${username}`,
+				);
+			}
+		} else {
+			logger.debug(
+				"ANALYSIS",
+				`Not confirmed (confidence: ${confidence}% < ${CONFIDENCE_THRESHOLD}%)`,
+			);
+			cycleManager.recordProfileProcessed(username, false);
+		}
+
+		// Mark profile as processed successfully
+		profileProcessedSuccessfully = true;
+
+		// Human-like delay before next profile
+		const [profileDelayMin, profileDelayMax] = getDelay("between_profiles");
+		const profileWait =
+			profileDelayMin + Math.random() * (profileDelayMax - profileDelayMin);
+		logger.debug(
+			"DELAY",
+			`Waiting ${Math.floor(profileWait)}s before next profile...`,
+		);
+		await sleep(profileWait * 1000);
+	} catch (err) {
+		const errorMessage = err instanceof Error ? err.message : String(err);
+		recordError(err, `profile_processing_${username}`, username);
+
+		if (metricsTracker) {
+			metricsTracker.recordError(
+				username,
+				"profile_processing_failed",
+				errorMessage,
+			);
+		}
+
+		await logger.errorWithScreenshot(
+			"ERROR",
+			`Critical error processing @${username}: ${errorMessage}`,
+			page,
+			`profile_critical_error_${username}`,
+		);
+
+		throw err; // Re-throw to let caller handle
+	} finally {
+		// Record profile visit metrics with complete data
+		if (metricsTracker) {
+			const finalProcessingTime = timer.end();
+			metricsTracker.recordProfileVisit(
+				username,
+				finalProcessingTime,
+				source,
+				discoveryDepth,
+				sourceProfile,
+				contentCategories,
+				visionApiCalls,
+			);
+		} else {
+			timer.end();
+		}
+	}
 }
 
 /**
  * Process the following list of a seed profile.
  */
 export async function processFollowingList(
-  seedUsername: string,
-  page: Page,
-  metricsTracker?: MetricsTracker,
-  sendDM: boolean = true
+	seedUsername: string,
+	page: Page,
+	metricsTracker?: MetricsTracker,
+	sendDM: boolean = true,
 ): Promise<void> {
-  logger.info('PROFILE', `Processing following list of @${seedUsername}`);
+	logger.info("PROFILE", `Processing following list of @${seedUsername}`);
 
-  // Navigate to seed profile
-  try {
-    logger.debug('NAVIGATION', `Navigating to seed profile @${seedUsername}`);
-    const status = await navigateToProfileAndCheck(page, seedUsername, {
-      timeout: 15000,
-    });
+	// Navigate to seed profile
+	try {
+		logger.debug("NAVIGATION", `Navigating to seed profile @${seedUsername}`);
+		const status = await navigateToProfileAndCheck(page, seedUsername, {
+			timeout: 15000,
+		});
 
-    if (status.notFound || status.isPrivate) {
-      const reason = status.notFound ? 'not found' : 'private';
-      logger.warn('PROFILE', `Seed profile @${seedUsername} is ${reason}`);
-      cycleManager.recordWarning(
-        status.notFound ? 'PROFILE_NOT_FOUND' : 'PROFILE_PRIVATE',
-        `Seed profile is ${reason}`,
-        seedUsername
-      );
-      return;
-    }
+		if (status.notFound || status.isPrivate) {
+			const reason = status.notFound ? "not found" : "private";
+			logger.warn("PROFILE", `Seed profile @${seedUsername} is ${reason}`);
+			cycleManager.recordWarning(
+				status.notFound ? "PROFILE_NOT_FOUND" : "PROFILE_PRIVATE",
+				`Seed profile is ${reason}`,
+				seedUsername,
+			);
+			return;
+		}
 
-    // Ensure we're logged in
-    await ensureLoggedIn(page);
-    logger.debug('AUTH', `Confirmed logged in for seed @${seedUsername}`);
-  } catch (err) {
-    recordError(err, `seed_profile_load_${seedUsername}`, seedUsername);
-    await logger.errorWithScreenshot(
-      'ERROR',
-      `Failed to load seed profile @${seedUsername}: ${
-        err instanceof Error ? err.message : String(err)
-      }`,
-      page,
-      `seed_profile_load_${seedUsername}`
-    );
-    return;
-  }
+		// Ensure we're logged in
+		await ensureLoggedIn(page);
+		logger.debug("AUTH", `Confirmed logged in for seed @${seedUsername}`);
+	} catch (err) {
+		recordError(err, `seed_profile_load_${seedUsername}`, seedUsername);
+		await logger.errorWithScreenshot(
+			"ERROR",
+			`Failed to load seed profile @${seedUsername}: ${
+				err instanceof Error ? err.message : String(err)
+			}`,
+			page,
+			`seed_profile_load_${seedUsername}`,
+		);
+		return;
+	}
 
-  // Open following modal
-  logger.debug('NAVIGATION', `Opening following modal for @${seedUsername}`);
-  const modalOpened = await openFollowingModal(page);
-  if (!modalOpened) {
-    recordError(
-      'Modal opening failed',
-      `modal_open_${seedUsername}`,
-      seedUsername
-    );
-    await logger.errorWithScreenshot(
-      'ERROR',
-      `Could not open following modal for @${seedUsername}`,
-      page,
-      `modal_open_${seedUsername}`
-    );
-    return;
-  }
-  logger.debug('NAVIGATION', `Following modal opened successfully`);
+	// Open following modal
+	logger.debug("NAVIGATION", `Opening following modal for @${seedUsername}`);
+	const modalOpened = await openFollowingModal(page);
+	if (!modalOpened) {
+		recordError(
+			"Modal opening failed",
+			`modal_open_${seedUsername}`,
+			seedUsername,
+		);
+		await logger.errorWithScreenshot(
+			"ERROR",
+			`Could not open following modal for @${seedUsername}`,
+			page,
+			`modal_open_${seedUsername}`,
+		);
+		return;
+	}
+	logger.debug("NAVIGATION", `Following modal opened successfully`);
 
-  // Get current scroll index
-  let scrollIndex = getScrollIndex(seedUsername);
-  logger.debug('NAVIGATION', `Starting from scroll index: ${scrollIndex}`);
+	// Get current scroll index
+	let scrollIndex = getScrollIndex(seedUsername);
+	logger.debug("NAVIGATION", `Starting from scroll index: ${scrollIndex}`);
 
-  // If we've scrolled before, scroll to that position
-  if (scrollIndex > 0) {
-    logger.debug('NAVIGATION', `Scrolling to position ${scrollIndex}...`);
-    for (let i = 0; i < Math.floor(scrollIndex / 500); i++) {
-      await scrollFollowingModal(page, 500);
-    }
-    await sleep(2000);
-  }
+	// If we've scrolled before, scroll to that position
+	if (scrollIndex > 0) {
+		logger.debug("NAVIGATION", `Scrolling to position ${scrollIndex}...`);
+		for (let i = 0; i < Math.floor(scrollIndex / 500); i++) {
+			await scrollFollowingModal(page, 500);
+		}
+		await sleep(2000);
+	}
 
-  let processedInBatch = 0;
-  const batchSize = 10;
-  let consecutiveAllVisited = 0;
-  const maxConsecutiveAllVisited = 3;
+	let processedInBatch = 0;
+	const batchSize = 10;
+	let consecutiveAllVisited = 0;
+	const maxConsecutiveAllVisited = 3;
 
-  while (consecutiveAllVisited < maxConsecutiveAllVisited && shouldContinue()) {
-    try {
-      // Extract usernames from modal
-      logger.debug('NAVIGATION', `Extracting batch of ${batchSize} usernames`);
-      const usernames = await extractFollowingUsernames(page, batchSize);
+	while (consecutiveAllVisited < maxConsecutiveAllVisited && shouldContinue()) {
+		try {
+			// Extract usernames from modal
+			logger.debug("NAVIGATION", `Extracting batch of ${batchSize} usernames`);
+			const usernames = await extractFollowingUsernames(page, batchSize);
 
-      if (usernames.length === 0) {
-        logger.debug('NAVIGATION', 'No more usernames in modal');
-        // Take screenshot to debug empty username extraction
-        await logger.errorWithScreenshot(
-          'DEBUG',
-          `No usernames found in modal for @${seedUsername} at scroll position ${scrollIndex}`,
-          page,
-          `empty_usernames_${seedUsername}_${scrollIndex}`
-        );
-        break;
-      }
+			if (usernames.length === 0) {
+				logger.debug("NAVIGATION", "No more usernames in modal");
+				// Take screenshot to debug empty username extraction
+				await logger.errorWithScreenshot(
+					"DEBUG",
+					`No usernames found in modal for @${seedUsername} at scroll position ${scrollIndex}`,
+					page,
+					`empty_usernames_${seedUsername}_${scrollIndex}`,
+				);
+				break;
+			}
 
-      logger.info(
-        'QUEUE',
-        `Processing batch ${Math.floor(scrollIndex / 500) + 1} with ${
-          usernames.length
-        } profiles (scroll position: ${scrollIndex})`
-      );
-      for (const u of usernames) {
-        logger.debug('QUEUE', `  - @${u}`);
-      }
+			logger.info(
+				"QUEUE",
+				`Processing batch ${Math.floor(scrollIndex / 500) + 1} with ${
+					usernames.length
+				} profiles (scroll position: ${scrollIndex})`,
+			);
+			for (const u of usernames) {
+				logger.debug("QUEUE", `  - @${u}`);
+			}
 
-      // Process each username
-      let allVisited = true;
-      for (const username of usernames) {
-        if (!wasVisited(username)) {
-          allVisited = false;
+			// Process each username
+			let allVisited = true;
+			for (const username of usernames) {
+				if (!wasVisited(username)) {
+					allVisited = false;
 
-          // Close the modal before visiting profile
-          logger.debug('NAVIGATION', `Closing modal to visit @${username}`);
-          await page.keyboard.press('Escape');
-          await sleep(1000); // brief delay after modal close
+					// Close the modal before visiting profile
+					logger.debug("NAVIGATION", `Closing modal to visit @${username}`);
+					await page.keyboard.press("Escape");
+					await sleep(1000); // brief delay after modal close
 
-          try {
-            await processProfile(
-              username,
-              page,
-              `following_of_${seedUsername}`,
-              metricsTracker,
-              sendDM
-            );
-            processedInBatch++;
-          } catch (profileError) {
-            recordError(
-              profileError,
-              `profile_processing_${username}`,
-              username
-            );
-            logger.warn(
-              'ERROR',
-              `Failed to process @${username}, continuing...`
-            );
-            await logger.errorWithScreenshot(
-              'ERROR',
-              `Profile processing failed for @${username}: ${
-                profileError instanceof Error
-                  ? profileError.message
-                  : String(profileError)
-              }`,
-              page,
-              `profile_processing_failed_${username}`
-            );
-          }
+					try {
+						await processProfile(
+							username,
+							page,
+							`following_of_${seedUsername}`,
+							metricsTracker,
+							sendDM,
+						);
+						processedInBatch++;
+					} catch (profileError) {
+						recordError(
+							profileError,
+							`profile_processing_${username}`,
+							username,
+						);
+						logger.warn(
+							"ERROR",
+							`Failed to process @${username}, continuing...`,
+						);
+						await logger.errorWithScreenshot(
+							"ERROR",
+							`Profile processing failed for @${username}: ${
+								profileError instanceof Error
+									? profileError.message
+									: String(profileError)
+							}`,
+							page,
+							`profile_processing_failed_${username}`,
+						);
+					}
 
-          // Re-open the following modal
-          logger.debug('NAVIGATION', `Re-opening following modal`);
-          const status = await navigateToProfileAndCheck(page, seedUsername, {
-            timeout: 15000,
-          });
-          if (!status.notFound && !status.isPrivate) {
-            await openFollowingModal(page);
+					// Re-open the following modal
+					logger.debug("NAVIGATION", `Re-opening following modal`);
+					const status = await navigateToProfileAndCheck(page, seedUsername, {
+						timeout: 15000,
+					});
+					if (!status.notFound && !status.isPrivate) {
+						await openFollowingModal(page);
 
-            // Scroll back to position if needed
-            if (scrollIndex > 0) {
-              logger.debug(
-                'NAVIGATION',
-                `Scrolling back to position ${scrollIndex}...`
-              );
-              for (let i = 0; i < Math.floor(scrollIndex / 500); i++) {
-                await scrollFollowingModal(page, 500);
-              }
-              await sleep(2000);
-            }
-          } else {
-            logger.warn(
-              'NAVIGATION',
-              `Failed to re-open modal for @${seedUsername}`
-            );
-            await logger.errorWithScreenshot(
-              'ERROR',
-              `Failed to re-open following modal for @${seedUsername} after profile visit`,
-              page,
-              `modal_reopen_failed_${seedUsername}`
-            );
-          }
-        } else {
-          logger.debug('PROFILE', `@${username} already visited, skipping`);
-        }
-      }
+						// Scroll back to position if needed
+						if (scrollIndex > 0) {
+							logger.debug(
+								"NAVIGATION",
+								`Scrolling back to position ${scrollIndex}...`,
+							);
+							for (let i = 0; i < Math.floor(scrollIndex / 500); i++) {
+								await scrollFollowingModal(page, 500);
+							}
+							await sleep(2000);
+						}
+					} else {
+						logger.warn(
+							"NAVIGATION",
+							`Failed to re-open modal for @${seedUsername}`,
+						);
+						await logger.errorWithScreenshot(
+							"ERROR",
+							`Failed to re-open following modal for @${seedUsername} after profile visit`,
+							page,
+							`modal_reopen_failed_${seedUsername}`,
+						);
+					}
+				} else {
+					logger.debug("PROFILE", `@${username} already visited, skipping`);
+				}
+			}
 
-      // If all in batch were already visited, scroll for more
-      if (allVisited) {
-        consecutiveAllVisited++;
-        logger.debug(
-          'NAVIGATION',
-          `All profiles in batch already visited (${consecutiveAllVisited}/${maxConsecutiveAllVisited})`
-        );
-        await scrollFollowingModal(page, 500);
-        scrollIndex += 500;
-        updateScrollIndex(seedUsername, scrollIndex);
-        await sleep(2000);
-      } else {
-        consecutiveAllVisited = 0;
-        // Processed new profiles, continue with next batch
-      }
+			// If all in batch were already visited, scroll for more
+			if (allVisited) {
+				consecutiveAllVisited++;
+				logger.debug(
+					"NAVIGATION",
+					`All profiles in batch already visited (${consecutiveAllVisited}/${maxConsecutiveAllVisited})`,
+				);
+				await scrollFollowingModal(page, 500);
+				scrollIndex += 500;
+				updateScrollIndex(seedUsername, scrollIndex);
+				await sleep(2000);
+			} else {
+				consecutiveAllVisited = 0;
+				// Processed new profiles, continue with next batch
+			}
 
-      // Safety: don't process too many in one go
-      if (processedInBatch >= 50) {
-        logger.warn('PROFILE', 'Processed 50 profiles, pausing...');
-        break;
-      }
-    } catch (err) {
-      recordError(
-        err,
-        `following_batch_processing_${seedUsername}`,
-        seedUsername
-      );
-      logger.error(
-        'ERROR',
-        `Batch processing failed for @${seedUsername}, stopping`
-      );
-      await logger.errorWithScreenshot(
-        'ERROR',
-        `Batch processing failed for @${seedUsername}: ${
-          err instanceof Error ? err.message : String(err)
-        }`,
-        page,
-        `batch_processing_failed_${seedUsername}`
-      );
-      break;
-    }
-  }
+			// Safety: don't process too many in one go
+			if (processedInBatch >= 50) {
+				logger.warn("PROFILE", "Processed 50 profiles, pausing...");
+				break;
+			}
+		} catch (err) {
+			recordError(
+				err,
+				`following_batch_processing_${seedUsername}`,
+				seedUsername,
+			);
+			logger.error(
+				"ERROR",
+				`Batch processing failed for @${seedUsername}, stopping`,
+			);
+			await logger.errorWithScreenshot(
+				"ERROR",
+				`Batch processing failed for @${seedUsername}: ${
+					err instanceof Error ? err.message : String(err)
+				}`,
+				page,
+				`batch_processing_failed_${seedUsername}`,
+			);
+			break;
+		}
+	}
 
-  logger.info(
-    'PROFILE',
-    `Finished processing following list of @${seedUsername}`
-  );
-  logger.info('PROFILE', `Processed ${processedInBatch} new profiles`);
+	logger.info(
+		"PROFILE",
+		`Finished processing following list of @${seedUsername}`,
+	);
+	logger.info("PROFILE", `Processed ${processedInBatch} new profiles`);
 }
 
 /**
  * Run the main scrape loop
  */
 export async function runScrapeLoop(
-  page: Page,
-  metricsTracker?: MetricsTracker
+	page: Page,
+	metricsTracker?: MetricsTracker,
 ): Promise<void> {
-  let dmsSent = 0;
-  let seedsProcessed = 0;
+	let dmsSent = 0;
+	let seedsProcessed = 0;
 
-  logger.info('CYCLE', 'Starting main scrape loop');
+	logger.info("CYCLE", "Starting main scrape loop");
 
-  while (dmsSent < MAX_DMS_PER_DAY && shouldContinue()) {
-    // Get next profile from queue
-    const target = queueNext();
+	while (dmsSent < MAX_DMS_PER_DAY && shouldContinue()) {
+		// Get next profile from queue
+		const target = queueNext();
 
-    if (!target) {
-      const [waitMin, waitMax] = getDelay('queue_empty');
-      const waitTime = waitMin + Math.random() * (waitMax - waitMin);
-      logger.debug(
-        'QUEUE',
-        `Queue empty - sleeping ${Math.floor(waitTime)}s...`
-      );
-      await sleep(waitTime * 1000);
-      continue;
-    }
+		if (!target) {
+			const [waitMin, waitMax] = getDelay("queue_empty");
+			const waitTime = waitMin + Math.random() * (waitMax - waitMin);
+			logger.debug(
+				"QUEUE",
+				`Queue empty - sleeping ${Math.floor(waitTime)}s...`,
+			);
+			await sleep(waitTime * 1000);
+			continue;
+		}
 
-    seedsProcessed++;
-    logger.info('QUEUE', `Queue: ${queueCount()} remaining`);
-    logger.info('SEED', `Processing seed #${seedsProcessed}: @${target}`);
+		seedsProcessed++;
+		logger.info("QUEUE", `Queue: ${queueCount()} remaining`);
+		logger.info("SEED", `Processing seed #${seedsProcessed}: @${target}`);
 
-    try {
-      // Process their following list
-      await processFollowingList(target, page, metricsTracker, true); // sendDM = true
-    } catch (err) {
-      recordError(err, `seed_processing_${target}`, target);
-      logger.error(
-        'ERROR',
-        `Failed to process seed @${target}, continuing to next`
-      );
-      // Note: Screenshot will be taken by processFollowingList if it fails
-    }
+		try {
+			// Process their following list
+			await processFollowingList(target, page, metricsTracker, true); // sendDM = true
+		} catch (err) {
+			recordError(err, `seed_processing_${target}`, target);
+			logger.error(
+				"ERROR",
+				`Failed to process seed @${target}, continuing to next`,
+			);
+			// Note: Screenshot will be taken by processFollowingList if it fails
+		}
 
-    // Print stats
-    const stats = getStats();
-    logger.info(
-      'STATS',
-      `Progress: Visited ${stats.total_visited} | Creators: ${stats.confirmed_creators} | DMs: ${stats.dms_sent} | Queue: ${stats.queue_size}`
-    );
+		// Print stats
+		const stats = getStats();
+		logger.info(
+			"STATS",
+			`Progress: Visited ${stats.total_visited} | Creators: ${stats.confirmed_creators} | DMs: ${stats.dms_sent} | Queue: ${stats.queue_size}`,
+		);
 
-    dmsSent = stats.dms_sent;
+		dmsSent = stats.dms_sent;
 
-    // Check if we've hit DM limit
-    if (dmsSent >= MAX_DMS_PER_DAY) {
-      logger.info('LIMIT', `Reached daily DM limit (${MAX_DMS_PER_DAY})`);
-      break;
-    }
+		// Check if we've hit DM limit
+		if (dmsSent >= MAX_DMS_PER_DAY) {
+			logger.info("LIMIT", `Reached daily DM limit (${MAX_DMS_PER_DAY})`);
+			break;
+		}
 
-    // Long delay between seed profiles
-    const [seedDelayMin, seedDelayMax] = getDelay('between_seeds');
-    const seedWait =
-      seedDelayMin + Math.random() * (seedDelayMax - seedDelayMin);
-    logger.debug(
-      'DELAY',
-      `Waiting ${Math.floor(seedWait)}s before next seed...`
-    );
-    await sleep(seedWait * 1000);
-  }
+		// Long delay between seed profiles
+		const [seedDelayMin, seedDelayMax] = getDelay("between_seeds");
+		const seedWait =
+			seedDelayMin + Math.random() * (seedDelayMax - seedDelayMin);
+		logger.debug(
+			"DELAY",
+			`Waiting ${Math.floor(seedWait)}s before next seed...`,
+		);
+		await sleep(seedWait * 1000);
+	}
 
-  const stats = getStats();
-  logger.info(
-    'STATS',
-    `Session complete! Total visited: ${stats.total_visited}`
-  );
-  logger.info('STATS', `Confirmed creators: ${stats.confirmed_creators}`);
-  logger.info('STATS', `DMs sent: ${stats.dms_sent}`);
-  logger.info('STATS', `Seeds processed: ${seedsProcessed}`);
+	const stats = getStats();
+	logger.info(
+		"STATS",
+		`Session complete! Total visited: ${stats.total_visited}`,
+	);
+	logger.info("STATS", `Confirmed creators: ${stats.confirmed_creators}`);
+	logger.info("STATS", `DMs sent: ${stats.dms_sent}`);
+	logger.info("STATS", `Seeds processed: ${seedsProcessed}`);
 
-  // Log cycle summary
-  const cycleStatus = dmsSent >= MAX_DMS_PER_DAY ? 'COMPLETED' : 'INTERRUPTED';
-  endCycle(cycleStatus, {
-    seedsProcessed,
-    finalStats: stats,
-    reason:
-      dmsSent >= MAX_DMS_PER_DAY ? 'DM limit reached' : 'Cycle interrupted',
-  });
+	// Log cycle summary
+	const cycleStatus = dmsSent >= MAX_DMS_PER_DAY ? "COMPLETED" : "INTERRUPTED";
+	endCycle(cycleStatus, {
+		seedsProcessed,
+		finalStats: stats,
+		reason:
+			dmsSent >= MAX_DMS_PER_DAY ? "DM limit reached" : "Cycle interrupted",
+	});
 }
 
 /**
@@ -906,79 +957,79 @@ export async function runScrapeLoop(
  * Only discovers and follows creators, skips DM engagement
  */
 export async function runScrapeLoopWithoutDM(
-  page: Page,
-  metricsTracker?: MetricsTracker
+	page: Page,
+	metricsTracker?: MetricsTracker,
 ): Promise<void> {
-  let seedsProcessed = 0;
+	let seedsProcessed = 0;
 
-  logger.info('CYCLE', 'Starting main scrape loop (no DM mode)');
+	logger.info("CYCLE", "Starting main scrape loop (no DM mode)");
 
-  while (shouldContinue()) {
-    // Get next profile from queue
-    const target = queueNext();
+	while (shouldContinue()) {
+		// Get next profile from queue
+		const target = queueNext();
 
-    if (!target) {
-      const [waitMin, waitMax] = getDelay('queue_empty');
-      const waitTime = waitMin + Math.random() * (waitMax - waitMin);
-      logger.debug(
-        'QUEUE',
-        `Queue empty - sleeping ${Math.floor(waitTime)}s...`
-      );
-      await sleep(waitTime * 1000);
-      continue;
-    }
+		if (!target) {
+			const [waitMin, waitMax] = getDelay("queue_empty");
+			const waitTime = waitMin + Math.random() * (waitMax - waitMin);
+			logger.debug(
+				"QUEUE",
+				`Queue empty - sleeping ${Math.floor(waitTime)}s...`,
+			);
+			await sleep(waitTime * 1000);
+			continue;
+		}
 
-    seedsProcessed++;
-    logger.info('QUEUE', `Queue: ${queueCount()} remaining`);
-    logger.info(
-      'SEED',
-      `Processing seed #${seedsProcessed}: @${target} (no DM mode)`
-    );
+		seedsProcessed++;
+		logger.info("QUEUE", `Queue: ${queueCount()} remaining`);
+		logger.info(
+			"SEED",
+			`Processing seed #${seedsProcessed}: @${target} (no DM mode)`,
+		);
 
-    try {
-      // Process their following list
-      await processFollowingList(target, page, metricsTracker, false); // sendDM = false
-    } catch (err) {
-      recordError(err, `seed_processing_${target}`, target);
-      logger.error(
-        'ERROR',
-        `Failed to process seed @${target}, continuing to next`
-      );
-      // Note: Screenshot will be taken by processFollowingList if it fails
-    }
+		try {
+			// Process their following list
+			await processFollowingList(target, page, metricsTracker, false); // sendDM = false
+		} catch (err) {
+			recordError(err, `seed_processing_${target}`, target);
+			logger.error(
+				"ERROR",
+				`Failed to process seed @${target}, continuing to next`,
+			);
+			// Note: Screenshot will be taken by processFollowingList if it fails
+		}
 
-    // Print stats (without DM count)
-    const stats = getStats();
-    logger.info(
-      'STATS',
-      `Progress: Visited ${stats.total_visited} | Creators: ${stats.confirmed_creators} | Queue: ${stats.queue_size}`
-    );
+		// Print stats (without DM count)
+		const stats = getStats();
+		logger.info(
+			"STATS",
+			`Progress: Visited ${stats.total_visited} | Creators: ${stats.confirmed_creators} | Queue: ${stats.queue_size}`,
+		);
 
-    // Long delay between seed profiles
-    const [seedDelayMin, seedDelayMax] = getDelay('between_seeds');
-    const seedWait =
-      seedDelayMin + Math.random() * (seedDelayMax - seedDelayMin);
-    logger.debug(
-      'DELAY',
-      `Waiting ${Math.floor(seedWait)}s before next seed...`
-    );
-    await sleep(seedWait * 1000);
-  }
+		// Long delay between seed profiles
+		const [seedDelayMin, seedDelayMax] = getDelay("between_seeds");
+		const seedWait =
+			seedDelayMin + Math.random() * (seedDelayMax - seedDelayMin);
+		logger.debug(
+			"DELAY",
+			`Waiting ${Math.floor(seedWait)}s before next seed...`,
+		);
+		await sleep(seedWait * 1000);
+	}
 
-  const stats = getStats();
-  logger.info(
-    'STATS',
-    `Discovery session complete! Total visited: ${stats.total_visited}`
-  );
-  logger.info('STATS', `Confirmed creators: ${stats.confirmed_creators}`);
-  logger.info('STATS', `Seeds processed: ${seedsProcessed}`);
+	const stats = getStats();
+	logger.info(
+		"STATS",
+		`Discovery session complete! Total visited: ${stats.total_visited}`,
+	);
+	logger.info("STATS", `Confirmed creators: ${stats.confirmed_creators}`);
+	logger.info("STATS", `Seeds processed: ${seedsProcessed}`);
 
-  // Log cycle summary
-  endCycle('COMPLETED_DISCOVERY', {
-    seedsProcessed,
-    finalStats: stats,
-    reason: 'Discovery mode completed',
-  });
+	// Log cycle summary
+	endCycle("COMPLETED_DISCOVERY", {
+		seedsProcessed,
+		finalStats: stats,
+		reason: "Discovery mode completed",
+	});
 }
 
 /**
@@ -986,97 +1037,97 @@ export async function runScrapeLoopWithoutDM(
  * @param debug - If true, enables logging output
  */
 export async function scrape(debug: boolean = false): Promise<void> {
-  logger.info(
-    'ACTION',
-    '🚀 Scout - Instagram Patreon Creator Discovery Agent'
-  );
-  logger.info('SYSTEM', `Debug mode: ${debug}`);
+	logger.info(
+		"ACTION",
+		"🚀 Scout - Instagram Patreon Creator Discovery Agent",
+	);
+	logger.info("SYSTEM", `Debug mode: ${debug}`);
 
-  // Initialize metrics tracking
-  const metricsTracker = getGlobalMetricsTracker();
-  logger.info(
-    'METRICS',
-    `Started session tracking: ${metricsTracker.getSessionId()}`
-  );
+	// Initialize metrics tracking
+	const metricsTracker = getGlobalMetricsTracker();
+	logger.info(
+		"METRICS",
+		`Started session tracking: ${metricsTracker.getSessionId()}`,
+	);
 
-  let browser: Browser | null = null;
-  let cycleId: string | null = null;
+	let browser: Browser | null = null;
+	let cycleId: string | null = null;
 
-  try {
-    // Connect to browser
-    logger.info('ACTION', 'Connecting to browser...');
-    browser = await createBrowser({ headless: true });
-    const page = await createPage(browser);
-    logger.info('ACTION', 'Browser connected successfully');
+	try {
+		// Connect to browser
+		logger.info("ACTION", "Connecting to browser...");
+		browser = await createBrowser({ headless: true });
+		const page = await createPage(browser);
+		logger.info("ACTION", "Browser connected successfully");
 
-    // Login (will use saved session if available)
-    logger.info('ACTION', 'Logging in to Instagram...');
-    await ensureLoggedIn(page);
-    logger.info('ACTION', '✅ Logged in successfully!');
+		// Login (will use saved session if available)
+		logger.info("ACTION", "Logging in to Instagram...");
+		await ensureLoggedIn(page);
+		logger.info("ACTION", "✅ Logged in successfully!");
 
-    // Load seeds
-    const seedsLoaded = loadSeeds();
-    if (seedsLoaded === 0) {
-      logger.warn('QUEUE', '❌ No seeds.txt found or no seeds loaded!');
-      endCycle('FAILED', 'No seeds loaded');
-      await browser.close();
-      return;
-    }
-    logger.info('QUEUE', `📋 Loaded ${seedsLoaded} seeds`);
+		// Load seeds
+		const seedsLoaded = loadSeeds();
+		if (seedsLoaded === 0) {
+			logger.warn("QUEUE", "❌ No seeds.txt found or no seeds loaded!");
+			endCycle("FAILED", "No seeds loaded");
+			await browser.close();
+			return;
+		}
+		logger.info("QUEUE", `📋 Loaded ${seedsLoaded} seeds`);
 
-    // Start cycle tracking
-    cycleId = startCycle('batch_scraping', seedsLoaded * 50); // Estimate profiles to process
-    logger.info(
-      'CYCLE',
-      `Started cycle ${cycleId} with estimated ${seedsLoaded * 50} profiles`
-    );
+		// Start cycle tracking
+		cycleId = startCycle("batch_scraping", seedsLoaded * 50); // Estimate profiles to process
+		logger.info(
+			"CYCLE",
+			`Started cycle ${cycleId} with estimated ${seedsLoaded * 50} profiles`,
+		);
 
-    // Run main processing loop
-    await runScrapeLoop(page, metricsTracker);
+		// Run main processing loop
+		await runScrapeLoop(page, metricsTracker);
 
-    // End metrics session
-    metricsTracker.endSession();
-    const finalMetrics = metricsTracker.getSessionMetrics();
-    logger.info(
-      'METRICS',
-      `✅ Session completed - Profiles: ${finalMetrics.profilesVisited}, Creators: ${finalMetrics.creatorsFound}, DMs: ${finalMetrics.dmsSent}`
-    );
+		// End metrics session
+		metricsTracker.endSession();
+		const finalMetrics = metricsTracker.getSessionMetrics();
+		logger.info(
+			"METRICS",
+			`✅ Session completed - Profiles: ${finalMetrics.profilesVisited}, Creators: ${finalMetrics.creatorsFound}, DMs: ${finalMetrics.dmsSent}`,
+		);
 
-    endCycle('COMPLETED');
-    await browser.close();
-    logger.info('ACTION', '🎉 Scraping session completed successfully');
-  } catch (err) {
-    const errorMessage = err instanceof Error ? err.message : String(err);
-    recordError(err, 'scrape_fatal_error');
+		endCycle("COMPLETED");
+		await browser.close();
+		logger.info("ACTION", "🎉 Scraping session completed successfully");
+	} catch (err) {
+		const errorMessage = err instanceof Error ? err.message : String(err);
+		recordError(err, "scrape_fatal_error");
 
-    endCycle('FAILED', errorMessage);
+		endCycle("FAILED", errorMessage);
 
-    logger.error('FATAL', `💥 Fatal error in scrape: ${errorMessage}`);
+		logger.error("FATAL", `💥 Fatal error in scrape: ${errorMessage}`);
 
-    if (browser) {
-      try {
-        logger.debug('SYSTEM', 'Attempting to take fatal error screenshot...');
-        const page = await browser.newPage().catch(() => null);
-        if (page) {
-          await logger.errorWithScreenshot(
-            'ERROR',
-            `Fatal error in scrape: ${errorMessage}`,
-            page,
-            'scrape_fatal_error'
-          );
-        }
-      } catch (screenshotError) {
-        logger.error(
-          'ERROR',
-          `Failed to take fatal error screenshot: ${screenshotError}`
-        );
-      }
-      await browser.close();
-    } else {
-      console.error('💥 Fatal error before browser creation:', err);
-    }
-    throw err;
-  }
+		if (browser) {
+			try {
+				logger.debug("SYSTEM", "Attempting to take fatal error screenshot...");
+				const page = await browser.newPage().catch(() => null);
+				if (page) {
+					await logger.errorWithScreenshot(
+						"ERROR",
+						`Fatal error in scrape: ${errorMessage}`,
+						page,
+						"scrape_fatal_error",
+					);
+				}
+			} catch (screenshotError) {
+				logger.error(
+					"ERROR",
+					`Failed to take fatal error screenshot: ${screenshotError}`,
+				);
+			}
+			await browser.close();
+		} else {
+			console.error("💥 Fatal error before browser creation:", err);
+		}
+		throw err;
+	}
 }
 
 /**
@@ -1085,120 +1136,153 @@ export async function scrape(debug: boolean = false): Promise<void> {
  * @param debug - If true, enables logging output
  */
 export async function scrapeWithoutDM(debug: boolean = false): Promise<void> {
-  logger.info(
-    'ACTION',
-    '🔍 Scout - Instagram Patreon Creator Discovery Agent (Discovery Mode - No DMs)'
-  );
-  logger.info('SYSTEM', `Debug mode: ${debug}`);
+	logger.info(
+		"ACTION",
+		"🔍 Scout - Instagram Patreon Creator Discovery Agent (Discovery Mode - No DMs)",
+	);
+	logger.info("SYSTEM", `Debug mode: ${debug}`);
 
-  // Initialize metrics tracking
-  const metricsTracker = getGlobalMetricsTracker();
-  logger.info(
-    'METRICS',
-    `Started discovery session tracking: ${metricsTracker.getSessionId()}`
-  );
+	// Initialize metrics tracking
+	const metricsTracker = getGlobalMetricsTracker();
+	logger.info(
+		"METRICS",
+		`Started discovery session tracking: ${metricsTracker.getSessionId()}`,
+	);
 
-  let browser: Browser | null = null;
-  let cycleId: string | null = null;
+	let browser: Browser | null = null;
+	let cycleId: string | null = null;
 
-  try {
-    // Connect to browser
-    logger.info('ACTION', 'Connecting to browser...');
-    browser = await createBrowser({ headless: true });
-    const page = await createPage(browser);
-    logger.info('ACTION', 'Browser connected successfully');
+	try {
+		// Connect to browser (respect LOCAL_BROWSER setting for visibility)
+		const usingLocalBrowser = process.env.LOCAL_BROWSER === "true";
+		logger.info(
+			"ACTION",
+			`Connecting to browser (${usingLocalBrowser ? "visible" : "headless"})...`,
+		);
+		browser = await createBrowser({ headless: !usingLocalBrowser });
+		const page = await createPage(browser);
+		logger.info("ACTION", "Browser connected successfully");
 
-    // Login (will use saved session if available)
-    logger.info('ACTION', 'Logging in to Instagram...');
-    await ensureLoggedIn(page);
-    logger.info('ACTION', '✅ Logged in successfully!');
+		// Wait for browser window to be visible if using local browser
+		if (usingLocalBrowser) {
+			logger.info(
+				"ACTION",
+				"🖥️  Browser window should now be visible on your desktop!",
+			);
+			logger.info(
+				"ACTION",
+				"💡  Check ALL desktops/spaces if you don't see it",
+			);
+			logger.info(
+				"ACTION",
+				"⏳ Waiting 3 seconds for browser to fully load...",
+			);
 
-    // Load seeds
-    const seedsLoaded = loadSeeds();
-    if (seedsLoaded === 0) {
-      logger.warn('QUEUE', '❌ No seeds.txt found or no seeds loaded!');
-      endCycle('FAILED', 'No seeds loaded');
-      await browser.close();
-      return;
-    }
-    logger.info('QUEUE', `📋 Loaded ${seedsLoaded} seeds`);
+			// System notification for browser ready
+			try {
+				const { execSync } = await import("child_process");
+				execSync(
+					`osascript -e 'display notification "Browser window is ready for Instagram discovery" with title "Scout Discovery" subtitle "Check your desktop" sound name "Ping"'`,
+				);
+			} catch (e) {
+				// Ignore notification errors on non-macOS systems
+			}
 
-    // Start cycle tracking
-    cycleId = startCycle('batch_discovery', seedsLoaded * 50); // Estimate profiles to process
-    logger.info(
-      'CYCLE',
-      `Started discovery cycle ${cycleId} with estimated ${
-        seedsLoaded * 50
-      } profiles`
-    );
+			await new Promise((resolve) => setTimeout(resolve, 3000));
+			logger.info("ACTION", "✅ Continuing with scraping process...");
+		}
 
-    // Run main processing loop (WITHOUT DMs)
-    await runScrapeLoopWithoutDM(page, metricsTracker);
+		// Login (will use saved session if available)
+		logger.info("ACTION", "Logging in to Instagram...");
+		await ensureLoggedIn(page);
+		logger.info("ACTION", "✅ Logged in successfully!");
 
-    // End metrics session
-    metricsTracker.endSession();
-    const finalMetrics = metricsTracker.getSessionMetrics();
-    logger.info(
-      'METRICS',
-      `✅ Discovery session completed - Profiles: ${finalMetrics.profilesVisited}, Creators: ${finalMetrics.creatorsFound}`
-    );
+		// Load seeds
+		const seedsLoaded = loadSeeds();
+		if (seedsLoaded === 0) {
+			logger.warn("QUEUE", "❌ No seeds.txt found or no seeds loaded!");
+			endCycle("FAILED", "No seeds loaded");
+			await browser.close();
+			return;
+		}
+		logger.info("QUEUE", `📋 Loaded ${seedsLoaded} seeds`);
 
-    endCycle('COMPLETED_DISCOVERY');
-    await browser.close();
-    logger.info('ACTION', '🔍 Discovery session completed successfully');
-  } catch (err) {
-    const errorMessage = err instanceof Error ? err.message : String(err);
-    recordError(err, 'scrape_discovery_fatal_error');
+		// Start cycle tracking
+		cycleId = startCycle("batch_discovery", seedsLoaded * 50); // Estimate profiles to process
+		logger.info(
+			"CYCLE",
+			`Started discovery cycle ${cycleId} with estimated ${
+				seedsLoaded * 50
+			} profiles`,
+		);
 
-    endCycle('FAILED_DISCOVERY', errorMessage);
+		// Run main processing loop (WITHOUT DMs)
+		await runScrapeLoopWithoutDM(page, metricsTracker);
 
-    logger.error('FATAL', `💥 Fatal error in discovery mode: ${errorMessage}`);
+		// End metrics session
+		metricsTracker.endSession();
+		const finalMetrics = metricsTracker.getSessionMetrics();
+		logger.info(
+			"METRICS",
+			`✅ Discovery session completed - Profiles: ${finalMetrics.profilesVisited}, Creators: ${finalMetrics.creatorsFound}`,
+		);
 
-    if (browser) {
-      try {
-        logger.debug('SYSTEM', 'Attempting to take fatal error screenshot...');
-        const page = await browser.newPage().catch(() => null);
-        if (page) {
-          await logger.errorWithScreenshot(
-            'ERROR',
-            `Fatal error in discovery mode: ${errorMessage}`,
-            page,
-            'scrape_discovery_fatal_error'
-          );
-        }
-      } catch (screenshotError) {
-        logger.error(
-          'ERROR',
-          `Failed to take fatal error screenshot: ${screenshotError}`
-        );
-      }
-      await browser.close();
-    } else {
-      console.error('💥 Fatal error before browser creation:', err);
-    }
-    throw err;
-  }
+		endCycle("COMPLETED_DISCOVERY");
+		await browser.close();
+		logger.info("ACTION", "🔍 Discovery session completed successfully");
+	} catch (err) {
+		const errorMessage = err instanceof Error ? err.message : String(err);
+		recordError(err, "scrape_discovery_fatal_error");
+
+		endCycle("FAILED_DISCOVERY", errorMessage);
+
+		logger.error("FATAL", `💥 Fatal error in discovery mode: ${errorMessage}`);
+
+		if (browser) {
+			try {
+				logger.debug("SYSTEM", "Attempting to take fatal error screenshot...");
+				const page = await browser.newPage().catch(() => null);
+				if (page) {
+					await logger.errorWithScreenshot(
+						"ERROR",
+						`Fatal error in discovery mode: ${errorMessage}`,
+						page,
+						"scrape_discovery_fatal_error",
+					);
+				}
+			} catch (screenshotError) {
+				logger.error(
+					"ERROR",
+					`Failed to take fatal error screenshot: ${screenshotError}`,
+				);
+			}
+			await browser.close();
+		} else {
+			console.error("💥 Fatal error before browser creation:", err);
+		}
+		throw err;
+	}
 }
 
 // Run if executed directly
 if (
-  import.meta.url.endsWith(process.argv[1]?.replace(process.cwd(), '') || '')
+	import.meta.url.endsWith(process.argv[1]?.replace(process.cwd(), "") || "")
 ) {
-  const debug = process.argv.includes('--debug') || process.argv.includes('-d');
-  const noDM =
-    process.argv.includes('--no-dm') || process.argv.includes('--discovery');
+	const debug = process.argv.includes("--debug") || process.argv.includes("-d");
+	const noDM =
+		process.argv.includes("--no-dm") || process.argv.includes("--discovery");
 
-  if (noDM) {
-    console.log('🔍 Running in DISCOVERY MODE (no DMs will be sent)');
-    scrapeWithoutDM(debug).catch((err) => {
-      console.error(err);
-      process.exit(1);
-    });
-  } else {
-    console.log('🚀 Running in FULL MODE (will send DMs to creators)');
-    scrape(debug).catch((err) => {
-      console.error(err);
-      process.exit(1);
-    });
-  }
+	if (noDM) {
+		console.log("🔍 Running in DISCOVERY MODE (no DMs will be sent)");
+		scrapeWithoutDM(debug).catch((err) => {
+			console.error(err);
+			process.exit(1);
+		});
+	} else {
+		console.log("🚀 Running in FULL MODE (will send DMs to creators)");
+		scrape(debug).catch((err) => {
+			console.error(err);
+			process.exit(1);
+		});
+	}
 }
