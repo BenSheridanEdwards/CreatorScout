@@ -3,10 +3,11 @@ import { isConfirmedCreator } from "../vision/vision.ts";
 
 /**
  * Call the TypeScript vision pipeline for an image and return a normalized result.
+ * Only use when other analysis methods are inconclusive (confidence < 70%).
  */
 export async function classifyWithVision(
 	imagePath: string,
-	threshold: number = 70,
+	threshold: number = 60, // Lower threshold since vision is used as fallback
 ): Promise<{ ok: boolean; data: VisionData }> {
 	try {
 		const [isConfirmed, data] = await isConfirmedCreator(imagePath, threshold);

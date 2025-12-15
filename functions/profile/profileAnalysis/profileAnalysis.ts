@@ -13,6 +13,9 @@ import {
 import {
 	buildUniqueLinks,
 	hasDirectCreatorLink,
+	analyzeExternalLink,
+	shouldUseVisionAnalysis,
+	decodeInstagramRedirect,
 } from "../../extraction/linkExtraction/linkExtraction.ts";
 import { SKIP_VISION } from "../../shared/config/config.ts";
 import { snapshot } from "../../shared/snapshot/snapshot.ts";
@@ -165,19 +168,64 @@ export async function analyzeProfileComprehensive(
 		}
 	}
 
-	// Take profile screenshot for vision analysis
-	if (highlights.length > 0 || result.confidence > 0) {
+	// Analyze external links properly
+	const externalLinks = result.links
+		.map((link) => decodeInstagramRedirect(link)) // Decode Instagram redirects
+		.filter(
+			(link) =>
+				link && link.includes("http") && !link.includes("instagram.com"),
+		)
+		.filter((link, index, arr) => arr.indexOf(link) === index); // Remove duplicates
+
+	if (externalLinks.length > 0) {
+		result.indicators.push("External links in profile");
+
+		// Analyze each external link
+		for (const linkUrl of externalLinks) {
+			if (!linkUrl || result.confidence >= 70) break; // Stop if we already have high confidence
+
+			try {
+				const linkAnalysis = await analyzeExternalLink(page, linkUrl, username);
+
+				if (linkAnalysis.isCreator) {
+					result.isCreator = true;
+					result.confidence = Math.max(
+						result.confidence,
+						linkAnalysis.confidence,
+					);
+					result.indicators.push(...linkAnalysis.indicators);
+					result.reason = linkAnalysis.reason;
+
+					// Take screenshot of the link page for records
+					const linkScreenshot = await snapshot(
+						page,
+						`link_analysis_${username}`,
+					);
+					result.screenshots.push(linkScreenshot);
+				}
+			} catch (error) {
+				result.errors?.push(`Link analysis failed: ${error}`);
+			}
+		}
+	}
+
+	// Only use vision analysis if we're still unsure
+	const shouldUseVision = await shouldUseVisionAnalysis(
+		result.confidence,
+		externalLinks.length > 0,
+		result.highlights.length > 0,
+	);
+
+	if (shouldUseVision && !SKIP_VISION) {
 		try {
-			await page.evaluate(() => {
-				window.scrollTo(0, 0);
-			});
+			await page.evaluate(() => window.scrollTo(0, 0));
 			await sleep(1000);
 
 			const profileScreenshot = await snapshot(page, `profile_${username}`);
 			result.screenshots.push(profileScreenshot);
 
 			const visionResult = await analyzeProfile(profileScreenshot);
-			if (visionResult?.is_adult_creator) {
+			if (visionResult?.is_adult_creator && visionResult.confidence > 60) {
 				result.isCreator = true;
 				result.confidence = Math.max(
 					result.confidence,
@@ -188,20 +236,20 @@ export async function analyzeProfileComprehensive(
 				}
 				result.reason = visionResult.reason || "profile_vision";
 			}
-		} catch {
+		} catch (error) {
 			// Vision analysis failed, continue
 		}
 	}
 
-	// Direct Patreon shortcut
+	// Direct Patreon shortcut (fallback for backward compatibility)
 	if (hasDirectCreatorLink(result.links)) {
 		result.isCreator = true;
-		result.confidence = 90;
+		result.confidence = Math.max(result.confidence, 90);
 		result.reason = "direct_patreon_link";
 	}
 
-	// Final decision based on combined signals
-	if (!result.isCreator && result.confidence >= 50) {
+	// Final decision - require higher confidence threshold
+	if (!result.isCreator && result.confidence >= 70) {
 		result.isCreator = true;
 		result.reason = result.reason || "combined_signals";
 	}

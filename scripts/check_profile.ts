@@ -1,36 +1,22 @@
 /**
- * Reusable profile checker used by tests and app scripts.
- * Exposes runProfileCheck(username) that:
- *  - logs into Instagram (puppeteer + stealth)
- *  - loads profile, extracts bio + external links
- *  - follows link aggregators, screenshots, and calls Python vision pipeline
- * Returns structured result with reasons, indicators, confidence, and screenshots.
+ * Robust profile checker that uses updated core functions for comprehensive analysis.
  *
  * Usage:
- *   node scripts/check_profile.js --user username
+ *   node scripts/check_profile.js --user username [--debug]
  */
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import dotenv from "dotenv";
 import type { Browser } from "puppeteer";
 import {
-	collectAggregatorLinks,
-	hasDirectCreatorLink,
-	toSafeHttps,
-} from "../functions/extraction/linkExtraction/linkExtraction.ts";
-import {
 	createBrowser,
 	createPage,
 } from "../functions/navigation/browser/browser.ts";
-import {
-	ensureLoggedIn,
-	navigateToProfileAndCheck,
-} from "../functions/navigation/profileNavigation/profileNavigation.ts";
-import { classifyWithVision } from "../functions/profile/classifyWithVision/classifyWithVision.ts";
+import { login } from "../functions/auth/login/login.ts";
 import { analyzeProfileComprehensive } from "../functions/profile/profileAnalysis/profileAnalysis.ts";
 import { createLogger } from "../functions/shared/logger/logger.ts";
-import { snapshot } from "../functions/shared/snapshot/snapshot.ts";
 import type { ProfileCheckResult } from "../functions/shared/types/types.ts";
+import { IG_USER, IG_PASS } from "../functions/shared/config/config.ts";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -66,28 +52,40 @@ async function runProfileCheck(
 		const page = await createPage(browser);
 
 		logger.info("ACTION", "Logging in...");
-		await ensureLoggedIn(page);
+		const loginCreds = {
+			username: IG_USER || process.env.INSTAGRAM_USERNAME!,
+			password: IG_PASS || process.env.INSTAGRAM_PASSWORD!,
+		};
+		await login(page, loginCreds);
 		logger.info("ACTION", "Login complete");
 
 		logger.info("ACTION", `Navigating to profile @${username}...`);
-		const status = await navigateToProfileAndCheck(page, username, {
-			timeout: 20000,
-			waitForHeader: true,
+		await page.goto(`https://www.instagram.com/${username}/`, {
+			waitUntil: "networkidle2",
+			timeout: 30000,
 		});
 
-		if (status.notFound) {
+		// Check if profile exists
+		const isNotFound = await page.$(
+			'text="Sorry, this page isn\'t available."',
+		);
+		if (isNotFound) {
 			logger.warn("PROFILE", "Profile not found or unavailable");
 			result.errors.push("Profile not found or unavailable");
 			return result;
 		}
 
-		if (status.isPrivate) {
+		// Check if profile is private
+		const isPrivate = await page.$('text="This account is private"');
+		if (isPrivate) {
 			logger.warn("PROFILE", "Profile is private");
 			result.errors.push("Profile is private");
 			return result;
 		}
 
 		logger.info("ACTION", "Running comprehensive analysis...");
+
+		// Use the updated core function that handles all the complex logic
 		const analysis = await analyzeProfileComprehensive(page, username);
 
 		result.bio = analysis.bio;
@@ -98,110 +96,10 @@ async function runProfileCheck(
 		result.isCreator = analysis.isCreator;
 		result.reason = analysis.reason;
 
-		if (result.bio) {
-			logger.info(
-				"ANALYSIS",
-				`Bio: ${result.bio.substring(0, 100)}${
-					result.bio.length > 100 ? "..." : ""
-				}`,
-			);
-			logger.info("ANALYSIS", `Bio score: ${analysis.bioScore}`);
-		} else {
-			logger.warn("ANALYSIS", "No bio found");
-			const isLocal = process.env.HEADLESS === "false" || !process.env.CI;
-			if (isLocal) {
-				const shot = await snapshot(page, `bio_extraction_failed_${username}`);
-				result.screenshots.push(shot);
-				logger.info("SCREENSHOT", `Bio extraction screenshot: ${shot}`);
-			}
-		}
-
-		if (analysis.stats) {
-			logger.info(
-				"ANALYSIS",
-				`Followers: ${analysis.stats.followers ?? "N/A"} | Following: ${
-					analysis.stats.following ?? "N/A"
-				} | Ratio: ${analysis.stats.ratio ?? "N/A"}`,
-			);
-		}
-
-		if (analysis.highlights.length > 0) {
-			logger.info(
-				"ANALYSIS",
-				`Highlights: ${analysis.highlights.map((h) => `"${h.title}"`).join(", ")}`,
-			);
-		}
-
-		if (result.links.length > 0) {
-			logger.info(
-				"ANALYSIS",
-				`Links (${result.links.length}): ${result.links.join(", ")}`,
-			);
-		}
-
-		if (hasDirectCreatorLink(result.links)) {
-			logger.info("ANALYSIS", "Direct creator link detected");
-		}
-
-		// Check link aggregators if still not confirmed
-		if (!result.isCreator && result.links.length) {
-			const aggregators = collectAggregatorLinks(result.links);
-			logger.info(
-				"ANALYSIS",
-				`Aggregator links to check: ${aggregators.length}`,
-			);
-
-			for (let i = 0; i < aggregators.length && !result.isCreator; i++) {
-				const safeUrl = toSafeHttps(aggregators[i]);
-				logger.info("ANALYSIS", `[${i + 1}/${aggregators.length}] ${safeUrl}`);
-
-				const extPage = await browser.newPage();
-				try {
-					const response = await extPage.goto(safeUrl, {
-						waitUntil: "networkidle2",
-						timeout: 15000,
-					});
-					const finalUrl = response?.url() || safeUrl;
-
-					if (finalUrl.toLowerCase().includes("patreon.com")) {
-						result.isCreator = true;
-						result.confidence = 90;
-						result.reason = "redirect_patreon";
-						logger.info("ANALYSIS", "Redirected to Patreon");
-						break;
-					}
-
-					const shot = await snapshot(extPage, `linkagg_${username}`);
-					result.screenshots.push(shot);
-					logger.info("SCREENSHOT", `Aggregator screenshot: ${shot}`);
-
-					const visionResult = await classifyWithVision(shot);
-					if (visionResult.ok) {
-						result.isCreator = true;
-						result.confidence = visionResult.data?.confidence || 70;
-						result.indicators = visionResult.data?.indicators || [];
-						result.reason = visionResult.data?.reason || "vision_detected";
-						logger.info(
-							"ANALYSIS",
-							`Vision confirmed creator (confidence: ${result.confidence}%)`,
-						);
-					} else {
-						logger.debug("ANALYSIS", "Vision did not confirm creator");
-					}
-				} catch (e) {
-					const message = e instanceof Error ? e.message : String(e);
-					logger.warn("ERROR", `Aggregator load failed: ${message}`);
-					result.errors.push(`Aggregator load failed: ${message}`);
-				} finally {
-					await extPage.close().catch(() => {});
-				}
-			}
-		}
-
 		if (result.isCreator) {
 			logger.info(
 				"ACTION",
-				`Flagged as creator (confidence: ${result.confidence}%, reason: ${result.reason})`,
+				`🎯 CONFIRMED CREATOR (confidence: ${result.confidence}%, reason: ${result.reason})`,
 			);
 		} else {
 			logger.info("ACTION", "Not confirmed as creator");
