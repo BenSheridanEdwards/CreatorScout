@@ -303,14 +303,12 @@ export async function processProfile(
 			// Record metrics for confirmed creator
 			if (metricsTracker) {
 				// Count vision API calls from comprehensive analysis
-				const visionCalls = analysis.indicators.filter(
-					(indicator) =>
-						indicator.includes("screenshot") || indicator.includes("vision"),
-				).length;
+				// Comprehensive analysis may use vision for low-confidence links or profile analysis
+				const visionCalls = analysis.screenshots.length; // Each screenshot likely involved vision analysis
 				for (let i = 0; i < visionCalls; i++) {
 					metricsTracker.recordVisionApiCall(0.001); // ~$0.001 per call
 				}
-				metricsTracker.recordCreatorFound(username, confidence, 1);
+				metricsTracker.recordCreatorFound(username, confidence, visionCalls);
 			}
 		}
 
@@ -318,7 +316,17 @@ export async function processProfile(
 		if (!confirmedCreator && confidence < CONFIDENCE_THRESHOLD) {
 			logger.debug(
 				"ANALYSIS",
-				`Confidence too low (${confidence} < ${CONFIDENCE_THRESHOLD}), skipping @${username}`,
+				`Profile @${username} analyzed but not a creator (confidence: ${confidence}%, threshold: ${CONFIDENCE_THRESHOLD})`,
+			);
+			cycleManager.recordProfileProcessed(username, false);
+			return;
+		}
+
+		// Log profiles that were analyzed but not confirmed as creators
+		if (!confirmedCreator) {
+			logger.info(
+				"ANALYSIS",
+				`Profile @${username} analyzed (confidence: ${confidence}%) but not confirmed as creator`,
 			);
 			cycleManager.recordProfileProcessed(username, false);
 			return;
@@ -332,10 +340,7 @@ export async function processProfile(
 		// If confirmed creator, take actions
 		if (confirmedCreator && confidence >= CONFIDENCE_THRESHOLD) {
 			const dmStatus = sendDM ? "" : " - SKIPPING DM";
-			const visionCalls = analysis.indicators.filter(
-				(indicator) =>
-					indicator.includes("screenshot") || indicator.includes("vision"),
-			).length;
+			const visionCalls = analysis.screenshots.length; // Each screenshot likely involved vision analysis
 
 			logger.info(
 				"ACTION",
