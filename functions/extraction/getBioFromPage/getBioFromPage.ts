@@ -6,6 +6,11 @@ const logger = createLogger(process.env.DEBUG_LOGS === "true");
 
 export async function getBioFromPage(page: Page): Promise<string | null> {
 	const selectors = [
+		// More robust selectors that don't rely on changing CSS classes
+		'header section div span[dir="auto"]',
+		'header section span[dir="auto"]',
+		'div[dir="auto"] span[dir="auto"]',
+		// Legacy selectors for backwards compatibility
 		"header section > div.-vDIg > span",
 		"header section span:not([class])",
 		'div[class*="biography"]',
