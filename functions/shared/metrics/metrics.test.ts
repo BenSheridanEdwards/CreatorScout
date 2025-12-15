@@ -679,11 +679,12 @@ describe("Metrics System Documentation", () => {
 			const timer = startTimer("async test");
 
 			// Simulate async work
-			await new Promise((resolve) => setTimeout(resolve, 10));
+			await new Promise((resolve) => setTimeout(resolve, 15));
 
 			const duration = timer.end();
 
-			expect(duration).toBeGreaterThan(0.01); // At least 10ms
+			expect(duration).toBeGreaterThanOrEqual(0.01); // At least 10ms (inclusive due to timer precision)
+			expect(duration).toBeLessThan(1.0); // Reasonable upper bound
 		});
 	});
 

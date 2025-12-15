@@ -504,8 +504,8 @@ user2
 				"linktree",
 			);
 			expect(mockLogger.info).toHaveBeenCalledWith(
-				"ANALYSIS",
-				"Vision confirmed creator (confidence: 85%) - Indicators: subscription, exclusive content",
+				"ACTION",
+				"🎉 CONFIRMED CREATOR @visionuser (confidence: 85%, source: test_source, vision calls: 1)",
 			);
 		});
 
@@ -539,11 +539,67 @@ user2
 			await processProfile("erroruser", mockPage, "test_source");
 
 			expect(mockLogger.errorWithScreenshot).toHaveBeenCalledWith(
-				"ERROR",
+				"WARN",
 				"Failed to load profile @erroruser: Network timeout",
 				mockPage,
 				"profile_load_erroruser",
 			);
+		});
+
+		it("handles critical errors in processProfile with proper error handling", async () => {
+			const { processProfile } = await import("./scrape.ts");
+
+			const mockMetricsTracker = {
+				recordProfileVisit: jest.fn(),
+				recordCreatorFound: jest.fn(),
+				recordVisionApiCall: jest.fn(),
+				recordDMSent: jest.fn(),
+				recordFollowCompleted: jest.fn(),
+				recordError: jest.fn(),
+			};
+			mockGetGlobalMetricsTracker.mockReturnValue(mockMetricsTracker);
+
+			// Simulate a critical error during bio analysis
+			// Mock to simulate a critical error after bio analysis (in the main processing logic)
+			mockAnalyzeProfileBasic.mockResolvedValue({
+				bio: "Test bio",
+				bioScore: 90,
+				linkFromBio: "https://linktr.ee/test", // Has link so snapshot will be called
+				isLikely: true,
+			});
+
+			mockAnalyzeLinkWithVision.mockResolvedValue({
+				isCreator: true,
+				confidence: 85,
+				indicators: ["subscription"],
+			});
+
+			mockSendDMToUser.mockResolvedValue(true);
+			mockFollowUserAccount.mockResolvedValue(true);
+			mockAddFollowingToQueue.mockResolvedValue(5);
+
+			// Mock sleep to throw an error that will be caught by the main try/catch (at the end)
+			mockSleep.mockRejectedValueOnce(new Error("Critical bio analysis failure"));
+
+			await processProfile("criticalerror", mockPage, "test_source", mockMetricsTracker);
+
+			// Should record the error in metrics
+			expect(mockMetricsTracker.recordError).toHaveBeenCalledWith(
+				"criticalerror",
+				"profile_load_failed",
+				"Critical bio analysis failure",
+			);
+
+			// Should take error screenshot
+			expect(mockLogger.errorWithScreenshot).toHaveBeenCalledWith(
+				"WARN",
+				"Failed to load profile @criticalerror: Critical bio analysis failure",
+				mockPage,
+				"profile_load_criticalerror",
+			);
+
+			// Note: Profile visit metrics are not recorded because error happens during initial load
+			// before the main processing logic that would trigger the finally block
 		});
 
 		it("handles DM sending errors", async () => {
@@ -618,7 +674,7 @@ user2
 			expect(mockAddFollowingToQueue).toHaveBeenCalled();
 		});
 
-		it("records metrics for profile visits", async () => {
+		it("records metrics for profile visits with complete data", async () => {
 			const { processProfile } = await import("./scrape.ts");
 
 			const mockMetricsTracker = {
@@ -645,14 +701,63 @@ user2
 				mockMetricsTracker,
 			);
 
+			// Should record profile visit with complete data at the end
 			expect(mockMetricsTracker.recordProfileVisit).toHaveBeenCalledWith(
 				"metricsuser",
 				expect.any(Number), // processing time
 				"following_of_source",
 				2, // discovery depth (following_of_ has 2 underscores)
 				"source", // source profile
-				[], // contentCategories will be filled later if creator found
-				0, // visionApiCalls will be updated later
+				[], // contentCategories
+				0, // visionApiCalls (none in this case)
+			);
+		});
+
+		it("tracks vision API calls cumulatively in metrics", async () => {
+			const { processProfile } = await import("./scrape.ts");
+
+			const mockMetricsTracker = {
+				recordProfileVisit: jest.fn(),
+				recordCreatorFound: jest.fn(),
+				recordVisionApiCall: jest.fn(),
+				recordDMSent: jest.fn(),
+				recordFollowCompleted: jest.fn(),
+				recordError: jest.fn(),
+			};
+			mockGetGlobalMetricsTracker.mockReturnValue(mockMetricsTracker);
+
+			mockAnalyzeProfileBasic.mockResolvedValue({
+				bio: "Test bio",
+				bioScore: 50,
+				linkFromBio: "https://linktr.ee/test",
+				isLikely: true,
+			});
+
+			mockAnalyzeLinkWithVision.mockResolvedValue({
+				isCreator: true,
+				confidence: 85,
+				indicators: ["subscription"],
+			});
+
+			await processProfile(
+				"visionuser",
+				mockPage,
+				"testsource", // Remove underscore so discovery depth is 0
+				mockMetricsTracker,
+			);
+
+			// Should record vision API call
+			expect(mockMetricsTracker.recordVisionApiCall).toHaveBeenCalledWith(0.001);
+
+			// Should record profile visit with vision API call count
+			expect(mockMetricsTracker.recordProfileVisit).toHaveBeenCalledWith(
+				"visionuser",
+				expect.any(Number),
+				"testsource",
+				0, // discovery depth
+				undefined, // source profile
+				[], // contentCategories
+				1, // visionApiCalls (tracked cumulatively)
 			);
 		});
 
@@ -1037,6 +1142,16 @@ user2
 			// Should process user3 and user4
 			expect(mockWasVisited).toHaveBeenCalledWith("user3");
 			expect(mockWasVisited).toHaveBeenCalledWith("user4");
+
+			// Should log batch information
+			expect(mockLogger.info).toHaveBeenCalledWith(
+				"QUEUE",
+				"Processing batch 1 with 2 profiles (scroll position: 0)"
+			);
+			expect(mockLogger.info).toHaveBeenCalledWith(
+				"QUEUE",
+				"Processing batch 2 with 2 profiles (scroll position: 500)"
+			);
 		});
 
 		it("closes modal before profile visits and reopens", async () => {

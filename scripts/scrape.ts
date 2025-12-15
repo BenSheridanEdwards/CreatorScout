@@ -132,12 +132,24 @@ export async function processProfile(
   username: string,
   page: Page,
   source: string,
-  metricsTracker?: MetricsTracker
+  metricsTracker?: MetricsTracker,
+  sendDM: boolean = true
 ): Promise<void> {
   logger.info('PROFILE', `[${source}] Processing @${username}...`);
 
   // Start performance timer
   const timer = startTimer(`Profile processing: @${username}`);
+
+  // Track metrics throughout processing
+  let visionApiCalls = 0;
+  let contentCategories: string[] = [];
+  let profileProcessedSuccessfully = false;
+
+  // Parse discovery source to extract depth and source profile (moved outside try for finally block access)
+  const discoveryDepth = source.split('_').length - 1; // Count underscores as depth
+  const sourceProfile = source.includes('_of_')
+    ? source.split('_of_').pop()
+    : undefined;
 
   try {
     // Skip if already visited
@@ -148,7 +160,6 @@ export async function processProfile(
         'Already visited',
         username
       );
-      timer.end();
       return;
     }
 
@@ -201,7 +212,7 @@ export async function processProfile(
     recordError(err, `profile_load_${username}`, username);
 
     await logger.errorWithScreenshot(
-      'ERROR',
+      'WARN',
       `Failed to load profile @${username}: ${errorMessage}`,
       page,
       `profile_load_${username}`
@@ -260,288 +271,308 @@ export async function processProfile(
   // Mark as visited with bio and score
   markVisited(username, undefined, analysis.bio, analysis.bioScore);
 
-  // Parse discovery source to extract depth and source profile
-  const discoveryDepth = source.split('_').length - 1; // Count underscores as depth
-  const sourceProfile = source.includes('_of_')
-    ? source.split('_of_').pop()
-    : undefined;
-
-  // Record profile visit metrics
-  if (metricsTracker) {
-    const processingTime = timer.end(); // End timer here for initial processing
-    metricsTracker.recordProfileVisit(
-      username,
-      processingTime,
-      source,
-      discoveryDepth,
-      sourceProfile,
-      [], // contentCategories will be filled later if creator found
-      0 // visionApiCalls will be updated later
-    );
-  }
-
-  // If not promising, skip expensive vision analysis
-  if (!analysis.isLikely) {
-    logger.debug(
-      'ANALYSIS',
-      `Bio score too low (${analysis.bioScore} < 40), skipping @${username}`
-    );
-    cycleManager.recordProfileProcessed(username, false);
-    return;
-  }
-
-  logger.info('ANALYSIS', `Link in bio: ${analysis.linkFromBio || 'none'}`);
-
-  // If has linktree/link aggregator, do vision analysis
-  let confirmedCreator = false;
-  let confidence = analysis.bioScore;
-  let visionExplicitlyRejected = false;
-
-  if (analysis.linkFromBio) {
-    logger.debug(
-      'VISION',
-      `Starting vision analysis for @${username} link: ${analysis.linkFromBio}`
-    );
-    try {
-      const visionResult = await analyzeLinkWithVision(
-        page,
-        analysis.linkFromBio,
-        username,
-        'linktree'
+  try {
+    // If not promising, skip expensive vision analysis
+    if (!analysis.isLikely) {
+      logger.debug(
+        'ANALYSIS',
+        `Bio score too low (${analysis.bioScore} < 40), skipping @${username}`
       );
+      cycleManager.recordProfileProcessed(username, false);
+      return;
+    }
 
-      if (visionResult.isCreator) {
-        confirmedCreator = true;
-        confidence = visionResult.confidence || analysis.bioScore;
-        logger.info(
-          'ANALYSIS',
-          `Vision confirmed creator (confidence: ${confidence}%) - Indicators: ${
-            visionResult.indicators?.join(', ') || 'none'
-          }`
+    logger.info('ANALYSIS', `Link in bio: ${analysis.linkFromBio || 'none'}`);
+
+    // If has linktree/link aggregator, do vision analysis
+    let confirmedCreator = false;
+    let confidence = analysis.bioScore;
+    let visionExplicitlyRejected = false;
+
+    if (analysis.linkFromBio) {
+      logger.debug(
+        'VISION',
+        `Starting vision analysis for @${username} link: ${analysis.linkFromBio}`
+      );
+      try {
+        const visionResult = await analyzeLinkWithVision(
+          page,
+          analysis.linkFromBio,
+          username,
+          'linktree'
         );
 
-        // Record vision API usage
-        if (metricsTracker) {
-          metricsTracker.recordVisionApiCall(0.001); // ~$0.001 per call
-          metricsTracker.recordCreatorFound(username, confidence, 1);
+        if (visionResult.isCreator) {
+          confirmedCreator = true;
+          confidence = visionResult.confidence || analysis.bioScore;
+          logger.info(
+            'ANALYSIS',
+            `Vision confirmed creator (confidence: ${confidence}%) - Indicators: ${
+              visionResult.indicators?.join(', ') || 'none'
+            }`
+          );
+
+          // Record vision API usage
+          visionApiCalls++;
+          if (metricsTracker) {
+            metricsTracker.recordVisionApiCall(0.001); // ~$0.001 per call
+            metricsTracker.recordCreatorFound(username, confidence, 1);
+          }
+        } else {
+          visionExplicitlyRejected = true;
+          logger.debug(
+            'ANALYSIS',
+            `Vision did not confirm creator for @${username} - Confidence: ${
+              visionResult.confidence || 0
+            }%`
+          );
+
+          // Still record vision API usage even if not a creator
+          visionApiCalls++;
+          if (metricsTracker) {
+            metricsTracker.recordVisionApiCall(0.001);
+          }
+        }
+      } catch (visionError) {
+        recordError(visionError, `vision_analysis_${username}`, username);
+        logger.warn(
+          'ANALYSIS',
+          `Vision analysis failed for @${username}, using bio score only`
+        );
+        await logger.errorWithScreenshot(
+          'WARN',
+          `Vision analysis failed for @${username}, falling back to bio score: ${
+            visionError instanceof Error
+              ? visionError.message
+              : String(visionError)
+          }`,
+          page,
+          `vision_failed_${username}`
+        );
+      }
+    }
+
+    if (
+      !confirmedCreator &&
+      !visionExplicitlyRejected &&
+      analysis.bioScore >= 70
+    ) {
+      // High bio score alone can indicate creator (e.g., direct creator mention)
+      confirmedCreator = true;
+      confidence = analysis.bioScore;
+      logger.info(
+        'ANALYSIS',
+        `High bio score (${analysis.bioScore}) - likely creator without linktree`
+      );
+
+      // Record creator found without vision API
+      if (metricsTracker) {
+        metricsTracker.recordCreatorFound(username, confidence, 0);
+      }
+    } else if (
+      !confirmedCreator &&
+      !visionExplicitlyRejected &&
+      analysis.bioScore >= CONFIDENCE_THRESHOLD
+    ) {
+      // Fallback for very high confidence scores
+      confirmedCreator = true;
+      confidence = analysis.bioScore;
+
+      // Record creator found
+      if (metricsTracker) {
+        metricsTracker.recordCreatorFound(username, confidence, 0);
+      }
+    }
+
+    // If confirmed creator, take actions
+    if (confirmedCreator && confidence >= CONFIDENCE_THRESHOLD) {
+      const dmStatus = sendDM ? '' : ' - SKIPPING DM';
+      logger.info(
+        'ACTION',
+        `🎉 CONFIRMED CREATOR @${username} (confidence: ${confidence}%, source: ${source}, vision calls: ${visionApiCalls})${dmStatus}`
+      );
+      cycleManager.recordProfileProcessed(username, true);
+
+      // Mark in database
+      let proofPath = null;
+      try {
+        proofPath = analysis.linkFromBio
+          ? await snapshot(page, `creator_${username}`)
+          : null;
+        if (proofPath) {
+          logger.info('SCREENSHOT', `Creator proof saved: ${proofPath}`);
+        }
+      } catch (snapshotError) {
+        logger.warn(
+          'SCREENSHOT',
+          `Failed to take creator proof screenshot for @${username}`
+        );
+        await logger.errorWithScreenshot(
+          'ERROR',
+          `Creator proof screenshot failed for @${username}: ${
+            snapshotError instanceof Error
+              ? snapshotError.message
+              : String(snapshotError)
+          }`,
+          page,
+          `snapshot_failed_${username}`
+        );
+      }
+      markAsCreator(username, confidence, proofPath);
+
+      // Send DM (if not already sent and DM sending is enabled)
+      if (sendDM && !wasDmSent(username)) {
+        const [dmDelayMin, dmDelayMax] = getDelay('before_dm');
+        const dmWait = dmDelayMin + Math.random() * (dmDelayMax - dmDelayMin);
+        logger.debug('DELAY', `Waiting ${Math.floor(dmWait)}s before DM...`);
+        await sleep(dmWait * 1000);
+
+        try {
+          await sendDMToUser(page, username);
+          logger.info('ACTION', `💬 DM sent to @${username}`);
+          cycleManager.recordDMSent(username);
+
+          // Record DM sent
+          if (metricsTracker) {
+            metricsTracker.recordDMSent(username);
+          }
+        } catch (dmError) {
+          recordError(dmError, `dm_send_${username}`, username);
+          await logger.errorWithScreenshot(
+            'ERROR',
+            `DM send failed for @${username}: ${
+              dmError instanceof Error ? dmError.message : String(dmError)
+            }`,
+            page,
+            `dm_failed_${username}`
+          );
+        }
+      } else if (!sendDM) {
+        logger.debug('ACTION', `DM sending disabled for @${username}`);
+      } else {
+        logger.debug('ACTION', `DM already sent to @${username}`);
+        cycleManager.recordWarning(
+          'DM_ALREADY_SENT',
+          'DM already sent',
+          username
+        );
+      }
+
+      // Follow (if not already following)
+      if (!wasFollowed(username)) {
+        try {
+          await followUserAccount(page, username);
+          logger.info('ACTION', `👥 Followed @${username}`);
+          cycleManager.recordFollowCompleted(username);
+
+          // Record follow completed
+          if (metricsTracker) {
+            metricsTracker.recordFollowCompleted(username);
+          }
+        } catch (followError) {
+          recordError(followError, `follow_${username}`, username);
+          await logger.errorWithScreenshot(
+            'ERROR',
+            `Follow action failed for @${username}: ${
+              followError instanceof Error
+                ? followError.message
+                : String(followError)
+            }`,
+            page,
+            `follow_failed_${username}`
+          );
         }
       } else {
-        visionExplicitlyRejected = true;
-        logger.debug(
-          'ANALYSIS',
-          `Vision did not confirm creator for @${username} - Confidence: ${
-            visionResult.confidence || 0
-          }%`
+        logger.debug('ACTION', `Already following @${username}`);
+        cycleManager.recordWarning(
+          'ALREADY_FOLLOWING',
+          'Already following',
+          username
         );
-
-        // Still record vision API usage even if not a creator
-        if (metricsTracker) {
-          metricsTracker.recordVisionApiCall(0.001);
-        }
       }
-    } catch (visionError) {
-      recordError(visionError, `vision_analysis_${username}`, username);
-      logger.warn(
+
+      // Add their following to queue for expansion
+      logger.info('QUEUE', `Adding @${username}'s following to queue...`);
+      try {
+        const added = await addFollowingToQueue(
+          page,
+          username,
+          `following_of_${username}`,
+          20
+        );
+        if (added > 0) {
+          logger.info('QUEUE', `Added ${added} profiles to queue`);
+        }
+      } catch (queueError) {
+        recordError(queueError, `queue_expansion_${username}`, username);
+        await logger.errorWithScreenshot(
+          'ERROR',
+          `Queue expansion failed for @${username}: ${
+            queueError instanceof Error
+              ? queueError.message
+              : String(queueError)
+          }`,
+          page,
+          `queue_expansion_failed_${username}`
+        );
+      }
+    } else {
+      logger.debug(
         'ANALYSIS',
-        `Vision analysis failed for @${username}, using bio score only`
+        `Not confirmed (confidence: ${confidence}% < ${CONFIDENCE_THRESHOLD}%)`
       );
-      await logger.errorWithScreenshot(
-        'ERROR',
-        `Vision analysis failed for @${username}: ${
-          visionError instanceof Error
-            ? visionError.message
-            : String(visionError)
-        }`,
-        page,
-        `vision_failed_${username}`
-      );
-    }
-  }
-
-  if (
-    !confirmedCreator &&
-    !visionExplicitlyRejected &&
-    analysis.bioScore >= 70
-  ) {
-    // High bio score alone can indicate creator (e.g., direct creator mention)
-    confirmedCreator = true;
-    confidence = analysis.bioScore;
-    logger.info(
-      'ANALYSIS',
-      `High bio score (${analysis.bioScore}) - likely creator without linktree`
-    );
-
-    // Record creator found without vision API
-    if (metricsTracker) {
-      metricsTracker.recordCreatorFound(username, confidence, 0);
-    }
-  } else if (
-    !confirmedCreator &&
-    !visionExplicitlyRejected &&
-    analysis.bioScore >= CONFIDENCE_THRESHOLD
-  ) {
-    // Fallback for very high confidence scores
-    confirmedCreator = true;
-    confidence = analysis.bioScore;
-
-    // Record creator found
-    if (metricsTracker) {
-      metricsTracker.recordCreatorFound(username, confidence, 0);
-    }
-  }
-
-  // If confirmed creator, take actions
-  if (confirmedCreator && confidence >= CONFIDENCE_THRESHOLD) {
-    logger.info('ACTION', `CONFIRMED CREATOR (confidence: ${confidence}%)`);
-    cycleManager.recordProfileProcessed(username, true);
-
-    // Mark in database
-    let proofPath = null;
-    try {
-      proofPath = analysis.linkFromBio
-        ? await snapshot(page, `creator_${username}`)
-        : null;
-      if (proofPath) {
-        logger.info('SCREENSHOT', `Creator proof saved: ${proofPath}`);
-      }
-    } catch (snapshotError) {
-      logger.warn(
-        'SCREENSHOT',
-        `Failed to take creator proof screenshot for @${username}`
-      );
-      await logger.errorWithScreenshot(
-        'ERROR',
-        `Creator proof screenshot failed for @${username}: ${
-          snapshotError instanceof Error
-            ? snapshotError.message
-            : String(snapshotError)
-        }`,
-        page,
-        `snapshot_failed_${username}`
-      );
-    }
-    markAsCreator(username, confidence, proofPath);
-
-    // Send DM (if not already sent)
-    if (!wasDmSent(username)) {
-      const [dmDelayMin, dmDelayMax] = getDelay('before_dm');
-      const dmWait = dmDelayMin + Math.random() * (dmDelayMax - dmDelayMin);
-      logger.debug('DELAY', `Waiting ${Math.floor(dmWait)}s before DM...`);
-      await sleep(dmWait * 1000);
-
-      try {
-        await sendDMToUser(page, username);
-        logger.info('ACTION', `DM sent to @${username}`);
-        cycleManager.recordDMSent(username);
-
-        // Record DM sent
-        if (metricsTracker) {
-          metricsTracker.recordDMSent(username);
-        }
-      } catch (dmError) {
-        recordError(dmError, `dm_send_${username}`, username);
-        await logger.errorWithScreenshot(
-          'ERROR',
-          `DM send failed for @${username}: ${
-            dmError instanceof Error ? dmError.message : String(dmError)
-          }`,
-          page,
-          `dm_failed_${username}`
-        );
-      }
-    } else {
-      logger.debug('ACTION', `DM already sent to @${username}`);
-      cycleManager.recordWarning(
-        'DM_ALREADY_SENT',
-        'DM already sent',
-        username
-      );
+      cycleManager.recordProfileProcessed(username, false);
     }
 
-    // Follow (if not already following)
-    if (!wasFollowed(username)) {
-      try {
-        await followUserAccount(page, username);
-        logger.info('ACTION', `Followed @${username}`);
-        cycleManager.recordFollowCompleted(username);
+    // Mark profile as processed successfully
+    profileProcessedSuccessfully = true;
 
-        // Record follow completed
-        if (metricsTracker) {
-          metricsTracker.recordFollowCompleted(username);
-        }
-      } catch (followError) {
-        recordError(followError, `follow_${username}`, username);
-        await logger.errorWithScreenshot(
-          'ERROR',
-          `Follow action failed for @${username}: ${
-            followError instanceof Error
-              ? followError.message
-              : String(followError)
-          }`,
-          page,
-          `follow_failed_${username}`
-        );
-      }
-    } else {
-      logger.debug('ACTION', `Already following @${username}`);
-      cycleManager.recordWarning(
-        'ALREADY_FOLLOWING',
-        'Already following',
-        username
-      );
-    }
-
-    // Add their following to queue for expansion
-    logger.info('QUEUE', `Adding @${username}'s following to queue...`);
-    try {
-      const added = await addFollowingToQueue(
-        page,
-        username,
-        `following_of_${username}`,
-        20
-      );
-      if (added > 0) {
-        logger.info('QUEUE', `Added ${added} profiles to queue`);
-      }
-    } catch (queueError) {
-      recordError(queueError, `queue_expansion_${username}`, username);
-      await logger.errorWithScreenshot(
-        'ERROR',
-        `Queue expansion failed for @${username}: ${
-          queueError instanceof Error ? queueError.message : String(queueError)
-        }`,
-        page,
-        `queue_expansion_failed_${username}`
-      );
-    }
-  } else {
+    // Human-like delay before next profile
+    const [profileDelayMin, profileDelayMax] = getDelay('between_profiles');
+    const profileWait =
+      profileDelayMin + Math.random() * (profileDelayMax - profileDelayMin);
     logger.debug(
-      'ANALYSIS',
-      `Not confirmed (confidence: ${confidence}% < ${CONFIDENCE_THRESHOLD}%)`
+      'DELAY',
+      `Waiting ${Math.floor(profileWait)}s before next profile...`
     );
-    cycleManager.recordProfileProcessed(username, false);
-  }
+    await sleep(profileWait * 1000);
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    recordError(err, `profile_processing_${username}`, username);
 
-  // Human-like delay before next profile
-  const [profileDelayMin, profileDelayMax] = getDelay('between_profiles');
-  const profileWait =
-    profileDelayMin + Math.random() * (profileDelayMax - profileDelayMin);
-  logger.debug(
-    'DELAY',
-    `Waiting ${Math.floor(profileWait)}s before next profile...`
-  );
-  await sleep(profileWait * 1000);
-  // Note: Error handling temporarily disabled due to syntax issues
-  // } catch (err) {
-  // 	recordError(err, `profile_processing_${username}`, username);
-  // 	if (metricsTracker) {
-  // 		const errorMessage = err instanceof Error ? err.message : String(err);
-  // 		metricsTracker.recordError(username, "profile_processing_failed", errorMessage);
-  // 	}
-  // } finally {
-  // 	timer.end();
-  // }
-  timer.end();
+    if (metricsTracker) {
+      metricsTracker.recordError(
+        username,
+        'profile_processing_failed',
+        errorMessage
+      );
+    }
+
+    await logger.errorWithScreenshot(
+      'ERROR',
+      `Critical error processing @${username}: ${errorMessage}`,
+      page,
+      `profile_critical_error_${username}`
+    );
+
+    throw err; // Re-throw to let caller handle
+  } finally {
+    // Record profile visit metrics with complete data
+    if (metricsTracker) {
+      const finalProcessingTime = timer.end();
+      metricsTracker.recordProfileVisit(
+        username,
+        finalProcessingTime,
+        source,
+        discoveryDepth,
+        sourceProfile,
+        contentCategories,
+        visionApiCalls
+      );
+    } else {
+      timer.end();
+    }
+  }
 }
 
 /**
@@ -550,7 +581,8 @@ export async function processProfile(
 export async function processFollowingList(
   seedUsername: string,
   page: Page,
-  metricsTracker?: MetricsTracker
+  metricsTracker?: MetricsTracker,
+  sendDM: boolean = true
 ): Promise<void> {
   logger.info('PROFILE', `Processing following list of @${seedUsername}`);
 
@@ -643,7 +675,12 @@ export async function processFollowingList(
         break;
       }
 
-      logger.debug('QUEUE', `Batch of ${usernames.length} profiles`);
+      logger.info(
+        'QUEUE',
+        `Processing batch ${Math.floor(scrollIndex / 500) + 1} with ${
+          usernames.length
+        } profiles (scroll position: ${scrollIndex})`
+      );
       for (const u of usernames) {
         logger.debug('QUEUE', `  - @${u}`);
       }
@@ -664,7 +701,8 @@ export async function processFollowingList(
               username,
               page,
               `following_of_${seedUsername}`,
-              metricsTracker
+              metricsTracker,
+              sendDM
             );
             processedInBatch++;
           } catch (profileError) {
@@ -808,7 +846,7 @@ export async function runScrapeLoop(
 
     try {
       // Process their following list
-      await processFollowingList(target, page, metricsTracker);
+      await processFollowingList(target, page, metricsTracker, true); // sendDM = true
     } catch (err) {
       recordError(err, `seed_processing_${target}`, target);
       logger.error(
@@ -864,7 +902,87 @@ export async function runScrapeLoop(
 }
 
 /**
- * Main scrape function - does the full automation flow
+ * Run the main scrape loop (WITHOUT sending DMs)
+ * Only discovers and follows creators, skips DM engagement
+ */
+export async function runScrapeLoopWithoutDM(
+  page: Page,
+  metricsTracker?: MetricsTracker
+): Promise<void> {
+  let seedsProcessed = 0;
+
+  logger.info('CYCLE', 'Starting main scrape loop (no DM mode)');
+
+  while (shouldContinue()) {
+    // Get next profile from queue
+    const target = queueNext();
+
+    if (!target) {
+      const [waitMin, waitMax] = getDelay('queue_empty');
+      const waitTime = waitMin + Math.random() * (waitMax - waitMin);
+      logger.debug(
+        'QUEUE',
+        `Queue empty - sleeping ${Math.floor(waitTime)}s...`
+      );
+      await sleep(waitTime * 1000);
+      continue;
+    }
+
+    seedsProcessed++;
+    logger.info('QUEUE', `Queue: ${queueCount()} remaining`);
+    logger.info(
+      'SEED',
+      `Processing seed #${seedsProcessed}: @${target} (no DM mode)`
+    );
+
+    try {
+      // Process their following list
+      await processFollowingList(target, page, metricsTracker, false); // sendDM = false
+    } catch (err) {
+      recordError(err, `seed_processing_${target}`, target);
+      logger.error(
+        'ERROR',
+        `Failed to process seed @${target}, continuing to next`
+      );
+      // Note: Screenshot will be taken by processFollowingList if it fails
+    }
+
+    // Print stats (without DM count)
+    const stats = getStats();
+    logger.info(
+      'STATS',
+      `Progress: Visited ${stats.total_visited} | Creators: ${stats.confirmed_creators} | Queue: ${stats.queue_size}`
+    );
+
+    // Long delay between seed profiles
+    const [seedDelayMin, seedDelayMax] = getDelay('between_seeds');
+    const seedWait =
+      seedDelayMin + Math.random() * (seedDelayMax - seedDelayMin);
+    logger.debug(
+      'DELAY',
+      `Waiting ${Math.floor(seedWait)}s before next seed...`
+    );
+    await sleep(seedWait * 1000);
+  }
+
+  const stats = getStats();
+  logger.info(
+    'STATS',
+    `Discovery session complete! Total visited: ${stats.total_visited}`
+  );
+  logger.info('STATS', `Confirmed creators: ${stats.confirmed_creators}`);
+  logger.info('STATS', `Seeds processed: ${seedsProcessed}`);
+
+  // Log cycle summary
+  endCycle('COMPLETED_DISCOVERY', {
+    seedsProcessed,
+    finalStats: stats,
+    reason: 'Discovery mode completed',
+  });
+}
+
+/**
+ * Main scrape function - does the full automation flow (WITHOUT sending DMs)
  * @param debug - If true, enables logging output
  */
 export async function scrape(debug: boolean = false): Promise<void> {
@@ -961,13 +1079,126 @@ export async function scrape(debug: boolean = false): Promise<void> {
   }
 }
 
+/**
+ * Main scrape function - does the full automation flow (WITHOUT sending DMs)
+ * This function discovers creators but doesn't send DMs - useful for passive discovery.
+ * @param debug - If true, enables logging output
+ */
+export async function scrapeWithoutDM(debug: boolean = false): Promise<void> {
+  logger.info(
+    'ACTION',
+    '🔍 Scout - Instagram Patreon Creator Discovery Agent (Discovery Mode - No DMs)'
+  );
+  logger.info('SYSTEM', `Debug mode: ${debug}`);
+
+  // Initialize metrics tracking
+  const metricsTracker = getGlobalMetricsTracker();
+  logger.info(
+    'METRICS',
+    `Started discovery session tracking: ${metricsTracker.getSessionId()}`
+  );
+
+  let browser: Browser | null = null;
+  let cycleId: string | null = null;
+
+  try {
+    // Connect to browser
+    logger.info('ACTION', 'Connecting to browser...');
+    browser = await createBrowser({ headless: true });
+    const page = await createPage(browser);
+    logger.info('ACTION', 'Browser connected successfully');
+
+    // Login (will use saved session if available)
+    logger.info('ACTION', 'Logging in to Instagram...');
+    await ensureLoggedIn(page);
+    logger.info('ACTION', '✅ Logged in successfully!');
+
+    // Load seeds
+    const seedsLoaded = loadSeeds();
+    if (seedsLoaded === 0) {
+      logger.warn('QUEUE', '❌ No seeds.txt found or no seeds loaded!');
+      endCycle('FAILED', 'No seeds loaded');
+      await browser.close();
+      return;
+    }
+    logger.info('QUEUE', `📋 Loaded ${seedsLoaded} seeds`);
+
+    // Start cycle tracking
+    cycleId = startCycle('batch_discovery', seedsLoaded * 50); // Estimate profiles to process
+    logger.info(
+      'CYCLE',
+      `Started discovery cycle ${cycleId} with estimated ${
+        seedsLoaded * 50
+      } profiles`
+    );
+
+    // Run main processing loop (WITHOUT DMs)
+    await runScrapeLoopWithoutDM(page, metricsTracker);
+
+    // End metrics session
+    metricsTracker.endSession();
+    const finalMetrics = metricsTracker.getSessionMetrics();
+    logger.info(
+      'METRICS',
+      `✅ Discovery session completed - Profiles: ${finalMetrics.profilesVisited}, Creators: ${finalMetrics.creatorsFound}`
+    );
+
+    endCycle('COMPLETED_DISCOVERY');
+    await browser.close();
+    logger.info('ACTION', '🔍 Discovery session completed successfully');
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    recordError(err, 'scrape_discovery_fatal_error');
+
+    endCycle('FAILED_DISCOVERY', errorMessage);
+
+    logger.error('FATAL', `💥 Fatal error in discovery mode: ${errorMessage}`);
+
+    if (browser) {
+      try {
+        logger.debug('SYSTEM', 'Attempting to take fatal error screenshot...');
+        const page = await browser.newPage().catch(() => null);
+        if (page) {
+          await logger.errorWithScreenshot(
+            'ERROR',
+            `Fatal error in discovery mode: ${errorMessage}`,
+            page,
+            'scrape_discovery_fatal_error'
+          );
+        }
+      } catch (screenshotError) {
+        logger.error(
+          'ERROR',
+          `Failed to take fatal error screenshot: ${screenshotError}`
+        );
+      }
+      await browser.close();
+    } else {
+      console.error('💥 Fatal error before browser creation:', err);
+    }
+    throw err;
+  }
+}
+
 // Run if executed directly
 if (
   import.meta.url.endsWith(process.argv[1]?.replace(process.cwd(), '') || '')
 ) {
   const debug = process.argv.includes('--debug') || process.argv.includes('-d');
-  scrape(debug).catch((err) => {
-    console.error(err);
-    process.exit(1);
-  });
+  const noDM =
+    process.argv.includes('--no-dm') || process.argv.includes('--discovery');
+
+  if (noDM) {
+    console.log('🔍 Running in DISCOVERY MODE (no DMs will be sent)');
+    scrapeWithoutDM(debug).catch((err) => {
+      console.error(err);
+      process.exit(1);
+    });
+  } else {
+    console.log('🚀 Running in FULL MODE (will send DMs to creators)');
+    scrape(debug).catch((err) => {
+      console.error(err);
+      process.exit(1);
+    });
+  }
 }
