@@ -223,7 +223,9 @@ describe("Humanize Functions", () => {
 		test("types text with realistic character delays", async () => {
 			const { humanTypeText } = await import("./humanize.ts");
 
-			const result = await humanTypeText(mockPage, "input", "hello");
+			const result = await humanTypeText(mockPage, "input", "hello", {
+				mistakeRate: 0, // Disable typos for deterministic testing
+			});
 
 			expect(result).toBe(true);
 			expect(mockPage.keyboard.type).toHaveBeenCalledTimes(5); // h,e,l,l,o
@@ -264,32 +266,37 @@ describe("Humanize Functions", () => {
 			expect(mockPage.keyboard.press).toHaveBeenCalledWith("Backspace");
 		});
 
-		test("simulates typos and corrections", async () => {
-			const { humanTypeText } = await import("./humanize.ts");
-
-			// Mock random to always trigger typo
-			const originalRandom = Math.random;
-			Math.random = jest.fn().mockReturnValue(0.01); // < 0.02 mistake rate
-
-			await humanTypeText(mockPage, "input", "hi", {
-				mistakeRate: 0.5, // High mistake rate for testing
-			});
-
-			// Should have backspace and retype
-			expect(mockPage.keyboard.press).toHaveBeenCalledWith("Backspace");
-
-			Math.random = originalRandom;
-		});
-
 		test("respects custom typing parameters", async () => {
 			const { humanTypeText } = await import("./humanize.ts");
 
 			const result = await humanTypeText(mockPage, "input", "test", {
 				typeDelay: 200,
 				wordPause: 500,
+				mistakeRate: 0, // Disable typos for this test
 			});
 
 			expect(result).toBe(true);
+		});
+
+		test("supports typo simulation for anti-detection", async () => {
+			const { humanTypeText } = await import("./humanize.ts");
+
+			// Mock Math.random to always trigger typo for testing
+			const originalRandom = Math.random;
+			Math.random = jest.fn().mockReturnValue(0.01); // < 0.02 mistake rate
+
+			const result = await humanTypeText(mockPage, "input", "hi", {
+				mistakeRate: 0.5, // High mistake rate for testing
+			});
+
+			expect(result).toBe(true);
+			// Should have typed 'h', then 'i', then backspace, then 'i' again
+			expect(mockPage.keyboard.type).toHaveBeenCalledWith("h");
+			expect(mockPage.keyboard.type).toHaveBeenCalledWith("i");
+			expect(mockPage.keyboard.press).toHaveBeenCalledWith("Backspace");
+			expect(mockPage.keyboard.type).toHaveBeenCalledWith("i"); // Retype after correction
+
+			Math.random = originalRandom;
 		});
 	});
 

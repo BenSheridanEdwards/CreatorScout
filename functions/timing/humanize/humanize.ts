@@ -361,15 +361,15 @@ export async function humanTypeText(
 		clearFirst?: boolean;
 		typeDelay?: number; // Base delay between characters (auto-adjusted)
 		wordPause?: number; // Pause between words
-		mistakeRate?: number; // Chance of making a typo (0.0-1.0)
-		correctionDelay?: number; // Delay before correcting mistakes
+		mistakeRate?: number; // Chance of making a typo (0.0-1.0, default 0.02)
+		correctionDelay?: number; // Delay before correcting mistakes (default 300ms)
 	} = {},
 ): Promise<boolean> {
 	const {
 		clearFirst = true,
 		typeDelay = 80, // Faster base typing (80-180ms per char)
 		wordPause = 200, // Shorter word pauses
-		mistakeRate = 0.02, // 2% chance of typo per character
+		mistakeRate = 0.02, // 2% chance of typo per character (safety feature)
 		correctionDelay = 300,
 	} = options;
 
@@ -420,8 +420,8 @@ export async function humanTypeText(
 			await page.keyboard.type(char);
 			await sleep(charDelay + Math.random() * 40);
 
-			// Occasional typos (backspace and retype)
-			if (Math.random() < mistakeRate && charIndex > 0) {
+			// Occasional typos (backspace and retype) - safety feature for anti-detection
+			if (mistakeRate > 0 && Math.random() < mistakeRate && charIndex > 0) {
 				// Wait a bit, then correct
 				await sleep(correctionDelay + Math.random() * 200);
 				await page.keyboard.press("Backspace");

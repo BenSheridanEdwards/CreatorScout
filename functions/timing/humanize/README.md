@@ -38,11 +38,16 @@ await humanClickElement(page, '.dropdown', {
 ```typescript
 import { humanTypeText } from './humanize.js';
 
-// Type with realistic human patterns
+// Type with realistic human patterns (default includes typos)
 await humanTypeText(page, 'input[name="email"]', 'user@example.com', {
   typeDelay: 80,     // Base 80-180ms between characters
   wordPause: 200,    // 200ms between words
-  mistakeRate: 0.02, // 2% chance of typos
+  mistakeRate: 0.02, // 2% chance of typos (safety feature)
+});
+
+// Disable typos for sensitive information
+await humanTypeText(page, 'input[type="password"]', 'secret123', {
+  mistakeRate: 0,    // Disable typos for important fields
 });
 ```
 
@@ -97,8 +102,9 @@ await humanClickElement(page, 'input.search', {
 Human-like typing with cognitive patterns:
 - **Variable character delays**: 80-180ms (slower for capitals)
 - **Word boundary awareness**: Slower at word starts/ends
-- **Occasional typos**: 2% chance with realistic corrections
+- **Occasional typos**: 2% chance with realistic corrections (configurable)
 - **Thinking pauses**: 5% chance of longer delays (100-300ms)
+- **Correction behavior**: Backspace and retype with appropriate delays
 
 ## Integration with Existing Code
 
@@ -179,7 +185,7 @@ await humanTypeText(page, 'input.sensitive', 'secret', {
 | **Mouse Movement** | Straight lines | Bezier curves | 85% more natural |
 | **Click Timing** | Instant | 35-120ms | Realistic motor delay |
 | **Hover Delays** | None | Context-aware | Human decision making |
-| **Typing Speed** | Constant | Variable + typos | Cognitive patterns |
+| **Typing Speed** | Constant | Variable + typos | Cognitive patterns + corrections |
 | **Detection Risk** | High | Very Low | Enterprise stealth |
 
 ## Detection Avoidance
@@ -189,6 +195,7 @@ await humanTypeText(page, 'input.sensitive', 'secret', {
 - **Realistic timing**: Based on Fitts' Law and human motor studies
 - **Context awareness**: Different behavior for buttons vs inputs vs links
 - **Cognitive patterns**: Includes "thinking" pauses and correction behavior
+- **Typo simulation**: Configurable mistake rates with realistic corrections
 - **Micro-variations**: Sub-pixel randomization prevents pattern matching
 
 ### Instagram-Specific Optimizations
