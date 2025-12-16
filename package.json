@@ -16,8 +16,7 @@
 		"follow": "tsx scripts/follow_user.ts",
 		"dm": "tsx scripts/dm_user.ts",
 		"following": "tsx scripts/get_following.ts",
-		"process": "tsx scripts/process_profiles.ts",
-		"automation": "tsx scripts/instagram_automation.ts"
+		"process": "tsx scripts/process_profiles.ts"
 	},
 	"dependencies": {
 		"better-sqlite3": "^12.5.0",

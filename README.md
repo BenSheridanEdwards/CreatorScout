@@ -127,9 +127,36 @@ cp .env.example .env  # Edit with your credentials
 # Add seeds (known creator usernames to start exploring from)
 echo "somemodel" >> seeds.txt
 
-# Run the scraper
-npm run scrape
+# Test individual components
+npm run analyze some_profile    # Test profile analysis
+npm run follow test_user        # Test following
+npm run dm test_user           # Test DM sending
+
+# Run full automation
+npm run discover               # Safe discovery (no DMs)
+npm run scrape                 # Full automation (with DMs)
 ```
+
+## 📋 Available Scripts
+
+Scout provides both **individual testing scripts** and **full automation scripts**:
+
+### Individual Testing Scripts (For Development & Manual Operations)
+```bash
+npm run analyze <username>     # Analyze profile for creator indicators
+npm run follow <username>      # Follow a specific user
+npm run dm <username>          # Send DM to a specific user
+npm run following <username>   # Extract following list from profile
+npm run process <users> [opts] # Batch process multiple profiles
+```
+
+### Full Automation Scripts
+```bash
+npm run discover               # Find creators safely (no DMs)
+npm run scrape                 # Full automation with DMs
+```
+
+📖 **Detailed documentation:** See [`SCRIPTS.md`](SCRIPTS.md) for comprehensive usage examples and testing workflows.
 
 ## Development
 
