@@ -3,7 +3,6 @@
  */
 import { readFileSync } from "node:fs";
 import { OpenAI } from "openai";
-import { getProxyAgent } from "../../shared/proxy/proxy.ts";
 import {
 	OPENROUTER_API_KEY,
 	VISION_MODEL,
@@ -12,7 +11,6 @@ import {
 const client = new OpenAI({
 	baseURL: "https://openrouter.ai/api/v1",
 	apiKey: OPENROUTER_API_KEY,
-	httpAgent: getProxyAgent(), // Use proxy for API requests
 });
 
 const LINKTREE_PROMPT = `You are analyzing a screenshot of a link page (linktree, beacons, allmylinks, etc.) for an Instagram user.

@@ -206,9 +206,6 @@ BROWSERLESS_TOKEN=your_browserless_token_here
 # Use local browser instead of BrowserLess (for development)
 LOCAL_BROWSER=false
 
-# Optional: External proxy for API calls (BrowserLess stealth includes residential proxies)
-# PROXY_URL=http://username:password@proxy.example.com:8080
-
 # ===========================================
 # INSTAGRAM CREDENTIALS
 # ===========================================

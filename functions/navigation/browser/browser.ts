@@ -21,11 +21,7 @@ const extra = puppeteer as unknown as {
 };
 extra.use(StealthPlugin());
 
-// Optional proxy support for local development (BrowserLess stealth handles this automatically)
-const PROXY_URL = process.env.PROXY_URL;
-if (PROXY_URL) {
-	extra.use(puppeteerProxy(PROXY_URL));
-}
+// BrowserLess stealth handles all proxy needs automatically
 
 export interface BrowserOptions {
 	headless?: boolean;
