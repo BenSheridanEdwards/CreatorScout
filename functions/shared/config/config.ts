@@ -45,38 +45,39 @@ export const DELAY_SCALES = {
 };
 
 // Base delay values (min, max) in seconds - before scaling
+// Based on human behavior studies and real usage patterns
 export const DELAYS: Record<string, [number, number]> = {
-	// Navigation
-	after_navigate: [2, 4],
-	after_go_back: [2, 3],
+	// Navigation - Page loads and major transitions
+	after_navigate: [1.5, 3.5], // Faster, more confident
+	after_go_back: [1.8, 3.2], // Slightly longer for back actions
 
-	// Modal
-	after_modal_open: [2, 4],
-	after_modal_close: [1, 2],
-	after_scroll: [0.5, 1.5],
-	after_scroll_batch: [2, 4],
+	// Modal - Instagram modal interactions
+	after_modal_open: [1.2, 2.8], // Quicker for expected modals
+	after_modal_close: [0.8, 1.8], // Faster modal close
+	after_scroll: [0.3, 1.2], // Shorter scroll delays
+	after_scroll_batch: [1.5, 3.5], // Modal batch processing
 
-	// Input/Interaction
-	after_click: [0.5, 1.5],
-	after_type: [0.3, 0.8],
-	after_linktree_click: [3, 5],
-	mouse_wiggle: [0.7, 2.4],
+	// Input/Interaction - Core interactions
+	after_click: [0.2, 0.8], // Much faster - humans click quickly
+	after_type: [0.1, 0.4], // Minimal delay after typing
+	after_linktree_click: [2.5, 4.5], // Linktree loads slower
+	mouse_wiggle: [0.5, 1.8], // More natural wiggle timing
 
-	// Actions (higher risk - should be slower)
-	after_message_open: [2, 4],
-	after_dm_type: [1, 2],
-	after_dm_send: [2, 4],
-	after_follow: [1, 2],
+	// Actions (higher risk - Instagram monitors these)
+	after_message_open: [1.8, 3.5], // DM opening - careful
+	after_dm_type: [0.8, 1.8], // After typing message
+	after_dm_send: [1.5, 3.5], // After sending - wait for response
+	after_follow: [0.8, 1.8], // Follow action timing
 
-	// Pacing
-	between_profiles: [2, 6],
-	between_seeds: [60, 180],
-	queue_empty: [300, 300], // Fixed 5 min wait
+	// Pacing - Rate limiting and anti-detection
+	between_profiles: [1.5, 4.5], // More variable profile timing
+	between_seeds: [45, 150], // Shorter seed delays for efficiency
+	queue_empty: [180, 300], // 3-5 min when queue empty
 
-	// Login
-	after_credentials: [1.5, 3.5],
-	after_login_submit: [4, 7],
-	after_popup_dismiss: [0.7, 2.4],
+	// Login - Critical path, be more cautious
+	after_credentials: [1.2, 2.8], // Username/password entry
+	after_login_submit: [3.5, 6.5], // Wait for login processing
+	after_popup_dismiss: [0.5, 1.8], // Quick popup dismissal
 };
 
 // Category mapping - which scale applies to which delay
@@ -118,22 +119,22 @@ export const DELAY_CATEGORIES: Record<string, keyof typeof DELAY_SCALES> = {
 
 export const TIMEOUT_SCALE = _float("TIMEOUT_SCALE", 1.0);
 
-// Base timeout values in milliseconds
+// Base timeout values in milliseconds - more realistic for modern web
 export const TIMEOUTS: Record<string, number> = {
-	// Page loads
-	page_load: 30000,
-	navigation: 20000,
+	// Page loads - Instagram loads relatively fast
+	page_load: 25000, // Reduced from 30s - Instagram is fast
+	navigation: 15000, // Reduced from 20s - profile switches are quick
 
-	// Element waits
-	element_default: 10000,
-	element_modal: 5000,
-	element_button: 3000,
-	element_input: 5000,
+	// Element waits - Instagram elements appear quickly
+	element_default: 8000, // Reduced from 10s - elements load fast
+	element_modal: 4000, // Reduced from 5s - modals are snappy
+	element_button: 2500, // Reduced from 3s - buttons appear quickly
+	element_input: 3500, // Reduced from 5s - inputs are responsive
 
-	// Actions
-	login: 15000,
-	dm_send: 10000,
-	follow: 3000,
+	// Actions - Instagram actions are quick
+	login: 12000, // Reduced from 15s - login is fast
+	dm_send: 8000, // Reduced from 10s - DMs send quickly
+	follow: 2500, // Reduced from 3s - follow is instant
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════

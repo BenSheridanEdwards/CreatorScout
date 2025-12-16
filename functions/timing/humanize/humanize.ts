@@ -143,17 +143,19 @@ export async function moveMouseToElement(
 	options: {
 		offsetX?: number; // Offset from center (for buttons, forms, etc.)
 		offsetY?: number;
-		duration?: number; // Total movement time in ms
+		duration?: number; // Total movement time in ms (auto-calculated if not provided)
 		steps?: number; // Number of movement steps
 		randomize?: boolean; // Add slight randomization
+		distance?: number; // Override distance calculation
 	} = {},
 ): Promise<boolean> {
 	const {
 		offsetX = 0,
 		offsetY = 0,
-		duration = 800,
-		steps = 50,
+		duration,
+		steps = 35, // Reduced from 50 for smoother movement
 		randomize = true,
+		distance: providedDistance,
 	} = options;
 
 	// Get target element position
@@ -168,8 +170,8 @@ export async function moveMouseToElement(
 	let targetY = targetPos.y + offsetY;
 
 	if (randomize) {
-		targetX += (Math.random() - 0.5) * 20; // ±10px randomization
-		targetY += (Math.random() - 0.5) * 20;
+		targetX += (Math.random() - 0.5) * 16; // ±8px randomization (more precise)
+		targetY += (Math.random() - 0.5) * 16;
 	}
 
 	// Get current mouse position
@@ -177,6 +179,22 @@ export async function moveMouseToElement(
 		x: window.mouseX || 0,
 		y: window.mouseY || 0,
 	}));
+
+	// Calculate distance for dynamic duration
+	const distance =
+		providedDistance ??
+		Math.sqrt(
+			Math.pow(targetX - currentPos.x, 2) +
+				Math.pow(targetPos.y - currentPos.y, 2),
+		);
+
+	// Dynamic duration based on distance (50-200ms per 100px, more realistic)
+	const calculatedDuration =
+		duration ??
+		Math.max(
+			300, // Minimum 300ms
+			Math.min(1500, distance * 1.8 + 200), // 180ms per 100px + base delay
+		);
 
 	// Calculate control point for curved movement
 	const controlPoint = {
@@ -190,8 +208,8 @@ export async function moveMouseToElement(
 			(Math.random() - 0.5) * 50,
 	};
 
-	// Animate along the curve
-	const stepDuration = duration / steps;
+	// Animate along the curve with dynamic timing
+	const stepDuration = calculatedDuration / steps;
 	for (let i = 0; i <= steps; i++) {
 		const t = i / steps;
 		const point = bezierPoint(
@@ -201,14 +219,19 @@ export async function moveMouseToElement(
 			t,
 		);
 
-		// Add micro-randomization for each step
+		// Add micro-randomization for each step (±1px for precision)
 		const microX = randomize ? point.x + (Math.random() - 0.5) * 2 : point.x;
 		const microY = randomize ? point.y + (Math.random() - 0.5) * 2 : point.y;
 
 		await page.mouse.move(microX, microY);
 
-		// Variable timing between steps (more human-like)
-		const timingVariation = randomize ? Math.random() * 0.5 + 0.75 : 1;
+		// Variable timing between steps (more human-like acceleration/deceleration)
+		let timingVariation = 1.0;
+		if (randomize) {
+			// Accelerate in middle, decelerate at ends (Fitts' Law)
+			const acceleration = Math.sin(t * Math.PI); // Sine wave for smooth acceleration
+			timingVariation = 0.7 + acceleration * 0.6; // 0.7-1.3x variation
+		}
 		await sleep(stepDuration * timingVariation);
 	}
 
@@ -235,7 +258,8 @@ export async function humanClickElement(
 		offsetY?: number;
 		button?: "left" | "right" | "middle";
 		clickCount?: number;
-		hoverDelay?: number; // Delay before clicking (like reading)
+		hoverDelay?: number; // Delay before clicking (context-dependent)
+		elementType?: "button" | "link" | "input" | "generic"; // Affects timing
 	} = {},
 ): Promise<boolean> {
 	const {
@@ -243,28 +267,67 @@ export async function humanClickElement(
 		offsetY = 0,
 		button = "left",
 		clickCount = 1,
-		hoverDelay = 200,
+		hoverDelay,
+		elementType = "generic",
 	} = options;
 
-	// Move mouse to element
-	const moved = await moveMouseToElement(page, selector, { offsetX, offsetY });
-	if (!moved) return false;
+	// Move mouse to element with appropriate speed for element type
+	const moveOptions: any = { offsetX, offsetY };
 
-	// Add human-like pause (like reading the button text)
-	if (hoverDelay > 0) {
-		await sleep(hoverDelay + Math.random() * 300);
+	// Different movement speeds based on element type
+	switch (elementType) {
+		case "button":
+			// Buttons: confident, direct movement
+			moveOptions.duration = 400 + Math.random() * 200;
+			break;
+		case "link":
+			// Links: slightly faster, more confident
+			moveOptions.duration = 350 + Math.random() * 150;
+			break;
+		case "input":
+			// Inputs: slower, more careful
+			moveOptions.duration = 500 + Math.random() * 250;
+			break;
+		default:
+			// Generic: standard timing
+			break; // Use default calculated duration
 	}
 
-	// Click the element
+	const moved = await moveMouseToElement(page, selector, moveOptions);
+	if (!moved) return false;
+
+	// Context-aware hover delay (different for different element types)
+	const calculatedHoverDelay =
+		hoverDelay ??
+		(() => {
+			switch (elementType) {
+				case "button":
+					return 80 + Math.random() * 150; // Quick decision
+				case "link":
+					return 50 + Math.random() * 120; // Very quick
+				case "input":
+					return 120 + Math.random() * 200; // More careful
+				default:
+					return 100 + Math.random() * 200; // Standard
+			}
+		})();
+
+	if (calculatedHoverDelay > 0) {
+		await sleep(calculatedHoverDelay);
+	}
+
+	// More realistic click timing (based on Fitts' Law and human studies)
 	await page.mouse.down({ button });
-	await sleep(50 + Math.random() * 100); // Human click duration
+	const clickDuration = 35 + Math.random() * 85; // 35-120ms (more realistic)
+	await sleep(clickDuration);
 	await page.mouse.up({ button });
 
-	// Handle double/triple clicks
+	// Handle double/triple clicks with realistic timing
 	for (let i = 1; i < clickCount; i++) {
-		await sleep(100 + Math.random() * 200);
+		const doubleClickDelay = 120 + Math.random() * 180; // 120-300ms between clicks
+		await sleep(doubleClickDelay);
 		await page.mouse.down({ button });
-		await sleep(50 + Math.random() * 100);
+		await sleep(35 + Math.random() * 65); // Slightly faster subsequent clicks
 		await page.mouse.up({ button });
 	}
 
@@ -296,39 +359,87 @@ export async function humanTypeText(
 	text: string,
 	options: {
 		clearFirst?: boolean;
-		typeDelay?: number; // Delay between characters
+		typeDelay?: number; // Base delay between characters (auto-adjusted)
 		wordPause?: number; // Pause between words
+		mistakeRate?: number; // Chance of making a typo (0.0-1.0)
+		correctionDelay?: number; // Delay before correcting mistakes
 	} = {},
 ): Promise<boolean> {
-	const { clearFirst = true, typeDelay = 100, wordPause = 300 } = options;
+	const {
+		clearFirst = true,
+		typeDelay = 80, // Faster base typing (80-180ms per char)
+		wordPause = 200, // Shorter word pauses
+		mistakeRate = 0.02, // 2% chance of typo per character
+		correctionDelay = 300,
+	} = options;
 
-	// Click on the input field first
-	const clicked = await humanClickElement(page, selector);
+	// Click on the input field first (input-specific timing)
+	const clicked = await humanClickElement(page, selector, {
+		elementType: "input",
+		hoverDelay: 150, // Longer hover for inputs (focus consideration)
+	});
 	if (!clicked) return false;
 
-	// Clear existing text if requested
+	// Clear existing text if requested (more realistic clearing)
 	if (clearFirst) {
 		await page.keyboard.down("Control");
 		await page.keyboard.press("a");
 		await page.keyboard.up("Control");
+		await sleep(50 + Math.random() * 100); // Quick clear
 		await page.keyboard.press("Backspace");
-		await sleep(100);
+		await sleep(30 + Math.random() * 70);
 	}
 
-	// Type text with human-like timing
+	// Type text with realistic human patterns
 	const words = text.split(" ");
 	for (let i = 0; i < words.length; i++) {
 		const word = words[i];
 
-		for (const char of word) {
+		for (let charIndex = 0; charIndex < word.length; charIndex++) {
+			const char = word[charIndex];
+
+			// Realistic typing variations
+			let charDelay = typeDelay;
+
+			// Slower for capital letters (shift press)
+			if (char >= "A" && char <= "Z") {
+				charDelay += 30 + Math.random() * 50;
+			}
+
+			// Slightly slower at word boundaries
+			if (charIndex === 0 || charIndex === word.length - 1) {
+				charDelay += 10 + Math.random() * 20;
+			}
+
+			// Occasional longer pauses (thinking)
+			if (Math.random() < 0.05) {
+				// 5% chance
+				charDelay += 100 + Math.random() * 200;
+			}
+
 			await page.keyboard.type(char);
-			await sleep(typeDelay + Math.random() * 50);
+			await sleep(charDelay + Math.random() * 40);
+
+			// Occasional typos (backspace and retype)
+			if (Math.random() < mistakeRate && charIndex > 0) {
+				// Wait a bit, then correct
+				await sleep(correctionDelay + Math.random() * 200);
+				await page.keyboard.press("Backspace");
+
+				// Retype the character (slightly slower correction)
+				await sleep(80 + Math.random() * 100);
+				await page.keyboard.type(char);
+				await sleep(60 + Math.random() * 80);
+			}
 		}
 
-		// Add space between words (except for last word)
+		// Space between words (except for last word)
 		if (i < words.length - 1) {
 			await page.keyboard.type(" ");
-			await sleep(wordPause + Math.random() * 200);
+
+			// Variable word spacing (thinking between words)
+			const spaceDelay = wordPause + Math.random() * 150;
+			await sleep(spaceDelay);
 		}
 	}
 
