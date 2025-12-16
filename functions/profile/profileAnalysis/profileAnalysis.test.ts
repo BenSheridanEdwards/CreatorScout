@@ -48,6 +48,25 @@ const buildUniqueLinksMock = jest
 const hasDirectCreatorLinkMock = jest
 	.fn<(links: string[]) => boolean>()
 	.mockReturnValue(true);
+const analyzeExternalLinkMock = jest
+	.fn<
+		() => Promise<{
+			isCreator: boolean;
+			confidence: number;
+			indicators: string[];
+		}>
+	>()
+	.mockResolvedValue({
+		isCreator: true,
+		confidence: 70,
+		indicators: ["patreon link"],
+	});
+const shouldUseVisionAnalysisMock = jest
+	.fn<() => boolean>()
+	.mockReturnValue(true);
+const decodeInstagramRedirectMock = jest
+	.fn<(url: string) => string | null>()
+	.mockReturnValue("https://patreon.com/user");
 const analyzeProfileMock = jest
 	.fn<
 		() => Promise<{
@@ -109,6 +128,9 @@ jest.unstable_mockModule(
 	() => ({
 		buildUniqueLinks: buildUniqueLinksMock,
 		hasDirectCreatorLink: hasDirectCreatorLinkMock,
+		analyzeExternalLink: analyzeExternalLinkMock,
+		shouldUseVisionAnalysis: shouldUseVisionAnalysisMock,
+		decodeInstagramRedirect: decodeInstagramRedirectMock,
 	}),
 );
 jest.unstable_mockModule("../vision/vision.ts", () => ({
@@ -181,9 +203,10 @@ describe("profileAnalysis", () => {
 		expect(result.indicators).toEqual(
 			expect.arrayContaining([
 				"reason1",
+				"High follower ratio (200.0x)",
 				"Highlight keywords: kw",
 				'Link highlight: "Fun"',
-				"vision",
+				"External links in profile",
 			]),
 		);
 		expect(result.isCreator).toBe(true);

@@ -11,7 +11,6 @@ const mockGetUserDataDir = jest
 const mockConfig = {
 	LOCAL_BROWSER: true,
 	BROWSERLESS_TOKEN: "test-token",
-	PROXY_URL: undefined,
 };
 
 jest.unstable_mockModule("puppeteer-extra", () => ({

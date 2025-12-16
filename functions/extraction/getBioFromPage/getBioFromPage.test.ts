@@ -37,11 +37,11 @@ describe("getBioFromPage", () => {
 		expect(page.$).toHaveBeenCalled();
 	});
 
-	test("skips short text and uses a later selector", async () => {
-		const shortEl = {
-			evaluate: jest.fn<() => Promise<string>>().mockResolvedValue("Too short"),
+	test("skips non-bio content and uses a later selector", async () => {
+		const uiEl = {
+			evaluate: jest.fn<() => Promise<string>>().mockResolvedValue("Follow"), // UI element text
 		};
-		const longEl = {
+		const bioEl = {
 			evaluate: jest
 				.fn<() => Promise<string>>()
 				.mockResolvedValue("This is a sufficiently long bio for testing."),
@@ -52,8 +52,8 @@ describe("getBioFromPage", () => {
 				.fn<(selector: string) => Promise<ElementHandle<Element> | null>>()
 				.mockImplementation(async () => {
 					call += 1;
-					if (call === 1) return shortEl as unknown as ElementHandle<Element>;
-					if (call === 2) return longEl as unknown as ElementHandle<Element>;
+					if (call === 1) return uiEl as unknown as ElementHandle<Element>;
+					if (call === 2) return bioEl as unknown as ElementHandle<Element>;
 					return null;
 				}),
 		}) as jest.Mocked<Page>;
@@ -61,8 +61,8 @@ describe("getBioFromPage", () => {
 		const result = await getBioFromPage(page as Page);
 
 		expect(result).toBe("This is a sufficiently long bio for testing.");
-		expect(shortEl.evaluate).toHaveBeenCalled();
-		expect(longEl.evaluate).toHaveBeenCalled();
+		expect(uiEl.evaluate).toHaveBeenCalled();
+		expect(bioEl.evaluate).toHaveBeenCalled();
 	});
 
 	test("falls back to header and picks longest non-link line", async () => {
@@ -88,7 +88,7 @@ describe("getBioFromPage", () => {
 
 		const result = await getBioFromPage(page as Page);
 
-		expect(result).toBe("This is a long descriptive bio line without links");
+		expect(result).toBe("This long descriptive bio line without links");
 	});
 
 	test("falls back to header and returns trimmed text when no long line", async () => {

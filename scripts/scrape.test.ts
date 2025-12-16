@@ -621,9 +621,16 @@ user2
 			mockAddFollowingToQueue.mockResolvedValue(5);
 
 			// Mock sleep to throw an error that will be caught by the main try/catch (at the end)
-			mockSleep.mockRejectedValueOnce(new Error("Critical bio analysis failure"));
+			mockSleep.mockRejectedValueOnce(
+				new Error("Critical bio analysis failure"),
+			);
 
-			await processProfile("criticalerror", mockPage, "test_source", mockMetricsTracker);
+			await processProfile(
+				"criticalerror",
+				mockPage,
+				"test_source",
+				mockMetricsTracker,
+			);
 
 			// Should record the error in metrics
 			expect(mockMetricsTracker.recordError).toHaveBeenCalledWith(
@@ -824,7 +831,9 @@ user2
 			);
 
 			// Should record vision API call
-			expect(mockMetricsTracker.recordVisionApiCall).toHaveBeenCalledWith(0.001);
+			expect(mockMetricsTracker.recordVisionApiCall).toHaveBeenCalledWith(
+				0.001,
+			);
 
 			// Should record profile visit with vision API call count
 			expect(mockMetricsTracker.recordProfileVisit).toHaveBeenCalledWith(
@@ -1300,11 +1309,11 @@ user2
 			// Should log batch information
 			expect(mockLogger.info).toHaveBeenCalledWith(
 				"QUEUE",
-				"Processing batch 1 with 2 profiles (scroll position: 0)"
+				"Processing batch 1 with 2 profiles (scroll position: 0)",
 			);
 			expect(mockLogger.info).toHaveBeenCalledWith(
 				"QUEUE",
-				"Processing batch 2 with 2 profiles (scroll position: 500)"
+				"Processing batch 2 with 2 profiles (scroll position: 500)",
 			);
 		});
 
