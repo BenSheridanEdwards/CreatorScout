@@ -921,28 +921,39 @@ user2
 		it("handles vision analysis that does not confirm creator", async () => {
 			const { processProfile } = await import("./scrape.ts");
 
+			// Mock a profile with external links that would trigger vision analysis
+			// but vision analysis doesn't confirm creator status
 			mockAnalyzeProfileComprehensive.mockResolvedValue({
-				bio: "Test bio",
-				bioScore: 50,
-				links: ["https://linktr.ee/test"],
+				bio: "Test bio with linktree",
+				bioScore: 60,
+				isLikely: true,
+				links: ["https://linktr.ee/testprofile"],
 				stats: null,
 				highlights: [],
-				confidence: 30, // Low confidence, not a creator
-				indicators: [],
-				screenshots: [],
-				isCreator: false,
+				confidence: 60, // Above threshold but vision doesn't confirm
+				indicators: ["External links in profile"],
+				screenshots: ["vision_screenshot.png"], // Vision was attempted
+				isCreator: false, // Vision analysis didn't confirm creator
 				reason: null,
-				isLikely: true,
 			});
 
 			await processProfile("novisioncreator", mockPage, "test_source");
 
-			expect(mockLogger.debug).toHaveBeenCalledWith(
-				"ANALYSIS",
-				"Profile @novisioncreator analyzed but not a creator (confidence: 30%, threshold: 50)",
+			// Should analyze the profile and attempt vision
+			expect(mockAnalyzeProfileComprehensive).toHaveBeenCalledWith(
+				mockPage,
+				"novisioncreator",
 			);
+
+			// Should not mark as creator since vision didn't confirm
 			expect(mockMarkAsCreator).not.toHaveBeenCalled();
+
+			// Should not send DM or follow since not confirmed as creator
 			expect(mockSendDMToUser).not.toHaveBeenCalled();
+			expect(mockFollowUserAccount).not.toHaveBeenCalled();
+
+			// Should record that profile was processed but no creator found
+			expect(mockWasVisited).toHaveBeenCalledWith("novisioncreator");
 		});
 
 		it("skips DM if already sent", async () => {
@@ -1007,29 +1018,38 @@ user2
 		it("handles low bio score that doesn't meet confidence threshold", async () => {
 			const { processProfile } = await import("./scrape.ts");
 
+			// Mock a profile with low bio score that doesn't meet confidence threshold
 			mockAnalyzeProfileComprehensive.mockResolvedValue({
 				bio: "Test bio",
 				bioScore: 35,
+				isLikely: false, // Low score, not likely a creator
 				links: [],
 				stats: null,
 				highlights: [],
 				confidence: 35, // Below CONFIDENCE_THRESHOLD (50)
 				indicators: [],
-				screenshots: [],
+				screenshots: [], // No vision analysis attempted
 				isCreator: false,
 				reason: null,
-				isLikely: true,
 			});
 
 			await processProfile("lowscore", mockPage, "test_source");
 
-			expect(mockLogger.debug).toHaveBeenCalledWith(
-				"ANALYSIS",
-				"Profile @lowscore analyzed but not a creator (confidence: 35%, threshold: 50)",
+			// Should analyze the profile
+			expect(mockAnalyzeProfileComprehensive).toHaveBeenCalledWith(
+				mockPage,
+				"lowscore",
 			);
+
+			// Should not mark as creator due to low confidence
 			expect(mockMarkAsCreator).not.toHaveBeenCalled();
+
+			// Should not send DM or follow since confidence too low
 			expect(mockSendDMToUser).not.toHaveBeenCalled();
 			expect(mockFollowUserAccount).not.toHaveBeenCalled();
+
+			// Should record that profile was visited but not as creator
+			expect(mockWasVisited).toHaveBeenCalledWith("lowscore");
 		});
 
 		it("handles bio score between 40-70 that meets threshold", async () => {
