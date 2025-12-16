@@ -186,14 +186,25 @@ export function markAsCreator(
 ): void {
 	const db = getDb();
 	const stmt = db.prepare(`
-    UPDATE profiles SET 
-        is_patreon = 1, 
+    UPDATE profiles SET
+        is_patreon = 1,
         confidence = ?,
         proof_path = ?,
         last_seen = CURRENT_TIMESTAMP
     WHERE username = ?
   `);
 	stmt.run(confidence, proofPath || null, username.toLowerCase().trim());
+}
+
+export function getConfirmedCreators(): string[] {
+	const db = getDb();
+	const stmt = db.prepare(`
+		SELECT username FROM profiles
+		WHERE is_patreon = 1
+		ORDER BY last_seen DESC
+	`);
+	const rows = stmt.all() as { username: string }[];
+	return rows.map((row) => row.username);
 }
 
 export function wasDmSent(username: string): boolean {
