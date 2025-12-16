@@ -6,8 +6,8 @@ import { jest } from "@jest/globals";
 // Mock all the dependencies
 const mockMouseWiggle = jest.fn<any>().mockResolvedValue(undefined);
 const mockNavigateToProfileAndCheck = jest.fn();
-const mockAnalyzeProfileBasic = jest.fn();
-const mockAnalyzeLinkWithVision = jest.fn();
+const mockAnalyzeProfileComprehensive = jest.fn();
+const mockAnalyzeLinkWithVision = jest.fn(); // Keep for backwards compatibility
 const mockSnapshot = jest.fn();
 const mockMarkAsCreator = jest.fn();
 const mockSendDMToUser = jest.fn();
@@ -81,8 +81,7 @@ jest.unstable_mockModule(
 jest.unstable_mockModule(
 	"../functions/profile/profileAnalysis/profileAnalysis.ts",
 	() => ({
-		analyzeProfileBasic: mockAnalyzeProfileBasic,
-		analyzeLinkWithVision: mockAnalyzeLinkWithVision,
+		analyzeProfileComprehensive: mockAnalyzeProfileComprehensive,
 	}),
 );
 
@@ -180,11 +179,18 @@ describe("scrape.ts", () => {
 			notFound: false,
 			isPrivate: false,
 		});
-		mockAnalyzeProfileBasic.mockResolvedValue({
+		mockAnalyzeProfileComprehensive.mockResolvedValue({
 			bio: "Test bio with content",
 			bioScore: 45,
-			linkFromBio: null,
 			isLikely: true,
+			links: [],
+			stats: null,
+			highlights: [],
+			confidence: 45,
+			indicators: ["High follower ratio (500.0x)"],
+			screenshots: [],
+			isCreator: false,
+			reason: null,
 		});
 		mockGetDelay.mockReturnValue([1, 3]);
 		mockWasVisited.mockReturnValue(false);
@@ -383,10 +389,18 @@ user2
 		it("calls mouseWiggle after navigation", async () => {
 			const { processProfile } = await import("./scrape.ts");
 
-			mockAnalyzeProfileBasic.mockResolvedValue({
+			mockAnalyzeProfileComprehensive.mockResolvedValue({
 				bio: "Test bio",
-				bioScore: 30, // Below threshold to skip creator logic
-				linkFromBio: null,
+				bioScore: 30,
+				isLikely: false,
+				links: [],
+				stats: null,
+				highlights: [],
+				confidence: 30,
+				indicators: [],
+				screenshots: [],
+				isCreator: false,
+				reason: null,
 				isLikely: false,
 			});
 
@@ -463,11 +477,18 @@ user2
 		it("confirms creator with high bio score (70+)", async () => {
 			const { processProfile } = await import("./scrape.ts");
 
-			mockAnalyzeProfileBasic.mockResolvedValue({
+			mockAnalyzeProfileComprehensive.mockResolvedValue({
 				bio: "Test bio with patreon",
 				bioScore: 75,
-				linkFromBio: null,
 				isLikely: true,
+				links: [],
+				stats: null,
+				highlights: [],
+				confidence: 75,
+				indicators: ["Bio contains creator keywords: patreon"],
+				screenshots: [],
+				isCreator: false, // Will be set to true by confidence check
+				reason: null,
 			});
 
 			await processProfile("highscoreuser", mockPage, "test_source");
@@ -482,11 +503,18 @@ user2
 		it("confirms creator with vision analysis", async () => {
 			const { processProfile } = await import("./scrape.ts");
 
-			mockAnalyzeProfileBasic.mockResolvedValue({
+			mockAnalyzeProfileComprehensive.mockResolvedValue({
 				bio: "Test bio",
 				bioScore: 50,
-				linkFromBio: "https://linktr.ee/test",
 				isLikely: true,
+				links: ["https://linktr.ee/test"],
+				stats: null,
+				highlights: [],
+				confidence: 50,
+				indicators: ["External links in profile"],
+				screenshots: [],
+				isCreator: false, // Vision will confirm
+				reason: null,
 			});
 
 			mockAnalyzeLinkWithVision.mockResolvedValue({
@@ -512,10 +540,17 @@ user2
 		it("sends DM and follows confirmed creators", async () => {
 			const { processProfile } = await import("./scrape.ts");
 
-			mockAnalyzeProfileBasic.mockResolvedValue({
+			mockAnalyzeProfileComprehensive.mockResolvedValue({
 				bio: "Test bio",
 				bioScore: 90,
-				linkFromBio: null,
+				links: [],
+				stats: null,
+				highlights: [],
+				confidence: 50,
+				indicators: [],
+				screenshots: [],
+				isCreator: false,
+				reason: null,
 				isLikely: true,
 			});
 
@@ -561,10 +596,17 @@ user2
 
 			// Simulate a critical error during bio analysis
 			// Mock to simulate a critical error after bio analysis (in the main processing logic)
-			mockAnalyzeProfileBasic.mockResolvedValue({
+			mockAnalyzeProfileComprehensive.mockResolvedValue({
 				bio: "Test bio",
 				bioScore: 90,
-				linkFromBio: "https://linktr.ee/test", // Has link so snapshot will be called
+				links: ["https://linktr.ee/test"],
+				stats: null,
+				highlights: [],
+				confidence: 50,
+				indicators: [],
+				screenshots: [],
+				isCreator: false,
+				reason: null, // Has link so snapshot will be called
 				isLikely: true,
 			});
 
@@ -605,10 +647,17 @@ user2
 		it("handles DM sending errors", async () => {
 			const { processProfile } = await import("./scrape.ts");
 
-			mockAnalyzeProfileBasic.mockResolvedValue({
+			mockAnalyzeProfileComprehensive.mockResolvedValue({
 				bio: "Test bio",
 				bioScore: 90,
-				linkFromBio: null,
+				links: [],
+				stats: null,
+				highlights: [],
+				confidence: 50,
+				indicators: [],
+				screenshots: [],
+				isCreator: false,
+				reason: null,
 				isLikely: true,
 			});
 			mockSendDMToUser.mockResolvedValue(false); // DM fails
@@ -625,10 +674,17 @@ user2
 		it("handles follow action errors", async () => {
 			const { processProfile } = await import("./scrape.ts");
 
-			mockAnalyzeProfileBasic.mockResolvedValue({
+			mockAnalyzeProfileComprehensive.mockResolvedValue({
 				bio: "Test bio",
 				bioScore: 90,
-				linkFromBio: null,
+				links: [],
+				stats: null,
+				highlights: [],
+				confidence: 50,
+				indicators: [],
+				screenshots: [],
+				isCreator: false,
+				reason: null,
 				isLikely: true,
 			});
 			mockSendDMToUser.mockResolvedValue(true); // DM succeeds
@@ -651,10 +707,17 @@ user2
 		it("handles following queue addition errors", async () => {
 			const { processProfile } = await import("./scrape.ts");
 
-			mockAnalyzeProfileBasic.mockResolvedValue({
+			mockAnalyzeProfileComprehensive.mockResolvedValue({
 				bio: "Test bio",
 				bioScore: 90,
-				linkFromBio: null,
+				links: [],
+				stats: null,
+				highlights: [],
+				confidence: 50,
+				indicators: [],
+				screenshots: [],
+				isCreator: false,
+				reason: null,
 				isLikely: true,
 			});
 			mockSendDMToUser.mockResolvedValue(true); // DM succeeds
@@ -687,10 +750,17 @@ user2
 			};
 			mockGetGlobalMetricsTracker.mockReturnValue(mockMetricsTracker);
 
-			mockAnalyzeProfileBasic.mockResolvedValue({
+			mockAnalyzeProfileComprehensive.mockResolvedValue({
 				bio: "Test bio with content",
 				bioScore: 45,
-				linkFromBio: null,
+				links: [],
+				stats: null,
+				highlights: [],
+				confidence: 50,
+				indicators: [],
+				screenshots: [],
+				isCreator: false,
+				reason: null,
 				isLikely: true,
 			});
 
@@ -726,10 +796,17 @@ user2
 			};
 			mockGetGlobalMetricsTracker.mockReturnValue(mockMetricsTracker);
 
-			mockAnalyzeProfileBasic.mockResolvedValue({
+			mockAnalyzeProfileComprehensive.mockResolvedValue({
 				bio: "Test bio",
 				bioScore: 50,
-				linkFromBio: "https://linktr.ee/test",
+				links: ["https://linktr.ee/test"],
+				stats: null,
+				highlights: [],
+				confidence: 50,
+				indicators: [],
+				screenshots: [],
+				isCreator: false,
+				reason: null,
 				isLikely: true,
 			});
 
@@ -774,10 +851,17 @@ user2
 			};
 			mockGetGlobalMetricsTracker.mockReturnValue(mockMetricsTracker);
 
-			mockAnalyzeProfileBasic.mockResolvedValue({
+			mockAnalyzeProfileComprehensive.mockResolvedValue({
 				bio: "Test bio",
 				bioScore: 80,
-				linkFromBio: null,
+				links: [],
+				stats: null,
+				highlights: [],
+				confidence: 50,
+				indicators: [],
+				screenshots: [],
+				isCreator: false,
+				reason: null,
 				isLikely: true,
 			});
 			mockWasDmSent.mockReturnValue(false);
@@ -837,10 +921,17 @@ user2
 		it("handles vision analysis that does not confirm creator", async () => {
 			const { processProfile } = await import("./scrape.ts");
 
-			mockAnalyzeProfileBasic.mockResolvedValue({
+			mockAnalyzeProfileComprehensive.mockResolvedValue({
 				bio: "Test bio",
 				bioScore: 50,
-				linkFromBio: "https://linktr.ee/test",
+				links: ["https://linktr.ee/test"],
+				stats: null,
+				highlights: [],
+				confidence: 50,
+				indicators: [],
+				screenshots: [],
+				isCreator: false,
+				reason: null,
 				isLikely: true,
 			});
 
@@ -869,10 +960,17 @@ user2
 		it("skips DM if already sent", async () => {
 			const { processProfile } = await import("./scrape.ts");
 
-			mockAnalyzeProfileBasic.mockResolvedValue({
+			mockAnalyzeProfileComprehensive.mockResolvedValue({
 				bio: "Test bio",
 				bioScore: 90,
-				linkFromBio: null,
+				links: [],
+				stats: null,
+				highlights: [],
+				confidence: 50,
+				indicators: [],
+				screenshots: [],
+				isCreator: false,
+				reason: null,
 				isLikely: true,
 			});
 			mockWasDmSent.mockReturnValue(true);
@@ -892,10 +990,17 @@ user2
 		it("skips follow if already following", async () => {
 			const { processProfile } = await import("./scrape.ts");
 
-			mockAnalyzeProfileBasic.mockResolvedValue({
+			mockAnalyzeProfileComprehensive.mockResolvedValue({
 				bio: "Test bio",
 				bioScore: 90,
-				linkFromBio: null,
+				links: [],
+				stats: null,
+				highlights: [],
+				confidence: 50,
+				indicators: [],
+				screenshots: [],
+				isCreator: false,
+				reason: null,
 				isLikely: true,
 			});
 			mockWasDmSent.mockReturnValue(false);
@@ -914,10 +1019,17 @@ user2
 		it("handles low bio score that doesn't meet confidence threshold", async () => {
 			const { processProfile } = await import("./scrape.ts");
 
-			mockAnalyzeProfileBasic.mockResolvedValue({
+			mockAnalyzeProfileComprehensive.mockResolvedValue({
 				bio: "Test bio",
 				bioScore: 35, // Below CONFIDENCE_THRESHOLD (40)
-				linkFromBio: null,
+				links: [],
+				stats: null,
+				highlights: [],
+				confidence: 50,
+				indicators: [],
+				screenshots: [],
+				isCreator: false,
+				reason: null,
 				isLikely: true,
 			});
 
@@ -935,10 +1047,17 @@ user2
 		it("handles bio score between 40-70 that meets threshold", async () => {
 			const { processProfile } = await import("./scrape.ts");
 
-			mockAnalyzeProfileBasic.mockResolvedValue({
+			mockAnalyzeProfileComprehensive.mockResolvedValue({
 				bio: "Test bio",
 				bioScore: 60, // Above CONFIDENCE_THRESHOLD (40) but below 70
-				linkFromBio: null,
+				links: [],
+				stats: null,
+				highlights: [],
+				confidence: 50,
+				indicators: [],
+				screenshots: [],
+				isCreator: false,
+				reason: null,
 				isLikely: true,
 			});
 			mockWasDmSent.mockReturnValue(false);
@@ -957,10 +1076,17 @@ user2
 		it("takes screenshot for creators with links", async () => {
 			const { processProfile } = await import("./scrape.ts");
 
-			mockAnalyzeProfileBasic.mockResolvedValue({
+			mockAnalyzeProfileComprehensive.mockResolvedValue({
 				bio: "Test bio",
 				bioScore: 50,
-				linkFromBio: "https://linktr.ee/creator",
+				links: ["https://linktr.ee/creator" ? "https://linktr.ee/creator" : ""],
+				stats: null,
+				highlights: [],
+				confidence: 50,
+				indicators: [],
+				screenshots: [],
+				isCreator: false,
+				reason: null,
 				isLikely: true,
 			});
 
@@ -992,10 +1118,17 @@ user2
 		it("handles profiles with no bio found", async () => {
 			const { processProfile } = await import("./scrape.ts");
 
-			mockAnalyzeProfileBasic.mockResolvedValue({
+			mockAnalyzeProfileComprehensive.mockResolvedValue({
 				bio: null,
 				bioScore: 0,
-				linkFromBio: null,
+				links: [],
+				stats: null,
+				highlights: [],
+				confidence: 50,
+				indicators: [],
+				screenshots: [],
+				isCreator: false,
+				reason: null,
 				isLikely: false,
 			});
 
@@ -1024,10 +1157,17 @@ user2
 		it("handles vision analysis errors gracefully", async () => {
 			const { processProfile } = await import("./scrape.ts");
 
-			mockAnalyzeProfileBasic.mockResolvedValue({
+			mockAnalyzeProfileComprehensive.mockResolvedValue({
 				bio: "Test bio",
 				bioScore: 50,
-				linkFromBio: "https://linktr.ee/test",
+				links: ["https://linktr.ee/test"],
+				stats: null,
+				highlights: [],
+				confidence: 50,
+				indicators: [],
+				screenshots: [],
+				isCreator: false,
+				reason: null,
 				isLikely: true,
 			});
 
@@ -1058,10 +1198,17 @@ user2
 		it("falls back to CONFIDENCE_THRESHOLD when vision doesn't confirm creator", async () => {
 			const { processProfile } = await import("./scrape.ts");
 
-			mockAnalyzeProfileBasic.mockResolvedValue({
+			mockAnalyzeProfileComprehensive.mockResolvedValue({
 				bio: "Test bio",
 				bioScore: 45, // Below 70 but above CONFIDENCE_THRESHOLD (40)
-				linkFromBio: null, // No link to avoid screenshot logic
+				links: [],
+				stats: null,
+				highlights: [],
+				confidence: 50,
+				indicators: [],
+				screenshots: [],
+				isCreator: false,
+				reason: null, // No link to avoid screenshot logic
 				isLikely: true,
 			});
 
@@ -1081,10 +1228,17 @@ user2
 		it("applies final delay after profile processing", async () => {
 			const { processProfile } = await import("./scrape.ts");
 
-			mockAnalyzeProfileBasic.mockResolvedValue({
+			mockAnalyzeProfileComprehensive.mockResolvedValue({
 				bio: "Test bio",
 				bioScore: 30, // Below threshold to skip creator logic
-				linkFromBio: null,
+				links: [],
+				stats: null,
+				highlights: [],
+				confidence: 50,
+				indicators: [],
+				screenshots: [],
+				isCreator: false,
+				reason: null,
 				isLikely: false,
 			});
 

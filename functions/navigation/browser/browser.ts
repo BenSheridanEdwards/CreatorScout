@@ -6,19 +6,26 @@ import { join } from "node:path";
 import type { Browser, Page } from "puppeteer";
 import puppeteer from "puppeteer-extra";
 import StealthPlugin from "puppeteer-extra-plugin-stealth";
+import puppeteerProxy from "puppeteer-proxy";
 import { getUserDataDir } from "../../auth/sessionManager/sessionManager.ts";
 import {
 	BROWSERLESS_TOKEN,
 	LOCAL_BROWSER,
+	PROXY_URL,
 } from "../../shared/config/config.ts";
 
-// Initialize puppeteer-extra with stealth plugin
+// Initialize puppeteer-extra with stealth and proxy plugins
 const extra = puppeteer as unknown as {
 	use: (plugin: unknown) => void;
 	launch: (options: object) => Promise<Browser>;
 	connect: (options: object) => Promise<Browser>;
 };
 extra.use(StealthPlugin());
+
+// Apply proxy plugin if proxy is configured
+if (PROXY_URL) {
+	extra.use(puppeteerProxy(PROXY_URL));
+}
 
 export interface BrowserOptions {
 	headless?: boolean;
@@ -77,8 +84,12 @@ export async function createBrowser(
 				"BROWSERLESS_TOKEN must be set when not using LOCAL_BROWSER",
 			);
 		}
+
+		// BrowserLess stealth endpoint includes residential proxies by default
+		const wsEndpoint = `wss://chrome.browserless.io/chrome/stealth?token=${BROWSERLESS_TOKEN}`;
+
 		return await extra.connect({
-			browserWSEndpoint: `wss://chrome.browserless.io?token=${BROWSERLESS_TOKEN}`,
+			browserWSEndpoint: wsEndpoint,
 		});
 	}
 }

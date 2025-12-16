@@ -11,6 +11,7 @@ const mockGetUserDataDir = jest
 const mockConfig = {
 	LOCAL_BROWSER: true,
 	BROWSERLESS_TOKEN: "test-token",
+	PROXY_URL: undefined,
 };
 
 jest.unstable_mockModule("puppeteer-extra", () => ({
@@ -27,6 +28,9 @@ jest.unstable_mockModule("../../auth/sessionManager/sessionManager.ts", () => ({
 	getUserDataDir: mockGetUserDataDir,
 }));
 jest.unstable_mockModule("../../shared/config/config.ts", () => mockConfig);
+jest.unstable_mockModule("puppeteer-proxy", () => ({
+	default: jest.fn(() => ({})),
+}));
 
 // Helper to import module after any config tweaks
 const loadBrowserModule = async () => {
@@ -104,7 +108,8 @@ describe("browser helpers", () => {
 		await createBrowser();
 
 		expect(mockConnect).toHaveBeenCalledWith({
-			browserWSEndpoint: "wss://chrome.browserless.io?token=token-123",
+			browserWSEndpoint:
+				"wss://chrome.browserless.io/chrome/stealth?token=token-123",
 		});
 	});
 

@@ -145,6 +145,13 @@ export const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 export const IG_USER = process.env.INSTAGRAM_USERNAME;
 export const IG_PASS = process.env.INSTAGRAM_PASSWORD;
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// PROXY CONFIGURATION (Optional - BrowserLess stealth includes residential proxies)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Optional external proxy for API calls (vision analysis) - not needed with BrowserLess stealth
+export const PROXY_URL = process.env.PROXY_URL;
+
 // <<< BEST MODEL RIGHT NOW (Dec 2025) >>>
 export const VISION_MODEL = "google/gemini-flash-1.5-exp"; // fastest + cheapest winner
 // export const VISION_MODEL = 'google/gemini-pro-vision-2.5'; // max accuracy if you want

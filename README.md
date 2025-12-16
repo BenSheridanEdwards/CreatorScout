@@ -2,6 +2,28 @@
 
 An Instagram automation agent that discovers influencers with monetization links by exploring Following networks, using keyword matching and vision AI.
 
+## Quick Start
+
+1. **Clone and install:**
+   ```bash
+   git clone <repo>
+   cd scout
+   npm install
+   ```
+
+2. **Configure environment:**
+   ```bash
+   cp .env.example .env
+   # Edit .env with your credentials
+   ```
+
+3. **Run discovery:**
+   ```bash
+   npm run discover
+   ```
+
+## Configuration
+
 ## The Flow
 
 ```
@@ -166,6 +188,93 @@ The `functions/profile/bioMatcher/bioMatcher.ts` module scores bios based on:
 **Links** (25 points max):
 
 - `linktr.ee/xxx`, `patreon.com/xxx`, `ko-fi.com/xxx`, etc.
+
+## Configuration
+
+### Environment Variables
+
+Create a `.env` file with the following variables:
+
+```bash
+# ===========================================
+# BROWSER & PROXY CONFIGURATION
+# ===========================================
+
+# BrowserLess.io API token (required for production)
+BROWSERLESS_TOKEN=your_browserless_token_here
+
+# Use local browser instead of BrowserLess (for development)
+LOCAL_BROWSER=false
+
+# Optional: External proxy for API calls (BrowserLess stealth includes residential proxies)
+# PROXY_URL=http://username:password@proxy.example.com:8080
+
+# ===========================================
+# INSTAGRAM CREDENTIALS
+# ===========================================
+
+INSTAGRAM_USERNAME=your_instagram_username
+INSTAGRAM_PASSWORD=your_instagram_password
+
+# ===========================================
+# AI & VISION API
+# ===========================================
+
+# OpenRouter API key for vision analysis (Gemini models)
+OPENROUTER_API_KEY=your_openrouter_api_key
+
+# ===========================================
+# PERFORMANCE & DEBUGGING
+# ===========================================
+
+# Enable debug logging
+DEBUG_LOGS=false
+
+# Run in fast mode (reduced delays, skip vision - for testing)
+FAST_MODE=false
+
+# Skip vision API calls entirely (for testing)
+SKIP_VISION=false
+```
+
+### BrowserLess Stealth Setup
+
+**Why BrowserLess Stealth?**
+
+BrowserLess provides **enterprise-grade anti-detection** that surpasses traditional stealth plugins:
+
+- **Advanced Fingerprinting Mitigation**: Spoofs WebGL, Canvas, WebRTC, screen properties, and system characteristics
+- **Entropy Injection**: Injects realistic human-like behavior patterns and timing
+- **Residential Proxy Integration**: Built-in clean residential IPs with automatic rotation
+- **CAPTCHA Handling**: Automatic detection and solving of CAPTCHA challenges
+- **Behavioral Simulation**: Path-based semantics that mimic real user interactions
+
+**How It Works:**
+
+1. **Stealth Endpoint**: Connects to `/chrome/stealth` instead of regular Chrome
+2. **All-Inclusive**: Stealth features + residential proxies in one service
+3. **Zero Configuration**: Works out-of-the-box, no additional proxy setup needed
+4. **Professional Infrastructure**: Enterprise-grade anti-detection systems
+
+**Connection:**
+```typescript
+// Your browser connects to the stealth endpoint:
+wss://chrome.browserless.io/chrome/stealth?token=YOUR_TOKEN
+// (Residential proxies and stealth features included automatically)
+```
+
+**What You Get:**
+- ✅ **Advanced browser fingerprint spoofing**
+- ✅ **Human-like behavior simulation**
+- ✅ **Clean residential IP rotation**
+- ✅ **Automatic CAPTCHA handling**
+- ✅ **99.9% uptime infrastructure**
+
+**Cost Impact:**
+- **BrowserLess Stealth**: $50/month (everything included)
+- **Vision API**: $10-30/month
+- **Total**: $60-80/month
+- **No additional proxy services needed**
 
 ## Tests
 

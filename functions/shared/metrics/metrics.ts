@@ -242,3 +242,4 @@ export function startTimer(label: string): PerformanceTimer {
 	return new PerformanceTimer(label);
 }
 
+
