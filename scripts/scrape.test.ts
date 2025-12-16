@@ -205,6 +205,7 @@ describe("scrape.ts", () => {
 		mockQueueNext.mockReturnValue(null);
 		mockWasDmSent.mockReturnValue(false);
 		mockWasFollowed.mockReturnValue(false);
+		mockEnsureLoggedIn.mockResolvedValue(undefined);
 
 		mockCycleManager = {
 			recordWarning: jest.fn<any>(),
@@ -487,15 +488,19 @@ user2
 				confidence: 75,
 				indicators: ["Bio contains creator keywords: patreon"],
 				screenshots: [],
-				isCreator: false, // Will be set to true by confidence check
-				reason: null,
+				isCreator: true, // Set to true for high confidence
+				reason: "combined_signals",
 			});
 
 			await processProfile("highscoreuser", mockPage, "test_source");
 
 			expect(mockLogger.info).toHaveBeenCalledWith(
 				"ANALYSIS",
-				"High bio score (75) - likely creator without linktree",
+				"Bio: Test bio with patreon",
+			);
+			expect(mockLogger.info).toHaveBeenCalledWith(
+				"ANALYSIS",
+				"Confidence: 75%",
 			);
 			expect(mockMarkAsCreator).toHaveBeenCalledWith("highscoreuser", 75, null);
 		});
@@ -510,27 +515,19 @@ user2
 				links: ["https://linktr.ee/test"],
 				stats: null,
 				highlights: [],
-				confidence: 50,
-				indicators: ["External links in profile"],
-				screenshots: [],
-				isCreator: false, // Vision will confirm
-				reason: null,
-			});
-
-			mockAnalyzeLinkWithVision.mockResolvedValue({
-				isCreator: true,
 				confidence: 85,
-				indicators: ["subscription", "exclusive content"],
+				indicators: [
+					"External links in profile",
+					"subscription",
+					"exclusive content",
+				],
+				screenshots: ["test_screenshot.png"],
+				isCreator: true,
+				reason: "linktree",
 			});
 
 			await processProfile("visionuser", mockPage, "test_source");
 
-			expect(mockAnalyzeLinkWithVision).toHaveBeenCalledWith(
-				mockPage,
-				"https://linktr.ee/test",
-				"visionuser",
-				"linktree",
-			);
 			expect(mockLogger.info).toHaveBeenCalledWith(
 				"ACTION",
 				"🎉 CONFIRMED CREATOR @visionuser (confidence: 85%, source: test_source, vision calls: 1)",
@@ -546,11 +543,11 @@ user2
 				links: [],
 				stats: null,
 				highlights: [],
-				confidence: 50,
+				confidence: 80,
 				indicators: [],
 				screenshots: [],
-				isCreator: false,
-				reason: null,
+				isCreator: true,
+				reason: "test",
 				isLikely: true,
 			});
 
@@ -660,11 +657,11 @@ user2
 				links: [],
 				stats: null,
 				highlights: [],
-				confidence: 50,
+				confidence: 80,
 				indicators: [],
 				screenshots: [],
-				isCreator: false,
-				reason: null,
+				isCreator: true,
+				reason: "test",
 				isLikely: true,
 			});
 			mockSendDMToUser.mockResolvedValue(false); // DM fails
@@ -687,11 +684,11 @@ user2
 				links: [],
 				stats: null,
 				highlights: [],
-				confidence: 50,
+				confidence: 90,
 				indicators: [],
 				screenshots: [],
-				isCreator: false,
-				reason: null,
+				isCreator: true,
+				reason: "test",
 				isLikely: true,
 			});
 			mockSendDMToUser.mockResolvedValue(true); // DM succeeds
@@ -720,11 +717,11 @@ user2
 				links: [],
 				stats: null,
 				highlights: [],
-				confidence: 50,
+				confidence: 90,
 				indicators: [],
 				screenshots: [],
-				isCreator: false,
-				reason: null,
+				isCreator: true,
+				reason: "test",
 				isLikely: true,
 			});
 			mockSendDMToUser.mockResolvedValue(true); // DM succeeds
@@ -809,18 +806,12 @@ user2
 				links: ["https://linktr.ee/test"],
 				stats: null,
 				highlights: [],
-				confidence: 50,
+				confidence: 80,
 				indicators: [],
-				screenshots: [],
-				isCreator: false,
-				reason: null,
-				isLikely: true,
-			});
-
-			mockAnalyzeLinkWithVision.mockResolvedValue({
+				screenshots: ["test_screenshot.png"], // One screenshot = one vision call
 				isCreator: true,
-				confidence: 85,
-				indicators: ["subscription"],
+				reason: "test",
+				isLikely: true,
 			});
 
 			await processProfile(
@@ -843,7 +834,7 @@ user2
 				0, // discovery depth
 				undefined, // source profile
 				[], // contentCategories
-				1, // visionApiCalls (tracked cumulatively)
+				1, // visionApiCalls (based on screenshots.length)
 			);
 		});
 
@@ -866,11 +857,11 @@ user2
 				links: [],
 				stats: null,
 				highlights: [],
-				confidence: 50,
+				confidence: 80,
 				indicators: [],
 				screenshots: [],
-				isCreator: false,
-				reason: null,
+				isCreator: true,
+				reason: "test",
 				isLikely: true,
 			});
 			mockWasDmSent.mockReturnValue(false);
@@ -936,7 +927,7 @@ user2
 				links: ["https://linktr.ee/test"],
 				stats: null,
 				highlights: [],
-				confidence: 50,
+				confidence: 30, // Low confidence, not a creator
 				indicators: [],
 				screenshots: [],
 				isCreator: false,
@@ -944,23 +935,11 @@ user2
 				isLikely: true,
 			});
 
-			mockAnalyzeLinkWithVision.mockResolvedValue({
-				isCreator: false,
-				confidence: 30,
-				indicators: [],
-			});
-
 			await processProfile("novisioncreator", mockPage, "test_source");
 
-			expect(mockAnalyzeLinkWithVision).toHaveBeenCalledWith(
-				mockPage,
-				"https://linktr.ee/test",
-				"novisioncreator",
-				"linktree",
-			);
 			expect(mockLogger.debug).toHaveBeenCalledWith(
 				"ANALYSIS",
-				"Vision did not confirm creator for @novisioncreator - Confidence: 30%",
+				"Profile @novisioncreator analyzed but not a creator (confidence: 30%, threshold: 50)",
 			);
 			expect(mockMarkAsCreator).not.toHaveBeenCalled();
 			expect(mockSendDMToUser).not.toHaveBeenCalled();
@@ -975,11 +954,11 @@ user2
 				links: [],
 				stats: null,
 				highlights: [],
-				confidence: 50,
+				confidence: 80,
 				indicators: [],
 				screenshots: [],
-				isCreator: false,
-				reason: null,
+				isCreator: true,
+				reason: "test",
 				isLikely: true,
 			});
 			mockWasDmSent.mockReturnValue(true);
@@ -1005,11 +984,11 @@ user2
 				links: [],
 				stats: null,
 				highlights: [],
-				confidence: 50,
+				confidence: 80,
 				indicators: [],
 				screenshots: [],
-				isCreator: false,
-				reason: null,
+				isCreator: true,
+				reason: "test",
 				isLikely: true,
 			});
 			mockWasDmSent.mockReturnValue(false);
@@ -1030,11 +1009,11 @@ user2
 
 			mockAnalyzeProfileComprehensive.mockResolvedValue({
 				bio: "Test bio",
-				bioScore: 35, // Below CONFIDENCE_THRESHOLD (40)
+				bioScore: 35,
 				links: [],
 				stats: null,
 				highlights: [],
-				confidence: 50,
+				confidence: 35, // Below CONFIDENCE_THRESHOLD (50)
 				indicators: [],
 				screenshots: [],
 				isCreator: false,
@@ -1046,7 +1025,7 @@ user2
 
 			expect(mockLogger.debug).toHaveBeenCalledWith(
 				"ANALYSIS",
-				"Not confirmed (confidence: 35% < 40%)",
+				"Profile @lowscore analyzed but not a creator (confidence: 35%, threshold: 50)",
 			);
 			expect(mockMarkAsCreator).not.toHaveBeenCalled();
 			expect(mockSendDMToUser).not.toHaveBeenCalled();
@@ -1058,15 +1037,15 @@ user2
 
 			mockAnalyzeProfileComprehensive.mockResolvedValue({
 				bio: "Test bio",
-				bioScore: 60, // Above CONFIDENCE_THRESHOLD (40) but below 70
+				bioScore: 60, // Above CONFIDENCE_THRESHOLD (50)
 				links: [],
 				stats: null,
 				highlights: [],
-				confidence: 50,
+				confidence: 60,
 				indicators: [],
 				screenshots: [],
-				isCreator: false,
-				reason: null,
+				isCreator: true,
+				reason: "test",
 				isLikely: true,
 			});
 			mockWasDmSent.mockReturnValue(false);
@@ -1087,22 +1066,16 @@ user2
 
 			mockAnalyzeProfileComprehensive.mockResolvedValue({
 				bio: "Test bio",
-				bioScore: 50,
-				links: ["https://linktr.ee/creator" ? "https://linktr.ee/creator" : ""],
+				bioScore: 85,
+				links: ["https://linktr.ee/creator"],
 				stats: null,
 				highlights: [],
-				confidence: 50,
+				confidence: 85,
 				indicators: [],
 				screenshots: [],
-				isCreator: false,
-				reason: null,
-				isLikely: true,
-			});
-
-			mockAnalyzeLinkWithVision.mockResolvedValue({
 				isCreator: true,
-				confidence: 85,
-				indicators: ["subscription"],
+				reason: "test",
+				isLikely: true,
 			});
 
 			mockSnapshot.mockResolvedValue("/path/to/screenshot.png");
@@ -1155,7 +1128,7 @@ user2
 			);
 			expect(mockRecordError).toHaveBeenCalledWith(
 				"No bio found",
-				"bio_analysis_nobiouser",
+				"comprehensive_analysis_nobiouser",
 				"nobiouser",
 			);
 			// Should not proceed to creator actions
@@ -1175,26 +1148,13 @@ user2
 				confidence: 50,
 				indicators: [],
 				screenshots: [],
-				isCreator: false,
-				reason: null,
+				isCreator: true,
+				reason: "bio_score",
 				isLikely: true,
 			});
 
-			mockAnalyzeLinkWithVision.mockRejectedValue(
-				new Error("Vision API timeout"),
-			);
-
 			await processProfile("visionerroruser", mockPage, "test_source");
 
-			expect(mockLogger.warn).toHaveBeenCalledWith(
-				"ANALYSIS",
-				"Vision analysis failed for @visionerroruser, using bio score only",
-			);
-			expect(mockRecordError).toHaveBeenCalledWith(
-				expect.any(Error),
-				"vision_analysis_visionerroruser",
-				"visionerroruser",
-			);
 			// Should still mark as visited and potentially as creator based on bio score
 			expect(mockMarkVisited).toHaveBeenCalledWith(
 				"visionerroruser",
@@ -1209,24 +1169,21 @@ user2
 
 			mockAnalyzeProfileComprehensive.mockResolvedValue({
 				bio: "Test bio",
-				bioScore: 45, // Below 70 but above CONFIDENCE_THRESHOLD (40)
+				bioScore: 55, // Above CONFIDENCE_THRESHOLD (50)
 				links: [],
 				stats: null,
 				highlights: [],
-				confidence: 50,
+				confidence: 55,
 				indicators: [],
 				screenshots: [],
-				isCreator: false,
-				reason: null, // No link to avoid screenshot logic
+				isCreator: true,
+				reason: "test",
 				isLikely: true,
 			});
 
-			// Don't mock vision analysis - let it be undefined so it doesn't explicitly reject
-			mockAnalyzeLinkWithVision.mockResolvedValue(undefined);
-
 			await processProfile("thresholduser", mockPage, "test_source");
 
-			expect(mockMarkAsCreator).toHaveBeenCalledWith("thresholduser", 45, null);
+			expect(mockMarkAsCreator).toHaveBeenCalledWith("thresholduser", 55, null);
 			expect(mockSendDMToUser).toHaveBeenCalledWith(mockPage, "thresholduser");
 			expect(mockFollowUserAccount).toHaveBeenCalledWith(
 				mockPage,

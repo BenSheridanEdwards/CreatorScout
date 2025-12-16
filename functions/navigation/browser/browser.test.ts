@@ -27,9 +27,6 @@ jest.unstable_mockModule("../../auth/sessionManager/sessionManager.ts", () => ({
 	getUserDataDir: mockGetUserDataDir,
 }));
 jest.unstable_mockModule("../../shared/config/config.ts", () => mockConfig);
-jest.unstable_mockModule("puppeteer-proxy", () => ({
-	default: jest.fn(() => ({})),
-}));
 
 // Helper to import module after any config tweaks
 const loadBrowserModule = async () => {

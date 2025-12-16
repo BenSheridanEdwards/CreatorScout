@@ -307,6 +307,7 @@ export async function processProfile(
 				const visionCalls = analysis.screenshots.length; // Each screenshot likely involved vision analysis
 				for (let i = 0; i < visionCalls; i++) {
 					metricsTracker.recordVisionApiCall(0.001); // ~$0.001 per call
+					visionApiCalls++; // Increment cumulative counter
 				}
 				metricsTracker.recordCreatorFound(username, confidence, visionCalls);
 			}

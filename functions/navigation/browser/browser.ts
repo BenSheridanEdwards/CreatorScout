@@ -6,7 +6,6 @@ import { join } from "node:path";
 import type { Browser, Page } from "puppeteer";
 import puppeteer from "puppeteer-extra";
 import StealthPlugin from "puppeteer-extra-plugin-stealth";
-import puppeteerProxy from "puppeteer-proxy";
 import { getUserDataDir } from "../../auth/sessionManager/sessionManager.ts";
 import {
 	BROWSERLESS_TOKEN,
