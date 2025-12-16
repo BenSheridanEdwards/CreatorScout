@@ -29,6 +29,21 @@ const humanTypeTextMock = jest
 	.fn<() => Promise<boolean>>()
 	.mockResolvedValue(true);
 
+// Mock circuit breaker
+const executeWithCircuitBreakerMock =
+	jest.fn<(fn: () => Promise<any>, context?: string) => Promise<any>>();
+
+// Mock dashboard
+const recordActivityMock =
+	jest.fn<
+		(
+			action: string,
+			username: string,
+			status?: string,
+			details?: string,
+		) => void
+	>();
+
 jest.unstable_mockModule("../../shared/config/config.ts", () => configMock);
 jest.unstable_mockModule("../../shared/snapshot/snapshot.ts", () => ({
 	snapshot: snapshotMock,
@@ -54,6 +69,17 @@ jest.unstable_mockModule("../../timing/humanize/humanize.ts", () => ({
 	humanTypeText: humanTypeTextMock,
 }));
 
+jest.unstable_mockModule(
+	"../../shared/circuitBreaker/circuitBreaker.ts",
+	() => ({
+		executeWithCircuitBreaker: executeWithCircuitBreakerMock,
+	}),
+);
+
+jest.unstable_mockModule("../../shared/dashboard/dashboard.ts", () => ({
+	recordActivity: recordActivityMock,
+}));
+
 const {
 	checkDmThreadEmpty,
 	sendDMToUser,
@@ -67,6 +93,8 @@ describe("profileActions", () => {
 		openFollowingModalMock.mockResolvedValue(true);
 		extractFollowingUsernamesMock.mockResolvedValue(["user1", "user2"]);
 		wasVisitedMock.mockReturnValue(false);
+		// Make circuit breaker actually execute the function
+		executeWithCircuitBreakerMock.mockImplementation(async (fn) => await fn());
 	});
 
 	describe("checkDmThreadEmpty", () => {

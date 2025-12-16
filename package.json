@@ -16,7 +16,9 @@
 		"follow": "tsx scripts/follow_user.ts",
 		"dm": "tsx scripts/dm_user.ts",
 		"following": "tsx scripts/get_following.ts",
-		"process": "tsx scripts/process_profiles.ts"
+		"process": "tsx scripts/process_profiles.ts",
+		"health": "tsx scripts/health_check.ts",
+		"dashboard": "tsx scripts/dashboard.ts"
 	},
 	"dependencies": {
 		"better-sqlite3": "^12.5.0",

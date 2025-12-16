@@ -18,6 +18,8 @@ import {
 	decodeInstagramRedirect,
 } from "../../extraction/linkExtraction/linkExtraction.ts";
 import { SKIP_VISION } from "../../shared/config/config.ts";
+import { executeWithCircuitBreaker } from "../../shared/circuitBreaker/circuitBreaker.ts";
+import { recordActivity } from "../../shared/dashboard/dashboard.ts";
 import { snapshot } from "../../shared/snapshot/snapshot.ts";
 import { sleep } from "../../timing/sleep/sleep.ts";
 import { findKeywords, isLikelyCreator } from "../bioMatcher/bioMatcher.ts";
@@ -185,7 +187,10 @@ export async function analyzeProfileComprehensive(
 			if (!linkUrl || result.confidence >= 70) break; // Stop if we already have high confidence
 
 			try {
-				const linkAnalysis = await analyzeExternalLink(page, linkUrl, username);
+				const linkAnalysis = await executeWithCircuitBreaker(
+					() => analyzeExternalLink(page, linkUrl, username),
+					`link_analysis_${username}`,
+				);
 
 				if (linkAnalysis.isCreator) {
 					result.isCreator = true;
@@ -224,7 +229,10 @@ export async function analyzeProfileComprehensive(
 			const profileScreenshot = await snapshot(page, `profile_${username}`);
 			result.screenshots.push(profileScreenshot);
 
-			const visionResult = await analyzeProfile(profileScreenshot);
+			const visionResult = await executeWithCircuitBreaker(
+				() => analyzeProfile(profileScreenshot),
+				`vision_analysis_${username}`,
+			);
 			if (visionResult?.is_adult_creator && visionResult.confidence > 60) {
 				result.isCreator = true;
 				result.confidence = Math.max(
@@ -252,6 +260,23 @@ export async function analyzeProfileComprehensive(
 	if (!result.isCreator && result.confidence >= 70) {
 		result.isCreator = true;
 		result.reason = result.reason || "combined_signals";
+	}
+
+	// Record activity for dashboard
+	if (result.isCreator) {
+		recordActivity(
+			"creator_found",
+			username,
+			"success",
+			`confidence: ${result.confidence}%, reason: ${result.reason}`,
+		);
+	} else {
+		recordActivity(
+			"profile_analyzed",
+			username,
+			"success",
+			`confidence: ${result.confidence}%`,
+		);
 	}
 
 	return result;

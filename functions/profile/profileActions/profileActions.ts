@@ -7,6 +7,8 @@ import {
 	openFollowingModal,
 } from "../../navigation/modalOperations/modalOperations.ts";
 import { DM_MESSAGE } from "../../shared/config/config.ts";
+import { executeWithCircuitBreaker } from "../../shared/circuitBreaker/circuitBreaker.ts";
+import { recordActivity } from "../../shared/dashboard/dashboard.ts";
 import {
 	markDmSent,
 	markFollowed,
@@ -48,11 +50,13 @@ export async function sendDMToUser(
 	username: string,
 ): Promise<boolean> {
 	try {
-		// Navigate to DM page
-		await page.goto(`https://www.instagram.com/direct/inbox/`, {
-			waitUntil: "networkidle2",
-			timeout: 15000,
-		});
+		// Navigate to DM page with circuit breaker protection
+		await executeWithCircuitBreaker(async () => {
+			await page.goto(`https://www.instagram.com/direct/inbox/`, {
+				waitUntil: "networkidle2",
+				timeout: 15000,
+			});
+		}, `navigate_dm_inbox_${username}`);
 
 		// Click "New Message" or search for user
 		await sleep(2000);
@@ -115,12 +119,14 @@ export async function sendDMToUser(
 			markDmSent(username, proofPath);
 
 			logger.info("ACTION", `DM sent to @${username}`);
+			recordActivity("dm_sent", username, "success");
 			return true;
 		}
 
 		return false;
 	} catch (err) {
 		logger.error("ERROR", `Failed to send DM to @${username}: ${err}`);
+		recordActivity("dm_error", username, "error", err.message);
 		return false;
 	}
 }
@@ -133,10 +139,13 @@ export async function followUserAccount(
 	username: string,
 ): Promise<boolean> {
 	try {
-		await page.goto(`https://www.instagram.com/${username}/`, {
-			waitUntil: "networkidle2",
-			timeout: 15000,
-		});
+		await executeWithCircuitBreaker(async () => {
+			await page.goto(`https://www.instagram.com/${username}/`, {
+				waitUntil: "networkidle2",
+				timeout: 15000,
+			});
+		}, `navigate_profile_${username}`);
+
 		await sleep(2000);
 
 		// Find follow button
@@ -166,16 +175,19 @@ export async function followUserAccount(
 			await sleep(2000);
 			markFollowed(username);
 			logger.info("ACTION", `Followed @${username}`);
+			recordActivity("followed", username, "success");
 			return true;
 		} else {
 			logger.info(
 				"ACTION",
 				`Already following @${username} or button not found`,
 			);
+			recordActivity("already_following", username, "warning");
 			return false;
 		}
 	} catch (err) {
 		logger.error("ERROR", `Failed to follow @${username}: ${err}`);
+		recordActivity("follow_failed", username, "error", err.message);
 		return false;
 	}
 }

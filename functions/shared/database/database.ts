@@ -8,7 +8,7 @@ const DB_PATH = "scout.db";
 
 let dbInstance: Database.Database | null = null;
 
-function getDb(): Database.Database {
+export function getDb(): Database.Database {
 	if (!dbInstance) {
 		dbInstance = new Database(DB_PATH);
 		initDb();
