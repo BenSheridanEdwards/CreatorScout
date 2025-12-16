@@ -16,6 +16,10 @@ import {
 import { createLogger } from "../../shared/logger/logger.ts";
 import { snapshot } from "../../shared/snapshot/snapshot.ts";
 import { sleep } from "../../timing/sleep/sleep.ts";
+import {
+	humanClickElement,
+	humanTypeText,
+} from "../../timing/humanize/humanize.ts";
 
 const logger = createLogger(process.env.DEBUG_LOGS === "true");
 
@@ -54,15 +58,27 @@ export async function sendDMToUser(
 		await sleep(2000);
 
 		// Try to find existing conversation or start new one
-		const searchInput = await page.$('input[placeholder*="Search"]');
-		if (searchInput) {
-			await searchInput.type(username, { delay: 50 });
+		const searchSuccess = await humanTypeText(
+			page,
+			'input[placeholder*="Search"]',
+			username,
+			{
+				typeDelay: 80,
+				wordPause: 200,
+			},
+		);
+		if (searchSuccess) {
 			await sleep(2000);
 
-			// Click first result
-			const firstResult = await page.$('div[role="button"]');
-			if (firstResult) {
-				await firstResult.click();
+			// Click first result with human-like movement
+			const clickSuccess = await humanClickElement(
+				page,
+				'div[role="button"]:first-child',
+				{
+					hoverDelay: 500, // Pause like reading the result
+				},
+			);
+			if (clickSuccess) {
 				await sleep(2000);
 			}
 		}
@@ -77,15 +93,20 @@ export async function sendDMToUser(
 			return false;
 		}
 
-		// Type message
-		const messageInput = await page.$('div[role="textbox"]');
-		if (messageInput) {
-			await messageInput.click();
-			await sleep(500);
-			await page.keyboard.type(DM_MESSAGE, { delay: 50 });
+		// Type message with human-like timing
+		const typeSuccess = await humanTypeText(
+			page,
+			'div[role="textbox"]',
+			DM_MESSAGE,
+			{
+				typeDelay: 120, // Realistic typing speed
+				wordPause: 400, // Pause between words
+			},
+		);
+		if (typeSuccess) {
 			await sleep(1000);
 
-			// Send (Enter key or Send button)
+			// Send with Enter key (or could click send button)
 			await page.keyboard.press("Enter");
 			await sleep(2000);
 
@@ -131,7 +152,17 @@ export async function followUserAccount(
 		});
 
 		if (followButton) {
-			await page.click('button:has-text("Follow")');
+			// Click the follow button (keep existing approach for compatibility)
+			await page.evaluate(() => {
+				const buttons = Array.from(document.querySelectorAll("button"));
+				for (const btn of buttons) {
+					const text = btn.textContent?.trim().toLowerCase() || "";
+					if (text === "follow") {
+						btn.click();
+						return;
+					}
+				}
+			});
 			await sleep(2000);
 			markFollowed(username);
 			logger.info("ACTION", `Followed @${username}`);

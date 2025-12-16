@@ -21,6 +21,14 @@ const extractFollowingUsernamesMock = jest
 	.fn<() => Promise<string[]>>()
 	.mockResolvedValue(["user1", "user2"]);
 
+// Mock humanize functions
+const humanClickElementMock = jest
+	.fn<() => Promise<boolean>>()
+	.mockResolvedValue(true);
+const humanTypeTextMock = jest
+	.fn<() => Promise<boolean>>()
+	.mockResolvedValue(true);
+
 jest.unstable_mockModule("../../shared/config/config.ts", () => configMock);
 jest.unstable_mockModule("../../shared/snapshot/snapshot.ts", () => ({
 	snapshot: snapshotMock,
@@ -41,6 +49,10 @@ jest.unstable_mockModule(
 		extractFollowingUsernames: extractFollowingUsernamesMock,
 	}),
 );
+jest.unstable_mockModule("../../timing/humanize/humanize.ts", () => ({
+	humanClickElement: humanClickElementMock,
+	humanTypeText: humanTypeTextMock,
+}));
 
 const {
 	checkDmThreadEmpty,
@@ -97,9 +109,7 @@ describe("profileActions", () => {
 					.mockResolvedValue(undefined),
 				$: jest
 					.fn<
-						(
-							selector: string,
-						) => Promise<{
+						(selector: string) => Promise<{
 							type?: (text: string, opts?: unknown) => Promise<void>;
 							click?: () => Promise<void>;
 						} | null>
