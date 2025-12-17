@@ -8,7 +8,9 @@ jest.mock("node:fs/promises", () => ({
 }));
 
 const page = {
-	screenshot: jest.fn<any>().mockResolvedValue(undefined),
+	screenshot: jest
+		.fn<any>()
+		.mockResolvedValue(Buffer.from("fakepngbinary", "utf8")),
 } as unknown as Page;
 
 describe("snapshot", () => {

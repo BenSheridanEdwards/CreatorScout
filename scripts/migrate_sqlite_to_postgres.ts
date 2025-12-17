@@ -12,6 +12,8 @@
 import { createRequire } from "node:module";
 import { resolve } from "node:path";
 import { PrismaClient, Prisma } from "@prisma/client";
+import { PrismaPg } from "@prisma/adapter-pg";
+import { Pool } from "pg";
 
 type Args = { sqlitePath: string };
 
@@ -95,7 +97,19 @@ async function main(): Promise<void> {
 	}
 
 	const db = new SqliteDatabase(absSqlite, { readonly: true });
-	const prisma = new PrismaClient();
+	if (!process.env.DATABASE_URL) {
+		throw new Error("DATABASE_URL must be set (target Postgres).");
+	}
+
+	const pool = new Pool({
+		connectionString: process.env.DATABASE_URL,
+		ssl:
+			process.env.NODE_ENV === "production"
+				? { rejectUnauthorized: false }
+				: undefined,
+	});
+	const adapter = new PrismaPg(pool);
+	const prisma = new PrismaClient({ adapter });
 	await prisma.$connect();
 
 	const tables = db

@@ -1,4 +1,5 @@
 import type { Page } from "puppeteer";
+import fs from "node:fs/promises";
 import { clickAny } from "../../navigation/clickAny/clickAny.ts";
 import {
 	isLoggedIn,
@@ -127,7 +128,8 @@ export async function login(
 		let formFound = false;
 		for (const selector of loginSelectors) {
 			try {
-				await page.waitForSelector(selector, { timeout: 2000 });
+				// Instagram often hydrates the login UI asynchronously; give it time.
+				await page.waitForSelector(selector, { timeout: 15000 });
 				logger.info("ACTION", `Login form found with selector: ${selector}`);
 				formFound = true;
 				break;
@@ -205,6 +207,21 @@ export async function login(
 					"ACTION",
 					`Page content preview: ${bodyText.replace(/\n/g, " ").substring(0, 200)}...`,
 				);
+
+				// Persist full HTML/text to disk for troubleshooting in restricted environments.
+				await fs.mkdir("tmp", { recursive: true });
+				const ts = Date.now();
+				const html = await page.content();
+				await fs.writeFile(`tmp/login_debug_${ts}.html`, html, "utf8");
+				await fs.writeFile(
+					`tmp/login_debug_${ts}.txt`,
+					bodyText,
+					"utf8",
+				);
+				logger.info(
+					"ACTION",
+					`Login debug saved: tmp/login_debug_${ts}.html and tmp/login_debug_${ts}.txt`,
+				);
 			} catch (debugError) {
 				logger.error("ERROR", `Could not gather debug info: ${debugError}`);
 			}
@@ -240,10 +257,12 @@ export async function login(
 	];
 
 	let usernameField = null;
+	let usernameSelectorUsed: string | null = null;
 	for (const selector of usernameSelectors) {
 		try {
 			usernameField = await page.$(selector);
 			if (usernameField) {
+				usernameSelectorUsed = selector;
 				logger.info(
 					"ACTION",
 					`Username field found with selector: ${selector}`,
@@ -259,15 +278,34 @@ export async function login(
 		throw new Error("Could not find username input field");
 	}
 
-	// Focus and clear the field first
-	await usernameField.click();
-	await page.keyboard.press("Control+a");
-	await page.keyboard.press("Backspace");
+	// Focus the field (click can fail if the node is covered/animated)
+	try {
+		await usernameField.click();
+	} catch {
+		try {
+			// Scroll into view and focus as a fallback
+			await page.evaluate((el) => {
+				(el as HTMLElement | null)?.scrollIntoView?.({
+					block: "center",
+					inline: "center",
+				});
+			}, usernameField);
+		} catch {
+			// ignore
+		}
 
-	// Type username with more realistic delays
-	await page.type("input:focus", creds.username, {
-		delay: 100 + Math.random() * 50,
-	});
+		// Try focusing by selector if we have one
+		if (usernameSelectorUsed) {
+			try {
+				await page.focus(usernameSelectorUsed);
+			} catch {
+				// ignore
+			}
+		}
+	}
+
+	// Type username with more realistic delays (type on the element handle itself)
+	await usernameField.type(creds.username, { delay: 100 + Math.random() * 50 });
 	logger.info("ACTION", "Username entered");
 
 	// Add pause between fields (like a human would)

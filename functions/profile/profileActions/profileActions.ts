@@ -9,6 +9,7 @@ import {
 import { DM_MESSAGE } from "../../shared/config/config.ts";
 import { executeWithCircuitBreaker } from "../../shared/circuitBreaker/circuitBreaker.ts";
 import { recordActivity } from "../../shared/dashboard/dashboard.ts";
+import { clickAny } from "../../navigation/clickAny/clickAny.ts";
 import {
 	markDmSent,
 	markFollowed,
@@ -18,10 +19,7 @@ import {
 import { createLogger } from "../../shared/logger/logger.ts";
 import { snapshot } from "../../shared/snapshot/snapshot.ts";
 import { sleep } from "../../timing/sleep/sleep.ts";
-import {
-	humanClickElement,
-	humanTypeText,
-} from "../../timing/humanize/humanize.ts";
+import { humanTypeText } from "../../timing/humanize/humanize.ts";
 
 const logger = createLogger(process.env.DEBUG_LOGS === "true");
 
@@ -50,6 +48,7 @@ export async function sendDMToUser(
 	username: string,
 ): Promise<boolean> {
 	try {
+		const u = username.toLowerCase().trim();
 		logger.info("ACTION", `Current URL before DM navigation: ${page.url()}`);
 
 		// Navigate to DM page with circuit breaker protection
@@ -80,13 +79,12 @@ export async function sendDMToUser(
 		// Wait for page to load and look for new message button
 		await sleep(3000);
 
-		// Try multiple selectors for the "New Message" button
+		// Try multiple selectors for the "New Message" / compose button
 		const newMessageSelectors = [
 			'[aria-label="New message"]',
 			'[data-testid="new-message-button"]',
 			'svg[aria-label="New message"]',
 			'button[aria-label="New message"]',
-			'[role="button"]:has-text("Send message")',
 			".x1i10hfl button", // Instagram's current button class
 		];
 
@@ -100,55 +98,95 @@ export async function sendDMToUser(
 					newMessageClicked = true;
 					break;
 				}
-			} catch (e) {
+			} catch {
 				continue;
 			}
 		}
 
-		// If we can't find new message button, try direct search approach
+		// If we can't find the compose button, navigate directly to the composer route.
 		if (!newMessageClicked) {
 			logger.info(
 				"ACTION",
-				"New message button not found, trying direct search approach",
+				"New message button not found, navigating to /direct/new/",
 			);
+			await page.goto("https://www.instagram.com/direct/new/", {
+				waitUntil: "networkidle2",
+				timeout: 20000,
+			});
+			await sleep(2000);
+			newMessageClicked = true;
+		}
 
-			// Try to find search input in DM interface
-			const searchSelectors = [
-				'input[placeholder*="Search"]',
-				'input[aria-label*="Search"]',
-				'input[type="text"]',
-			];
+		// In the composer, select recipient first (otherwise message box won't appear).
+		const toInputSelectors = [
+			'div[role="dialog"] input[name="queryBox"]',
+			'div[role="dialog"] input[placeholder*="Search"]',
+			'div[role="dialog"] input[aria-label*="Search"]',
+			'div[role="dialog"] input[type="text"]',
+			// Fallback if dialog role changes
+			'input[name="queryBox"]',
+			'input[placeholder*="Search"]',
+			'input[aria-label*="Search"]',
+		];
 
-			let searchSuccess = false;
-			for (const selector of searchSelectors) {
-				try {
-					const searchResult = await humanTypeText(page, selector, username, {
-						typeDelay: 100,
-						wordPause: 300,
-					});
-					if (searchResult) {
-						searchSuccess = true;
-						await sleep(2000);
-						break;
-					}
-				} catch (e) {
-					continue;
-				}
-			}
-
-			if (!searchSuccess) {
-				throw new Error("Could not find or use search input in DM interface");
-			}
-
-			// Click first result
+		let typedRecipient = false;
+		for (const selector of toInputSelectors) {
 			try {
-				await humanClickElement(page, '[role="button"]:first-child', {
-					hoverDelay: 500,
+				const ok = await humanTypeText(page, selector, u, {
+					typeDelay: 80,
+					wordPause: 150,
 				});
-				await sleep(2000);
-			} catch (e) {
-				throw new Error("Could not select user from search results");
+				if (ok) {
+					typedRecipient = true;
+					await sleep(1500);
+					break;
+				}
+			} catch {
+				continue;
 			}
+		}
+
+		if (!typedRecipient) {
+			throw new Error("Could not find recipient search input in DM composer");
+		}
+
+		// Click the matching user result (avoid clicking random buttons like Next).
+		const selectedRecipient = await page.evaluate((uname: string) => {
+			const lower = uname.toLowerCase();
+			const root =
+				document.querySelector('div[role="dialog"]') ??
+				document.documentElement;
+			const candidates = Array.from(
+				root.querySelectorAll<HTMLElement>('[role="button"], button, a'),
+			);
+			const match = candidates.find((el) => {
+				const t = (el.textContent || "").trim().toLowerCase();
+				return t === lower || t === `@${lower}` || t.includes(`@${lower}`);
+			});
+			if (!match) return false;
+			match.click();
+			return true;
+		}, u);
+
+		if (!selectedRecipient) {
+			throw new Error("Could not select recipient from DM search results");
+		}
+
+		// Click Next/Chat to open the thread (text changes over time).
+		await sleep(1000);
+		await clickAny(page, ["Next", "Chat", "Done"]);
+		await sleep(1500);
+
+		// Safety: do not message if conversation already exists.
+		const threadEmpty = await checkDmThreadEmpty(page);
+		if (!threadEmpty) {
+			logger.info(
+				"ACTION",
+				`DM thread for @${username} is not empty; skipping to avoid spamming`,
+			);
+			recordActivity("dm_skipped_existing_thread", username, "warning");
+			await snapshot(page, `dm_skipped_existing_${username}`);
+			return false;
 		}
 
 		// Look for message input - try multiple selectors
@@ -177,7 +215,7 @@ export async function sendDMToUser(
 					messageInputFound = true;
 					break;
 				}
-			} catch (e) {
+			} catch {
 				continue;
 			}
 		}
@@ -192,7 +230,6 @@ export async function sendDMToUser(
 			'[data-testid="send-button"]',
 			'svg[aria-label="Send"]',
 			'button[type="submit"]',
-			'[role="button"]:has-text("Send")',
 		];
 
 		let messageSent = false;
@@ -205,7 +242,7 @@ export async function sendDMToUser(
 					messageSent = true;
 					break;
 				}
-			} catch (e) {
+			} catch {
 				continue;
 			}
 		}
@@ -219,6 +256,18 @@ export async function sendDMToUser(
 		}
 
 		if (messageSent) {
+			// Best-effort verification: check that the message appears in the thread.
+			const appearsInThread = await page
+				.evaluate((msg: string) => {
+					const text = document.body?.innerText || "";
+					return text.includes(msg);
+				}, DM_MESSAGE)
+				.catch(() => true);
+
+			if (!appearsInThread) {
+				throw new Error("Message did not appear in the thread after sending");
+			}
+
 			// Take screenshot as proof
 			const proofPath = await snapshot(page, `dm_${username}`);
 			await markDmSent(username, proofPath);
