@@ -120,5 +120,45 @@ export async function createPage(
 	await page.setViewport(viewport);
 	await page.setUserAgent(userAgent);
 
+	// Additional stealth techniques
+	await page.evaluateOnNewDocument(() => {
+		// Override navigator properties to avoid detection
+		Object.defineProperty(navigator, "webdriver", { get: () => undefined });
+
+		// Randomize some navigator properties slightly
+		const languages = ["en-US", "en"];
+		Object.defineProperty(navigator, "languages", { get: () => languages });
+
+		// Add realistic plugins (common ones)
+		Object.defineProperty(navigator, "plugins", {
+			get: () => [
+				{ name: "Chrome PDF Plugin", filename: "internal-pdf-viewer" },
+				{
+					name: "Chrome PDF Viewer",
+					filename: "mhjfbmdgcfjbbpaeojofohoefgiehjai",
+				},
+				{ name: "Native Client", filename: "internal-nacl-plugin" },
+			],
+		});
+	});
+
+	// Set extra HTTP headers to look more human
+	await page.setExtraHTTPHeaders({
+		Accept:
+			"text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+		"Accept-Encoding": "gzip, deflate, br",
+		"Accept-Language": "en-US,en;q=0.9",
+		"Cache-Control": "max-age=0",
+		"Sec-Ch-Ua":
+			'"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
+		"Sec-Ch-Ua-Mobile": "?0",
+		"Sec-Ch-Ua-Platform": '"macOS"',
+		"Sec-Fetch-Dest": "document",
+		"Sec-Fetch-Mode": "navigate",
+		"Sec-Fetch-Site": "none",
+		"Sec-Fetch-User": "?1",
+		"Upgrade-Insecure-Requests": "1",
+	});
+
 	return page;
 }

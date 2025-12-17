@@ -87,42 +87,226 @@ export async function login(
 		);
 	}
 
-	logger.info("ACTION", "Handling cookie consent dialog");
+	logger.info("ACTION", "Handling cookie consent and popups");
 	await clickAny(page, [
 		"Allow all cookies",
 		"Allow essential and optional cookies",
 		"Decline optional cookies",
+		"Accept All",
+		"Accept",
+		"OK",
+		"Continue",
 	]);
-	logger.info("ACTION", "Cookie consent handled");
+	logger.info("ACTION", "Popups handled");
 
-	// Wait for login form or already logged in state
+	// Add a brief pause to let any animations settle
+	await new Promise((resolve) => setTimeout(resolve, 1000));
+
+	// Wait for login form or already logged in state with multiple selectors
 	logger.info("ACTION", "Waiting for login form to appear");
 	try {
-		await page.waitForSelector('input[name="username"]', { timeout: 5000 });
-		logger.info("ACTION", "Login form found and ready");
-	} catch {
-		logger.warn(
-			"ACTION",
-			"Login form selector timeout, checking if already logged in",
-		);
-		// Check if we're already logged in (maybe cookies worked)
-		const loggedIn = await page.$('a[href="/direct/inbox/"]');
-		if (loggedIn) {
-			logger.info("ACTION", "Already logged in (cookies restored session)");
-			// Save cookies again to refresh expiration
-			await saveCookies(page);
-			logger.info("ACTION", "Cookies refreshed for restored session");
-			return;
+		// Try multiple login form selectors (Instagram changes them frequently)
+		const loginSelectors = [
+			'input[name="username"]',
+			'input[aria-label*="Phone number, username, or email"]',
+			'input[aria-label*="Username"]',
+			'input[placeholder*="Phone number, username, or email"]',
+			'input[placeholder*="Username"]',
+			'#loginForm input[type="text"]',
+			'form input[type="text"]',
+		];
+
+		let formFound = false;
+		for (const selector of loginSelectors) {
+			try {
+				await page.waitForSelector(selector, { timeout: 2000 });
+				logger.info("ACTION", `Login form found with selector: ${selector}`);
+				formFound = true;
+				break;
+			} catch {
+				continue;
+			}
 		}
-		logger.error("ACTION", "Could not find login form");
-		throw new Error("Could not find login form");
+
+		if (!formFound) {
+			logger.warn(
+				"ACTION",
+				"No login form selectors found, checking if already logged in",
+			);
+
+			// Check if we're already logged in with multiple indicators
+			const loggedInIndicators = await page.evaluate(() => {
+				const inboxLink = !!document.querySelector('a[href="/direct/inbox/"]');
+				const profileLink = !!document.querySelector('[aria-label*="profile"]');
+				const createButton = !!document.querySelector('[aria-label*="create"]');
+				const homeIcon = !!document.querySelector('[aria-label*="home"]');
+				const feed = !!document.querySelector('[role="main"]');
+
+				return { inboxLink, profileLink, createButton, homeIcon, feed };
+			});
+
+			const isLoggedIn = Object.values(loggedInIndicators).some(Boolean);
+
+			if (isLoggedIn) {
+				logger.info(
+					"ACTION",
+					"Already logged in - found user interface elements",
+				);
+				logger.info(
+					"ACTION",
+					`UI elements found: ${Object.entries(loggedInIndicators)
+						.filter(([_, v]) => v)
+						.map(([k]) => k)
+						.join(", ")}`,
+				);
+
+				// Save cookies again to refresh expiration
+				await saveCookies(page);
+				logger.info("ACTION", "Cookies refreshed for existing session");
+				return;
+			}
+
+			// Take debug screenshot
+			try {
+				await snapshot(page, `login_form_not_found_${Date.now()}`);
+				logger.info(
+					"ACTION",
+					`Debug screenshot saved for login form detection failure`,
+				);
+			} catch (screenshotError) {
+				logger.error(
+					"ERROR",
+					`Could not take debug screenshot: ${screenshotError}`,
+				);
+			}
+
+			// Also log some page information for debugging
+			try {
+				const pageTitle = await page.title();
+				const pageUrl = page.url();
+				const bodyText = await page.evaluate(() => {
+					const body = document.body;
+					return body ? body.innerText.substring(0, 500) : "No body found";
+				});
+
+				logger.info(
+					"ACTION",
+					`Page debug info - Title: "${pageTitle}", URL: ${pageUrl}`,
+				);
+				logger.info(
+					"ACTION",
+					`Page content preview: ${bodyText.replace(/\n/g, " ").substring(0, 200)}...`,
+				);
+			} catch (debugError) {
+				logger.error("ERROR", `Could not gather debug info: ${debugError}`);
+			}
+
+			logger.error(
+				"ACTION",
+				"Could not find login form or logged-in interface",
+			);
+			throw new Error("Could not find login form or determine login status");
+		}
+	} catch (error) {
+		if (error.message.includes("Could not find")) {
+			throw error;
+		}
+		logger.error("ACTION", `Login form detection failed: ${error.message}`);
+		throw new Error(`Login form detection failed: ${error.message}`);
 	}
 
 	logger.info("ACTION", `Filling in credentials for user: ${creds.username}`);
-	await page.type('input[name="username"]', creds.username, { delay: 5 });
+
+	// Add human-like delay before typing
+	await new Promise((resolve) =>
+		setTimeout(resolve, 1000 + Math.random() * 2000),
+	);
+
+	// Find and fill username field
+	const usernameSelectors = [
+		'input[name="username"]',
+		'input[aria-label*="Phone number, username, or email"]',
+		'input[aria-label*="Username"]',
+		'input[placeholder*="Phone number, username, or email"]',
+		'input[placeholder*="Username"]',
+		'#loginForm input[type="text"]',
+		'form input[type="text"]:first-of-type',
+	];
+
+	let usernameField = null;
+	for (const selector of usernameSelectors) {
+		try {
+			usernameField = await page.$(selector);
+			if (usernameField) {
+				logger.info(
+					"ACTION",
+					`Username field found with selector: ${selector}`,
+				);
+				break;
+			}
+		} catch {
+			continue;
+		}
+	}
+
+	if (!usernameField) {
+		throw new Error("Could not find username input field");
+	}
+
+	// Focus and clear the field first
+	await usernameField.click();
+	await page.keyboard.press("Control+a");
+	await page.keyboard.press("Backspace");
+
+	// Type username with more realistic delays
+	await page.type("input:focus", creds.username, {
+		delay: 100 + Math.random() * 50,
+	});
 	logger.info("ACTION", "Username entered");
-	await page.type('input[name="password"]', creds.password, { delay: 5 });
+
+	// Add pause between fields (like a human would)
+	await new Promise((resolve) =>
+		setTimeout(resolve, 500 + Math.random() * 1000),
+	);
+
+	// Find and fill password field
+	const passwordSelectors = [
+		'input[name="password"]',
+		'input[type="password"]',
+		'input[aria-label*="Password"]',
+		'input[placeholder*="Password"]',
+		'#loginForm input[type="password"]',
+		'form input[type="password"]',
+	];
+
+	let passwordField = null;
+	for (const selector of passwordSelectors) {
+		try {
+			passwordField = await page.$(selector);
+			if (passwordField) {
+				logger.info(
+					"ACTION",
+					`Password field found with selector: ${selector}`,
+				);
+				break;
+			}
+		} catch {
+			continue;
+		}
+	}
+
+	if (!passwordField) {
+		throw new Error("Could not find password input field");
+	}
+
+	// Type password with realistic delays
+	await passwordField.type(creds.password, { delay: 120 + Math.random() * 80 });
 	logger.info("ACTION", "Password entered");
+
+	// Add another pause before clicking submit (human hesitation)
+	await new Promise((resolve) =>
+		setTimeout(resolve, 800 + Math.random() * 1200),
+	);
 
 	if (options?.skipSubmit) {
 		logger.info(
@@ -155,59 +339,162 @@ export async function login(
 	}
 
 	logger.info("ACTION", "Submitting login form");
-	await page.click('button[type="submit"]');
+
+	// Try multiple submit button selectors
+	const submitSelectors = [
+		'button[type="submit"]',
+		'button:has-text("Log in")',
+		'button:has-text("Log In")',
+		'[data-testid*="login"] button',
+		'[role="button"]:has-text("Log in")',
+		'form button[type="submit"]',
+		'button[class*="login"]',
+	];
+
+	let submitClicked = false;
+	for (const selector of submitSelectors) {
+		try {
+			const submitButton = await page.$(selector);
+			if (submitButton) {
+				await submitButton.click();
+				logger.info(
+					"ACTION",
+					`Submit button clicked with selector: ${selector}`,
+				);
+				submitClicked = true;
+				break;
+			}
+		} catch {
+			continue;
+		}
+	}
+
+	if (!submitClicked) {
+		logger.warn(
+			"ACTION",
+			"Submit button not found with standard selectors, trying keyboard enter",
+		);
+		// Try pressing Enter on the password field
+		await page.keyboard.press("Enter");
+	}
+
 	logger.info("ACTION", "Login form submitted");
 
-	// Wait for navigation after login
-	logger.info("ACTION", "Waiting for login to complete and inbox to load");
+	// Wait for navigation after login with longer timeout and better detection
+	logger.info("ACTION", "Waiting for login to complete and page to load");
 	try {
-		await page.waitForSelector('a[href="/direct/inbox/"]', { timeout: 15000 });
-		logger.info("ACTION", "Login successful - inbox link found");
+		// Wait for either inbox link or error indicators
+		await page.waitForFunction(
+			() => {
+				// Check for successful login indicators
+				const inboxLink = document.querySelector('a[href="/direct/inbox/"]');
+				const profileLink = document.querySelector('a[href*="/accounts/"]');
+				const feedContent = document.querySelector('[role="main"]');
 
-		// Save cookies after successful login
-		await saveCookies(page);
-		logger.info("ACTION", "Cookies saved after successful login");
-	} catch {
-		const currentUrl = page.url();
-		logger.warn("ACTION", `Login timeout - current URL: ${currentUrl}`);
+				// Check for login failure indicators
+				const errorMsg =
+					document.body?.innerText?.includes("incorrect") ||
+					document.body?.innerText?.includes("challenge") ||
+					document.body?.innerText?.includes("verify") ||
+					document.body?.innerText?.includes("suspicious");
 
-		// Check if login failed with an error message
-		logger.info("ACTION", "Checking for error messages on page");
-		const errorText = await page.evaluate(() => {
-			const el = document.body;
-			return (
-				el?.innerText?.includes("couldn't connect") ||
-				el?.innerText?.includes("incorrect") ||
-				el?.innerText?.includes("Sorry") ||
-				el?.innerText?.includes("suspended") ||
-				el?.innerText?.includes("challenge") ||
-				el?.innerText?.includes("verify") ||
-				el?.innerText?.includes("suspicious")
-			);
+				return inboxLink || profileLink || feedContent || errorMsg;
+			},
+			{ timeout: 30000 },
+		);
+
+		// Double-check login status
+		await new Promise((resolve) => setTimeout(resolve, 3000));
+		const finalUrl = page.url();
+
+		// Check for various success indicators
+		const successIndicators = await page.evaluate(() => {
+			const inboxLink = !!document.querySelector('a[href="/direct/inbox/"]');
+			const profileMenu = !!document.querySelector('[aria-label*="profile"]');
+			const createPost = !!document.querySelector('[aria-label*="create"]');
+			const feed = !!document.querySelector('[role="main"]');
+
+			return { inboxLink, profileMenu, createPost, feed };
 		});
-		if (errorText) {
-			logger.error("ACTION", "Login error detected on page");
-			const bodyText = await page.evaluate(() => document.body.innerText || "");
-			const errorPreview = bodyText.substring(0, 300).replace(/\n/g, " ");
-			throw new Error(
-				`Login failed - Instagram may be showing an error or challenge. Page preview: ${errorPreview}`,
-			);
-		}
-		// Check if we're already on a different page (maybe logged in but different UI)
-		if (
-			currentUrl.includes("instagram.com") &&
-			!currentUrl.includes("/accounts/login")
-		) {
-			logger.warn(
+
+		const isLoggedIn =
+			successIndicators.inboxLink ||
+			successIndicators.profileMenu ||
+			successIndicators.createPost ||
+			successIndicators.feed;
+
+		if (isLoggedIn) {
+			logger.info("ACTION", "Login successful - user interface detected");
+			logger.info(
 				"ACTION",
-				"Login may have succeeded but inbox link not found. Continuing anyway...",
+				`Success indicators: ${Object.entries(successIndicators)
+					.filter(([_, v]) => v)
+					.map(([k]) => k)
+					.join(", ")}`,
 			);
-			// Try to continue - might be logged in but UI changed
+
+			// Save cookies after successful login
+			await saveCookies(page);
+			logger.info("ACTION", "Cookies saved after successful login");
 			return;
 		}
-		logger.error("ACTION", "Login timeout - could not complete login process");
+
+		// Check for error conditions
+		const errorText = await page.evaluate(() => {
+			const bodyText = document.body?.innerText || "";
+			return (
+				bodyText.includes("couldn't connect") ||
+				bodyText.includes("incorrect") ||
+				bodyText.includes("Sorry") ||
+				bodyText.includes("suspended") ||
+				bodyText.includes("challenge") ||
+				bodyText.includes("verify") ||
+				bodyText.includes("suspicious") ||
+				bodyText.includes("unusual activity")
+			);
+		});
+
+		if (errorText) {
+			logger.error("ACTION", "Login error detected on page");
+			const bodyText = await page.evaluate(
+				() => document.body?.innerText || "",
+			);
+			const errorPreview = bodyText.substring(0, 300).replace(/\n/g, " ");
+			throw new Error(
+				`Login failed - Instagram security detected. Page preview: ${errorPreview}`,
+			);
+		}
+
+		logger.warn(
+			"ACTION",
+			`Login completed but login status uncertain. URL: ${finalUrl}`,
+		);
+		logger.warn(
+			"ACTION",
+			`Success indicators found: ${Object.entries(successIndicators)
+				.filter(([_, v]) => v)
+				.map(([k]) => k)
+				.join(", ")}`,
+		);
+
+		// Try to continue anyway - Instagram might be using a different UI
+		return;
+	} catch (waitError) {
+		const currentUrl = page.url();
+		logger.error("ACTION", `Login timeout - current URL: ${currentUrl}`);
+
+		// Take screenshot for debugging
+		try {
+			await snapshot(page, `login_timeout_debug_${Date.now()}`);
+		} catch (screenshotError) {
+			logger.error(
+				"ERROR",
+				`Could not take debug screenshot: ${screenshotError}`,
+			);
+		}
+
 		throw new Error(
-			"Login timeout - could not find inbox link after 15 seconds. Instagram may be blocking headless browsers or requiring verification.",
+			`Login timeout after 30 seconds. Instagram may be blocking automated access or requiring manual verification. Current URL: ${currentUrl}`,
 		);
 	}
 

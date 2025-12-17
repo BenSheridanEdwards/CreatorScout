@@ -31,6 +31,13 @@ async function dmUser(username: string): Promise<void> {
 		await ensureLoggedIn(page);
 		console.log("✅ Logged in successfully");
 
+		// Take a screenshot to see what the page looks like after login
+		const loginScreenshot = await page.screenshot({
+			path: `login_state_${Date.now()}.png`,
+			fullPage: true,
+		});
+		console.log(`📸 Login state screenshot saved`);
+
 		console.log(`📨 Sending DM to @${username}...`);
 		const success = await sendDMToUser(page, username);
 

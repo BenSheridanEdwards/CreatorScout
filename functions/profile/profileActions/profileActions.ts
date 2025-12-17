@@ -50,6 +50,8 @@ export async function sendDMToUser(
 	username: string,
 ): Promise<boolean> {
 	try {
+		logger.info("ACTION", `Current URL before DM navigation: ${page.url()}`);
+
 		// Navigate to DM page with circuit breaker protection
 		await executeWithCircuitBreaker(async () => {
 			await page.goto(`https://www.instagram.com/direct/inbox/`, {
@@ -58,62 +60,165 @@ export async function sendDMToUser(
 			});
 		}, `navigate_dm_inbox_${username}`);
 
-		// Click "New Message" or search for user
-		await sleep(2000);
+		logger.info("ACTION", `Current URL after DM navigation: ${page.url()}`);
 
-		// Try to find existing conversation or start new one
-		const searchSuccess = await humanTypeText(
-			page,
-			'input[placeholder*="Search"]',
-			username,
-			{
-				typeDelay: 80,
-				wordPause: 200,
-			},
-		);
-		if (searchSuccess) {
-			await sleep(2000);
+		// Check if we're logged in by looking for profile elements
+		const isLoggedIn =
+			(await page.$('[href*="/direct/inbox/"]')) !== null ||
+			(await page.$('[aria-label*="profile"]')) !== null ||
+			(await page.$('[data-testid*="user-avatar"]')) !== null;
 
-			// Click first result with human-like movement
-			const clickSuccess = await humanClickElement(
-				page,
-				'div[role="button"]:first-child',
-				{
-					hoverDelay: 500, // Pause like reading the result
-				},
-			);
-			if (clickSuccess) {
-				await sleep(2000);
+		logger.info("ACTION", `Logged in check: ${isLoggedIn}`);
+
+		if (!isLoggedIn) {
+			throw new Error("Not logged in - cannot send DM");
+		}
+
+		// Take debug screenshot
+		await snapshot(page, `dm_page_debug_${username}`);
+
+		// Wait for page to load and look for new message button
+		await sleep(3000);
+
+		// Try multiple selectors for the "New Message" button
+		const newMessageSelectors = [
+			'[aria-label="New message"]',
+			'[data-testid="new-message-button"]',
+			'svg[aria-label="New message"]',
+			'button[aria-label="New message"]',
+			'[role="button"]:has-text("Send message")',
+			".x1i10hfl button", // Instagram's current button class
+		];
+
+		let newMessageClicked = false;
+		for (const selector of newMessageSelectors) {
+			try {
+				const element = await page.$(selector);
+				if (element) {
+					await element.click();
+					await sleep(2000);
+					newMessageClicked = true;
+					break;
+				}
+			} catch (e) {
+				continue;
 			}
 		}
 
-		// Check if conversation already has messages
-		const messages = await page.$$('div[role="textbox"]');
-		if (messages.length > 0) {
-			logger.warn(
+		// If we can't find new message button, try direct search approach
+		if (!newMessageClicked) {
+			logger.info(
 				"ACTION",
-				`Conversation with @${username} already exists, skipping DM`,
+				"New message button not found, trying direct search approach",
 			);
-			return false;
+
+			// Try to find search input in DM interface
+			const searchSelectors = [
+				'input[placeholder*="Search"]',
+				'input[aria-label*="Search"]',
+				'input[type="text"]',
+			];
+
+			let searchSuccess = false;
+			for (const selector of searchSelectors) {
+				try {
+					const searchResult = await humanTypeText(page, selector, username, {
+						typeDelay: 100,
+						wordPause: 300,
+					});
+					if (searchResult) {
+						searchSuccess = true;
+						await sleep(2000);
+						break;
+					}
+				} catch (e) {
+					continue;
+				}
+			}
+
+			if (!searchSuccess) {
+				throw new Error("Could not find or use search input in DM interface");
+			}
+
+			// Click first result
+			try {
+				await humanClickElement(page, '[role="button"]:first-child', {
+					hoverDelay: 500,
+				});
+				await sleep(2000);
+			} catch (e) {
+				throw new Error("Could not select user from search results");
+			}
 		}
 
-		// Type message with human-like timing
-		const typeSuccess = await humanTypeText(
-			page,
-			'div[role="textbox"]',
-			DM_MESSAGE,
-			{
-				typeDelay: 120, // Realistic typing speed
-				wordPause: 400, // Pause between words
-			},
-		);
-		if (typeSuccess) {
-			await sleep(1000);
+		// Look for message input - try multiple selectors
+		const messageSelectors = [
+			'[role="textbox"]',
+			'[contenteditable="true"]',
+			'[aria-label*="Message"]',
+			'div[data-lexical-editor="true"]',
+			".x1i10hfl textarea",
+			".x1i10hfl div[contenteditable]",
+		];
 
-			// Send with Enter key (or could click send button)
+		let messageInputFound = false;
+		for (const selector of messageSelectors) {
+			try {
+				const messageInput = await page.$(selector);
+				if (messageInput) {
+					// Focus the input
+					await messageInput.click();
+					await sleep(500);
+
+					// Type the message
+					await page.keyboard.type(DM_MESSAGE, { delay: 120 });
+					await sleep(1000);
+
+					messageInputFound = true;
+					break;
+				}
+			} catch (e) {
+				continue;
+			}
+		}
+
+		if (!messageInputFound) {
+			throw new Error("Could not find message input field");
+		}
+
+		// Send the message - try multiple send button selectors
+		const sendSelectors = [
+			'[aria-label="Send"]',
+			'[data-testid="send-button"]',
+			'svg[aria-label="Send"]',
+			'button[type="submit"]',
+			'[role="button"]:has-text("Send")',
+		];
+
+		let messageSent = false;
+		for (const selector of sendSelectors) {
+			try {
+				const sendButton = await page.$(selector);
+				if (sendButton) {
+					await sendButton.click();
+					await sleep(2000);
+					messageSent = true;
+					break;
+				}
+			} catch (e) {
+				continue;
+			}
+		}
+
+		// If send button not found, try Enter key
+		if (!messageSent) {
+			logger.info("ACTION", "Send button not found, trying Enter key");
 			await page.keyboard.press("Enter");
 			await sleep(2000);
+			messageSent = true;
+		}
 
+		if (messageSent) {
 			// Take screenshot as proof
 			const proofPath = await snapshot(page, `dm_${username}`);
 			markDmSent(username, proofPath);
