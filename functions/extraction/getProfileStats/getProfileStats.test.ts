@@ -1,3 +1,19 @@
+/**
+ * getProfileStats Function Tests
+ *
+ * The getProfileStats() function extracts follower/following/posts statistics:
+ *
+ * Algorithm:
+ * 1. Use page.evaluate() to extract stats from DOM
+ * 2. Try multiple extraction methods:
+ *    - Method 1: Find links with /followers/ or /following/ hrefs
+ *    - Method 2: Parse header text for patterns like "110K followers"
+ * 3. Handle abbreviated counts (K, M, B suffixes)
+ * 4. Calculate follower/following ratio if both counts available
+ *
+ * Returns: { followers, following, posts, ratio } with null for missing values
+ */
+
 import { jest } from "@jest/globals";
 import { createPageMock } from "../../__test__/testUtils.ts";
 import { getProfileStats } from "./getProfileStats.ts";
@@ -7,8 +23,12 @@ describe("getProfileStats", () => {
 		jest.clearAllMocks();
 	});
 
-	describe("happy path", () => {
-		test("returns parsed counts and ratio when evaluate succeeds", async () => {
+	// ═══════════════════════════════════════════════════════════════════════════
+	// Happy Path: Successful Stats Extraction
+	// ═══════════════════════════════════════════════════════════════════════════
+
+	describe("Successful stats extraction", () => {
+		test("returns parsed counts with calculated ratio", async () => {
 			const evaluateMock = jest
 				.fn<
 					() => Promise<{ followers: number; following: number; posts: number }>
@@ -27,11 +47,39 @@ describe("getProfileStats", () => {
 				followers: 1200,
 				following: 300,
 				posts: 42,
-				ratio: 4,
+				ratio: 4, // 1200 / 300 = 4
 			});
 		});
 
-		test("leaves ratio null when following is zero", async () => {
+		test("calculates correct ratio for high follower counts", async () => {
+			const page = createPageMock({
+				evaluate: jest
+					.fn<
+						() => Promise<{
+							followers: number;
+							following: number;
+							posts: number;
+						}>
+					>()
+					.mockResolvedValue({
+						followers: 100000,
+						following: 500,
+						posts: 200,
+					}),
+			});
+
+			const stats = await getProfileStats(page);
+
+			expect(stats.ratio).toBe(200); // 100000 / 500 = 200
+		});
+	});
+
+	// ═══════════════════════════════════════════════════════════════════════════
+	// Ratio Edge Cases
+	// ═══════════════════════════════════════════════════════════════════════════
+
+	describe("Ratio calculation edge cases", () => {
+		test("returns null ratio when following count is zero (avoid division by zero)", async () => {
 			const page = createPageMock({
 				evaluate: jest
 					.fn<
@@ -58,7 +106,29 @@ describe("getProfileStats", () => {
 			});
 		});
 
-		test("leaves ratio null when any count is null", async () => {
+		test("returns null ratio when followers count is null", async () => {
+			const page = createPageMock({
+				evaluate: jest
+					.fn<
+						() => Promise<{
+							followers: number | null;
+							following: number | null;
+							posts: number | null;
+						}>
+					>()
+					.mockResolvedValue({
+						followers: null,
+						following: 500,
+						posts: 20,
+					}),
+			});
+
+			const stats = await getProfileStats(page);
+
+			expect(stats.ratio).toBeNull();
+		});
+
+		test("returns null ratio when following count is null", async () => {
 			const page = createPageMock({
 				evaluate: jest
 					.fn<
@@ -86,8 +156,12 @@ describe("getProfileStats", () => {
 		});
 	});
 
-	describe("error and malformed responses", () => {
-		test("returns null stats when evaluate throws", async () => {
+	// ═══════════════════════════════════════════════════════════════════════════
+	// Error Handling
+	// ═══════════════════════════════════════════════════════════════════════════
+
+	describe("Error handling", () => {
+		test("returns all null stats when evaluate throws error", async () => {
 			const page = createPageMock({
 				evaluate: jest
 					.fn<() => Promise<never>>()
@@ -104,7 +178,7 @@ describe("getProfileStats", () => {
 			});
 		});
 
-		test("passes through nulls from evaluate", async () => {
+		test("passes through null values from page evaluation", async () => {
 			const page = createPageMock({
 				evaluate: jest
 					.fn<

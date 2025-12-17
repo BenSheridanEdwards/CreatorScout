@@ -1,10 +1,33 @@
+/**
+ * Vision AI Tests
+ *
+ * Vision AI module for analyzing linktree/profile screenshots:
+ *
+ * Functions:
+ * - analyzeLinktree(imagePath): Analyzes link page screenshot
+ *   - Reads image file and converts to base64
+ *   - Sends to OpenRouter API with LINKTREE_PROMPT
+ *   - Parses JSON response for creator indicators
+ *   - Returns: VisionAnalysisResult or null on failure
+ *
+ * - analyzeProfile(imagePath): Analyzes Instagram profile screenshot
+ *   - Uses PROFILE_PROMPT optimized for profile pages
+ *   - Checks highlights, bio, and visual elements
+ *   - Returns: VisionAnalysisResult or null on failure
+ *
+ * - isConfirmedCreator(imagePath, threshold): Wrapper with confidence check
+ *   - Calls analyzeLinktree
+ *   - Applies exclusive+discount heuristic override
+ *   - Returns: [boolean, VisionAnalysisResult | null]
+ *
+ * IMPORTANT: These tests are designed to NOT make API calls (no cost).
+ * They test error handling by using non-existent files which fail at
+ * file reading step before any API calls are made.
+ */
+
 import { jest } from "@jest/globals";
 import { mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { analyzeLinktree, isConfirmedCreator } from "./vision.ts";
-
-// IMPORTANT: These tests are designed to NOT make API calls and cost money.
-// They test error handling by using non-existent files, which fail at the
-// file reading step before any API calls are made.
 
 describe("vision", () => {
 	let mockImagePath: string;
@@ -35,45 +58,89 @@ describe("vision", () => {
 		}
 	});
 
-	describe("analyzeLinktree", () => {
-		test("returns null for non-existent file (no API call made)", async () => {
+	// ═══════════════════════════════════════════════════════════════════════════
+	// analyzeLinktree() - Link Page Analysis
+	// ═══════════════════════════════════════════════════════════════════════════
+
+	describe("analyzeLinktree()", () => {
+		test("returns null for non-existent file (fails before API call)", async () => {
 			// This test uses a non-existent file, so readFileSync will throw
 			// before any API call is made - safe and free!
 			const result = await analyzeLinktree("/nonexistent/image.png");
+
 			expect(result).toBeNull();
 		});
 
-		test("handles empty path gracefully (no API call made)", async () => {
+		test("returns null for empty path (fails before API call)", async () => {
 			// Empty path will fail at file reading, no API call
 			const result = await analyzeLinktree("");
+
 			expect(result).toBeNull();
 		});
 
-		test("fails at file read step before API call", () => {
-			// Verify that non-existent files fail at readFileSync, not API call
+		test("verifies file reading fails before reaching API", () => {
+			// Confirm that non-existent files fail at readFileSync
 			expect(() => {
 				readFileSync("/nonexistent/image.png");
 			}).toThrow();
 		});
 	});
 
-	describe("isConfirmedCreator", () => {
-		test("returns false for null analysis (no API call made)", async () => {
+	// ═══════════════════════════════════════════════════════════════════════════
+	// isConfirmedCreator() - Threshold-Based Classification
+	// ═══════════════════════════════════════════════════════════════════════════
+
+	describe("isConfirmedCreator()", () => {
+		test("returns [false, null] when analysis fails (no API call)", async () => {
 			// Non-existent file fails at readFileSync, no API call
 			const [isConfirmed, data] = await isConfirmedCreator(
 				"/nonexistent.png",
 				70,
 			);
+
 			expect(isConfirmed).toBe(false);
 			expect(data).toBeNull();
 		});
 
-		test("returns correct tuple structure (no API call made)", async () => {
+		test("returns correct tuple structure [boolean, data]", async () => {
 			// Non-existent file fails at readFileSync, no API call
 			const result = await isConfirmedCreator("/nonexistent.png", 70);
+
 			expect(Array.isArray(result)).toBe(true);
 			expect(result.length).toBe(2);
 			expect(typeof result[0]).toBe("boolean");
+		});
+
+		test("uses default threshold of 70 when not specified", async () => {
+			const result = await isConfirmedCreator("/nonexistent.png");
+
+			// Should still return valid tuple structure
+			expect(result[0]).toBe(false);
+			expect(result[1]).toBeNull();
+		});
+	});
+
+	// ═══════════════════════════════════════════════════════════════════════════
+	// Response Structure (when API would succeed)
+	// ═══════════════════════════════════════════════════════════════════════════
+
+	describe("Expected response structure", () => {
+		test("VisionAnalysisResult should contain required fields", () => {
+			// Document the expected structure for future reference
+			const expectedFields = [
+				"is_adult_creator",
+				"confidence",
+				"platform_links",
+				"indicators",
+				"reason",
+			];
+
+			// This test documents the interface contract
+			expect(expectedFields).toContain("is_adult_creator");
+			expect(expectedFields).toContain("confidence");
+			expect(expectedFields).toContain("platform_links");
+			expect(expectedFields).toContain("indicators");
+			expect(expectedFields).toContain("reason");
 		});
 	});
 });

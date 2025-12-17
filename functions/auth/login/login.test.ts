@@ -39,6 +39,7 @@ const createMockPage = (): Page =>
 		keyboard: { press: jest.fn<any>().mockResolvedValue(undefined) },
 		cookies: jest.fn<any>().mockResolvedValue([]),
 		setCookie: jest.fn<any>(),
+		screenshot: jest.fn<any>().mockResolvedValue(Buffer.from("mock-screenshot")),
 	}) as unknown as Page;
 
 describe("login", () => {

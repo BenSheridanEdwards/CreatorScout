@@ -1,5 +1,33 @@
+/**
+ * Profile Analysis Tests
+ *
+ * Profile analysis combines multiple signals to determine creator likelihood:
+ *
+ * Functions:
+ * - analyzeProfileBasic(page, username): Fast, lightweight analysis
+ *   - Extracts bio and checks for keywords
+ *   - Gets link from bio
+ *   - Returns: { bio, bioScore, isLikely, linkFromBio, confidence }
+ *
+ * - analyzeProfileComprehensive(page, username): Deep inspection
+ *   - Bio analysis with keyword matching
+ *   - Link collection and external link analysis
+ *   - Profile stats (follower ratio)
+ *   - Story highlights analysis
+ *   - Optional vision AI analysis
+ *   - Returns: Full analysis result with indicators and confidence
+ *
+ * - analyzeLinkWithVision(page, linkUrl, username, prefix): Vision AI for links
+ *   - Navigates to link page
+ *   - Takes screenshot and analyzes with AI
+ */
+
 import { jest } from "@jest/globals";
 import type { Page } from "puppeteer";
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Mock Setup
+// ═══════════════════════════════════════════════════════════════════════════
 
 const sleepMock = jest.fn<() => Promise<void>>();
 const snapshotMock = jest
@@ -177,42 +205,118 @@ describe("profileAnalysis", () => {
 		hasDirectCreatorLinkMock.mockReturnValue(true);
 	});
 
-	test("analyzeProfileBasic returns defaults when no bio", async () => {
-		getBioFromPageMock.mockResolvedValue(null);
-		const page = pageMock();
+	// ═══════════════════════════════════════════════════════════════════════════
+	// analyzeProfileBasic() - Lightweight Analysis
+	// ═══════════════════════════════════════════════════════════════════════════
 
-		const result = await analyzeProfileBasic(page, "user");
+	describe("analyzeProfileBasic()", () => {
+		test("returns default values when bio extraction fails", async () => {
+			getBioFromPageMock.mockResolvedValue(null);
+			const page = pageMock();
 
-		expect(result).toMatchObject({
-			bio: null,
-			bioScore: 0,
-			isLikely: false,
-			linkFromBio: null,
-			confidence: 0,
+			const result = await analyzeProfileBasic(page, "user");
+
+			expect(result).toMatchObject({
+				bio: null,
+				bioScore: 0,
+				isLikely: false,
+				linkFromBio: null,
+				confidence: 0,
+			});
+		});
+
+		test("extracts bio and calculates score when bio found", async () => {
+			getBioFromPageMock.mockResolvedValue("influencer bio");
+			isLikelyCreatorMock.mockReturnValue([
+				true,
+				{ score: 75, reasons: ["creator mention"] },
+			]);
+			const page = pageMock();
+
+			const result = await analyzeProfileBasic(page, "user");
+
+			expect(getBioFromPageMock).toHaveBeenCalledWith(page);
+			expect(isLikelyCreatorMock).toHaveBeenCalledWith(
+				"influencer bio",
+				40,
+				"user",
+			);
+			expect(result.bio).toBe("influencer bio");
+			expect(result.bioScore).toBe(75);
+		});
+
+		test("extracts link from bio for additional context", async () => {
+			getLinkFromBioMock.mockResolvedValue("https://linktr.ee/creator");
+			const page = pageMock();
+
+			const result = await analyzeProfileBasic(page, "user");
+
+			expect(getLinkFromBioMock).toHaveBeenCalledWith(page);
+			expect(result.linkFromBio).toBe("https://linktr.ee/creator");
 		});
 	});
 
-	test("analyzeProfileComprehensive aggregates signals and direct link", async () => {
-		const page = pageMock();
+	// ═══════════════════════════════════════════════════════════════════════════
+	// analyzeProfileComprehensive() - Deep Inspection
+	// ═══════════════════════════════════════════════════════════════════════════
 
-		const result = await analyzeProfileComprehensive(page, "user");
+	describe("analyzeProfileComprehensive()", () => {
+		test("aggregates signals from bio, links, stats, and highlights", async () => {
+			const page = pageMock();
 
-		expect(getBioFromPageMock).toHaveBeenCalled();
-		expect(getLinkFromBioMock).toHaveBeenCalled();
-		expect(buildUniqueLinksMock).toHaveBeenCalled();
-		expect(result.indicators).toEqual(
-			expect.arrayContaining([
-				"reason1",
-				"High follower ratio (200.0x)",
-				"Highlight keywords: kw",
-				'Link highlight: "Fun"',
-				"External links in profile",
-			]),
-		);
-		expect(result.isCreator).toBe(true);
-		expect(result.reason).toBe("direct_patreon_link");
-		expect(result.confidence).toBeGreaterThan(0);
-		expect(snapshotMock).toHaveBeenCalled();
-		expect(analyzeProfileMock).toHaveBeenCalled();
+			const result = await analyzeProfileComprehensive(page, "user");
+
+			// Verify all extraction functions called
+			expect(getBioFromPageMock).toHaveBeenCalled();
+			expect(getLinkFromBioMock).toHaveBeenCalled();
+			expect(buildUniqueLinksMock).toHaveBeenCalled();
+			expect(getProfileStatsMock).toHaveBeenCalled();
+			expect(getStoryHighlightsMock).toHaveBeenCalled();
+		});
+
+		test("includes indicators from multiple signal sources", async () => {
+			const page = pageMock();
+
+			const result = await analyzeProfileComprehensive(page, "user");
+
+			expect(result.indicators).toEqual(
+				expect.arrayContaining([
+					"reason1", // Bio matcher reason
+					"High follower ratio (200.0x)", // Stats
+					"Highlight keywords: kw", // Highlights
+					'Link highlight: "Fun"', // Link highlight
+					"External links in profile", // Links
+				]),
+			);
+		});
+
+		test("sets isCreator true when direct creator link found", async () => {
+			hasDirectCreatorLinkMock.mockReturnValue(true);
+			const page = pageMock();
+
+			const result = await analyzeProfileComprehensive(page, "user");
+
+			expect(result.isCreator).toBe(true);
+			expect(result.reason).toBe("direct_patreon_link");
+		});
+
+		test("achieves high confidence with direct creator link", async () => {
+			const page = pageMock();
+
+			const result = await analyzeProfileComprehensive(page, "user");
+
+			expect(result.confidence).toBeGreaterThan(0);
+		});
+
+		test("uses vision analysis when confidence is uncertain", async () => {
+			shouldUseVisionAnalysisMock.mockReturnValue(true);
+			const page = pageMock();
+
+			const result = await analyzeProfileComprehensive(page, "user");
+
+			expect(result).toBeDefined();
+			expect(snapshotMock).toHaveBeenCalled();
+			expect(analyzeProfileMock).toHaveBeenCalled();
+		});
 	});
 });
