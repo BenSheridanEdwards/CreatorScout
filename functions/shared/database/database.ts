@@ -191,13 +191,24 @@ export async function markDmSent(
 	proofPath?: string | null,
 ): Promise<void> {
 	const prisma = getPrisma();
+	const u = username.toLowerCase().trim();
 
-	await prisma.profile.update({
-		where: { username: username.toLowerCase().trim() },
-		data: {
+	// Use upsert to create profile if it doesn't exist
+	await prisma.profile.upsert({
+		where: { username: u },
+		create: {
+			username: u,
 			dmSent: true,
 			dmSentAt: new Date(),
 			proofPath: proofPath || undefined,
+			visitedAt: new Date(),
+			lastSeen: new Date(),
+		},
+		update: {
+			dmSent: true,
+			dmSentAt: new Date(),
+			proofPath: proofPath || undefined,
+			lastSeen: new Date(),
 		},
 	});
 }

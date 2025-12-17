@@ -45,6 +45,10 @@ async function dmUser(username: string): Promise<void> {
 		await ensureLoggedIn(page);
 		console.log("✅ Logged in successfully");
 
+		// Wait for session to fully establish before navigating
+		console.log("⏳ Waiting for session to stabilize...");
+		await new Promise((resolve) => setTimeout(resolve, 5000));
+
 		// Take a screenshot to see what the page looks like after login
 		mkdirSync("tmp", { recursive: true });
 		{
@@ -52,6 +56,18 @@ async function dmUser(username: string): Promise<void> {
 			const p = `tmp/login_state_${Date.now()}.png.base64`;
 			writeFileSync(p, b.toString("base64"), "utf8");
 			console.log(`📸 Login state screenshot saved: ${p}`);
+		}
+
+		// Verify we're still logged in before proceeding
+		const stillLoggedIn = await page.evaluate(() => {
+			return (
+				document.querySelector('a[href="/direct/inbox/"]') !== null ||
+				document.querySelector('svg[aria-label="Home"]') !== null
+			);
+		});
+
+		if (!stillLoggedIn) {
+			throw new Error("Session lost after login - Instagram may have detected automation");
 		}
 
 		console.log(`📨 Sending DM to @${username}...`);
