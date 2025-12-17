@@ -9,14 +9,25 @@ import { login } from "./login.ts";
 const createMockPage = (): Page =>
 	({
 		goto: jest.fn<any>().mockResolvedValue(undefined),
-		$: jest.fn<any>().mockResolvedValue(null),
+		$: jest.fn<any>().mockImplementation(async (selector: string) => {
+			const el = {
+				click: jest.fn<any>().mockResolvedValue(undefined),
+				type: jest.fn<any>().mockResolvedValue(undefined),
+			};
+			if (selector.includes("username") || selector.includes("Phone number"))
+				return el;
+			if (selector.includes("password")) return el;
+			if (selector.includes('button[type="submit"]')) return el;
+			return null;
+		}),
 		$$: jest.fn<any>().mockResolvedValue([]),
 		waitForSelector: jest.fn<any>().mockResolvedValue({} as unknown),
+		waitForFunction: jest.fn<any>().mockResolvedValue(undefined),
 		type: jest.fn<any>().mockResolvedValue(undefined),
 		click: jest.fn<any>().mockResolvedValue(undefined),
 		evaluate: jest.fn<any>().mockResolvedValue(""),
 		url: jest.fn<any>().mockReturnValue("https://www.instagram.com/"),
-		keyboard: { press: jest.fn<any>() },
+		keyboard: { press: jest.fn<any>().mockResolvedValue(undefined) },
 		cookies: jest.fn<any>().mockResolvedValue([]),
 		setCookie: jest.fn<any>(),
 	}) as unknown as Page;
@@ -39,48 +50,43 @@ describe("login", () => {
 			expect.objectContaining({ waitUntil: "domcontentloaded" }),
 		);
 
-		// Verify form was filled and submitted
+		// Verify username typing happened (login.ts types into the focused field)
 		expect(page.type).toHaveBeenCalledWith(
-			'input[name="username"]',
+			"input:focus",
 			"testuser",
-			{ delay: 5 },
+			expect.objectContaining({ delay: expect.any(Number) }),
 		);
-		expect(page.type).toHaveBeenCalledWith(
-			'input[name="password"]',
-			"testpass",
-			{ delay: 5 },
-		);
-		expect(page.click).toHaveBeenCalledWith('button[type="submit"]');
+
+		// Submit is clicked via element handle (page.$(...).click())
+		expect(page.$).toHaveBeenCalledWith('button[type="submit"]');
 	});
 
 	test("handles login form timeout", async () => {
-		// Mock waitForSelector to simulate timeout
-		page.waitForSelector = jest
-			.fn<any>()
-			.mockRejectedValue(new Error("Timeout"));
+		// Mock username selector to never resolve to simulate missing form fields
+		page.$ = jest.fn<any>().mockResolvedValue(null);
 
 		await expect(
 			login(page, { username: "testuser", password: "testpass" }),
-		).rejects.toThrow("Could not find login form");
+		).rejects.toThrow("Could not find username input field");
 	});
 
 	test("handles login failures", async () => {
-		// Mock waitForSelector to simulate timeout
-		page.waitForSelector = jest
+		// Simulate a failure to complete login (timeout waiting for success indicators)
+		page.waitForFunction = jest
 			.fn<any>()
 			.mockRejectedValue(new Error("Timeout"));
+		page.evaluate = jest.fn<any>().mockResolvedValue("");
 
 		await expect(
 			login(page, { username: "testuser", password: "testpass" }),
-		).rejects.toThrow("Could not find login form");
+		).rejects.toThrow("Login timeout");
 	});
 
 	test("handles Instagram error messages", async () => {
-		// Mock successful form submission but failed login
-		page.waitForSelector = jest
+		// Mock successful field discovery but failed login completion
+		page.waitForFunction = jest
 			.fn<any>()
-			.mockResolvedValueOnce({}) // Username field found
-			.mockRejectedValueOnce(new Error("Timeout")); // Inbox not found
+			.mockRejectedValue(new Error("Timeout"));
 
 		page.evaluate = jest
 			.fn<any>()

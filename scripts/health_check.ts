@@ -34,3 +34,4 @@ async function healthCheck(): Promise<void> {
 }
 
 healthCheck().catch(console.error);
+

@@ -54,7 +54,7 @@ export interface DashboardMetrics {
 	}>;
 }
 
-import { getDb } from "../database/database.ts";
+import { query } from "../database/database.ts";
 import { getInstagramCircuitBreaker } from "../circuitBreaker/circuitBreaker.ts";
 
 const ACTIVITY_LOG_SIZE = 50;
@@ -63,67 +63,79 @@ let recentActivity: DashboardMetrics["recentActivity"] = [];
 /**
  * Get comprehensive dashboard metrics
  */
-export function getDashboardMetrics(): DashboardMetrics {
-	const db = getDb();
+export async function getDashboardMetrics(): Promise<DashboardMetrics> {
 	const now = new Date();
 
 	// Current stats
-	const queueSize = (
-		db.prepare("SELECT COUNT(*) as count FROM queue").get() as { count: number }
-	).count;
+	const queueSizeRes = await query<{ count: string }>(
+		"SELECT COUNT(*)::text as count FROM queue",
+	);
+	const queueSize = Number.parseInt(queueSizeRes.rows[0]?.count ?? "0", 10);
 
 	// Last 24 hours stats
 	const dayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
 
-	const dailyStats = db
-		.prepare(`
-		SELECT
-			COUNT(*) as profiles_processed,
-			SUM(CASE WHEN is_patreon = 1 THEN 1 ELSE 0 END) as creators_found,
-			SUM(dm_sent) as dms_sent,
-			SUM(followed) as follows_completed,
-			AVG(processing_time_seconds) as avg_processing_time,
-			SUM(vision_api_calls * 0.001) as vision_api_cost,
-			COUNT(CASE WHEN last_error_at IS NOT NULL THEN 1 END) as total_errors
+	const dailyRes = await query<{
+		profiles_processed: string;
+		creators_found: string;
+		dms_sent: string;
+		follows_completed: string;
+		avg_processing_time: string | null;
+		vision_api_cost: string | null;
+		total_errors: string;
+	}>(
+		`SELECT
+			COUNT(*)::text as profiles_processed,
+			COALESCE(SUM(CASE WHEN is_patreon THEN 1 ELSE 0 END), 0)::text as creators_found,
+			COALESCE(SUM(CASE WHEN dm_sent THEN 1 ELSE 0 END), 0)::text as dms_sent,
+			COALESCE(SUM(CASE WHEN followed THEN 1 ELSE 0 END), 0)::text as follows_completed,
+			COALESCE(AVG(processing_time_seconds), 0)::text as avg_processing_time,
+			COALESCE(SUM(COALESCE(vision_api_calls, 0) * 0.001), 0)::text as vision_api_cost,
+			COUNT(*) FILTER (WHERE last_error_at IS NOT NULL)::text as total_errors
 		FROM profiles
-		WHERE visited_at > ?
-	`)
-		.get(dayAgo) as {
-		profiles_processed: number;
-		creators_found: number;
-		dms_sent: number;
-		follows_completed: number;
-		avg_processing_time: number | null;
-		vision_api_cost: number | null;
-		total_errors: number;
+		WHERE visited_at > $1`,
+		[dayAgo],
+	);
+
+	const dailyStats = dailyRes.rows[0] ?? {
+		profiles_processed: "0",
+		creators_found: "0",
+		dms_sent: "0",
+		follows_completed: "0",
+		avg_processing_time: "0",
+		vision_api_cost: "0",
+		total_errors: "0",
 	};
 
-	// Calculate efficiency metrics
-	const profilesProcessed = dailyStats.profiles_processed || 0;
-	const creatorsFound = dailyStats.creators_found || 0;
-	const dmsSent = dailyStats.dms_sent || 0;
-	const visionApiCost = dailyStats.vision_api_cost || 0;
+	const profilesProcessed = Number.parseInt(dailyStats.profiles_processed ?? "0", 10);
+	const creatorsFound = Number.parseInt(dailyStats.creators_found ?? "0", 10);
+	const dmsSent = Number.parseInt(dailyStats.dms_sent ?? "0", 10);
+	const followsCompleted = Number.parseInt(
+		dailyStats.follows_completed ?? "0",
+		10,
+	);
+	const avgProcessingTime = Number(dailyStats.avg_processing_time ?? 0);
+	const visionApiCost = Number(dailyStats.vision_api_cost ?? 0);
+	const totalErrors = Number.parseInt(dailyStats.total_errors ?? "0", 10);
 
+	// Efficiency metrics
 	const creatorDiscoveryRate =
 		profilesProcessed > 0 ? (creatorsFound / profilesProcessed) * 100 : 0;
-	const dmConversionRate =
-		creatorsFound > 0 ? (dmsSent / creatorsFound) * 100 : 0;
+	const dmConversionRate = creatorsFound > 0 ? (dmsSent / creatorsFound) * 100 : 0;
 
-	// Vision efficiency (lower is better - fewer calls per profile)
-	const visionCalls = db
-		.prepare(`
-		SELECT SUM(vision_api_calls) as total_calls
-		FROM profiles
-		WHERE visited_at > ?
-	`)
-		.get(dayAgo) as { total_calls: number | null };
+	const visionCallsRes = await query<{ total_calls: string | null }>(
+		`SELECT COALESCE(SUM(COALESCE(vision_api_calls, 0)), 0)::text as total_calls
+		 FROM profiles
+		 WHERE visited_at > $1`,
+		[dayAgo],
+	);
+	const totalVisionCalls = Number.parseInt(
+		visionCallsRes.rows[0]?.total_calls ?? "0",
+		10,
+	);
 
-	const totalVisionCalls = visionCalls.total_calls || 0;
 	const visionEfficiency =
-		totalVisionCalls > 0
-			? profilesProcessed / totalVisionCalls
-			: profilesProcessed;
-
+		totalVisionCalls > 0 ? profilesProcessed / totalVisionCalls : profilesProcessed;
 	const costPerCreator = creatorsFound > 0 ? visionApiCost / creatorsFound : 0;
 
 	// Circuit breaker status
@@ -136,45 +148,44 @@ export function getDashboardMetrics(): DashboardMetrics {
 
 	// Recent processing rate (last hour)
 	const hourAgo = new Date(now.getTime() - 60 * 60 * 1000).toISOString();
-	const recentProcessing = db
-		.prepare(`
-		SELECT COUNT(*) as count
-		FROM profiles
-		WHERE visited_at > ?
-	`)
-		.get(hourAgo) as { count: number };
-
-	const processingRate = recentProcessing.count; // profiles per hour
+	const recentProcessingRes = await query<{ count: string }>(
+		"SELECT COUNT(*)::text as count FROM profiles WHERE visited_at > $1",
+		[hourAgo],
+	);
+	const processedLastHour = Number.parseInt(
+		recentProcessingRes.rows[0]?.count ?? "0",
+		10,
+	);
 
 	return {
 		current: {
 			queueSize,
 			activeSessions: 1, // For now, assume single session
-			processingRate: Math.round((processingRate / 60) * 100) / 100, // per minute
-			errorRate: 0, // Would need error tracking table
+			processingRate: Math.round((processedLastHour / 60) * 100) / 100, // per minute
+			errorRate: 0, // Would need a dedicated error tracking table
 		},
 
 		historical: {
 			profilesProcessed,
 			creatorsFound,
 			dmsSent,
-			followsCompleted: dailyStats.follows_completed || 0,
-			avgProcessingTime: dailyStats.avg_processing_time || 0,
+			followsCompleted,
+			avgProcessingTime,
 			visionApiCost,
-			totalErrors: dailyStats.total_errors || 0,
+			totalErrors,
 		},
 
 		efficiency: {
 			creatorDiscoveryRate: Math.round(creatorDiscoveryRate * 100) / 100,
 			dmConversionRate: Math.round(dmConversionRate * 100) / 100,
 			visionEfficiency: Math.round(visionEfficiency * 100) / 100,
-			costPerCreator: Math.round(costPerCreator * 10000) / 10000, // Round to 4 decimals
+			costPerCreator: Math.round(costPerCreator * 10000) / 10000,
 		},
 
 		health: {
 			circuitBreakerState: circuitStats.state,
 			rateLimitHits: circuitStats.totalFailures,
-			avgResponseTime: dailyStats.avg_processing_time || 0,
+			avgResponseTime: avgProcessingTime,
 			memoryUsage: memoryUsageMB,
 		},
 
@@ -271,6 +282,6 @@ export function formatDashboard(dashboard: DashboardMetrics): string {
  * Create a simple dashboard script
  */
 export async function showDashboard(): Promise<void> {
-	const dashboard = getDashboardMetrics();
+	const dashboard = await getDashboardMetrics();
 	console.log(formatDashboard(dashboard));
 }

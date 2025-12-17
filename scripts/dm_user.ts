@@ -18,7 +18,7 @@ async function dmUser(username: string): Promise<void> {
 	console.log(`💬 Sending DM to: @${username}`);
 
 	// Check if already DM'd
-	if (wasDmSent(username)) {
+	if (await wasDmSent(username)) {
 		console.log("ℹ️  Already sent DM to this user");
 		return;
 	}
@@ -62,3 +62,4 @@ if (!username) {
 }
 
 dmUser(username).catch(console.error);
+

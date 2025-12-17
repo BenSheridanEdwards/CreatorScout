@@ -47,6 +47,7 @@ export interface ComprehensiveAnalysisResult {
 	confidence: number;
 	indicators: string[];
 	screenshots: string[];
+	errors?: string[];
 	isCreator: boolean;
 	reason: string | null;
 }
@@ -105,6 +106,7 @@ export async function analyzeProfileComprehensive(
 		confidence: 0,
 		indicators: [],
 		screenshots: [],
+		errors: [],
 		isCreator: false,
 		reason: null,
 	};

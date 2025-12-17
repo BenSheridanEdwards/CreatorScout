@@ -25,8 +25,6 @@ dist/
 .sessions/
 *.db
 *.db-journal
-scout.db
-scout.db-journal
 
 # Screenshots and temp files
 tmp/
@@ -41,4 +39,4 @@ tmp/
 *.swo
 *~
 
-scout.db*
+/generated/prisma

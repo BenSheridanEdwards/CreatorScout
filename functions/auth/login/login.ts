@@ -15,6 +15,14 @@ export type Credentials = {
 
 const logger = createLogger(process.env.DEBUG_LOGS === "true");
 
+const IS_TEST =
+	process.env.NODE_ENV === "test" || process.env.JEST_WORKER_ID !== undefined;
+
+function delay(ms: number): Promise<void> {
+	if (IS_TEST) return Promise.resolve();
+	return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 export async function login(
 	page: Page,
 	creds: Credentials,
@@ -55,7 +63,7 @@ export async function login(
 		"ACTION",
 		"Waiting for cookies to apply and checking login status",
 	);
-	await new Promise((resolve) => setTimeout(resolve, 2000));
+	await delay(2000);
 
 	const alreadyLoggedIn = await isLoggedIn(page);
 	logger.info("ACTION", `Already logged in check: ${alreadyLoggedIn}`);
@@ -100,7 +108,7 @@ export async function login(
 	logger.info("ACTION", "Popups handled");
 
 	// Add a brief pause to let any animations settle
-	await new Promise((resolve) => setTimeout(resolve, 1000));
+	await delay(1000);
 
 	// Wait for login form or already logged in state with multiple selectors
 	logger.info("ACTION", "Waiting for login form to appear");
@@ -218,9 +226,7 @@ export async function login(
 	logger.info("ACTION", `Filling in credentials for user: ${creds.username}`);
 
 	// Add human-like delay before typing
-	await new Promise((resolve) =>
-		setTimeout(resolve, 1000 + Math.random() * 2000),
-	);
+	await delay(1000 + Math.random() * 2000);
 
 	// Find and fill username field
 	const usernameSelectors = [
@@ -265,9 +271,7 @@ export async function login(
 	logger.info("ACTION", "Username entered");
 
 	// Add pause between fields (like a human would)
-	await new Promise((resolve) =>
-		setTimeout(resolve, 500 + Math.random() * 1000),
-	);
+	await delay(500 + Math.random() * 1000);
 
 	// Find and fill password field
 	const passwordSelectors = [
@@ -304,9 +308,7 @@ export async function login(
 	logger.info("ACTION", "Password entered");
 
 	// Add another pause before clicking submit (human hesitation)
-	await new Promise((resolve) =>
-		setTimeout(resolve, 800 + Math.random() * 1200),
-	);
+	await delay(800 + Math.random() * 1200);
 
 	if (options?.skipSubmit) {
 		logger.info(
@@ -319,7 +321,7 @@ export async function login(
 				"Not logged in, taking screenshot before skip submit",
 			);
 			logger.info("ACTION", "Waiting 20 seconds before taking screenshot...");
-			await new Promise((resolve) => setTimeout(resolve, 20000));
+			await delay(20000);
 			logger.info("ACTION", "20 second wait completed, taking screenshot now");
 			const savedPath = await snapshot(
 				page,
@@ -404,7 +406,7 @@ export async function login(
 		);
 
 		// Double-check login status
-		await new Promise((resolve) => setTimeout(resolve, 3000));
+		await delay(3000);
 		const finalUrl = page.url();
 
 		// Check for various success indicators
@@ -479,7 +481,7 @@ export async function login(
 
 		// Try to continue anyway - Instagram might be using a different UI
 		return;
-	} catch (waitError) {
+	} catch (_waitError) {
 		const currentUrl = page.url();
 		logger.error("ACTION", `Login timeout - current URL: ${currentUrl}`);
 
@@ -493,16 +495,32 @@ export async function login(
 			);
 		}
 
+		// If we can detect a login failure message, surface that instead of a generic timeout.
+		try {
+			const bodyText = await page.evaluate(
+				() => document.body?.innerText || "",
+			);
+			if (
+				bodyText.includes("incorrect") ||
+				bodyText.includes("Sorry") ||
+				bodyText.includes("challenge") ||
+				bodyText.includes("verify") ||
+				bodyText.includes("suspicious") ||
+				bodyText.includes("unusual activity")
+			) {
+				const errorPreview = bodyText.substring(0, 300).replace(/\n/g, " ");
+				throw new Error(
+					`Login failed - Instagram security detected. Page preview: ${errorPreview}`,
+				);
+			}
+		} catch (e) {
+			if (e instanceof Error && e.message.startsWith("Login failed")) {
+				throw e;
+			}
+		}
+
 		throw new Error(
 			`Login timeout after 30 seconds. Instagram may be blocking automated access or requiring manual verification. Current URL: ${currentUrl}`,
 		);
 	}
-
-	// Dismiss popups
-	logger.info("ACTION", "Dismissing post-login popups");
-	await clickAny(page, ["Not Now", "Not now", "Skip"]);
-	logger.info("ACTION", "First popup dismissed");
-	await clickAny(page, ["Not Now", "Not now", "Skip"]);
-	logger.info("ACTION", "Second popup dismissed");
-	logger.info("ACTION", "Login process completed successfully");
 }

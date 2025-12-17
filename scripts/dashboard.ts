@@ -32,7 +32,7 @@ async function showDashboard(): Promise<void> {
 				console.clear();
 			}
 
-			const dashboard = getDashboardMetrics();
+			const dashboard = await getDashboardMetrics();
 			console.log(formatDashboard(dashboard));
 
 			if (watchMode) {
@@ -50,3 +50,4 @@ async function showDashboard(): Promise<void> {
 }
 
 showDashboard().catch(console.error);
+

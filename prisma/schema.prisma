@@ -1,0 +1,83 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Profile {
+  username               String    @id
+  displayName            String?   @map("display_name")
+  bioText                String?   @map("bio_text")
+  linkUrl                String?   @map("link_url")
+  bioScore               Int       @default(0) @map("bio_score")
+  isCreator             Boolean   @default(false) @map("is_patreon")
+  confidence             Int       @default(0)
+  dmSent                 Boolean   @default(false) @map("dm_sent")
+  dmSentAt               DateTime? @map("dm_sent_at") @db.Timestamptz(6)
+  followed               Boolean   @default(false)
+  proofPath              String?   @map("proof_path")
+  visitedAt              DateTime  @default(now()) @map("visited_at") @db.Timestamptz(6)
+  lastSeen               DateTime  @default(now()) @map("last_seen") @db.Timestamptz(6)
+
+  processingTimeSeconds  Int?      @map("processing_time_seconds")
+  discoverySource        String?   @map("discovery_source")
+  discoveryDepth         Int       @default(0) @map("discovery_depth")
+  sessionId              String?   @map("session_id")
+  contentCategories      Json?     @map("content_categories") @db.JsonB
+  engagementMetrics      Json?     @map("engagement_metrics") @db.JsonB
+  visionApiCalls         Int       @default(0) @map("vision_api_calls")
+  errorsEncountered      Json?     @map("errors_encountered") @db.JsonB
+  lastErrorAt            DateTime? @map("last_error_at") @db.Timestamptz(6)
+  sourceProfile          String?   @map("source_profile")
+
+  @@index([dmSent], map: "idx_dm_sent")
+  @@index([isCreator], map: "idx_is_patreon")
+  @@index([visitedAt], map: "idx_visited")
+  @@map("profiles")
+}
+
+model QueueItem {
+  username  String   @id
+  priority  Int      @default(10)
+  source    String?
+  addedAt   DateTime @default(now()) @map("added_at") @db.Timestamptz(6)
+
+  @@map("queue")
+}
+
+model FollowingScraped {
+  username    String   @id
+  scrollIndex Int      @default(0) @map("scroll_index")
+  scrapedAt   DateTime @default(now()) @map("scraped_at") @db.Timestamptz(6)
+
+  @@map("following_scraped")
+}
+
+model Metric {
+  id                      BigInt    @id @default(autoincrement())
+  date                    DateTime?  @db.Date
+  sessionId               String?    @map("session_id")
+  profilesVisited         Int        @default(0) @map("profiles_visited")
+  creatorsFound           Int        @default(0) @map("creators_found")
+  dmsSent                 Int        @default(0) @map("dms_sent")
+  followsCompleted        Int        @default(0) @map("follows_completed")
+  avgBioScore             Decimal?   @map("avg_bio_score") @db.Decimal(5, 2)
+  avgConfidence           Decimal?   @map("avg_confidence") @db.Decimal(5, 2)
+  visionApiCost           Decimal?   @map("vision_api_cost") @db.Decimal(6, 4)
+  avgProcessingTimeSeconds Decimal?  @map("avg_processing_time_seconds") @db.Decimal(6, 2)
+  errorsEncountered       Int        @default(0) @map("errors_encountered")
+  rateLimitsHit           Int        @default(0) @map("rate_limits_hit")
+  createdAt               DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([date], map: "idx_metrics_date")
+  @@index([sessionId], map: "idx_metrics_session")
+  @@map("metrics")
+}

@@ -31,7 +31,7 @@ const humanTypeTextMock = jest
 
 // Mock circuit breaker
 const executeWithCircuitBreakerMock =
-	jest.fn<(fn: () => Promise<any>, context?: string) => Promise<any>>();
+	jest.fn<(fn: () => Promise<unknown>, context?: string) => Promise<unknown>>();
 
 // Mock dashboard
 const recordActivityMock =
@@ -120,31 +120,56 @@ describe("profileActions", () => {
 
 	describe("sendDMToUser", () => {
 		test("sends when conversation empty and records snapshot", async () => {
-			const searchInput = {
-				type: jest
-					.fn<(text: string, opts?: unknown) => Promise<void>>()
-					.mockResolvedValue(undefined),
-			};
-			const firstResult = {
+			const clickable = {
 				click: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
 			};
-			const messageInput = {
-				click: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
-			};
+
 			const page = {
+				url: jest
+					.fn<() => string>()
+					.mockReturnValue("https://www.instagram.com/"),
 				goto: jest
 					.fn<(url: string, opts?: object) => Promise<void>>()
 					.mockResolvedValue(undefined),
 				$: jest
 					.fn<
-						(selector: string) => Promise<{
-							type?: (text: string, opts?: unknown) => Promise<void>;
-							click?: () => Promise<void>;
-						} | null>
+						(
+							selector: string,
+						) => Promise<{ click?: () => Promise<void> } | null>
 					>()
-					.mockResolvedValueOnce(searchInput)
-					.mockResolvedValueOnce(firstResult)
-					.mockResolvedValueOnce(messageInput),
+					.mockImplementation(async (selector: string) => {
+						// Logged-in check selectors
+						if (
+							selector.includes("/direct/inbox/") ||
+							selector.includes("aria-label")
+						) {
+							return clickable;
+						}
+
+						// New message button
+						if (
+							selector.includes("New message") ||
+							selector.includes("new-message")
+						) {
+							return clickable;
+						}
+
+						// Message input
+						if (
+							selector.includes("textbox") ||
+							selector.includes("contenteditable") ||
+							selector.includes("lexical")
+						) {
+							return clickable;
+						}
+
+						// Send button
+						if (selector.includes("Send") || selector.includes("send")) {
+							return clickable;
+						}
+
+						return null;
+					}),
 				$$: jest.fn<() => Promise<unknown[]>>().mockResolvedValue([]), // messages empty
 				keyboard: {
 					type: jest
@@ -159,6 +184,7 @@ describe("profileActions", () => {
 			const ok = await sendDMToUser(page, "user123");
 
 			expect(ok).toBe(true);
+			expect(snapshotMock).toHaveBeenCalledWith(page, "dm_page_debug_user123");
 			expect(snapshotMock).toHaveBeenCalledWith(page, "dm_user123");
 			expect(markDmSentMock).toHaveBeenCalledWith("user123", "shot");
 		});

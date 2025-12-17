@@ -38,7 +38,7 @@ export interface SystemHealth {
 	};
 }
 
-import { getDb } from "../database/database.ts";
+import { query } from "../database/database.ts";
 import { createBrowser } from "../../navigation/browser/browser.ts";
 import { getInstagramCircuitBreaker } from "../circuitBreaker/circuitBreaker.ts";
 
@@ -50,22 +50,18 @@ const VERSION = "1.0.0";
  */
 export async function getSystemHealth(): Promise<SystemHealth> {
 	const checks: HealthCheck[] = [];
-	const startTime = Date.now();
 
-	// Run all checks
 	checks.push(await checkDatabase());
 	checks.push(await checkBrowser());
 	checks.push(await checkCircuitBreaker());
 	checks.push(await checkSystemResources());
 	checks.push(await checkQueueStatus());
 
-	// Calculate summary
 	const passing = checks.filter((c) => c.status === HealthStatus.PASS).length;
 	const warning = checks.filter((c) => c.status === HealthStatus.WARN).length;
 	const failing = checks.filter((c) => c.status === HealthStatus.FAIL).length;
 	const total = checks.length;
 
-	// Overall status is the worst status
 	let overallStatus = HealthStatus.PASS;
 	if (failing > 0) overallStatus = HealthStatus.FAIL;
 	else if (warning > 0) overallStatus = HealthStatus.WARN;
@@ -87,12 +83,10 @@ async function checkDatabase(): Promise<HealthCheck> {
 	const startTime = Date.now();
 
 	try {
-		const db = getDb();
-
-		// Test basic query
-		const result = db
-			.prepare("SELECT COUNT(*) as count FROM profiles")
-			.get() as { count: number };
+		const res = await query<{ count: string }>(
+			"SELECT COUNT(*)::text as count FROM profiles",
+		);
+		const profileCount = Number.parseInt(res.rows[0]?.count ?? "0", 10);
 
 		return {
 			name: "database",
@@ -100,9 +94,9 @@ async function checkDatabase(): Promise<HealthCheck> {
 			message: "Database connection healthy",
 			duration: Date.now() - startTime,
 			timestamp: new Date().toISOString(),
-			details: { profileCount: result.count },
+			details: { profileCount },
 		};
-	} catch (error) {
+	} catch (error: any) {
 		return {
 			name: "database",
 			status: HealthStatus.FAIL,
@@ -124,7 +118,6 @@ async function checkBrowser(): Promise<HealthCheck> {
 		const browser = await createBrowser({ headless: true });
 		const page = await browser.newPage();
 
-		// Test basic page navigation
 		await page.goto("data:text/html,<html><body>Test</body></html>");
 		const title = await page.title();
 
@@ -138,7 +131,7 @@ async function checkBrowser(): Promise<HealthCheck> {
 			timestamp: new Date().toISOString(),
 			details: { pageTitle: title },
 		};
-	} catch (error) {
+	} catch (error: any) {
 		return {
 			name: "browser",
 			status: HealthStatus.FAIL,
@@ -160,7 +153,6 @@ async function checkCircuitBreaker(): Promise<HealthCheck> {
 		const breaker = getInstagramCircuitBreaker();
 		const stats = breaker.getStats();
 
-		// Determine status based on circuit state
 		let status = HealthStatus.PASS;
 		let message = "Circuit breaker operational";
 
@@ -177,7 +169,7 @@ async function checkCircuitBreaker(): Promise<HealthCheck> {
 			timestamp: new Date().toISOString(),
 			details: stats,
 		};
-	} catch (error) {
+	} catch (error: any) {
 		return {
 			name: "circuit_breaker",
 			status: HealthStatus.FAIL,
@@ -196,7 +188,6 @@ async function checkSystemResources(): Promise<HealthCheck> {
 	const startTime = Date.now();
 
 	try {
-		// Memory usage
 		const memUsage = process.memoryUsage();
 		const memUsageMB = {
 			rss: Math.round(memUsage.rss / 1024 / 1024),
@@ -205,19 +196,16 @@ async function checkSystemResources(): Promise<HealthCheck> {
 			external: Math.round(memUsage.external / 1024 / 1024),
 		};
 
-		// CPU usage (basic)
 		const cpuUsage = process.cpuUsage();
 		const cpuUsageMs = {
 			user: Math.round(cpuUsage.user / 1000),
 			system: Math.round(cpuUsage.system / 1000),
 		};
 
-		// Warn if memory usage is high
 		let status = HealthStatus.PASS;
 		let message = "System resources normal";
 
 		if (memUsageMB.heapUsed > 500) {
-			// Over 500MB heap usage
 			status = HealthStatus.WARN;
 			message = "High memory usage detected";
 		}
@@ -230,7 +218,7 @@ async function checkSystemResources(): Promise<HealthCheck> {
 			timestamp: new Date().toISOString(),
 			details: { memory: memUsageMB, cpu: cpuUsageMs },
 		};
-	} catch (error) {
+	} catch (error: any) {
 		return {
 			name: "system_resources",
 			status: HealthStatus.FAIL,
@@ -249,43 +237,58 @@ async function checkQueueStatus(): Promise<HealthCheck> {
 	const startTime = Date.now();
 
 	try {
-		const db = getDb();
+		const queueRes = await query<{
+			total: string;
+			high_priority: string;
+			medium_priority: string;
+			low_priority: string;
+		}>(
+			`SELECT
+				COUNT(*)::text as total,
+				COALESCE(SUM(CASE WHEN priority >= 80 THEN 1 ELSE 0 END), 0)::text as high_priority,
+				COALESCE(SUM(CASE WHEN priority >= 50 AND priority < 80 THEN 1 ELSE 0 END), 0)::text as medium_priority,
+				COALESCE(SUM(CASE WHEN priority < 50 THEN 1 ELSE 0 END), 0)::text as low_priority
+			FROM queue`,
+		);
 
-		// Get queue statistics
-		const queueStats = db
-			.prepare(`
-			SELECT
-				COUNT(*) as total,
-				SUM(CASE WHEN priority >= 80 THEN 1 ELSE 0 END) as high_priority,
-				SUM(CASE WHEN priority >= 50 AND priority < 80 THEN 1 ELSE 0 END) as medium_priority,
-				SUM(CASE WHEN priority < 50 THEN 1 ELSE 0 END) as low_priority
-			FROM queue
-		`)
-			.get() as {
-			total: number;
-			high_priority: number;
-			medium_priority: number;
-			low_priority: number;
+		const queueStatsRow = queueRes.rows[0] ?? {
+			total: "0",
+			high_priority: "0",
+			medium_priority: "0",
+			low_priority: "0",
 		};
 
-		// Get recent processing stats
-		const recentStats = db
-			.prepare(`
-			SELECT
-				COUNT(*) as recent_profiles,
-				AVG(processing_time_seconds) as avg_processing_time
+		const queueStats = {
+			total: Number.parseInt(queueStatsRow.total, 10),
+			high_priority: Number.parseInt(queueStatsRow.high_priority, 10),
+			medium_priority: Number.parseInt(queueStatsRow.medium_priority, 10),
+			low_priority: Number.parseInt(queueStatsRow.low_priority, 10),
+		};
+
+		const recentRes = await query<{
+			recent_profiles: string;
+			avg_processing_time: string | null;
+		}>(
+			`SELECT
+				COUNT(*)::text as recent_profiles,
+				COALESCE(AVG(processing_time_seconds), 0)::text as avg_processing_time
 			FROM profiles
-			WHERE visited_at > datetime('now', '-1 hour')
-		`)
-			.get() as {
-			recent_profiles: number;
-			avg_processing_time: number | null;
+			WHERE visited_at > (NOW() - INTERVAL '1 hour')`,
+		);
+
+		const recentRow = recentRes.rows[0] ?? {
+			recent_profiles: "0",
+			avg_processing_time: "0",
+		};
+
+		const recentStats = {
+			recent_profiles: Number.parseInt(recentRow.recent_profiles, 10),
+			avg_processing_time: Number(recentRow.avg_processing_time ?? 0),
 		};
 
 		let status = HealthStatus.PASS;
 		let message = "Queue processing normal";
 
-		// Warn if queue is getting backed up
 		if (queueStats.total > 1000) {
 			status = HealthStatus.WARN;
 			message = "Large queue backlog detected";
@@ -302,7 +305,7 @@ async function checkQueueStatus(): Promise<HealthCheck> {
 				recentActivity: recentStats,
 			},
 		};
-	} catch (error) {
+	} catch (error: any) {
 		return {
 			name: "queue_status",
 			status: HealthStatus.FAIL,

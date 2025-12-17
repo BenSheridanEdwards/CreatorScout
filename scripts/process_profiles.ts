@@ -6,7 +6,6 @@
  * Example: tsx scripts/process_profiles.ts user1 --analyze
  */
 
-import type { Browser, Page } from "puppeteer";
 import {
 	createBrowser,
 	createPage,
@@ -20,7 +19,6 @@ import {
 	sendDMToUser,
 } from "../functions/profile/profileActions/profileActions.ts";
 import { analyzeProfileComprehensive } from "../functions/profile/profileAnalysis/profileAnalysis.ts";
-import { CONFIDENCE_THRESHOLD } from "../functions/shared/config/config.ts";
 import {
 	wasDmSent,
 	wasFollowed,
@@ -82,22 +80,22 @@ async function processProfiles(
 				}
 
 				// Follow if requested and not already followed
-				if (options.follow && !wasFollowed(username)) {
+				if (options.follow && !(await wasFollowed(username))) {
 					console.log("  👥 Following...");
 					const followSuccess = await followUserAccount(page, username);
 					console.log(
 						`  ${followSuccess ? "✅ Followed" : "ℹ️ Already following"}`,
 					);
-				} else if (options.follow && wasFollowed(username)) {
+				} else if (options.follow && (await wasFollowed(username))) {
 					console.log("  ℹ️ Already following");
 				}
 
 				// DM if requested and not already sent
-				if (options.dm && !wasDmSent(username)) {
+				if (options.dm && !(await wasDmSent(username))) {
 					console.log("  💬 Sending DM...");
 					const dmSuccess = await sendDMToUser(page, username);
 					console.log(`  ${dmSuccess ? "✅ DM sent" : "❌ DM failed"}`);
-				} else if (options.dm && wasDmSent(username)) {
+				} else if (options.dm && (await wasDmSent(username))) {
 					console.log("  ℹ️ Already DM'd");
 				}
 

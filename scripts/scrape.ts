@@ -37,7 +37,10 @@ import {
 	followUserAccount,
 	sendDMToUser,
 } from "../functions/profile/profileActions/profileActions.ts";
-import { analyzeProfileComprehensive } from "../functions/profile/profileAnalysis/profileAnalysis.ts";
+import {
+	analyzeProfileComprehensive,
+	type ComprehensiveAnalysisResult,
+} from "../functions/profile/profileAnalysis/profileAnalysis.ts";
 import {
 	CONFIDENCE_THRESHOLD,
 	MAX_DMS_PER_DAY,
@@ -71,7 +74,7 @@ import {
 // Enhanced logging imports
 import { createLoggerWithCycleTracking } from "../functions/shared/logger/logger.ts";
 
-initDb();
+// NOTE: Database init is async; we run it inside the main entrypoints.
 
 // Enhanced logging setup
 const {
@@ -86,7 +89,9 @@ const {
 /**
  * Load seeds from file into queue
  */
-export function loadSeeds(filePath: string = "seeds.txt"): number {
+export async function loadSeeds(
+	filePath: string = "seeds.txt",
+): Promise<number> {
 	try {
 		logger.debug("SEED", `Loading seeds from ${filePath}`);
 
@@ -103,7 +108,7 @@ export function loadSeeds(filePath: string = "seeds.txt"): number {
 		for (const line of lines) {
 			const username = line.trim().toLowerCase();
 			if (username && !username.startsWith("#")) {
-				queueAdd(username, 100, "seed");
+				await queueAdd(username, 100, "seed");
 				seedsLoaded++;
 				logger.debug("SEED", `Loaded seed: @${username}`);
 			} else if (username.startsWith("#")) {
@@ -150,7 +155,7 @@ export async function processProfile(
 
 	try {
 		// Skip if already visited
-		if (wasVisited(username)) {
+		if (await wasVisited(username)) {
 			logger.debug("PROFILE", `Already visited, skipping @${username}`);
 			cycleManager.recordWarning(
 				"PROFILE_NOT_FOUND",
@@ -181,7 +186,7 @@ export async function processProfile(
 		// Check if profile is accessible
 		if (status.notFound) {
 			logger.warn("PROFILE", `Profile not found: @${username}`);
-			markVisited(username, undefined, undefined, 0);
+			await markVisited(username, undefined, undefined, 0);
 			cycleManager.recordWarning(
 				"PROFILE_NOT_FOUND",
 				"Profile not found",
@@ -192,7 +197,7 @@ export async function processProfile(
 
 		if (status.isPrivate) {
 			logger.warn("PROFILE", `Profile is private: @${username}`);
-			markVisited(username, undefined, undefined, 0);
+			await markVisited(username, undefined, undefined, 0);
 			cycleManager.recordWarning(
 				"PROFILE_PRIVATE",
 				"Profile is private",
@@ -225,7 +230,7 @@ export async function processProfile(
 
 	// Comprehensive profile analysis with advanced link detection
 	logger.debug("ANALYSIS", `Starting comprehensive analysis for @${username}`);
-	let analysis;
+	let analysis: ComprehensiveAnalysisResult;
 	try {
 		analysis = await analyzeProfileComprehensive(page, username);
 	} catch (analysisError) {
@@ -249,7 +254,7 @@ export async function processProfile(
 
 	if (!analysis.bio) {
 		logger.warn("ANALYSIS", `No bio found for @${username}`);
-		markVisited(username, undefined, undefined, 0);
+		await markVisited(username, undefined, undefined, 0);
 		recordError("No bio found", `comprehensive_analysis_${username}`, username);
 		await logger.errorWithScreenshot(
 			"ERROR",
@@ -270,7 +275,7 @@ export async function processProfile(
 	logger.debug("ANALYSIS", `Is creator: ${analysis.isCreator}`);
 
 	// Mark as visited with bio and confidence score
-	markVisited(username, undefined, analysis.bio, analysis.confidence);
+	await markVisited(username, undefined, analysis.bio, analysis.confidence);
 
 	try {
 		// Comprehensive analysis already includes advanced link detection
@@ -385,7 +390,7 @@ export async function processProfile(
 					`snapshot_failed_${username}`,
 				);
 			}
-			markAsCreator(username, confidence, proofPath);
+			await markAsCreator(username, confidence, proofPath);
 			logger.info(
 				"DATABASE",
 				`💾 Creator @${username} saved to database (confidence: ${confidence}%)`,
@@ -402,7 +407,7 @@ export async function processProfile(
 			}
 
 			// Send DM (if not already sent and DM sending is enabled)
-			if (sendDM && !wasDmSent(username)) {
+			if (sendDM && !(await wasDmSent(username))) {
 				const [dmDelayMin, dmDelayMax] = getDelay("before_dm");
 				const dmWait = dmDelayMin + Math.random() * (dmDelayMax - dmDelayMin);
 				logger.debug("DELAY", `Waiting ${Math.floor(dmWait)}s before DM...`);
@@ -440,7 +445,7 @@ export async function processProfile(
 			}
 
 			// Follow (if not already following)
-			if (!wasFollowed(username)) {
+			if (!(await wasFollowed(username))) {
 				try {
 					await followUserAccount(page, username);
 					logger.info("ACTION", `👥 Followed @${username}`);
@@ -631,7 +636,7 @@ export async function processFollowingList(
 	logger.debug("NAVIGATION", `Following modal opened successfully`);
 
 	// Get current scroll index
-	let scrollIndex = getScrollIndex(seedUsername);
+	let scrollIndex = await getScrollIndex(seedUsername);
 	logger.debug("NAVIGATION", `Starting from scroll index: ${scrollIndex}`);
 
 	// If we've scrolled before, scroll to that position
@@ -679,7 +684,7 @@ export async function processFollowingList(
 			// Process each username
 			let allVisited = true;
 			for (const username of usernames) {
-				if (!wasVisited(username)) {
+				if (!(await wasVisited(username))) {
 					allVisited = false;
 
 					// Close the modal before visiting profile
@@ -763,7 +768,7 @@ export async function processFollowingList(
 				);
 				await scrollFollowingModal(page, 500);
 				scrollIndex += 500;
-				updateScrollIndex(seedUsername, scrollIndex);
+				await updateScrollIndex(seedUsername, scrollIndex);
 				await sleep(2000);
 			} else {
 				consecutiveAllVisited = 0;
@@ -818,7 +823,7 @@ export async function runScrapeLoop(
 
 	while (dmsSent < MAX_DMS_PER_DAY && shouldContinue()) {
 		// Get next profile from queue
-		const target = queueNext();
+		const target = await queueNext();
 
 		if (!target) {
 			const [waitMin, waitMax] = getDelay("queue_empty");
@@ -832,7 +837,7 @@ export async function runScrapeLoop(
 		}
 
 		seedsProcessed++;
-		logger.info("QUEUE", `Queue: ${queueCount()} remaining`);
+		logger.info("QUEUE", `Queue: ${await queueCount()} remaining`);
 		logger.info("SEED", `Processing seed #${seedsProcessed}: @${target}`);
 
 		try {
@@ -848,7 +853,7 @@ export async function runScrapeLoop(
 		}
 
 		// Print stats
-		const stats = getStats();
+		const stats = await getStats();
 		logger.info(
 			"STATS",
 			`Progress: Visited ${stats.total_visited} | Creators: ${stats.confirmed_creators} | DMs: ${stats.dms_sent} | Queue: ${stats.queue_size}`,
@@ -873,7 +878,7 @@ export async function runScrapeLoop(
 		await sleep(seedWait * 1000);
 	}
 
-	const stats = getStats();
+	const stats = await getStats();
 	logger.info(
 		"STATS",
 		`Session complete! Total visited: ${stats.total_visited}`,
@@ -906,7 +911,7 @@ export async function runScrapeLoopWithoutDM(
 
 	while (shouldContinue()) {
 		// Get next profile from queue
-		const target = queueNext();
+		const target = await queueNext();
 
 		if (!target) {
 			const [waitMin, waitMax] = getDelay("queue_empty");
@@ -920,7 +925,7 @@ export async function runScrapeLoopWithoutDM(
 		}
 
 		seedsProcessed++;
-		logger.info("QUEUE", `Queue: ${queueCount()} remaining`);
+		logger.info("QUEUE", `Queue: ${await queueCount()} remaining`);
 		logger.info(
 			"SEED",
 			`Processing seed #${seedsProcessed}: @${target} (no DM mode)`,
@@ -939,7 +944,7 @@ export async function runScrapeLoopWithoutDM(
 		}
 
 		// Print stats (without DM count)
-		const stats = getStats();
+		const stats = await getStats();
 		logger.info(
 			"STATS",
 			`Progress: Visited ${stats.total_visited} | Creators: ${stats.confirmed_creators} | Queue: ${stats.queue_size}`,
@@ -956,7 +961,7 @@ export async function runScrapeLoopWithoutDM(
 		await sleep(seedWait * 1000);
 	}
 
-	const stats = getStats();
+	const stats = await getStats();
 	logger.info(
 		"STATS",
 		`Discovery session complete! Total visited: ${stats.total_visited}`,
@@ -1006,7 +1011,7 @@ export async function scrape(debug: boolean = false): Promise<void> {
 		logger.info("ACTION", "✅ Logged in successfully!");
 
 		// Load seeds
-		const seedsLoaded = loadSeeds();
+		const seedsLoaded = await loadSeeds();
 		if (seedsLoaded === 0) {
 			logger.warn("QUEUE", "❌ No seeds.txt found or no seeds loaded!");
 			endCycle("FAILED", "No seeds loaded");
@@ -1138,7 +1143,7 @@ export async function scrapeWithoutDM(debug: boolean = false): Promise<void> {
 		logger.info("ACTION", "✅ Logged in successfully!");
 
 		// Load seeds
-		const seedsLoaded = loadSeeds();
+		const seedsLoaded = await loadSeeds();
 		if (seedsLoaded === 0) {
 			logger.warn("QUEUE", "❌ No seeds.txt found or no seeds loaded!");
 			endCycle("FAILED", "No seeds loaded");

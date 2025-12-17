@@ -8,7 +8,7 @@ import {
 	startSessionMetrics,
 	updateSessionMetrics,
 	recordProfileMetrics,
-	recordError,
+	recordError as recordDbError,
 	getDailyMetrics,
 } from "../database/database.ts";
 
@@ -35,7 +35,13 @@ export class MetricsTracker {
 		};
 
 		// Initialize session in database
-		startSessionMetrics(this.sessionId);
+		this.fireAndForget(startSessionMetrics(this.sessionId));
+	}
+
+	private fireAndForget(p: unknown): void {
+		void Promise.resolve(p).catch(() => {
+			// Metrics are best-effort; never crash the run if DB metrics fail.
+		});
 	}
 
 	// Profile processing metrics
@@ -51,23 +57,25 @@ export class MetricsTracker {
 		this.sessionMetrics.profilesVisited++;
 		this.sessionMetrics.totalProcessingTime += processingTimeSeconds;
 
-		recordProfileMetrics(username, {
-			processingTimeSeconds,
-			discoverySource,
-			discoveryDepth,
-			sessionId: this.sessionId,
-			contentCategories,
-			visionApiCalls,
-			sourceProfile,
-		});
+		this.fireAndForget(
+			recordProfileMetrics(username, {
+				processingTimeSeconds,
+				discoverySource,
+				discoveryDepth,
+				sessionId: this.sessionId,
+				contentCategories,
+				visionApiCalls,
+				sourceProfile,
+			}),
+		);
 
 		this.updateSessionMetrics();
 	}
 
 	// Creator discovery metrics
 	recordCreatorFound(
-		username: string,
-		confidence: number,
+		_username: string,
+		_confidence: number,
 		visionApiCalls: number = 0,
 	): void {
 		this.sessionMetrics.creatorsFound++;
@@ -76,12 +84,12 @@ export class MetricsTracker {
 	}
 
 	// Action metrics
-	recordDMSent(username: string): void {
+	recordDMSent(_username: string): void {
 		this.sessionMetrics.dmsSent++;
 		this.updateSessionMetrics();
 	}
 
-	recordFollowCompleted(username: string): void {
+	recordFollowCompleted(_username: string): void {
 		this.sessionMetrics.followsCompleted++;
 		this.updateSessionMetrics();
 	}
@@ -93,7 +101,7 @@ export class MetricsTracker {
 		errorMessage?: string,
 	): void {
 		this.sessionMetrics.errorsEncountered++;
-		recordError(username, errorType, errorMessage);
+		this.fireAndForget(recordDbError(username, errorType, errorMessage));
 		this.updateSessionMetrics();
 	}
 
@@ -158,7 +166,7 @@ export class MetricsTracker {
 			visionApiCost: this.sessionMetrics.visionApiCost,
 		};
 
-		updateSessionMetrics(this.sessionId, metrics);
+		this.fireAndForget(updateSessionMetrics(this.sessionId, metrics));
 	}
 }
 
@@ -177,14 +185,14 @@ export function createMetricsTracker(sessionId?: string): MetricsTracker {
 }
 
 // Utility functions for metrics analysis
-export function getMetricsSummary(date?: string): {
+export async function getMetricsSummary(date?: string): Promise<{
 	daily: DailyMetrics | null;
 	sessionSuccessRate: number;
 	creatorConversionRate: number;
 	dmSuccessRate: number;
 	averageProcessingTime: number;
-} {
-	const dailyMetrics = getDailyMetrics(date);
+}> {
+	const dailyMetrics = await getDailyMetrics(date);
 
 	if (!dailyMetrics) {
 		return {
@@ -241,5 +249,3 @@ export class PerformanceTimer {
 export function startTimer(label: string): PerformanceTimer {
 	return new PerformanceTimer(label);
 }
-
-

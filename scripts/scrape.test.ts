@@ -267,7 +267,7 @@ describe("scrape.ts", () => {
 		it("loads seeds from default seeds.txt file", async () => {
 			const { loadSeeds } = await import("./scrape.ts");
 
-			const count = loadSeeds();
+			const count = await loadSeeds();
 
 			// Should load the seeds from seeds.txt
 			expect(typeof count).toBe("number");
@@ -281,7 +281,7 @@ describe("scrape.ts", () => {
 
 			const { loadSeeds } = await import("./scrape.ts");
 
-			const count = loadSeeds("nonexistent.txt");
+			const count = await loadSeeds("nonexistent.txt");
 
 			expect(count).toBe(0);
 			expect(mockExistsSync).toHaveBeenCalledWith("nonexistent.txt");
@@ -296,7 +296,7 @@ describe("scrape.ts", () => {
 
 			const { loadSeeds } = await import("./scrape.ts");
 
-			const count = loadSeeds("empty.txt");
+			const count = await loadSeeds("empty.txt");
 
 			expect(count).toBe(0);
 			expect(mockExistsSync).toHaveBeenCalledWith("empty.txt");
@@ -318,7 +318,7 @@ user3
 
 			const { loadSeeds } = await import("./scrape.ts");
 
-			const count = loadSeeds("test.txt");
+			const count = await loadSeeds("test.txt");
 
 			expect(count).toBe(3);
 			expect(mockQueueAdd).toHaveBeenCalledTimes(3);
@@ -336,7 +336,7 @@ user3
 
 			const { loadSeeds } = await import("./scrape.ts");
 
-			const count = loadSeeds("whitespace.txt");
+			const count = await loadSeeds("whitespace.txt");
 
 			expect(count).toBe(2);
 			expect(mockQueueAdd).toHaveBeenCalledWith("username", 100, "seed");
@@ -359,7 +359,7 @@ user2
 
 			const { loadSeeds } = await import("./scrape.ts");
 
-			const count = loadSeeds("comments.txt");
+			const count = await loadSeeds("comments.txt");
 
 			expect(count).toBe(2);
 			expect(mockQueueAdd).toHaveBeenCalledTimes(2);
@@ -374,7 +374,7 @@ user2
 
 			const { loadSeeds } = await import("./scrape.ts");
 
-			const count = loadSeeds("custom/path/seeds.txt");
+			const count = await loadSeeds("custom/path/seeds.txt");
 
 			expect(count).toBe(1);
 			expect(mockExistsSync).toHaveBeenCalledWith("custom/path/seeds.txt");

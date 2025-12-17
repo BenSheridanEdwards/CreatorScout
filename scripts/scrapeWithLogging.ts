@@ -33,12 +33,12 @@ import {
 import {
 	getScrollIndex,
 	getStats,
-	initDb,
 	markAsCreator,
 	markVisited,
 	queueAdd,
 	queueCount,
 	queueNext,
+	updateScrollIndex,
 	wasDmSent,
 	wasFollowed,
 	wasVisited,
@@ -50,15 +50,15 @@ import {
 } from "../functions/timing/humanize/humanize.ts";
 import { sleep } from "../functions/timing/sleep/sleep.ts";
 import {
-	MetricsTracker,
 	getGlobalMetricsTracker,
 	startTimer,
+	type MetricsTracker,
 } from "../functions/shared/metrics/metrics.ts";
 
 // Enhanced logging imports
 import { createLoggerWithCycleTracking } from "../functions/shared/logger/logger.ts";
 
-initDb();
+// NOTE: Database init is async; queries will initialize schema on demand.
 
 // Enhanced logging setup
 const {
@@ -73,10 +73,12 @@ const {
 /**
  * Load seeds from file into queue
  */
-export function loadSeeds(filePath: string = "seeds.txt"): number {
+export async function loadSeeds(
+	filePath: string = "seeds.txt",
+): Promise<number> {
 	try {
 		if (!existsSync(filePath)) {
-			logger.warn("SEED", `Seeds file not found: ${filePath}`);
+			logger.warn("QUEUE", `Seeds file not found: ${filePath}`);
 			return 0;
 		}
 
@@ -87,14 +89,14 @@ export function loadSeeds(filePath: string = "seeds.txt"): number {
 		for (const line of lines) {
 			const username = line.trim().toLowerCase();
 			if (username && !username.startsWith("#")) {
-				queueAdd(username, 100, "seed");
+				await queueAdd(username, 100, "seed");
 				seedsLoaded++;
-				logger.debug("SEED", `Loaded seed: @${username}`);
+				logger.debug("QUEUE", `Loaded seed: @${username}`);
 			}
 		}
 
 		logger.info(
-			"SEED",
+			"QUEUE",
 			`Successfully loaded ${seedsLoaded} seeds from ${filePath}`,
 		);
 		return seedsLoaded;
@@ -119,7 +121,7 @@ export async function processProfile(
 
 	try {
 		// Skip if already visited
-		if (wasVisited(username)) {
+		if (await wasVisited(username)) {
 			logger.debug("PROFILE", `Already visited, skipping @${username}`);
 			cycleManager.recordWarning(
 				"PROFILE_NOT_FOUND",
@@ -150,7 +152,7 @@ export async function processProfile(
 		// Check if profile is accessible
 		if (status.notFound) {
 			logger.warn("PROFILE", `Profile not found: @${username}`);
-			markVisited(username, undefined, undefined, 0);
+			await markVisited(username, undefined, undefined, 0);
 			cycleManager.recordWarning(
 				"PROFILE_NOT_FOUND",
 				"Profile not found",
@@ -161,7 +163,7 @@ export async function processProfile(
 
 		if (status.isPrivate) {
 			logger.warn("PROFILE", `Profile is private: @${username}`);
-			markVisited(username, undefined, undefined, 0);
+			await markVisited(username, undefined, undefined, 0);
 			cycleManager.recordWarning(
 				"PROFILE_PRIVATE",
 				"Profile is private",
@@ -188,7 +190,7 @@ export async function processProfile(
 
 		if (!analysis.bio) {
 			logger.warn("ANALYSIS", `No bio found for @${username}`);
-			markVisited(username, undefined, undefined, 0);
+			await markVisited(username, undefined, undefined, 0);
 			return;
 		}
 
@@ -199,7 +201,7 @@ export async function processProfile(
 		logger.info("ANALYSIS", `Bio score: ${analysis.bioScore}`);
 
 		// Mark as visited with bio and score
-		markVisited(username, undefined, analysis.bio, analysis.bioScore);
+		await markVisited(username, undefined, analysis.bio, analysis.bioScore);
 
 		// Parse discovery source to extract depth and source profile
 		const discoveryDepth = source.split("_").length - 1; // Count underscores as depth
@@ -251,7 +253,7 @@ export async function processProfile(
 					confidence = visionResult.confidence || analysis.bioScore;
 					logger.info(
 						"ANALYSIS",
-						`Vision confirmed creator (confidence: ${confidence}%) - Indicators: ${visionResult.indicators?.join(", ") || "none"}`,
+						`Vision confirmed creator (confidence: ${confidence}%)`,
 					);
 
 					// Record vision API usage
@@ -314,10 +316,10 @@ export async function processProfile(
 			if (proofPath) {
 				logger.info("SCREENSHOT", `Creator proof saved: ${proofPath}`);
 			}
-			markAsCreator(username, confidence, proofPath);
+			await markAsCreator(username, confidence, proofPath);
 
 			// Send DM (if not already sent)
-			if (!wasDmSent(username)) {
+			if (!(await wasDmSent(username))) {
 				const [dmDelayMin, dmDelayMax] = getDelay("before_dm");
 				const dmWait = dmDelayMin + Math.random() * (dmDelayMax - dmDelayMin);
 				logger.debug("DELAY", `Waiting ${Math.floor(dmWait)}s before DM...`);
@@ -345,7 +347,7 @@ export async function processProfile(
 			}
 
 			// Follow (if not already following)
-			if (!wasFollowed(username)) {
+			if (!(await wasFollowed(username))) {
 				try {
 					await followUserAccount(page, username);
 					logger.info("ACTION", `Followed @${username}`);
@@ -460,7 +462,7 @@ export async function processFollowingList(
 	}
 
 	// Get current scroll index
-	let scrollIndex = getScrollIndex(seedUsername);
+	let scrollIndex = await getScrollIndex(seedUsername);
 	logger.debug("NAVIGATION", `Starting from scroll index: ${scrollIndex}`);
 
 	// If we've scrolled before, scroll to that position
@@ -495,7 +497,7 @@ export async function processFollowingList(
 			// Process each username
 			let allVisited = true;
 			for (const username of usernames) {
-				if (!wasVisited(username)) {
+				if (!(await wasVisited(username))) {
 					allVisited = false;
 
 					// Close the modal before visiting profile
@@ -543,7 +545,7 @@ export async function processFollowingList(
 				);
 				await scrollFollowingModal(page, 500);
 				scrollIndex += 500;
-				updateScrollIndex(seedUsername, scrollIndex);
+				await updateScrollIndex(seedUsername, scrollIndex);
 				await sleep(2000);
 			} else {
 				consecutiveAllVisited = 0;
@@ -583,7 +585,7 @@ export async function runScrapeLoop(
 
 	while (dmsSent < MAX_DMS_PER_DAY && shouldContinue()) {
 		// Get next profile from queue
-		const target = queueNext();
+		const target = await queueNext();
 
 		if (!target) {
 			const [waitMin, waitMax] = getDelay("queue_empty");
@@ -596,14 +598,14 @@ export async function runScrapeLoop(
 			continue;
 		}
 
-		logger.info("QUEUE", `Queue: ${queueCount()} remaining`);
+		logger.info("QUEUE", `Queue: ${await queueCount()} remaining`);
 
 		try {
 			// Process their following list
 			await processFollowingList(target, page, metricsTracker);
 
 			// Print stats
-			const stats = getStats();
+			const stats = await getStats();
 			logger.info(
 				"STATS",
 				`Visited: ${stats.total_visited} | Creators: ${stats.confirmed_creators} | DMs: ${stats.dms_sent} | Queue: ${stats.queue_size}`,
@@ -626,7 +628,7 @@ export async function runScrapeLoop(
 		}
 	}
 
-	const stats = getStats();
+	const stats = await getStats();
 	logger.info(
 		"STATS",
 		`Session complete! Total visited: ${stats.total_visited}`,
@@ -644,7 +646,7 @@ export async function scrape(debug: boolean = false): Promise<void> {
 	// Initialize metrics tracking
 	const metricsTracker = getGlobalMetricsTracker();
 	logger.info(
-		"METRICS",
+		"STATS",
 		`Started session tracking: ${metricsTracker.getSessionId()}`,
 	);
 
@@ -663,7 +665,7 @@ export async function scrape(debug: boolean = false): Promise<void> {
 		logger.info("ACTION", "Logged in!");
 
 		// Load seeds
-		const seedsLoaded = loadSeeds();
+		const seedsLoaded = await loadSeeds();
 		if (seedsLoaded === 0) {
 			logger.warn("QUEUE", "No seeds.txt found or no seeds loaded!");
 			endCycle("FAILED", "No seeds loaded");
@@ -682,7 +684,7 @@ export async function scrape(debug: boolean = false): Promise<void> {
 		metricsTracker.endSession();
 		const finalMetrics = metricsTracker.getSessionMetrics();
 		logger.info(
-			"METRICS",
+			"STATS",
 			`Session completed - Profiles: ${finalMetrics.profilesVisited}, Creators: ${finalMetrics.creatorsFound}, DMs: ${finalMetrics.dmsSent}`,
 		);
 
@@ -726,5 +728,3 @@ if (
 		process.exit(1);
 	});
 }
-
-

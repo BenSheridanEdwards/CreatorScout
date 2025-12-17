@@ -274,7 +274,7 @@ FAST_MODE=true              # Skip delays for faster testing
 ### Config Files
 - `seeds.txt` - List of seed profiles (one per line)
 - `functions/shared/config/config.ts` - Timing, limits, and messages
-- `scout.db` - SQLite database (auto-created)
+- `prisma/schema.prisma` - Prisma schema for Postgres
 
 ## 🎯 Use Cases
 
@@ -329,14 +329,18 @@ LOCAL_BROWSER=true npm run analyze username
 
 ## 📊 Database Schema
 
-Scout uses SQLite to track all interactions:
+Scout uses **Postgres via Prisma** to track all interactions:
 
 - `profiles` - User profiles and analysis results
 - `queue` - Processing queue for profiles
 - `following_scraped` - Following list extraction progress
 - `metrics` - Performance and usage statistics
 
-All scripts automatically update the database to avoid duplicate operations.
+Run migrations with Prisma (Railway-friendly):
+
+```bash
+npx prisma migrate deploy
+```
 
 ---
 

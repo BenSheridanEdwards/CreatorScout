@@ -689,7 +689,7 @@ describe("Metrics System Documentation", () => {
 	});
 
 	describe("Daily Metrics Aggregation", () => {
-		it("retrieves daily metrics summary", () => {
+		it("retrieves daily metrics summary", async () => {
 			mockGetDailyMetrics.mockReturnValue({
 				date: "2024-01-15",
 				totalSessions: 3,
@@ -704,7 +704,7 @@ describe("Metrics System Documentation", () => {
 				totalRateLimits: 2,
 			});
 
-			const summary = getMetricsSummary("2024-01-15");
+			const summary = await getMetricsSummary("2024-01-15");
 
 			expect(summary.daily).toEqual({
 				date: "2024-01-15",
@@ -721,7 +721,7 @@ describe("Metrics System Documentation", () => {
 			});
 		});
 
-		it("calculates conversion rates and success metrics", () => {
+		it("calculates conversion rates and success metrics", async () => {
 			mockGetDailyMetrics.mockReturnValue({
 				date: "2024-01-15",
 				totalSessions: 2,
@@ -736,17 +736,17 @@ describe("Metrics System Documentation", () => {
 				totalRateLimits: 1,
 			});
 
-			const summary = getMetricsSummary("2024-01-15");
+			const summary = await getMetricsSummary("2024-01-15");
 
 			expect(summary.sessionSuccessRate).toBe(50); // 100 profiles / 2 sessions
 			expect(summary.creatorConversionRate).toBe(10); // 10 creators / 100 profiles * 100
 			expect(summary.dmSuccessRate).toBe(80); // 8 DMs / 10 creators * 100
 		});
 
-		it("handles empty metrics gracefully", () => {
+		it("handles empty metrics gracefully", async () => {
 			mockGetDailyMetrics.mockReturnValue(null);
 
-			const summary = getMetricsSummary("2024-01-15");
+			const summary = await getMetricsSummary("2024-01-15");
 
 			expect(summary.daily).toBeNull();
 			expect(summary.sessionSuccessRate).toBe(0);
@@ -754,10 +754,10 @@ describe("Metrics System Documentation", () => {
 			expect(summary.dmSuccessRate).toBe(0);
 		});
 
-		it("uses today's date when no date provided", () => {
+		it("uses today's date when no date provided", async () => {
 			mockGetDailyMetrics.mockReturnValue(null);
 
-			const summary = getMetricsSummary();
+			await getMetricsSummary();
 
 			expect(mockGetDailyMetrics).toHaveBeenCalledWith(undefined);
 		});

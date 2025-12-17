@@ -76,19 +76,19 @@ export async function verifyLoggedIn(page: Page): Promise<boolean> {
  * Ensure we're logged in, re-logging if necessary.
  */
 export async function ensureLoggedIn(page: Page): Promise<void> {
-	// Check if logged in by looking for multiple indicators
-	const isLoggedIn = await page.evaluate(() => {
-		const inboxLink = document.querySelector('a[href="/direct/inbox/"]');
-		const profileLink = document.querySelector('[aria-label*="profile"]');
-		const createButton = document.querySelector('[aria-label*="create"]');
-		const homeIcon = document.querySelector('[aria-label*="home"]');
-		const loginButton = document.querySelector('a[href*="/accounts/login"]');
+	// Check if logged in by looking for multiple indicators.
+	// Use element queries instead of page.evaluate so unit tests can mock easily.
+	const inboxLink = await page.$('a[href="/direct/inbox/"]');
+	if (inboxLink) return; // Strong signal we're logged in
 
-		// Logged in if we have navigation elements and no login button
-		return (
-			(inboxLink || profileLink || createButton || homeIcon) && !loginButton
-		);
-	});
+	const [profileLink, createButton, homeIcon, loginButton] = await Promise.all([
+		page.$('[aria-label*="profile"]'),
+		page.$('[aria-label*="create"]'),
+		page.$('[aria-label*="home"]'),
+		page.$('a[href*="/accounts/login"]'),
+	]);
+
+	const isLoggedIn = (profileLink || createButton || homeIcon) && !loginButton;
 
 	if (isLoggedIn) {
 		return; // Already logged in

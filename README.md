@@ -193,11 +193,18 @@ INSTAGRAM_PASSWORD=your_ig_password
 
 ## Database Schema
 
-SQLite with WAL mode (`scout.db`):
+Postgres via Prisma (set `DATABASE_URL`):
 
 - **profiles** - All visited profiles with bio, score, creator status, DM/follow tracking
 - **queue** - Priority queue with source tracking (seed vs discovered)
 - **following_scraped** - Tracks scroll position for pagination
+- **metrics** - Performance and usage statistics
+
+Apply migrations (Railway-friendly):
+
+```bash
+npx prisma migrate deploy
+```
 
 ## Bio Matching Keywords
 
@@ -316,7 +323,7 @@ npm run test:coverage
 
 Tests cover:
 - **Bio matching** (keyword/emoji scoring)
-- **Database operations** (SQLite with visit/DM/follow tracking)
+- **Database operations** (Postgres via Prisma with visit/DM/follow tracking)
 - **Browser automation** (navigation, modal operations)
 - **Profile analysis** (vision AI, creator detection)
 - **Integration flows** (end-to-end scraping workflows)

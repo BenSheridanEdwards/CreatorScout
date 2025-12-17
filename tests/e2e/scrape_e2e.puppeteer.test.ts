@@ -12,7 +12,7 @@
  * 7. Queue Management → Add creators to database and queue
  */
 
-import { existsSync, unlinkSync } from "node:fs";
+// (no filesystem helpers needed for Postgres-backed E2E)
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import dotenv from "dotenv";
@@ -38,6 +38,7 @@ import { parseProfileStatus } from "../../functions/profile/profileStatus/profil
 import {
 	getScrollIndex,
 	initDb,
+	closeDb,
 	markAsCreator,
 	markVisited,
 	queueAdd,
@@ -65,7 +66,10 @@ if (!IG_USER || !IG_PASS) {
 }
 
 // Enable stealth mode
-(puppeteer as any).use(StealthPlugin());
+const puppeteerWithUse = puppeteer as unknown as {
+	use: (plugin: unknown) => void;
+};
+puppeteerWithUse.use(StealthPlugin());
 
 // Helper function for test-specific scrolling (wraps scrollFollowingModal)
 async function scrollModal(page: Page, times: number = 2): Promise<void> {
@@ -74,19 +78,17 @@ async function scrollModal(page: Page, times: number = 2): Promise<void> {
 	}
 }
 
-// Use a test database for e2e tests
-const TEST_DB = "test_e2e_scout.db";
+// E2E tests use Postgres via Prisma. Ensure DATABASE_URL is set.
 
 describe("Scout E2E Test Suite", () => {
 	let browser: Browser;
 	let page: Page;
 
 	beforeAll(async () => {
-		// Clean up test database if it exists
-		if (existsSync(TEST_DB)) {
-			unlinkSync(TEST_DB);
+		if (!process.env.DATABASE_URL) {
+			throw new Error("DATABASE_URL must be set for E2E tests");
 		}
-		initDb();
+		await initDb();
 
 		// Timing data available via performance.now() if needed
 		// const t0 = performance.now();
@@ -97,7 +99,10 @@ describe("Scout E2E Test Suite", () => {
 		);
 		const userDataDir = getUserDataDir();
 
-		browser = await (puppeteer as any).launch({
+		const puppeteerWithLaunch = puppeteer as unknown as {
+			launch: (opts: unknown) => Promise<Browser>;
+		};
+		browser = await puppeteerWithLaunch.launch({
 			headless: true,
 			args: ["--no-sandbox", "--disable-dev-shm-usage"],
 			userDataDir,
@@ -127,31 +132,25 @@ describe("Scout E2E Test Suite", () => {
 		if (browser) {
 			await browser.close();
 		}
-		// Clean up test database
-		if (existsSync(TEST_DB)) {
-			try {
-				unlinkSync(TEST_DB);
-			} catch {
-				// Ignore cleanup errors
-			}
-		}
+		await closeDb();
+		// No local DB file cleanup needed for Postgres.
 	});
 
 	describe("1. Seed Loading", () => {
-		test("queue operations with seed usernames", () => {
+		test("queue operations with seed usernames", async () => {
 			const seeds = ["seed_user_1", "seed_user_2", "seed_user_3"];
 			for (const s of seeds) {
-				queueAdd(s, 100, "seed");
+				await queueAdd(s, 100, "seed");
 			}
 
-			expect(queueCount()).toBeGreaterThanOrEqual(3);
+			expect(await queueCount()).toBeGreaterThanOrEqual(3);
 
 			// Verify we can retrieve them
 			const retrieved: string[] = [];
-			let next = queueNext();
+			let next = await queueNext();
 			while (next && retrieved.length < 3) {
 				retrieved.push(next);
-				next = queueNext();
+				next = await queueNext();
 			}
 
 			expect(retrieved.length).toBe(3);
@@ -160,10 +159,10 @@ describe("Scout E2E Test Suite", () => {
 			});
 		});
 
-		test("loadSeeds function loads from file", () => {
+		test("loadSeeds function loads from file", async () => {
 			// This test assumes seeds.txt might exist
 			// If it doesn't, the function should return 0
-			const count = loadSeeds();
+			const count = await loadSeeds();
 			expect(typeof count).toBe("number");
 			expect(count).toBeGreaterThanOrEqual(0);
 		});
@@ -357,18 +356,18 @@ describe("Scout E2E Test Suite", () => {
 			await page.keyboard.press("Escape");
 		}, 30000);
 
-		test("scroll index persistence (queue resume)", () => {
+		test("scroll index persistence (queue resume)", async () => {
 			const username = "test_seed_user";
 
-			const initial = getScrollIndex(username);
+			const initial = await getScrollIndex(username);
 			expect(initial).toBe(0);
 
-			updateScrollIndex(username, 10);
-			const idx1 = getScrollIndex(username);
+			await updateScrollIndex(username, 10);
+			const idx1 = await getScrollIndex(username);
 			expect(idx1).toBe(10);
 
-			updateScrollIndex(username, 20);
-			const idx2 = getScrollIndex(username);
+			await updateScrollIndex(username, 20);
+			const idx2 = await getScrollIndex(username);
 			expect(idx2).toBe(20);
 		});
 	});
@@ -453,22 +452,22 @@ describe("Scout E2E Test Suite", () => {
 	});
 
 	describe("7. Queue Management", () => {
-		test("full queue processing loop", () => {
+		test("full queue processing loop", async () => {
 			const seeds = ["seed_user_1", "seed_user_2", "seed_user_3"];
 			for (const s of seeds) {
-				queueAdd(s, 100, "seed");
+				await queueAdd(s, 100, "seed");
 			}
 
 			const processed: string[] = [];
 			const creatorsFound: string[] = [];
 
-			while (queueCount() > 0 && processed.length < 10) {
-				const target = queueNext();
+			while ((await queueCount()) > 0 && processed.length < 10) {
+				const target = await queueNext();
 				if (!target) {
 					break;
 				}
 
-				if (wasVisited(target)) {
+				if (await wasVisited(target)) {
 					continue;
 				}
 
@@ -476,20 +475,28 @@ describe("Scout E2E Test Suite", () => {
 
 				const isCreator = target === "seed_user_1";
 				const bioScore = isCreator ? 75 : 20;
-				markVisited(target, undefined, undefined, bioScore);
+				await markVisited(target, undefined, undefined, bioScore);
 
 				if (isCreator) {
-					markAsCreator(target, 85);
+					await markAsCreator(target, 85);
 					creatorsFound.push(target);
 
-					queueAdd("discovered_from_creator_1", 50, `following_of_${target}`);
-					queueAdd("discovered_from_creator_2", 50, `following_of_${target}`);
+					await queueAdd(
+						"discovered_from_creator_1",
+						50,
+						`following_of_${target}`,
+					);
+					await queueAdd(
+						"discovered_from_creator_2",
+						50,
+						`following_of_${target}`,
+					);
 				}
 			}
 
 			expect(processed.length).toBeGreaterThanOrEqual(3);
 			expect(creatorsFound.length).toBe(1);
-			expect(wasVisited("seed_user_1")).toBe(true);
+			expect(await wasVisited("seed_user_1")).toBe(true);
 		});
 
 		test("DM thread empty check", async () => {

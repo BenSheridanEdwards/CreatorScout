@@ -21,9 +21,10 @@
 		"dashboard": "tsx scripts/dashboard.ts"
 	},
 	"dependencies": {
-		"better-sqlite3": "^12.5.0",
+		"@prisma/client": "^7.1.0",
 		"dotenv": "^17.2.3",
 		"openai": "^6.10.0",
+		"prisma": "^7.1.0",
 		"puppeteer": "^22.13.1",
 		"puppeteer-extra": "^3.3.6",
 		"puppeteer-extra-plugin-stealth": "^2.11.2",

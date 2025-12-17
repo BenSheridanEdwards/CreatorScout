@@ -18,7 +18,7 @@ async function followUser(username: string): Promise<void> {
 	console.log(`👥 Following user: @${username}`);
 
 	// Check if already followed
-	if (wasFollowed(username)) {
+	if (await wasFollowed(username)) {
 		console.log("ℹ️  Already following this user");
 		return;
 	}
@@ -55,3 +55,4 @@ if (!username) {
 }
 
 followUser(username).catch(console.error);
+

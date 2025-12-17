@@ -4,13 +4,21 @@ import { snapshot } from "../snapshot/snapshot.ts";
 export type LogLevel = "DEBUG" | "INFO" | "WARN" | "ERROR";
 export type LogPrefix =
 	| "ACTION"
+	| "AUTH"
+	| "CYCLE"
+	| "DATABASE"
 	| "SCREENSHOT"
 	| "NAVIGATION"
 	| "ANALYSIS"
 	| "QUEUE"
+	| "SEED"
 	| "PROFILE"
 	| "ERROR"
+	| "FATAL"
 	| "STATS"
+	| "SYSTEM"
+	| "METRICS"
+	| "LIMIT"
 	| "DELAY";
 
 export interface Logger {

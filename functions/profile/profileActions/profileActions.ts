@@ -221,7 +221,7 @@ export async function sendDMToUser(
 		if (messageSent) {
 			// Take screenshot as proof
 			const proofPath = await snapshot(page, `dm_${username}`);
-			markDmSent(username, proofPath);
+			await markDmSent(username, proofPath);
 
 			logger.info("ACTION", `DM sent to @${username}`);
 			recordActivity("dm_sent", username, "success");
@@ -278,7 +278,7 @@ export async function followUserAccount(
 				}
 			});
 			await sleep(2000);
-			markFollowed(username);
+			await markFollowed(username);
 			logger.info("ACTION", `Followed @${username}`);
 			recordActivity("followed", username, "success");
 			return true;
@@ -317,8 +317,8 @@ export async function addFollowingToQueue(
 
 	// Use the source which includes the username
 	for (const followingUsername of followingUsernames) {
-		if (!wasVisited(followingUsername)) {
-			queueAdd(followingUsername, 50, source);
+		if (!(await wasVisited(followingUsername))) {
+			await queueAdd(followingUsername, 50, source);
 			added++;
 		}
 	}
