@@ -19,6 +19,7 @@ import {
 } from "../../shared/database/database.ts";
 import { createLogger } from "../../shared/logger/logger.ts";
 import { snapshot } from "../../shared/snapshot/snapshot.ts";
+import { analyzeDmProof } from "../vision/analyzeDmProof.ts";
 import { sleep } from "../../timing/sleep/sleep.ts";
 import { humanTypeText, humanClickElement, moveMouseToElement } from "../../timing/humanize/humanize.ts";
 
@@ -427,6 +428,21 @@ export async function sendDMToUser(
 
 			// Take screenshot as proof (before verification)
 			const proofPath = await snapshot(page, `dm_${username}`);
+
+			// Analyze screenshot with AI for better verification
+			const aiAnalysis = await analyzeDmProof(proofPath).catch(() => null);
+			
+			if (aiAnalysis) {
+				logger.info("VISION", `AI Analysis: DM sent=${aiAnalysis.dm_sent}, confidence=${aiAnalysis.confidence}%, reason="${aiAnalysis.reason}"`);
+				
+				if (aiAnalysis.indicators.length > 0) {
+					logger.info("VISION", `Indicators: ${aiAnalysis.indicators.join(", ")}`);
+				}
+				
+				if (!aiAnalysis.dm_sent || aiAnalysis.confidence < 70) {
+					logger.warn("VISION", `Low confidence DM verification (${aiAnalysis.confidence}%) - may need manual review`);
+				}
+			}
 
 			// Best-effort verification: check that the message appears in the thread.
 			// Use a more lenient check - just verify we're still in a DM thread

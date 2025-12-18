@@ -15,6 +15,7 @@ import {
 import { ensureLoggedIn } from "../functions/navigation/profileNavigation/profileNavigation.ts";
 import { sendDMToUser } from "../functions/profile/profileActions/profileActions.ts";
 import { wasDmSent } from "../functions/shared/database/database.ts";
+import { analyzeDmProof } from "../functions/profile/vision/analyzeDmProof.ts";
 
 async function dmUser(username: string, force: boolean = false): Promise<void> {
 	console.log(`💬 Sending DM to: @${username}`);
@@ -110,6 +111,47 @@ async function dmUser(username: string, force: boolean = false): Promise<void> {
 			const proofPath = `tmp/dm_proof_${username}_${Date.now()}.png`;
 			await page.screenshot({ path: proofPath, fullPage: true });
 			console.log(`📸 DM proof screenshot saved: ${proofPath}`);
+
+			// Analyze screenshot with AI to verify DM was sent
+			console.log("🤖 Analyzing screenshot with AI...");
+			const analysis = await analyzeDmProof(proofPath);
+
+			if (analysis) {
+				console.log("\n📊 AI Analysis Results:");
+				console.log(
+					`   ✅ DM Sent: ${analysis.dm_sent ? "YES" : "NO"} (${analysis.confidence}% confidence)`,
+				);
+				console.log(
+					`   📱 Is DM Thread: ${analysis.is_dm_thread ? "YES" : "NO"}`,
+				);
+				console.log(
+					`   💬 Message Visible: ${analysis.message_visible ? "YES" : "NO"}`,
+				);
+				console.log(
+					`   ⚠️  Error Detected: ${analysis.error_detected ? "YES" : "NO"}`,
+				);
+				console.log(`   📝 Reason: ${analysis.reason}`);
+				if (analysis.indicators.length > 0) {
+					console.log(`   🔍 Indicators:`);
+					analysis.indicators.forEach((indicator) => {
+						console.log(`      - ${indicator}`);
+					});
+				}
+
+				if (!analysis.dm_sent || analysis.confidence < 70) {
+					console.log(
+						"\n⚠️  WARNING: AI analysis suggests DM may not have been sent successfully!",
+					);
+					console.log(`   Confidence: ${analysis.confidence}%`);
+					console.log(`   Review screenshot manually: ${proofPath}`);
+				} else {
+					console.log("\n✅ AI confirms DM was sent successfully!");
+				}
+			} else {
+				console.log(
+					"⚠️  Could not analyze screenshot with AI - review manually",
+				);
+			}
 		} else {
 			console.log("❌ DM failed to send");
 			const failPath = `tmp/dm_failed_${username}_${Date.now()}.png`;
