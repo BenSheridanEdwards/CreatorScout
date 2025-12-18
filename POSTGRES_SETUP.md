@@ -225,3 +225,4 @@ After setup:
 4. ✅ (Optional) Migrate SQLite data if needed
 5. ✅ Start using the application!
 
+
