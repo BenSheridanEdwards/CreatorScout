@@ -20,7 +20,9 @@
 		"process": "tsx scripts/process_profiles.ts",
 		"health": "tsx scripts/health_check.ts",
 		"dashboard": "tsx scripts/dashboard.ts",
-		"studio": "npx prisma studio"
+		"studio": "npx prisma studio",
+		"dev:frontend": "cd frontend && npm run dev",
+		"dev:server": "tsx server.ts"
 	},
 	"dependencies": {
 		"@prisma/adapter-pg": "^7.1.0",

@@ -3,6 +3,7 @@
  * Provides unified browser creation with consistent configuration.
  */
 import { join } from "node:path";
+import fs from "node:fs/promises";
 import type { Browser, Page } from "puppeteer";
 import puppeteer from "puppeteer-extra";
 import StealthPlugin from "puppeteer-extra-plugin-stealth";
@@ -124,6 +125,33 @@ export async function createPage(
 	page.setDefaultTimeout(defaultTimeout);
 	await page.setViewport(viewport);
 	await page.setUserAgent(userAgent);
+
+	// If we're using Browserless, request a Live Debugger URL and persist it for the UI.
+	if (!LOCAL_BROWSER && BROWSERLESS_TOKEN) {
+		const pageWithCDP = page as unknown as {
+			createCDPSession?: () => Promise<{
+				send: (method: string, params?: unknown) => Promise<unknown>;
+			}>;
+		};
+		if (typeof pageWithCDP.createCDPSession === "function") {
+			try {
+				const cdp = await pageWithCDP.createCDPSession();
+				const resp = (await cdp.send("Browserless.liveURL")) as {
+					liveURL?: string;
+				};
+				if (resp?.liveURL) {
+					await fs.mkdir("tmp", { recursive: true });
+					await fs.writeFile(
+						"tmp/live-session-url.json",
+						JSON.stringify({ liveURL: resp.liveURL, ts: Date.now() }),
+						"utf8",
+					);
+				}
+			} catch {
+				// Best-effort only; ignore failures so automation isn't blocked.
+			}
+		}
+	}
 
 	// Additional stealth techniques
 	const pageWithEval = page as unknown as {
