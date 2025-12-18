@@ -50,6 +50,9 @@ function App() {
 		null,
 	);
 	const [liveUrlError, setLiveUrlError] = useState<string | null>(null);
+	const [logEntries, setLogEntries] = useState<any[]>([]);
+	const [logsError, setLogsError] = useState<string | null>(null);
+	const [logsLoading, setLogsLoading] = useState(false);
 
 	useEffect(() => {
 		void (async () => {
@@ -158,6 +161,35 @@ function App() {
 		}
 	}
 
+	async function refreshLogs() {
+		setLogsLoading(true);
+		setLogsError(null);
+		try {
+			const res = await fetch("/api/logs?limit=200");
+			if (!res.ok) {
+				setLogsError(`Failed to load logs (status ${res.status}).`);
+				// eslint-disable-next-line no-console
+				console.error(
+					`[Scout Studio] /api/logs failed with status ${res.status}.`,
+				);
+				return;
+			}
+			const data = (await res.json()) as { entries?: any[] };
+			setLogEntries(data.entries ?? []);
+		} catch {
+			setLogsError(
+				"Could not reach /api/logs. Is the API server running on port 4000?",
+			);
+			// eslint-disable-next-line no-console
+			console.error(
+				"[Scout Studio] Network error while calling /api/logs. " +
+					"Verify that `npm run dev:server` is running on port 4000.",
+			);
+		} finally {
+			setLogsLoading(false);
+		}
+	}
+
 	async function toggleRecording() {
 		try {
 			const res = await fetch("/api/session/recording", {
@@ -242,7 +274,7 @@ function App() {
 				</button>
 			</header>
 
-			<main className="flex-1 grid grid-cols-1 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)] gap-6 p-6">
+			<main className="flex-1 grid grid-cols-1 xl:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)] gap-6 p-6">
 				<section className="space-y-4">
 					<h2 className="text-sm font-semibold text-slate-300 uppercase tracking-wide">
 						Scripts
@@ -349,6 +381,72 @@ function App() {
 								No live viewer yet. Run a script (Browserless) and hit “Load
 								viewer”.
 							</p>
+						)}
+					</div>
+				</section>
+
+				<section className="flex flex-col rounded-xl border border-slate-800 bg-slate-900/60 overflow-hidden xl:col-span-2">
+					<div className="flex items-center justify-between border-b border-slate-800 px-4 py-2.5">
+						<h2 className="text-sm font-semibold text-slate-200">Logs</h2>
+						<button
+							onClick={refreshLogs}
+							type="button"
+							className="rounded-md border border-slate-700 bg-slate-900 px-2.5 py-1 text-xs font-medium text-slate-200 hover:bg-slate-800 disabled:opacity-60"
+							disabled={logsLoading}
+						>
+							{logsLoading ? "Loading..." : "Refresh logs"}
+						</button>
+					</div>
+					{logsError && (
+						<div className="px-4 py-2 text-[11px] text-amber-400 border-b border-slate-800 bg-slate-950/60">
+							{logsError}
+						</div>
+					)}
+					<div className="flex-1 overflow-y-auto px-4 py-3 text-xs font-mono text-slate-300 bg-slate-950/60">
+						{logEntries.length === 0 ? (
+							<p className="text-slate-500">
+								No log entries yet. Run a script to generate logs, then hit
+								“Refresh logs”.
+							</p>
+						) : (
+							<ul className="space-y-1">
+								{logEntries.map((entry, idx) => {
+									const ts = entry.timestamp ?? "";
+									const level = entry.level ?? "";
+									const prefix = entry.prefix ?? "";
+									const message = entry.message ?? entry.raw ?? "";
+									return (
+										<li
+											// eslint-disable-next-line react/no-array-index-key
+											key={idx}
+											className="whitespace-pre-wrap break-words"
+										>
+											<span className="text-slate-500 mr-1">
+												{ts && `[${ts}]`}
+											</span>
+											{level && (
+												<span
+													className={
+														level === "ERROR"
+															? "text-red-400 mr-1"
+															: level === "WARN"
+																? "text-amber-300 mr-1"
+																: "text-sky-300 mr-1"
+													}
+												>
+													{level}
+												</span>
+											)}
+											{prefix && (
+												<span className="text-emerald-300 mr-1">
+													[{prefix}]
+												</span>
+											)}
+											<span>{message}</span>
+										</li>
+									);
+								})}
+							</ul>
 						)}
 					</div>
 				</section>
