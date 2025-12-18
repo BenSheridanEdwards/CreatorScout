@@ -1,25 +1,17 @@
 import dotenv from "dotenv";
 
-// Load env first so config picks up LOCAL_BROWSER/BROWSERLESS_TOKEN
+// Load env so config picks up LOCAL_BROWSER/BROWSERLESS_TOKEN
 dotenv.config();
 
-// Force local browser for discovery mode so user can see what's happening
-process.env.LOCAL_BROWSER = "true";
-
-const hasBrowserless = Boolean(process.env.BROWSERLESS_TOKEN);
-
-// Log which browser we're using
+// Log which browser we're using based on current env/config
 const usingLocalBrowser = process.env.LOCAL_BROWSER === "true";
 console.log(`🔍 Scout - Instagram Creator Discovery Agent`);
 console.log(
 	`🌐 Using ${usingLocalBrowser ? "LOCAL BROWSER" : "BROWSERLESS"} ${usingLocalBrowser ? "(headful)" : "(headless)"}`,
 );
 
-// Dynamic imports so config reads the env we just set
+// Dynamic imports so config reads the env we just loaded
 const { scrapeWithoutDM } = await import("./scrape.ts");
-
-// Check if inspect mode is enabled
-const inspectMode = process.env.INSPECT_MODE === "true";
 
 async function main() {
 	console.log("🚀 Starting Instagram Creator Discovery...");
