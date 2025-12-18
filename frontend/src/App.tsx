@@ -114,11 +114,21 @@ function App() {
 				setLiveUrlError(
 					"No active Browserless live session. Start a script while connected to Browserless.",
 				);
+				// Also surface in devtools for easier debugging
+				// eslint-disable-next-line no-console
+				console.error(
+					"[Scout Studio] /api/session/live-url returned 204 (no live URL). " +
+						"Likely causes: script not using Browserless Sessions, plan without Live Debugger, or session not started yet.",
+				);
 				return;
 			}
 			if (!res.ok) {
 				setLiveUrlError(
 					`Failed to load live viewer (status ${res.status}). Check server logs.`,
+				);
+				// eslint-disable-next-line no-console
+				console.error(
+					`[Scout Studio] /api/session/live-url failed with status ${res.status}.`,
 				);
 				return;
 			}
@@ -131,10 +141,19 @@ function App() {
 				setLiveUrlError(
 					"No Browserless live URL available yet. Make sure a script is running with Browserless enabled.",
 				);
+				// eslint-disable-next-line no-console
+				console.error(
+					"[Scout Studio] /api/session/live-url responded without a liveURL field.",
+				);
 			}
 		} catch {
 			setLiveUrlError(
 				"Could not reach /api/session/live-url. Is the API server running on port 4000?",
+			);
+			// eslint-disable-next-line no-console
+			console.error(
+				"[Scout Studio] Network error while calling /api/session/live-url. " +
+					"Verify that `npm run dev:server` is running on port 4000.",
 			);
 		}
 	}

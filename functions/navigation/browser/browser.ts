@@ -146,9 +146,20 @@ export async function createPage(
 						JSON.stringify({ liveURL: resp.liveURL, ts: Date.now() }),
 						"utf8",
 					);
+				} else {
+					// eslint-disable-next-line no-console
+					console.warn(
+						"[browser] Browserless.liveURL did not return a liveURL. " +
+							"This usually means your Browserless plan/endpoint does not support the Live Debugger.",
+					);
 				}
-			} catch {
-				// Best-effort only; ignore failures so automation isn't blocked.
+			} catch (err) {
+				// eslint-disable-next-line no-console
+				console.warn(
+					"[browser] Failed to obtain Browserless live URL via CDP. " +
+						"Live viewer in Scout Studio will be blank.\n",
+					err,
+				);
 			}
 		}
 	}
