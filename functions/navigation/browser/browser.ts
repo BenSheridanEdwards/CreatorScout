@@ -131,17 +131,27 @@ export async function createPage(
 	};
 	if (typeof pageWithEval.evaluateOnNewDocument === "function") {
 		await pageWithEval.evaluateOnNewDocument(() => {
-			// Override navigator properties to avoid detection
+			// ===== CRITICAL: Remove all webdriver traces =====
 			Object.defineProperty(navigator, "webdriver", { get: () => undefined });
-
-			// Remove webdriver property completely
 			delete (navigator as { webdriver?: unknown }).webdriver;
 
-			// Randomize some navigator properties slightly
+			// Remove __webdriver_evaluate, __selenium_unwrapped, etc.
+			Object.defineProperty(window, "navigator", {
+				get: () => {
+					const nav = Object.create(navigator);
+					nav.webdriver = undefined;
+					return nav;
+				},
+			});
+
+			// ===== Navigator Properties =====
 			const languages = ["en-US", "en"];
 			Object.defineProperty(navigator, "languages", { get: () => languages });
+			Object.defineProperty(navigator, "platform", { get: () => "MacIntel" });
+			Object.defineProperty(navigator, "hardwareConcurrency", { get: () => 8 });
+			Object.defineProperty(navigator, "deviceMemory", { get: () => 8 });
 
-			// Add realistic plugins (common ones)
+			// Add realistic plugins
 			Object.defineProperty(navigator, "plugins", {
 				get: () => [
 					{ name: "Chrome PDF Plugin", filename: "internal-pdf-viewer" },
@@ -153,7 +163,40 @@ export async function createPage(
 				],
 			});
 
-			// Override permissions API
+			// ===== Canvas Fingerprinting Protection =====
+			const originalToDataURL = HTMLCanvasElement.prototype.toDataURL;
+			HTMLCanvasElement.prototype.toDataURL = function (
+				type?: string,
+				quality?: number,
+			) {
+				const context = this.getContext("2d");
+				if (context) {
+					const imageData = context.getImageData(0, 0, this.width, this.height);
+					for (let i = 0; i < imageData.data.length; i += 4) {
+						imageData.data[i] += Math.floor(Math.random() * 10) - 5;
+					}
+					context.putImageData(imageData, 0, 0);
+				}
+				return originalToDataURL.apply(this, [type, quality]);
+			};
+
+			// ===== WebGL Fingerprinting Protection =====
+			const getParameter = WebGLRenderingContext.prototype.getParameter;
+			WebGLRenderingContext.prototype.getParameter = function (
+				parameter: number,
+			) {
+				if (parameter === 37445) {
+					// UNMASKED_VENDOR_WEBGL
+					return "Intel Inc.";
+				}
+				if (parameter === 37446) {
+					// UNMASKED_RENDERER_WEBGL
+					return "Intel Iris OpenGL Engine";
+				}
+				return getParameter.apply(this, [parameter]);
+			};
+
+			// ===== Permissions API =====
 			const originalQuery = window.navigator.permissions.query;
 			window.navigator.permissions.query = (parameters) =>
 				parameters.name === "notifications"
@@ -162,15 +205,37 @@ export async function createPage(
 						} as PermissionStatus)
 					: originalQuery(parameters);
 
-			// Override chrome runtime
+			// ===== Chrome Runtime =====
 			(window as { chrome?: unknown }).chrome = {
 				runtime: {},
 			};
 
-			// Add realistic platform
-			Object.defineProperty(navigator, "platform", {
-				get: () => "MacIntel",
-			});
+			// ===== Battery API (can be used for fingerprinting) =====
+			const nav = navigator as { getBattery?: () => Promise<unknown> };
+			if (nav.getBattery) {
+				Object.defineProperty(navigator, "getBattery", {
+					get: () => () =>
+						Promise.resolve({
+							charging: true,
+							chargingTime: 0,
+							dischargingTime: Infinity,
+							level: 0.8 + Math.random() * 0.2,
+						}),
+				});
+			}
+
+			// ===== Connection API =====
+			const navWithConnection = navigator as { connection?: unknown };
+			if (navWithConnection.connection) {
+				Object.defineProperty(navigator, "connection", {
+					get: () => ({
+						effectiveType: "4g",
+						rtt: 50,
+						downlink: 10,
+						saveData: false,
+					}),
+				});
+			}
 		});
 	}
 

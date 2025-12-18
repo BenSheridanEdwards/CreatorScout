@@ -28,6 +28,18 @@ const logger = createLogger(process.env.DEBUG_LOGS === "true");
  * Handle Instagram popups and error pages (notifications, reload prompts, etc.)
  */
 async function handleInstagramPopups(page: Page): Promise<void> {
+	// Handle "The messaging tab has a new look" popup
+	const messagingTabDismissed = await clickAny(page, [
+		"OK",
+		"Got it",
+		"Got It",
+		"Dismiss",
+	]);
+	if (messagingTabDismissed) {
+		logger.info("ACTION", "Dismissed messaging tab popup");
+		await sleep(1000 + Math.random() * 1000);
+	}
+
 	// Handle "Turn on Notifications" popup
 	const notificationDismissed = await clickAny(page, [
 		"Not Now",
@@ -114,87 +126,136 @@ export async function sendDMToUser(
 		// Take debug screenshot
 		await snapshot(page, `dm_profile_debug_${username}`);
 
-		// Look for the "Message" button on the profile page
-		// Use human-like clicking with actual mouse cursor movement
-		let messageButtonClicked = false;
+		// MIMIC REAL USER BEHAVIOR EXACTLY
+		// 1. Scroll page naturally to see the button
+		logger.info("ACTION", "Scrolling page naturally like a real user");
+		await page.evaluate(() => {
+			window.scrollBy(0, Math.random() * 200 + 100);
+		});
+		await sleep(500 + Math.random() * 500);
+		
+		// 2. Move mouse around naturally (looking at profile)
+		logger.info("ACTION", "Moving mouse naturally around the page");
+		for (let i = 0; i < 3 + Math.floor(Math.random() * 3); i++) {
+			const randomX = Math.random() * 800 + 200;
+			const randomY = Math.random() * 600 + 200;
+			await page.mouse.move(randomX, randomY, {
+				steps: 20 + Math.floor(Math.random() * 20)
+			});
+			await sleep(200 + Math.random() * 400);
+		}
 
-		// Find the Message button by text and get its selector
-		const messageButtonSelector = await page.evaluate(() => {
+		// 3. Get Message button coordinates
+		const buttonInfo = await page.evaluate(() => {
 			const buttons = Array.from(document.querySelectorAll('button, a'));
 			for (const btn of buttons) {
 				const text = (btn.textContent || "").trim().toLowerCase();
 				if (text === "message") {
-					// Try to find a unique selector for this element
-					const tagName = btn.tagName.toLowerCase();
-					const href = (btn as HTMLAnchorElement).href || "";
+					const rect = btn.getBoundingClientRect();
+					// Check if button is visible in viewport
+					const isVisible = rect.top >= 0 && rect.left >= 0 && 
+						rect.bottom <= window.innerHeight && 
+						rect.right <= window.innerWidth;
 					
-					// If it's a link with href, return href-based selector
-					if (tagName === "a" && href) {
-						return { type: "link", href };
-					}
-					
-					// Otherwise try to find by aria-label or other attributes
-					const ariaLabel = btn.getAttribute("aria-label") || "";
-					if (ariaLabel.toLowerCase().includes("message")) {
-						return { type: "aria", ariaLabel };
-					}
-					
-					// Fallback: return tag and text
-					return { type: "text", tagName };
+					return {
+						x: rect.left + rect.width / 2,
+						y: rect.top + rect.height / 2,
+						width: rect.width,
+						height: rect.height,
+						isVisible,
+					};
 				}
 			}
 			return null;
 		});
 
-		if (messageButtonSelector) {
-			// Use human-like click with actual mouse cursor movement
-			if (messageButtonSelector.type === "link" && messageButtonSelector.href) {
-				// It's a link - use human click on the link with mouse movement
-				const clicked = await humanClickElement(page, `a[href*="/direct/t/"]`, {
-					elementType: "link",
-					hoverDelay: 200 + Math.random() * 300, // 200-500ms hover
-				});
-				if (clicked) {
-					messageButtonClicked = true;
-					logger.info("ACTION", "Message link clicked with actual mouse cursor movement");
-				}
-			} else if (messageButtonSelector.type === "aria") {
-				// Click by aria-label with mouse movement
-				const clicked = await humanClickElement(page, `button[aria-label*="Message"], a[aria-label*="Message"]`, {
-					elementType: "button",
-					hoverDelay: 200 + Math.random() * 300,
-				});
-				if (clicked) {
-					messageButtonClicked = true;
-					logger.info("ACTION", "Message button clicked with actual mouse cursor movement (aria-label)");
-				}
-			} else {
-				// Find button by text and click with mouse movement
-				// Use page.evaluate to find exact element, then click with mouse
-				const buttonFound = await page.evaluate(() => {
+		let messageButtonClicked = false;
+
+		if (buttonInfo) {
+			// 4. Scroll to button if not visible (like a real user would)
+			if (!buttonInfo.isVisible) {
+				logger.info("ACTION", "Button not visible, scrolling to it naturally");
+				await page.evaluate((targetY) => {
+					const currentScroll = window.pageYOffset;
+					const distance = targetY - currentScroll - 300; // Scroll to show button
+					window.scrollBy({
+						top: distance,
+						behavior: 'smooth'
+					});
+				}, buttonInfo.y);
+				await sleep(1000 + Math.random() * 1000);
+				
+				// Re-get coordinates after scroll
+				const newButtonInfo = await page.evaluate(() => {
 					const buttons = Array.from(document.querySelectorAll('button, a'));
 					for (const btn of buttons) {
 						const text = (btn.textContent || "").trim().toLowerCase();
 						if (text === "message") {
-							// Mark it so we can find it
-							(btn as HTMLElement).setAttribute("data-scout-message-btn", "true");
-							return true;
+							const rect = btn.getBoundingClientRect();
+							return {
+								x: rect.left + rect.width / 2,
+								y: rect.top + rect.height / 2,
+								width: rect.width,
+								height: rect.height,
+							};
 						}
 					}
-					return false;
+					return null;
 				});
-				
-				if (buttonFound) {
-					const clicked = await humanClickElement(page, '[data-scout-message-btn="true"]', {
-						elementType: "button",
-						hoverDelay: 200 + Math.random() * 300,
-					});
-					if (clicked) {
-						messageButtonClicked = true;
-						logger.info("ACTION", "Message button clicked with actual mouse cursor movement (text match)");
-					}
+				if (newButtonInfo) {
+					Object.assign(buttonInfo, newButtonInfo);
 				}
 			}
+
+			// 5. Move mouse in NATURAL CURVED PATH to button (not straight line)
+			logger.info("ACTION", "Moving mouse in natural curved path to Message button");
+			const currentPos = await page.evaluate(() => ({
+				x: (window as any).mouseX || window.innerWidth / 2,
+				y: (window as any).mouseY || window.innerHeight / 2,
+			}));
+			
+			// Create waypoints for natural curved movement
+			const waypoints = [];
+			const numWaypoints = 3 + Math.floor(Math.random() * 2);
+			for (let i = 1; i <= numWaypoints; i++) {
+				const t = i / (numWaypoints + 1);
+				// Bezier-like curve with randomness
+				const midX = currentPos.x + (buttonInfo.x - currentPos.x) * t + (Math.random() - 0.5) * 100;
+				const midY = currentPos.y + (buttonInfo.y - currentPos.y) * t + (Math.random() - 0.5) * 50;
+				waypoints.push({ x: midX, y: midY });
+			}
+			
+			// Move through waypoints (natural path)
+			for (const waypoint of waypoints) {
+				await page.mouse.move(waypoint.x, waypoint.y, {
+					steps: 15 + Math.floor(Math.random() * 10)
+				});
+				await sleep(50 + Math.random() * 100);
+			}
+			
+			// 6. Move near button, pause, then move to it (human behavior)
+			const nearX = buttonInfo.x - 30 + Math.random() * 60;
+			const nearY = buttonInfo.y - 20 + Math.random() * 40;
+			await page.mouse.move(nearX, nearY, { steps: 10 });
+			await sleep(300 + Math.random() * 500); // Pause like reading
+			
+			// 7. Final movement to button center with small random offset
+			const finalX = buttonInfo.x + (Math.random() - 0.5) * (buttonInfo.width * 0.2);
+			const finalY = buttonInfo.y + (Math.random() - 0.5) * (buttonInfo.height * 0.2);
+			await page.mouse.move(finalX, finalY, { steps: 8 + Math.floor(Math.random() * 5) });
+			
+			// 8. Hover over button (real user pauses before clicking)
+			await sleep(400 + Math.random() * 600);
+			
+			// 9. Click with natural timing
+			logger.info("ACTION", "Clicking Message button with natural cursor movement");
+			await page.mouse.down();
+			await sleep(80 + Math.random() * 120); // Natural click hold time
+			await page.mouse.up();
+			
+			messageButtonClicked = true;
+			logger.info("ACTION", "Message button clicked - mimicked real user exactly");
+			await sleep(1000 + Math.random() * 1000);
 		}
 
 		if (!messageButtonClicked) {

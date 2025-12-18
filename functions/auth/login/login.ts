@@ -59,6 +59,22 @@ export async function login(
 		logger.info("ACTION", "Skipping cookie loading as requested");
 	}
 
+	// If cookies were loaded, reload the page so they take effect
+	if (cookiesLoaded) {
+		logger.info("ACTION", "Cookies loaded, reloading page to apply them...");
+		await page.goto("https://www.instagram.com/", {
+			waitUntil: "networkidle2",
+			timeout: 15000,
+		});
+		logger.info("ACTION", "Page reloaded with cookies applied");
+
+		// Wait for page to fully load and hydrate
+		await delay(3000);
+
+		// Handle any popups that appeared
+		await clickAny(page, ["OK", "Got it", "Got It", "Dismiss"]);
+	}
+
 	// Check if we're already logged in (either from cookies or previous session)
 	// Give cookies a moment to apply, then check current session
 	logger.info(
@@ -67,6 +83,7 @@ export async function login(
 	);
 	await delay(2000);
 
+	// Use comprehensive check for logged-in state
 	const alreadyLoggedIn = await isLoggedIn(page);
 	logger.info("ACTION", `Already logged in check: ${alreadyLoggedIn}`);
 
@@ -78,22 +95,11 @@ export async function login(
 		return;
 	}
 
-	// If cookies were loaded but we're not logged in, they may be expired
-	if (cookiesLoaded) {
+	// If cookies were loaded but we're still not logged in, they may be expired
+	if (cookiesLoaded && !alreadyLoggedIn) {
 		logger.warn(
 			"ACTION",
-			"Cookies loaded but session expired, reloading page for fresh login...",
-		);
-		// Only reload if cookies were loaded but session expired
-		await page.goto("https://www.instagram.com/", {
-			waitUntil: "networkidle2",
-			timeout: 15000,
-		});
-		logger.info("ACTION", "Page reloaded successfully");
-	} else {
-		logger.info(
-			"ACTION",
-			"No cookies loaded, proceeding with fresh login on current page",
+			"Cookies loaded but session appears expired, will attempt fresh login...",
 		);
 	}
 
@@ -107,6 +113,10 @@ export async function login(
 		"OK",
 		"Continue",
 	]);
+
+	// Handle "The messaging tab has a new look" popup that often appears
+	await clickAny(page, ["OK", "Got it", "Got It", "Dismiss"]);
+
 	logger.info("ACTION", "Popups handled");
 
 	// Add a brief pause to let any animations settle
@@ -214,11 +224,7 @@ export async function login(
 				const ts = Date.now();
 				const html = await page.content();
 				await fs.writeFile(`tmp/login_debug_${ts}.html`, html, "utf8");
-				await fs.writeFile(
-					`tmp/login_debug_${ts}.txt`,
-					bodyText,
-					"utf8",
-				);
+				await fs.writeFile(`tmp/login_debug_${ts}.txt`, bodyText, "utf8");
 				logger.info(
 					"ACTION",
 					`Login debug saved: tmp/login_debug_${ts}.html and tmp/login_debug_${ts}.txt`,
@@ -427,7 +433,7 @@ export async function login(
 	// Handle "Save your login info?" modal that may appear immediately after submission
 	// Use human-like mouse movement to click the button
 	const saveInfoButtonFound = await page.evaluate(() => {
-		const buttons = Array.from(document.querySelectorAll('button'));
+		const buttons = Array.from(document.querySelectorAll("button"));
 		for (const btn of buttons) {
 			const text = (btn.textContent || "").trim();
 			if (text === "Save info" || text === "Save Info" || text === "Save") {
@@ -437,17 +443,24 @@ export async function login(
 		}
 		return false;
 	});
-	
+
 	if (saveInfoButtonFound) {
-		const clicked = await humanClickElement(page, 'button[data-scout-save-info="true"]', {
-			elementType: "button",
-			hoverDelay: 200 + Math.random() * 300,
-		}).catch(async () => {
+		const clicked = await humanClickElement(
+			page,
+			'button[data-scout-save-info="true"]',
+			{
+				elementType: "button",
+				hoverDelay: 200 + Math.random() * 300,
+			},
+		).catch(async () => {
 			// Fallback to clickAny if humanClickElement doesn't work
 			return await clickAny(page, ["Save info", "Save Info", "Save"]);
 		});
 		if (clicked) {
-			logger.info("ACTION", "Clicked 'Save info' on login modal with actual mouse cursor movement (early)");
+			logger.info(
+				"ACTION",
+				"Clicked 'Save info' on login modal with actual mouse cursor movement (early)",
+			);
 			await delay(1000);
 		}
 	}
@@ -509,10 +522,10 @@ export async function login(
 			// We click "Save info" as it's less suspicious than dismissing
 			// Use human-like mouse movement to click the button
 			await delay(2000); // Wait for modal to appear
-			
+
 			// Find the Save info button by text and mark it
 			const saveInfoButtonFound = await page.evaluate(() => {
-				const buttons = Array.from(document.querySelectorAll('button'));
+				const buttons = Array.from(document.querySelectorAll("button"));
 				for (const btn of buttons) {
 					const text = (btn.textContent || "").trim();
 					if (text === "Save info" || text === "Save Info" || text === "Save") {
@@ -522,17 +535,24 @@ export async function login(
 				}
 				return false;
 			});
-			
+
 			if (saveInfoButtonFound) {
-				const clicked = await humanClickElement(page, 'button[data-scout-save-info="true"]', {
-					elementType: "button",
-					hoverDelay: 200 + Math.random() * 300,
-				}).catch(async () => {
+				const clicked = await humanClickElement(
+					page,
+					'button[data-scout-save-info="true"]',
+					{
+						elementType: "button",
+						hoverDelay: 200 + Math.random() * 300,
+					},
+				).catch(async () => {
 					// Fallback to clickAny if humanClickElement doesn't work
 					return await clickAny(page, ["Save info", "Save Info", "Save"]);
 				});
 				if (clicked) {
-					logger.info("ACTION", "Clicked 'Save info' on login modal with actual mouse cursor movement");
+					logger.info(
+						"ACTION",
+						"Clicked 'Save info' on login modal with actual mouse cursor movement",
+					);
 					await delay(1000);
 				}
 			} else {
@@ -543,20 +563,27 @@ export async function login(
 					"Save",
 				]);
 				if (saveInfoClicked) {
-					logger.info("ACTION", "Clicked 'Save info' on login modal (fallback)");
+					logger.info(
+						"ACTION",
+						"Clicked 'Save info' on login modal (fallback)",
+					);
 					await delay(1000);
 				} else {
 					// Last resort: try "Not now" if "Save info" not found
-					const notNowClicked = await clickAny(page, [
-						"Not now",
-						"Not Now",
-					]);
+					const notNowClicked = await clickAny(page, ["Not now", "Not Now"]);
 					if (notNowClicked) {
-						logger.info("ACTION", "Clicked 'Not now' on login modal (last resort)");
+						logger.info(
+							"ACTION",
+							"Clicked 'Not now' on login modal (last resort)",
+						);
 						await delay(1000);
 					}
 				}
 			}
+
+			// Handle "The messaging tab has a new look" popup that may appear after login
+			await delay(1000);
+			await clickAny(page, ["OK", "Got it", "Got It", "Dismiss"]);
 
 			// Save cookies after successful login
 			await saveCookies(page);
@@ -606,10 +633,10 @@ export async function login(
 		// We click "Save info" as it's less suspicious than dismissing
 		// Use human-like mouse movement to click the button
 		await delay(2000);
-		
+
 		// Find the Save info button by text and mark it
 		const saveInfoButtonFound = await page.evaluate(() => {
-			const buttons = Array.from(document.querySelectorAll('button'));
+			const buttons = Array.from(document.querySelectorAll("button"));
 			for (const btn of buttons) {
 				const text = (btn.textContent || "").trim();
 				if (text === "Save info" || text === "Save Info" || text === "Save") {
@@ -619,17 +646,24 @@ export async function login(
 			}
 			return false;
 		});
-		
+
 		if (saveInfoButtonFound) {
-			const clicked = await humanClickElement(page, 'button[data-scout-save-info="true"]', {
-				elementType: "button",
-				hoverDelay: 200 + Math.random() * 300,
-			}).catch(async () => {
+			const clicked = await humanClickElement(
+				page,
+				'button[data-scout-save-info="true"]',
+				{
+					elementType: "button",
+					hoverDelay: 200 + Math.random() * 300,
+				},
+			).catch(async () => {
 				// Fallback to clickAny if humanClickElement doesn't work
 				return await clickAny(page, ["Save info", "Save Info", "Save"]);
 			});
 			if (clicked) {
-				logger.info("ACTION", "Clicked 'Save info' on login modal with actual mouse cursor movement");
+				logger.info(
+					"ACTION",
+					"Clicked 'Save info' on login modal with actual mouse cursor movement",
+				);
 				await delay(1000);
 			}
 		} else {
@@ -644,12 +678,12 @@ export async function login(
 				await delay(1000);
 			} else {
 				// Last resort: try "Not now" if "Save info" not found
-				const notNowClicked = await clickAny(page, [
-					"Not now",
-					"Not Now",
-				]);
+				const notNowClicked = await clickAny(page, ["Not now", "Not Now"]);
 				if (notNowClicked) {
-					logger.info("ACTION", "Clicked 'Not now' on login modal (last resort)");
+					logger.info(
+						"ACTION",
+						"Clicked 'Not now' on login modal (last resort)",
+					);
 					await delay(1000);
 				}
 			}

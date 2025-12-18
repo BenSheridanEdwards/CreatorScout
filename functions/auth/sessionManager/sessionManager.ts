@@ -67,13 +67,30 @@ export async function loadCookies(page: Page): Promise<boolean> {
 }
 
 /**
- * Check if we're already logged in by checking for inbox link
+ * Check if we're already logged in by checking for multiple indicators
  */
 export async function isLoggedIn(page: Page): Promise<boolean> {
 	try {
-		// Check for inbox link (indicates logged in) without navigating
-		const inboxLink = await page.$('a[href="/direct/inbox/"]');
-		return inboxLink !== null;
+		// Use page.evaluate for more reliable detection
+		const loggedIn = await page.evaluate(() => {
+			// Check for multiple logged-in indicators
+			const inboxLink = !!document.querySelector('a[href="/direct/inbox/"]');
+			const profileLink = !!document.querySelector('[aria-label*="profile"]');
+			const createButton = !!document.querySelector('[aria-label*="create"]');
+			const homeIcon = !!document.querySelector('svg[aria-label="Home"]');
+			const feed = !!document.querySelector('[role="main"]');
+			const navigation = !!document.querySelector('nav');
+			
+			// Check for login form (if present, we're NOT logged in)
+			const loginForm = !!document.querySelector('input[name="username"]');
+			const loginButton = Array.from(document.querySelectorAll('button')).some(
+				btn => btn.textContent?.toLowerCase().includes('log in')
+			);
+			
+			// We're logged in if we have any logged-in indicators AND no login form
+			return (inboxLink || profileLink || createButton || homeIcon || feed || navigation) && !loginForm && !loginButton;
+		});
+		return loggedIn;
 	} catch {
 		return false;
 	}
