@@ -37,8 +37,13 @@ export async function login(
 		 * When true, skip loading saved cookies from persistent profile.
 		 */
 		skipCookies?: boolean;
+		/**
+		 * Internal: retry counter for handling transient login detection issues.
+		 */
+		attempt?: number;
 	},
 ): Promise<string | undefined> {
+	const attempt = options?.attempt ?? 1;
 	logger.info("ACTION", `Starting login process for user: ${creds.username}`);
 
 	// Navigate to Instagram first (required before setting cookies)
@@ -240,11 +245,33 @@ export async function login(
 			throw new Error("Could not find login form or determine login status");
 		}
 	} catch (error) {
-		if (error.message.includes("Could not find")) {
+		const message =
+			error instanceof Error ? error.message : String(error ?? "Unknown error");
+
+		if (message.includes("Could not find")) {
+			// Surface deterministic "could not find login UI" errors to callers as-is
 			throw error;
 		}
-		logger.error("ACTION", `Login form detection failed: ${error.message}`);
-		throw new Error(`Login form detection failed: ${error.message}`);
+
+		// Handle transient "detached Frame" errors more gracefully by retrying
+		if (message.includes("detached Frame") && attempt < 3) {
+			logger.warn(
+				"ACTION",
+				`Login form detection failed due to detached frame (attempt ${attempt}). Retrying...`,
+			);
+			// Short backoff before retrying detection
+			await delay(1000);
+			return await login(page, creds, {
+				...options,
+				// prevent unbounded growth and mark next attempt
+				attempt: attempt + 1,
+				// cookies were already handled on the first attempt
+				skipCookies: true,
+			});
+		}
+
+		logger.error("ACTION", `Login form detection failed: ${message}`);
+		throw new Error(`Login form detection failed: ${message}`);
 	}
 
 	logger.info("ACTION", `Filling in credentials for user: ${creds.username}`);

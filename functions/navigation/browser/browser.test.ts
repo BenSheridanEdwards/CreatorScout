@@ -163,8 +163,12 @@ describe("browser helpers", () => {
 			const mockPage = {
 				setDefaultNavigationTimeout: jest.fn<(ms: number) => void>(),
 				setDefaultTimeout: jest.fn<(ms: number) => void>(),
-				setViewport: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
-				setUserAgent: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
+				setViewport: jest
+					.fn<() => Promise<void>>()
+					.mockResolvedValue(undefined),
+				setUserAgent: jest
+					.fn<() => Promise<void>>()
+					.mockResolvedValue(undefined),
 			} as unknown as Page;
 			const mockBrowser = {
 				newPage: jest.fn<() => Promise<Page>>().mockResolvedValue(mockPage),
@@ -187,8 +191,12 @@ describe("browser helpers", () => {
 			const mockPage = {
 				setDefaultNavigationTimeout: jest.fn<(ms: number) => void>(),
 				setDefaultTimeout: jest.fn<(ms: number) => void>(),
-				setViewport: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
-				setUserAgent: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
+				setViewport: jest
+					.fn<() => Promise<void>>()
+					.mockResolvedValue(undefined),
+				setUserAgent: jest
+					.fn<() => Promise<void>>()
+					.mockResolvedValue(undefined),
 			} as unknown as Page;
 			const mockBrowser = {
 				newPage: jest.fn<() => Promise<Page>>().mockResolvedValue(mockPage),
