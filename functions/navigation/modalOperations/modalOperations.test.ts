@@ -22,6 +22,13 @@ jest.unstable_mockModule("../../timing/sleep/sleep.ts", () => ({
 	sleep: sleepMock,
 }));
 
+const humanLikeClickHandleMock = jest.fn<
+	(page: Page, handle: ElementHandle<Element>) => Promise<void>
+>();
+jest.unstable_mockModule("../humanClick/humanClick.ts", () => ({
+	humanLikeClickHandle: humanLikeClickHandleMock,
+}));
+
 const { extractFollowingUsernames, openFollowingModal, scrollFollowingModal } =
 	await import("./modalOperations.ts");
 
@@ -36,20 +43,17 @@ describe("modalOperations", () => {
 
 	describe("openFollowingModal()", () => {
 		test("clicks following link when found by CSS selector", async () => {
-			const clickMock = jest
-				.fn<() => Promise<void>>()
-				.mockResolvedValue(undefined);
 			const page = {
 				$: jest
-					.fn<() => Promise<{ click: () => Promise<void> } | null>>()
-					.mockResolvedValue({ click: clickMock }),
+					.fn<() => Promise<ElementHandle<Element> | null>>()
+					.mockResolvedValue({} as ElementHandle<Element>),
 				evaluate: jest.fn(),
 			} as unknown as Page;
 
 			const ok = await openFollowingModal(page);
 
 			expect(ok).toBe(true);
-			expect(clickMock).toHaveBeenCalled();
+			expect(humanLikeClickHandleMock).toHaveBeenCalled();
 			expect(sleepMock).toHaveBeenCalledWith(3000);
 		});
 

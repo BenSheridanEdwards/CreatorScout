@@ -3,6 +3,7 @@
  */
 import type { Page } from "puppeteer";
 import { sleep } from "../../timing/sleep/sleep.ts";
+import { humanLikeClickHandle } from "../humanClick/humanClick.ts";
 
 /**
  * Open the "Following" modal for a profile.
@@ -14,7 +15,7 @@ export async function openFollowingModal(page: Page): Promise<boolean> {
 		try {
 			const handle = await page.$(sel);
 			if (handle) {
-				await handle.click();
+				await humanLikeClickHandle(page, handle);
 				await sleep(3000);
 				return true;
 			}
@@ -28,14 +29,14 @@ export async function openFollowingModal(page: Page): Promise<boolean> {
 			for (const link of links) {
 				const href = link.getAttribute("href") || "";
 				if (href.includes("/following")) {
-					link.click();
+					(link as HTMLElement).click();
 					return true;
 				}
 			}
 			for (const link of links) {
 				const text = link.textContent?.toLowerCase() || "";
 				if (text.includes("following") && !text.includes("followers")) {
-					link.click();
+					(link as HTMLElement).click();
 					return true;
 				}
 			}

@@ -26,6 +26,11 @@ jest.unstable_mockModule("../../timing/sleep/sleep.ts", () => ({
 	sleep: sleepMock,
 }));
 
+const humanLikeClickHandleMock = jest.fn();
+jest.unstable_mockModule("../humanClick/humanClick.ts", () => ({
+	humanLikeClickHandle: humanLikeClickHandleMock,
+}));
+
 const { clickAny } = await import("./clickAny.ts");
 
 describe("clickAny", () => {
@@ -83,18 +88,15 @@ describe("clickAny", () => {
 		});
 
 		test("clicks with a brief delay for natural timing", async () => {
-			const clickMock = jest
-				.fn<() => Promise<void>>()
-				.mockResolvedValue(undefined);
 			const page = createPageMock({
 				$: jest
-					.fn<() => Promise<{ click: () => Promise<void> } | null>>()
-					.mockResolvedValue({ click: clickMock }),
+					.fn<() => Promise<unknown | null>>()
+					.mockResolvedValue({}),
 			});
 
 			await clickAny(page, ["text"]);
 
-			expect(clickMock).toHaveBeenCalledWith({ delay: 10 });
+			expect(humanLikeClickHandleMock).toHaveBeenCalled();
 		});
 
 		test("waits after clicking to allow UI to settle", async () => {

@@ -55,6 +55,14 @@ export const createPageWithElementMock = (
 ) => {
 	const element = {
 		click: jest.fn<any>().mockResolvedValue(undefined),
+		// Provide a realistic boundingBox so helpers like humanLikeClickHandle
+		// can operate without throwing in tests.
+		boundingBox: jest.fn<any>().mockResolvedValue({
+			x: 0,
+			y: 0,
+			width: 100,
+			height: 40,
+		}),
 		type: jest.fn<any>().mockResolvedValue(undefined),
 		evaluate: jest.fn<any>(),
 		$: jest.fn<any>().mockResolvedValue(null),

@@ -1,5 +1,6 @@
 import type { Page } from "puppeteer";
 import { sleep } from "../../timing/sleep/sleep.ts";
+import { humanLikeClickHandle } from "../humanClick/humanClick.ts";
 
 /**
  * Click the first button that matches any provided text.
@@ -10,7 +11,7 @@ export async function clickAny(page: Page, texts: string[]): Promise<boolean> {
 			`xpath//button[contains(normalize-space(), "${t}")]`,
 		);
 		if (handle) {
-			await handle.click({ delay: 10 });
+			await humanLikeClickHandle(page, handle);
 			await sleep(200);
 			return true;
 		}

@@ -20,6 +20,20 @@ const logger = createLogger(process.env.DEBUG_LOGS === "true");
 const IS_TEST =
 	process.env.NODE_ENV === "test" || process.env.JEST_WORKER_ID !== undefined;
 
+// When true, capture a screenshot at key points in the login flow to aid
+// debugging local-browser issues without impacting normal runs or tests.
+const DEBUG_LOGIN_SNAPSHOTS =
+	process.env.DEBUG_LOGIN_SNAPSHOTS === "true" && !IS_TEST;
+
+async function debugSnapshot(page: Page, label: string): Promise<void> {
+	if (!DEBUG_LOGIN_SNAPSHOTS) return;
+	try {
+		await snapshot(page, label);
+	} catch {
+		// Debug snapshots should never break the main flow
+	}
+}
+
 function delay(ms: number): Promise<void> {
 	if (IS_TEST) return Promise.resolve();
 	return new Promise((resolve) => setTimeout(resolve, ms));
@@ -53,6 +67,7 @@ export async function login(
 		timeout: 15000,
 	});
 	logger.info("ACTION", "Successfully navigated to Instagram homepage");
+	await debugSnapshot(page, `login_after_navigate_${Date.now()}`);
 
 	// Try to load saved cookies after navigation (unless skipped)
 	let cookiesLoaded = false;
@@ -78,6 +93,7 @@ export async function login(
 
 		// Handle any popups that appeared
 		await clickAny(page, ["OK", "Got it", "Got It", "Dismiss"]);
+		await debugSnapshot(page, `login_after_cookies_${Date.now()}`);
 	}
 
 	// Check if we're already logged in (either from cookies or previous session)
@@ -91,6 +107,7 @@ export async function login(
 	// Use comprehensive check for logged-in state
 	const alreadyLoggedIn = await isLoggedIn(page);
 	logger.info("ACTION", `Already logged in check: ${alreadyLoggedIn}`);
+	await debugSnapshot(page, `login_after_status_check_${Date.now()}`);
 
 	if (alreadyLoggedIn) {
 		logger.info("ACTION", "Already logged in (using saved session)");
@@ -123,6 +140,8 @@ export async function login(
 	await clickAny(page, ["OK", "Got it", "Got It", "Dismiss"]);
 
 	logger.info("ACTION", "Popups handled");
+
+	await debugSnapshot(page, `login_after_popups_${Date.now()}`);
 
 	// Add a brief pause to let any animations settle
 	await delay(1000);
@@ -189,6 +208,7 @@ export async function login(
 				// Save cookies again to refresh expiration
 				await saveCookies(page);
 				logger.info("ACTION", "Cookies refreshed for existing session");
+				await debugSnapshot(page, `login_already_logged_in_${Date.now()}`);
 				return;
 			}
 

@@ -1,5 +1,13 @@
 import { jest } from "@jest/globals";
 
+// Prevent tests from being affected by real .env values loaded via dotenv.
+// We want to control process.env directly in each test case.
+jest.unstable_mockModule("dotenv", () => ({
+	default: {
+		config: jest.fn(),
+	},
+}));
+
 // Mock environment variables
 const originalEnv = process.env;
 
@@ -15,12 +23,17 @@ afterEach(() => {
 describe("Configuration", () => {
 	describe("DELAY_SCALE", () => {
 		test("returns 0.2 when FAST_MODE is true", async () => {
+			// Ensure we ignore any real DELAY_SCALE from the environment so the
+			// default logic (based on FAST_MODE) is exercised consistently.
+			delete process.env.DELAY_SCALE;
 			process.env.FAST_MODE = "true";
 			const { DELAY_SCALE } = await import("./config.ts");
 			expect(DELAY_SCALE).toBe(0.2);
 		});
 
 		test("returns 1.0 by default", async () => {
+			delete process.env.DELAY_SCALE;
+			delete process.env.FAST_MODE;
 			const { DELAY_SCALE } = await import("./config.ts");
 			expect(DELAY_SCALE).toBe(1.0);
 		});
