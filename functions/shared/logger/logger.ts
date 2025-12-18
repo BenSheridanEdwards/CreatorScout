@@ -50,6 +50,13 @@ class LoggerImpl implements Logger {
 		this.enabled = debug;
 	}
 
+	private slugifyForPath(input: string, maxLen: number = 80): string {
+		// Lowercase, replace non-word characters with dashes, collapse repeats, trim
+		const base = input.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+		const collapsed = base.replace(/-+/g, "-").replace(/^-|-$/g, "");
+		return collapsed.slice(0, maxLen);
+	}
+
 	private formatMessage(
 		_level: LogLevel,
 		prefix: LogPrefix,
@@ -116,7 +123,12 @@ class LoggerImpl implements Logger {
 		...args: unknown[]
 	): Promise<void> {
 		try {
-			const screenshotPath = await snapshot(page, `error_${context}`);
+			const reasonSlug = this.slugifyForPath(message);
+			const label =
+				reasonSlug.length > 0
+					? `error_${context}_${reasonSlug}`
+					: `error_${context}`;
+			const screenshotPath = await snapshot(page, label);
 			this.error(prefix, message, screenshotPath, ...args);
 		} catch (screenshotError) {
 			// If screenshot fails, still log the error
