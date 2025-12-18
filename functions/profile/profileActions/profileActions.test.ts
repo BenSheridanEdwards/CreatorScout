@@ -2,7 +2,11 @@ import { jest } from "@jest/globals";
 import type { Page } from "puppeteer";
 import { createPageMock } from "../../__test__/testUtils.ts";
 
-const configMock = { DM_MESSAGE: "Hello!" };
+const configMock = {
+	DM_MESSAGE: "Hello!",
+	VISION_MODEL: "test-vision-model",
+	OPENROUTER_API_KEY: "test-openrouter-key",
+};
 const snapshotMock = jest
 	.fn<(page: Page, label: string) => Promise<string>>()
 	.mockResolvedValue("shot");
@@ -26,6 +30,9 @@ const humanClickElementMock = jest
 	.fn<() => Promise<boolean>>()
 	.mockResolvedValue(true);
 const humanTypeTextMock = jest
+	.fn<() => Promise<boolean>>()
+	.mockResolvedValue(true);
+const moveMouseToElementMock = jest
 	.fn<() => Promise<boolean>>()
 	.mockResolvedValue(true);
 
@@ -67,6 +74,7 @@ jest.unstable_mockModule(
 jest.unstable_mockModule("../../timing/humanize/humanize.ts", () => ({
 	humanClickElement: humanClickElementMock,
 	humanTypeText: humanTypeTextMock,
+	moveMouseToElement: moveMouseToElementMock,
 }));
 
 // Mock clickAny (used for Next/Chat/Send buttons in DM composer)

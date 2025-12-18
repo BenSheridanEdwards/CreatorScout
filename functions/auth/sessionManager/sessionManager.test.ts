@@ -35,6 +35,7 @@ type MockPage = Page & {
 	cookies: jest.MockedFunction<Page["cookies"]>;
 	goto: jest.MockedFunction<Page["goto"]>;
 	$: jest.MockedFunction<Page["$"]>;
+	evaluate: jest.MockedFunction<Page["evaluate"]>;
 };
 
 describe("sessionManager", () => {
@@ -52,6 +53,7 @@ describe("sessionManager", () => {
 			cookies: jest.fn<Page["cookies"]>().mockResolvedValue([]),
 			goto: jest.fn<Page["goto"]>().mockResolvedValue(null),
 			$: jest.fn<Page["$"]>().mockResolvedValue(null),
+			evaluate: jest.fn<Page["evaluate"]>().mockResolvedValue(false),
 		} as unknown as MockPage;
 	});
 
@@ -203,28 +205,27 @@ describe("sessionManager", () => {
 
 	describe("isLoggedIn()", () => {
 		test("returns true when inbox link element is found (logged in indicator)", async () => {
-			const mockInboxElement = {
-				click: jest.fn(),
-			} as unknown as ElementHandle<Element>;
-			page.$.mockResolvedValue(mockInboxElement);
+			// Simulate logged-in state via page.evaluate()
+			page.evaluate.mockResolvedValue(true as never);
 
 			const result = await isLoggedIn(page);
 
 			expect(result).toBe(true);
-			expect(page.$).toHaveBeenCalledWith('a[href="/direct/inbox/"]');
+			expect(page.evaluate).toHaveBeenCalled();
 		});
 
 		test("returns false when inbox link element is not found", async () => {
-			page.$.mockResolvedValue(null);
+			// Simulate logged-out state via page.evaluate()
+			page.evaluate.mockResolvedValue(false as never);
 
 			const result = await isLoggedIn(page);
 
 			expect(result).toBe(false);
-			expect(page.$).toHaveBeenCalledWith('a[href="/direct/inbox/"]');
+			expect(page.evaluate).toHaveBeenCalled();
 		});
 
 		test("returns false when selector query throws an error", async () => {
-			page.$.mockRejectedValue(new Error("Selector error"));
+			page.evaluate.mockRejectedValue(new Error("Selector error") as never);
 
 			const result = await isLoggedIn(page);
 
@@ -232,16 +233,13 @@ describe("sessionManager", () => {
 		});
 
 		test("checks login status without requiring navigation", async () => {
-			const mockInboxElement = {
-				click: jest.fn(),
-			} as unknown as ElementHandle<Element>;
-			page.$.mockResolvedValue(mockInboxElement);
+			page.evaluate.mockResolvedValue(true as never);
 
 			await isLoggedIn(page);
 
 			// Should only use selector, not navigate
 			expect(page.goto).not.toHaveBeenCalled();
-			expect(page.$).toHaveBeenCalledWith('a[href="/direct/inbox/"]');
+			expect(page.evaluate).toHaveBeenCalled();
 		});
 	});
 

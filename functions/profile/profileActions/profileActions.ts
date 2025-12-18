@@ -10,7 +10,6 @@ import { DM_MESSAGE } from "../../shared/config/config.ts";
 import { executeWithCircuitBreaker } from "../../shared/circuitBreaker/circuitBreaker.ts";
 import { recordActivity } from "../../shared/dashboard/dashboard.ts";
 import { clickAny } from "../../navigation/clickAny/clickAny.ts";
-import { humanClickElement } from "../../timing/humanize/humanize.ts";
 import {
 	markDmSent,
 	markFollowed,
@@ -21,7 +20,11 @@ import { createLogger } from "../../shared/logger/logger.ts";
 import { snapshot } from "../../shared/snapshot/snapshot.ts";
 import { analyzeDmProof } from "../vision/analyzeDmProof.ts";
 import { sleep } from "../../timing/sleep/sleep.ts";
-import { humanTypeText, humanClickElement, moveMouseToElement } from "../../timing/humanize/humanize.ts";
+import {
+	humanTypeText,
+	humanClickElement,
+	moveMouseToElement,
+} from "../../timing/humanize/humanize.ts";
 
 const logger = createLogger(process.env.DEBUG_LOGS === "true");
 

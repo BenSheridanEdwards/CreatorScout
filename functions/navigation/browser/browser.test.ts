@@ -78,6 +78,10 @@ describe("browser helpers", () => {
 					"--no-sandbox",
 					"--disable-dev-shm-usage",
 					"--disable-features=VizDisplayCompositor",
+					"--disable-blink-features=AutomationControlled",
+					"--disable-features=IsolateOrigins,site-per-process",
+					"--disable-web-security",
+					"--disable-features=BlockInsecurePrivateNetworkRequests",
 				],
 				userDataDir: "/tmp/custom",
 			});
