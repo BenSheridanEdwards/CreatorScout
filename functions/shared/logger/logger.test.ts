@@ -15,7 +15,11 @@ describe("logger", () => {
 
 	test("errorWithScreenshot resolves", async () => {
 		const logger = createLogger(true);
-		const page = {} as Page;
+		const page = {
+			screenshot: jest
+				.fn<() => Promise<Buffer | string>>()
+				.mockResolvedValue(Buffer.from("fake-image")),
+		} as unknown as Page;
 		await expect(
 			logger.errorWithScreenshot("ERROR", "msg", page, "ctx"),
 		).resolves.not.toThrow();

@@ -456,7 +456,7 @@ describe("profileActions", () => {
 					.mockResolvedValue(undefined),
 				evaluate: jest
 					.fn<(fn: unknown) => Promise<boolean>>()
-					.mockImplementation(async (fn: unknown) => {
+					.mockImplementation(async (fn: unknown): Promise<boolean> => {
 						callCount++;
 						if (typeof fn === "function") {
 							try {
@@ -465,16 +465,16 @@ describe("profileActions", () => {
 								if (callCount === 1 && typeof result === "boolean") {
 									return true; // follow button found
 								}
-								// Second call: click button (returns void)
+								// Second call: click button (returns void) - return true to indicate success
 								if (callCount === 2) {
-									return undefined;
+									return true; // button clicked successfully
 								}
-								return result;
+								// Convert result to boolean if needed
+								return Boolean(result);
 							} catch {
 								// If function throws (document.querySelector doesn't exist),
-								// return true for first call (button found), undefined for second (clicked)
-								if (callCount === 1) return true;
-								return undefined;
+								// return true for first call (button found), true for second (clicked)
+								return true;
 							}
 						}
 						return false;

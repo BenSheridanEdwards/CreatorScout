@@ -45,7 +45,7 @@ describe("popupHandler", () => {
 							// The function checks if any button text matches the labels
 							const labels = args[0] as string[];
 							// Simulate finding "ok" button
-							if (labels && labels.some((l) => l.toLowerCase() === "ok")) {
+							if (labels?.some((l) => l.toLowerCase() === "ok")) {
 								return true; // Found matching button
 							}
 							return false;
@@ -125,10 +125,7 @@ describe("popupHandler", () => {
 								return false;
 							}
 							// Third call: reload found
-							if (
-								labels &&
-								labels.some((l) => l.toLowerCase().includes("reload"))
-							) {
+							if (labels?.some((l) => l.toLowerCase().includes("reload"))) {
 								return true; // reload found
 							}
 							return false;

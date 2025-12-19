@@ -189,7 +189,7 @@ describe("dmSending", () => {
 			const page = createPageMock({
 				$: jest
 					.fn<(selector: string) => Promise<unknown>>()
-					.mockImplementation(async (selector: string) => {
+					.mockImplementation(async (_selector: string) => {
 						// All selectors fail, clickAny will also fail and fall back to Enter
 						return null;
 					}) as unknown as Page["$"],
