@@ -143,20 +143,41 @@ export async function followUserAccount(
 		let buttonText: { state: string } | null = null;
 		for (let attempt = 0; attempt < 3; attempt++) {
 			buttonText = await page.evaluate(() => {
-				// Get all text content from the page body
-				const bodyText = (document.body.textContent || "").toLowerCase();
+				// Search for buttons first - more reliable than searching entire page
+				const buttons = Array.from(document.querySelectorAll("button"));
 
-				// Check for "Following" first (most specific)
-				if (bodyText.includes("following")) {
-					// Make sure it's not "unfollow" or similar
-					const followingIndex = bodyText.indexOf("following");
-					const context = bodyText.substring(
-						Math.max(0, followingIndex - 10),
-						Math.min(bodyText.length, followingIndex + 20),
-					);
-					if (!context.includes("unfollow") && !context.includes("remove")) {
+				for (const btn of buttons) {
+					const text = (btn.textContent || (btn as HTMLElement).innerText || "")
+						.trim()
+						.toLowerCase();
+
+					// Priority 1: "Follow Back" - means we can follow
+					if (text === "follow back") {
+						return { state: "can_follow" };
+					}
+
+					// Priority 2: "Following" - already following
+					if (text === "following") {
 						return { state: "already_following" };
 					}
+
+					// Priority 3: "Requested" - request already sent
+					if (text === "requested") {
+						return { state: "request_sent" };
+					}
+
+					// Priority 4: "Follow" - can follow
+					if (text === "follow") {
+						return { state: "can_follow" };
+					}
+				}
+
+				// Fallback: search page text if buttons don't work
+				const bodyText = (document.body.textContent || "").toLowerCase();
+
+				// Check for "Follow Back" in page text
+				if (bodyText.includes("follow back")) {
+					return { state: "can_follow" };
 				}
 
 				// Check for "Requested"
@@ -164,21 +185,39 @@ export async function followUserAccount(
 					return { state: "request_sent" };
 				}
 
-				// Check for "Follow" or "Follow Back" (but not "Following" which we already checked)
-				if (bodyText.includes("follow back") || bodyText.includes("follow")) {
-					// Make sure it's not "Following" or "Unfollow"
-					const followIndex = bodyText.indexOf("follow");
-					const context = bodyText.substring(
-						Math.max(0, followIndex - 5),
-						Math.min(bodyText.length, followIndex + 15),
+				// Check for "Following" but exclude "Followed by" and similar
+				if (bodyText.includes("following")) {
+					// Look for "following" that's not part of "followed by" or "follow back"
+					const followingIndex = bodyText.indexOf("following");
+					const beforeContext = bodyText.substring(
+						Math.max(0, followingIndex - 20),
+						followingIndex,
 					);
+					const afterContext = bodyText.substring(
+						followingIndex + 9,
+						Math.min(bodyText.length, followingIndex + 30),
+					);
+
 					if (
-						!context.includes("following") &&
-						!context.includes("unfollow") &&
-						!context.includes("remove")
+						!beforeContext.includes("followed by") &&
+						!beforeContext.includes("follow back") &&
+						!afterContext.includes("by") &&
+						!bodyText
+							.substring(followingIndex - 5, followingIndex)
+							.includes("unfollow")
 					) {
-						return { state: "can_follow" };
+						return { state: "already_following" };
 					}
+				}
+
+				// Check for "Follow" but exclude "Follow Back", "Following", "Followed by"
+				if (
+					bodyText.includes("follow") &&
+					!bodyText.includes("follow back") &&
+					!bodyText.includes("following") &&
+					!bodyText.includes("followed by")
+				) {
+					return { state: "can_follow" };
 				}
 
 				return { state: "not_found" };
