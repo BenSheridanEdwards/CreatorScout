@@ -449,35 +449,48 @@ describe("profileActions", () => {
 
 	describe("followUserAccount", () => {
 		test("follows user when button is found", async () => {
-			let callCount = 0;
+			let evaluateCallCount = 0;
+			const mockButton = {
+				click: jest.fn(),
+				textContent: "Follow",
+				boundingBox: jest.fn().mockResolvedValue({ x: 0, y: 0, width: 100, height: 40 }),
+				evaluate: jest.fn().mockResolvedValue(undefined),
+			};
 			const page = createPageMock({
 				goto: jest
 					.fn<(url: string, opts?: object) => Promise<void>>()
 					.mockResolvedValue(undefined),
+				$: jest
+					.fn<(selector: string) => Promise<typeof mockButton | null>>()
+					.mockResolvedValue(mockButton as unknown as any),
+				mouse: {
+					move: jest.fn().mockResolvedValue(undefined),
+					down: jest.fn().mockResolvedValue(undefined),
+					up: jest.fn().mockResolvedValue(undefined),
+				},
 				evaluate: jest
-					.fn<(fn: unknown) => Promise<boolean>>()
-					.mockImplementation(async (fn: unknown): Promise<boolean> => {
-						callCount++;
+					.fn<(fn: unknown) => Promise<unknown>>()
+					.mockImplementation(async (fn: unknown): Promise<unknown> => {
+						evaluateCallCount++;
 						if (typeof fn === "function") {
 							try {
 								const result = await (fn as () => unknown)();
-								// First call: check for follow button (returns boolean)
-								if (callCount === 1 && typeof result === "boolean") {
-									return true; // follow button found
+								// First call: check button state - returns { state: "can_follow", button: btn }
+								if (evaluateCallCount === 1) {
+									return { state: "can_follow", button: mockButton };
 								}
-								// Second call: click button (returns void) - return true to indicate success
-								if (callCount === 2) {
-									return true; // button clicked successfully
+								// Second call: check button state after click - returns "following" or "requested"
+								if (evaluateCallCount === 2) {
+									return "following"; // Button changed to "Following"
 								}
-								// Convert result to boolean if needed
-								return Boolean(result);
+								return result;
 							} catch {
-								// If function throws (document.querySelector doesn't exist),
-								// return true for first call (button found), true for second (clicked)
-								return true;
+								// If function throws, return appropriate values
+								if (evaluateCallCount === 1) return { state: "can_follow", button: mockButton };
+								return "following";
 							}
 						}
-						return false;
+						return { state: "not_found" };
 					}) as unknown as Page["evaluate"],
 			});
 
@@ -494,14 +507,44 @@ describe("profileActions", () => {
 			expect(markFollowedMock).toHaveBeenCalledWith("user123");
 		});
 
-		test("returns false when no follow button", async () => {
+		test("returns false when already following", async () => {
 			const page = createPageMock({
 				goto: jest
 					.fn<(url: string, opts?: object) => Promise<void>>()
 					.mockResolvedValue(undefined),
 				evaluate: jest
-					.fn<(fn: unknown) => Promise<boolean>>()
-					.mockResolvedValue(false), // no follow button
+					.fn<(fn: unknown) => Promise<unknown>>()
+					.mockResolvedValue({ state: "already_following" }), // button shows "Following"
+			});
+
+			const ok = await followUserAccount(page as unknown as Page, "user123");
+
+			expect(ok).toBe(false);
+		});
+
+		test("returns false when follow request already sent", async () => {
+			const page = createPageMock({
+				goto: jest
+					.fn<(url: string, opts?: object) => Promise<void>>()
+					.mockResolvedValue(undefined),
+				evaluate: jest
+					.fn<(fn: unknown) => Promise<unknown>>()
+					.mockResolvedValue({ state: "request_sent" }), // button shows "Requested"
+			});
+
+			const ok = await followUserAccount(page as unknown as Page, "user123");
+
+			expect(ok).toBe(false);
+		});
+
+		test("returns false when button not found", async () => {
+			const page = createPageMock({
+				goto: jest
+					.fn<(url: string, opts?: object) => Promise<void>>()
+					.mockResolvedValue(undefined),
+				evaluate: jest
+					.fn<(fn: unknown) => Promise<unknown>>()
+					.mockResolvedValue("not_found"), // button not found
 			});
 
 			const ok = await followUserAccount(page as unknown as Page, "user123");

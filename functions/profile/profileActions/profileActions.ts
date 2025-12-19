@@ -136,43 +136,223 @@ export async function followUserAccount(
 			});
 		}, `navigate_profile_${username}`);
 
-		await sleep(2000);
+		await sleep(3000); // Wait longer for page to fully load
 
-		// Find follow button
-		const followButton = await page.evaluate(() => {
-			const buttons = Array.from(document.querySelectorAll("button"));
-			for (const btn of buttons) {
-				const text = btn.textContent?.trim().toLowerCase() || "";
-				if (text === "follow") {
-					return true;
-				}
-			}
-			return false;
-		});
+		// Step 3: Check the page for follow button text - simple text search
+		// Search the entire page body for "Following", "Follow", or "Requested" text
+		let buttonText: { state: string } | null = null;
+		for (let attempt = 0; attempt < 3; attempt++) {
+			buttonText = await page.evaluate(() => {
+				// Get all text content from the page body
+				const bodyText = (document.body.textContent || "").toLowerCase();
 
-		if (followButton) {
-			// Click the follow button (keep existing approach for compatibility)
-			await page.evaluate(() => {
-				const buttons = Array.from(document.querySelectorAll("button"));
-				for (const btn of buttons) {
-					const text = btn.textContent?.trim().toLowerCase() || "";
-					if (text === "follow") {
-						btn.click();
-						return;
+				// Check for "Following" first (most specific)
+				if (bodyText.includes("following")) {
+					// Make sure it's not "unfollow" or similar
+					const followingIndex = bodyText.indexOf("following");
+					const context = bodyText.substring(
+						Math.max(0, followingIndex - 10),
+						Math.min(bodyText.length, followingIndex + 20),
+					);
+					if (!context.includes("unfollow") && !context.includes("remove")) {
+						return { state: "already_following" };
 					}
 				}
+
+				// Check for "Requested"
+				if (bodyText.includes("requested")) {
+					return { state: "request_sent" };
+				}
+
+				// Check for "Follow" or "Follow Back" (but not "Following" which we already checked)
+				if (bodyText.includes("follow back") || bodyText.includes("follow")) {
+					// Make sure it's not "Following" or "Unfollow"
+					const followIndex = bodyText.indexOf("follow");
+					const context = bodyText.substring(
+						Math.max(0, followIndex - 5),
+						Math.min(bodyText.length, followIndex + 15),
+					);
+					if (
+						!context.includes("following") &&
+						!context.includes("unfollow") &&
+						!context.includes("remove")
+					) {
+						return { state: "can_follow" };
+					}
+				}
+
+				return { state: "not_found" };
 			});
-			await sleep(2000);
-			await markFollowed(username);
-			logger.info("ACTION", `Followed @${username}`);
-			recordActivity("followed", username, "success");
-			return true;
-		} else {
+
+			if (buttonText && buttonText.state !== "not_found") {
+				break; // Found a valid state
+			}
+
+			if (attempt < 2) {
+				logger.info(
+					"ACTION",
+					`Follow button text not found on page, waiting and retrying (attempt ${attempt + 1}/3)...`,
+				);
+				await sleep(2000);
+			}
+		}
+
+		// Safety check - if evaluate returned undefined or invalid result
+		if (!buttonText || typeof buttonText !== "object" || !buttonText.state) {
+			logger.error(
+				"ERROR",
+				`Could not determine follow state for @${username} - page may not have loaded`,
+			);
+			recordActivity("follow_button_state_error", username, "error");
+			return false;
+		}
+
+		// Step 4: If follow or follow back, click the button
+		if (buttonText.state === "can_follow") {
+			// Click the button - find it by searching for "Follow" or "Follow Back" text
+			const clicked = await page.evaluate(() => {
+				const buttons = Array.from(document.querySelectorAll("button"));
+				for (const btn of buttons) {
+					const text = (btn.textContent || (btn as HTMLElement).innerText || "")
+						.trim()
+						.toLowerCase();
+					// Match "Follow" or "Follow Back" but not "Following" or "Unfollow"
+					if (
+						(text === "follow" || text === "follow back") &&
+						!text.includes("following") &&
+						!text.includes("unfollow")
+					) {
+						btn.click();
+						return true;
+					}
+				}
+				return false;
+			});
+
+			if (clicked) {
+				// Step 5: Wait and check the button has changed to either following or requested
+				// Retry multiple times with increasing wait times to account for network delays
+				let newButtonText: string | null = null;
+				const maxAttempts = 5;
+				const initialWait = 3000; // Start with 3 seconds
+
+				for (let attempt = 0; attempt < maxAttempts; attempt++) {
+					// Wait before checking (longer wait for first attempt, then shorter)
+					const waitTime = attempt === 0 ? initialWait : 2000;
+					await sleep(waitTime);
+
+					newButtonText = await page.evaluate(() => {
+						// Simple text search on the entire page
+						const bodyText = (document.body.textContent || "").toLowerCase();
+
+						// Check for "Following" first
+						if (bodyText.includes("following")) {
+							const followingIndex = bodyText.indexOf("following");
+							const context = bodyText.substring(
+								Math.max(0, followingIndex - 10),
+								Math.min(bodyText.length, followingIndex + 20),
+							);
+							if (
+								!context.includes("unfollow") &&
+								!context.includes("remove")
+							) {
+								return "following";
+							}
+						}
+
+						// Check for "Requested"
+						if (bodyText.includes("requested")) {
+							return "requested";
+						}
+
+						return null;
+					});
+
+					if (newButtonText === "following" || newButtonText === "requested") {
+						break; // Success - button changed
+					}
+
+					if (attempt < maxAttempts - 1) {
+						// Debug: log what buttons we found (only on first retry to avoid spam)
+						if (attempt === 0) {
+							const buttonTexts = await page.evaluate(() => {
+								const buttons = Array.from(document.querySelectorAll("button"));
+								return buttons
+									.map((btn) =>
+										(
+											btn.textContent ||
+											(btn as HTMLElement).innerText ||
+											""
+										).trim(),
+									)
+									.filter((text) => text.length > 0 && text.length < 50)
+									.slice(0, 10); // Limit to first 10
+							});
+							logger.info(
+								"ACTION",
+								`⏳ Waiting for button state to update (attempt ${attempt + 1}/${maxAttempts}). Found buttons: ${buttonTexts.slice(0, 5).join(", ")}${buttonTexts.length > 5 ? "..." : ""}`,
+							);
+						} else {
+							logger.info(
+								"ACTION",
+								`⏳ Still waiting for button state to update (attempt ${attempt + 1}/${maxAttempts})...`,
+							);
+						}
+					}
+				}
+
+				if (newButtonText === "following" || newButtonText === "requested") {
+					await markFollowed(username);
+					const statusText =
+						newButtonText === "following" ? "Following" : "Requested";
+					logger.info(
+						"ACTION",
+						`✅ Successfully followed @${username} - button now shows "${statusText}"`,
+					);
+					recordActivity("followed", username, "success");
+					return true;
+				} else {
+					logger.warn(
+						"ACTION",
+						`⚠️  Follow button clicked but did not change to "Following" or "Requested" for @${username} after ${maxAttempts} attempts. Button may not have updated in time.`,
+					);
+					recordActivity("follow_verification_failed", username, "warning");
+					return false;
+				}
+			} else {
+				logger.warn(
+					"ACTION",
+					`⚠️  Could not find "Follow" or "Follow Back" button for @${username}. Profile may be private or button structure changed.`,
+				);
+				recordActivity("follow_button_not_found", username, "error");
+				return false;
+			}
+		} else if (buttonText.state === "already_following") {
 			logger.info(
 				"ACTION",
-				`Already following @${username} or button not found`,
+				`ℹ️  Already following @${username} (button shows "Following")`,
 			);
-			recordActivity("already_following", username, "warning");
+			recordActivity("already_following", username, "success");
+			await markFollowed(username).catch(() => {
+				// Ignore errors - best effort
+			});
+			return false;
+		} else if (buttonText.state === "request_sent") {
+			logger.info(
+				"ACTION",
+				`ℹ️  Follow request already sent to @${username} (button shows "Requested")`,
+			);
+			recordActivity("follow_request_sent", username, "success");
+			await markFollowed(username).catch(() => {
+				// Ignore errors - best effort
+			});
+			return false;
+		} else {
+			logger.warn(
+				"ACTION",
+				`⚠️  Could not determine follow button state for @${username}. Button may not be visible or page structure changed.`,
+			);
+			recordActivity("follow_button_not_found", username, "warning");
 			return false;
 		}
 	} catch (err) {

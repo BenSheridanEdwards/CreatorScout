@@ -515,6 +515,76 @@ export async function login(
 	// Wait for navigation after login with longer timeout and better detection
 	logger.info("ACTION", "Waiting for login to complete and page to load");
 	try {
+		// Check if we're on the onetap page (one-tap login confirmation)
+		const currentUrl = page.url();
+		if (currentUrl.includes("/accounts/onetap/")) {
+			logger.info(
+				"ACTION",
+				"Detected onetap page - waiting up to 20 seconds for processing",
+			);
+
+			// Try to click "Continue" or "Use this account" button on onetap page
+			const onetapClicked = await clickAny(page, [
+				"Continue",
+				"Use this account",
+				"Use Account",
+				"Not you?",
+			]);
+
+			if (onetapClicked) {
+				logger.info("ACTION", "Clicked onetap button, waiting for navigation");
+				await delay(3000);
+			}
+
+			// Wait up to 20 seconds for Instagram to process and redirect
+			logger.info(
+				"ACTION",
+				"Waiting for onetap page to process (up to 20 seconds)",
+			);
+			const startTime = Date.now();
+			const maxWaitTime = 20000; // 20 seconds
+
+			while (Date.now() - startTime < maxWaitTime) {
+				await delay(2000); // Check every 2 seconds
+				const currentUrlCheck = page.url();
+
+				// If we've navigated away from onetap, break
+				if (!currentUrlCheck.includes("/accounts/onetap/")) {
+					logger.info(
+						"ACTION",
+						`Navigated away from onetap page to: ${currentUrlCheck}`,
+					);
+					break;
+				}
+
+				// Check if login indicators are present (page might have loaded but URL not changed)
+				const hasLoginIndicators = await page.evaluate(() => {
+					const inboxLink = document.querySelector('a[href="/direct/inbox/"]');
+					const profileLink = document.querySelector('a[href*="/accounts/"]');
+					const feedContent = document.querySelector('[role="main"]');
+					return !!(inboxLink || profileLink || feedContent);
+				});
+
+				if (hasLoginIndicators) {
+					logger.info("ACTION", "Login indicators found on onetap page");
+					break;
+				}
+			}
+
+			// Navigate to home if still on onetap page after waiting
+			if (page.url().includes("/accounts/onetap/")) {
+				logger.info(
+					"ACTION",
+					"Still on onetap page after 20 seconds, navigating to home",
+				);
+				await page.goto("https://www.instagram.com/", {
+					waitUntil: "networkidle2",
+					timeout: 15000,
+				});
+				await delay(3000);
+			}
+		}
+
 		// Wait for either inbox link or error indicators
 		await page.waitForFunction(
 			() => {

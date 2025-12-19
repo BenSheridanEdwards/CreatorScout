@@ -20,7 +20,8 @@ export type LogPrefix =
 	| "METRICS"
 	| "LIMIT"
 	| "DELAY"
-	| "VISION";
+	| "VISION"
+	| "INTENTION";
 
 export interface Logger {
 	debug(prefix: LogPrefix, message: string, ...args: unknown[]): void;
