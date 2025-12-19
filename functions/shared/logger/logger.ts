@@ -19,7 +19,8 @@ export type LogPrefix =
 	| "SYSTEM"
 	| "METRICS"
 	| "LIMIT"
-	| "DELAY";
+	| "DELAY"
+	| "VISION";
 
 export interface Logger {
 	debug(prefix: LogPrefix, message: string, ...args: unknown[]): void;
