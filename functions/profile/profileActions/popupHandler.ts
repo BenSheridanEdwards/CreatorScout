@@ -18,24 +18,53 @@ function getLogger() {
 /**
  * Helper that clicks any button-like element (button or div[role="button"])
  * whose visible text contains one of the provided labels.
+ * Uses human-like clicking instead of direct .click() to avoid bot detection.
  */
 async function clickButtonLikeByText(
 	page: Page,
 	labels: string[],
 ): Promise<boolean> {
-	return await page.evaluate((texts) => {
+	// Find the element using the original logic
+	const elementInfo = await page.evaluate((texts) => {
 		const candidates = Array.from(
 			document.querySelectorAll('button, div[role="button"]'),
 		);
 		for (const el of candidates) {
 			const text = (el.textContent || "").trim().toLowerCase();
 			if (texts.some((label) => text.includes(label.toLowerCase()))) {
-				(el as HTMLElement).click();
-				return true;
+				// Return element info for human-like clicking
+				return {
+					found: true,
+					tagName: el.tagName.toLowerCase(),
+					text: text,
+					index: Array.from(el.parentElement?.children || []).indexOf(el),
+				};
 			}
 		}
-		return false;
+		return { found: false };
 	}, labels);
+
+	if (!elementInfo.found) {
+		return false;
+	}
+
+	// Find the element handle using the same selector logic
+	const candidates = await page.$$('button, div[role="button"]');
+	for (const candidate of candidates) {
+		const text = await candidate.evaluate((el) =>
+			(el.textContent || "").trim().toLowerCase(),
+		);
+		if (labels.some((label) => text.includes(label.toLowerCase()))) {
+			// Use human-like clicking instead of direct .click()
+			const { humanLikeClickHandle } = await import(
+				"../../navigation/humanClick/humanClick.ts"
+			);
+			await humanLikeClickHandle(page, candidate);
+			return true;
+		}
+	}
+
+	return false;
 }
 
 /**

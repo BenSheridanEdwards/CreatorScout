@@ -133,6 +133,7 @@ export async function detectFollowState(
 /**
  * Click the follow button on a profile page.
  * Works on any profile page - does not require navigation.
+ * Uses human-like clicking behavior to avoid bot detection.
  *
  * @param page - Puppeteer page instance (should be on a profile page)
  * @param username - Optional username for logging
@@ -142,33 +143,37 @@ export async function clickFollowButton(
 	page: Page,
 	username?: string,
 ): Promise<boolean> {
-	const clicked = await page.evaluate(() => {
-		const buttons = Array.from(document.querySelectorAll("button"));
-		for (const btn of buttons) {
-			const text = (btn.textContent || (btn as HTMLElement).innerText || "")
+	// Find the button using the original exact logic
+	const buttons = await page.$$("button");
+	for (const btn of buttons) {
+		const text = await btn.evaluate((el) =>
+			(el.textContent || (el as HTMLElement).innerText || "")
 				.trim()
-				.toLowerCase();
-			// Match "Follow" or "Follow Back" but not "Following" or "Unfollow"
-			if (
-				(text === "follow" || text === "follow back") &&
-				!text.includes("following") &&
-				!text.includes("unfollow")
-			) {
-				btn.click();
-				return true;
-			}
+				.toLowerCase(),
+		);
+		// Match "Follow" or "Follow Back" but not "Following" or "Unfollow"
+		if (
+			(text === "follow" || text === "follow back") &&
+			!text.includes("following") &&
+			!text.includes("unfollow")
+		) {
+			// Use human-like clicking instead of direct .click()
+			const { humanLikeClickHandle } = await import(
+				"../../navigation/humanClick/humanClick.ts"
+			);
+			await humanLikeClickHandle(page, btn);
+			return true;
 		}
-		return false;
-	});
+	}
 
-	if (!clicked && username) {
+	if (username) {
 		logger.warn(
 			"ACTION",
 			`⚠️  Could not find "Follow" or "Follow Back" button for @${username}. Profile may be private or button structure changed.`,
 		);
 	}
 
-	return clicked;
+	return false;
 }
 
 /**
@@ -247,4 +252,3 @@ export async function verifyFollowSucceeded(
 
 	return null; // Failed to verify
 }
-

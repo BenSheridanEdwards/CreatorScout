@@ -248,7 +248,8 @@ export async function moveMouseToElement(
 }
 
 /**
- * Human-like click on a UI element with mouse movement
+ * Human-like click on a UI element with mouse movement (wrapper for selector-based usage)
+ * This is a convenience function that finds the element and passes it to humanLikeClickHandle
  */
 export async function humanClickElement(
 	page: Page,
@@ -271,58 +272,25 @@ export async function humanClickElement(
 		elementType = "generic",
 	} = options;
 
-	// Move mouse to element with appropriate speed for element type
-	const moveOptions: any = { offsetX, offsetY };
-
-	// Different movement speeds based on element type
-	switch (elementType) {
-		case "button":
-			// Buttons: confident, direct movement
-			moveOptions.duration = 400 + Math.random() * 200;
-			break;
-		case "link":
-			// Links: slightly faster, more confident
-			moveOptions.duration = 350 + Math.random() * 150;
-			break;
-		case "input":
-			// Inputs: slower, more careful
-			moveOptions.duration = 500 + Math.random() * 250;
-			break;
-		default:
-			// Generic: standard timing
-			break; // Use default calculated duration
+	// Find the element
+	const element = await page.$(selector);
+	if (!element) {
+		return false;
 	}
 
-	const moved = await moveMouseToElement(page, selector, moveOptions);
-	if (!moved) return false;
+	// Import here to avoid circular dependencies
+	const { humanLikeClickHandle } = await import("../../navigation/humanClick/humanClick.ts");
 
-	// Context-aware hover delay (different for different element types)
-	const calculatedHoverDelay =
-		hoverDelay ??
-		(() => {
-			switch (elementType) {
-				case "button":
-					return 80 + Math.random() * 150; // Quick decision
-				case "link":
-					return 50 + Math.random() * 120; // Very quick
-				case "input":
-					return 120 + Math.random() * 200; // More careful
-				default:
-					return 100 + Math.random() * 200; // Standard
-			}
-		})();
+	// Use the encapsulated humanLikeClickHandle
+	await humanLikeClickHandle(page, element, {
+		offsetX,
+		offsetY,
+		hoverDelay,
+		button,
+		elementType,
+	});
 
-	if (calculatedHoverDelay > 0) {
-		await sleep(calculatedHoverDelay);
-	}
-
-	// More realistic click timing (based on Fitts' Law and human studies)
-	await page.mouse.down({ button });
-	const clickDuration = 35 + Math.random() * 85; // 35-120ms (more realistic)
-	await sleep(clickDuration);
-	await page.mouse.up({ button });
-
-	// Handle double/triple clicks with realistic timing
+	// Handle double/triple clicks (preserved behavior)
 	for (let i = 1; i < clickCount; i++) {
 		const doubleClickDelay = 120 + Math.random() * 180; // 120-300ms between clicks
 		await sleep(doubleClickDelay);

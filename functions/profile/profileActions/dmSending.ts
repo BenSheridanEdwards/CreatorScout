@@ -90,99 +90,44 @@ export async function sendMessage(page: Page): Promise<boolean> {
 	}
 
 	// Try XPath for div[role="button"] containing "Send" text (Instagram's current structure)
+	// Use humanClickElement for human-like clicking behavior
 	getLogger().info(
 		"ACTION",
-		"Trying XPath for div[role='button'] with 'Send' text...",
+		"Trying XPath for div[role='button'] with 'Send' text (using human-like click)...",
 	);
 	try {
-		// First try with page.$ (Puppeteer's XPath support)
 		const sendButtonXPath = await page.$(
 			'xpath//div[@role="button" and contains(normalize-space(), "Send")]',
 		);
 		if (sendButtonXPath) {
 			getLogger().info(
 				"ACTION",
-				"Found send button with XPath (div[role='button'])",
+				"Found send button with XPath (div[role='button']), using humanClickElement",
 			);
-			// Try clicking directly via element handle
-			try {
-				await sendButtonXPath.click();
+			// Use humanClickElement for human-like clicking with mouse movement
+			const clicked = await humanClickElement(
+				page,
+				'xpath//div[@role="button" and contains(normalize-space(), "Send")]',
+				{
+					elementType: "button",
+					hoverDelay: 150 + Math.random() * 200,
+				},
+			);
+			if (clicked) {
 				getLogger().info(
 					"ACTION",
-					"Successfully clicked send button via element handle",
+					"Successfully clicked send button via humanClickElement",
 				);
 				await sleep(3000 + Math.random() * 1000);
 				return true;
-			} catch (clickErr) {
-				getLogger().info(
-					"ACTION",
-					`Direct click failed, trying humanClickElement: ${clickErr}`,
-				);
-				// Fallback to humanClickElement
-				const clicked = await humanClickElement(
-					page,
-					'xpath//div[@role="button" and contains(normalize-space(), "Send")]',
-					{
-						elementType: "button",
-						hoverDelay: 150 + Math.random() * 200,
-					},
-				);
-				if (clicked) {
-					getLogger().info(
-						"ACTION",
-						"Successfully clicked send button via humanClickElement",
-					);
-					await sleep(3000 + Math.random() * 1000);
-					return true;
-				}
+			} else {
+				getLogger().info("ACTION", "Button found but humanClickElement failed");
 			}
 		} else {
 			getLogger().info("ACTION", "No send button found with XPath selector");
 		}
-
-		// Also try using page.evaluate to find and click directly
-		getLogger().info(
-			"ACTION",
-			"Trying page.evaluate to find Send button directly...",
-		);
-		const foundAndClicked = await page.evaluate(() => {
-			// Find all divs with role="button" and check their text
-			const buttons = Array.from(
-				document.querySelectorAll('div[role="button"]'),
-			) as HTMLElement[];
-			for (const btn of buttons) {
-				const text = btn.textContent?.trim() || "";
-				if (text === "Send" || text.includes("Send")) {
-					const style = window.getComputedStyle(btn);
-					if (
-						style.display !== "none" &&
-						style.visibility !== "hidden" &&
-						style.opacity !== "0"
-					) {
-						// Try clicking it
-						(btn as HTMLElement).click();
-						return true;
-					}
-				}
-			}
-			return false;
-		});
-
-		if (foundAndClicked) {
-			getLogger().info(
-				"ACTION",
-				"Found and clicked Send button via page.evaluate",
-			);
-			await sleep(3000 + Math.random() * 1000);
-			return true;
-		} else {
-			getLogger().info("ACTION", "page.evaluate did not find Send button");
-		}
 	} catch (err) {
-		getLogger().info(
-			"ACTION",
-			`XPath/evaluate send button selector failed: ${err}`,
-		);
+		getLogger().info("ACTION", `XPath send button selector failed: ${err}`);
 	}
 
 	// If send button not found, try clicking by text using clickAny
