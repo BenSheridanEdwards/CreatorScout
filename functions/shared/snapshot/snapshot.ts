@@ -17,17 +17,19 @@ function isPageOpen(page: Page): boolean {
 /**
  * Wait for the page to be in a stable state (not loading, not on login page)
  */
-async function waitForPageReady(page: Page, timeout: number = 5000): Promise<void> {
+async function waitForPageReady(
+	page: Page,
+	timeout: number = 5000,
+): Promise<void> {
 	if (!isPageOpen(page)) {
 		return;
 	}
 
 	try {
 		// Wait for page to not be loading
-		await page.waitForFunction(
-			() => document.readyState === "complete",
-			{ timeout },
-		);
+		await page.waitForFunction(() => document.readyState === "complete", {
+			timeout,
+		});
 
 		// Check if we're on Instagram login page and wait for it to potentially redirect
 		const isLoginPage = await page.evaluate(() => {
@@ -127,7 +129,9 @@ export async function snapshot(page: Page, label: string): Promise<string> {
 	} catch (err) {
 		// If screenshot fails due to page being closed, throw a more helpful error
 		if (err instanceof Error && err.message.includes("Target closed")) {
-			throw new Error("Cannot take screenshot: page was closed during screenshot capture");
+			throw new Error(
+				"Cannot take screenshot: page was closed during screenshot capture",
+			);
 		}
 		throw err;
 	}
@@ -191,7 +195,9 @@ async function waitForProfilePage(
 		}
 
 		const hasContent = await page.evaluate(() => {
-			return document.body.textContent && document.body.textContent.length > 100;
+			return (
+				document.body.textContent && document.body.textContent.length > 100
+			);
 		});
 
 		return hasContent;
@@ -248,7 +254,9 @@ export async function saveScreenshot(
 					`⚠️  Profile page not ready for @${username}. Current URL: ${currentUrl}. Taking screenshot anyway.`,
 				);
 			} else {
-				throw new Error("Cannot take screenshot: page was closed while waiting for profile");
+				throw new Error(
+					"Cannot take screenshot: page was closed while waiting for profile",
+				);
 			}
 		}
 	} else {
@@ -258,7 +266,9 @@ export async function saveScreenshot(
 
 	// Final check before taking screenshot
 	if (!isPageOpen(page)) {
-		throw new Error("Cannot take screenshot: page was closed before screenshot");
+		throw new Error(
+			"Cannot take screenshot: page was closed before screenshot",
+		);
 	}
 
 	// Log current URL for debugging
@@ -326,8 +336,14 @@ export async function saveScreenshot(
 		}
 	} catch (err) {
 		// If screenshot fails due to page being closed, throw a more helpful error
-		if (err instanceof Error && (err.message.includes("Target closed") || err.message.includes("Session closed"))) {
-			throw new Error("Cannot take screenshot: page was closed during screenshot capture");
+		if (
+			err instanceof Error &&
+			(err.message.includes("Target closed") ||
+				err.message.includes("Session closed"))
+		) {
+			throw new Error(
+				"Cannot take screenshot: page was closed during screenshot capture",
+			);
 		}
 		throw err;
 	}

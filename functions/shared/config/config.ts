@@ -150,7 +150,8 @@ export const IG_PASS = process.env.INSTAGRAM_PASSWORD;
 // No additional proxy configuration needed.
 
 // <<< BEST MODEL RIGHT NOW (Dec 2025) >>>
-export const VISION_MODEL = "google/gemini-flash-1.5-exp"; // fastest + cheapest winner
+export const VISION_MODEL = "google/gemini-flash-1.5"; // fastest + cheapest winner
+// export const VISION_MODEL = "google/gemini-2.0-flash-exp"; // alternative experimental version
 // export const VISION_MODEL = 'google/gemini-pro-vision-2.5'; // max accuracy if you want
 // export const VISION_MODEL = 'anthropic/claude-3-5-sonnet-20241022';
 

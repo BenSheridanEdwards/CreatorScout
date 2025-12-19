@@ -43,6 +43,13 @@ const CREATOR_KEYWORDS = [
 	"ko-fi",
 	"cashapp",
 	"venmo",
+	"private account",
+	"get access",
+	"limited time",
+	"my content",
+	"chat with me",
+	"content",
+	"account",
 ];
 
 /**
@@ -143,6 +150,8 @@ export async function analyzeExternalLink(
 		indicators: [] as string[],
 	};
 
+	let isAggregator = false; // Track if it's an aggregator for later use
+
 	try {
 		// Navigate to the external link
 		await page.goto(linkUrl, { waitUntil: "networkidle2", timeout: 15000 });
@@ -164,7 +173,7 @@ export async function analyzeExternalLink(
 		}
 
 		// Check if it's a known aggregator platform
-		const isAggregator = AGGREGATOR_DOMAINS.some((domain) =>
+		isAggregator = AGGREGATOR_DOMAINS.some((domain) =>
 			finalUrl.toLowerCase().includes(domain),
 		);
 
@@ -210,14 +219,38 @@ export async function analyzeExternalLink(
 				})
 				.map((img) => img.getAttribute("alt") || "social_icon");
 
-			// Look for subscription forms
-			const hasEmailForm =
-				document.querySelector('input[type="email"]') !== null;
-			const hasSubscribeButton =
-				document.querySelector("button, a") &&
-				Array.from(document.querySelectorAll("button, a")).some((el) =>
-					(el as HTMLElement).innerText?.toLowerCase().includes("subscribe"),
-				);
+		// Look for subscription forms
+		const hasEmailForm =
+			document.querySelector('input[type="email"]') !== null;
+		const hasSubscribeButton =
+			document.querySelector("button, a") &&
+			Array.from(document.querySelectorAll("button, a")).some((el) =>
+				(el as HTMLElement).innerText?.toLowerCase().includes("subscribe"),
+			);
+		
+		// Look for pricing/subscription indicators in buttons and text
+		const hasPricingIndicator = Array.from(document.querySelectorAll("button, a, div, span, p")).some((el) => {
+			const text = (el as HTMLElement).innerText?.toLowerCase() || "";
+			return (
+				text.includes("$") && (text.includes("/m") || text.includes("/month") || text.includes("month")) ||
+				text.includes("private account") ||
+				text.includes("get access") ||
+				text.includes("limited time") ||
+				text.includes("content") && (text.includes("my") || text.includes("exclusive"))
+			);
+		});
+		
+		// Look for premium content indicators
+		const hasMonetizationIndicator = Array.from(document.querySelectorAll("button, a, div, span, p")).some((el) => {
+			const text = (el as HTMLElement).innerText?.toLowerCase() || "";
+			return (
+				text.includes("🥵") ||
+				text.includes("hot") && text.includes("content") ||
+				text.includes("chat with me") ||
+				text.includes("don't tell") ||
+				text.includes("dont tell")
+			);
+		});
 
 			// Look for creator-specific text patterns
 			const creatorTextPatterns = [
@@ -230,6 +263,11 @@ export async function analyzeExternalLink(
 				"patron",
 				"patreon",
 				"premium content",
+				"private account",
+				"get access",
+				"limited time",
+				"my content",
+				"chat with me",
 			];
 
 			return {
@@ -240,6 +278,8 @@ export async function analyzeExternalLink(
 				socialIcons: socialIcons,
 				hasEmailForm: hasEmailForm,
 				hasSubscribeButton: hasSubscribeButton,
+				hasPricingIndicator: hasPricingIndicator,
+				hasMonetizationIndicator: hasMonetizationIndicator,
 				creatorPatterns: creatorTextPatterns.filter((pattern) =>
 					texts.some((text) => text.toLowerCase().includes(pattern)),
 				),
@@ -274,6 +314,8 @@ export async function analyzeExternalLink(
 		const hasCreatorIndicators =
 			pageContent.hasEmailForm ||
 			pageContent.hasSubscribeButton ||
+			pageContent.hasPricingIndicator ||
+			pageContent.hasMonetizationIndicator ||
 			pageContent.creatorPatterns.length > 0 ||
 			platformMatches.length > 0;
 
@@ -290,6 +332,21 @@ export async function analyzeExternalLink(
 				result.indicators.push(
 					`Found platform icons: ${platformMatches.join(", ")}`,
 				);
+			} else if (pageContent.hasPricingIndicator || pageContent.hasMonetizationIndicator) {
+				// Strong indicators: pricing + premium content = high confidence
+				if (pageContent.hasPricingIndicator && pageContent.hasMonetizationIndicator) {
+					result.confidence = 85;
+					result.reason = "pricing_and_adult_content";
+					result.indicators.push("Has pricing/subscription and premium content indicators");
+				} else if (pageContent.hasPricingIndicator) {
+					result.confidence = 75;
+					result.reason = "pricing_indicator";
+					result.indicators.push("Has pricing/subscription indicator");
+				} else {
+					result.confidence = 70;
+					result.reason = "adult_content_indicator";
+					result.indicators.push("Has premium content indicator");
+				}
 			} else if (pageContent.hasEmailForm || pageContent.hasSubscribeButton) {
 				result.confidence = 85;
 				result.reason = "subscription_form";
@@ -309,6 +366,21 @@ export async function analyzeExternalLink(
 				);
 			}
 
+			// Preserve aggregator confidence if it was higher
+			if (isAggregator && result.confidence < 60) {
+				result.confidence = 60;
+				result.reason = "aggregator_platform";
+			}
+
+			return result;
+		}
+
+		// If still unsure but it's an aggregator, keep aggregator confidence
+		if (isAggregator) {
+			result.isCreator = true;
+			result.confidence = 60;
+			result.reason = "aggregator_platform";
+			result.indicators.push("Uses creator aggregator (no strong content indicators found)");
 			return result;
 		}
 

@@ -283,7 +283,7 @@ export async function processProfile(
 		let confirmedCreator = analysis.isCreator;
 		let confidence = analysis.confidence;
 
-		// Log key indicators if creator was confirmed
+		// Log potential creator indicators (even if confidence is low)
 		if (confirmedCreator) {
 			const keyIndicators = analysis.indicators.filter(
 				(indicator) =>
@@ -293,28 +293,43 @@ export async function processProfile(
 					indicator.includes("creator keywords"),
 			);
 
-			logger.info(
-				"ANALYSIS",
-				`🎯 CONFIRMED CREATOR (confidence: ${confidence}%, reason: ${analysis.reason})`,
-			);
-
-			if (keyIndicators.length > 0) {
+			// Only log as "CONFIRMED CREATOR" if confidence meets threshold
+			if (confidence >= CONFIDENCE_THRESHOLD) {
 				logger.info(
 					"ANALYSIS",
-					`💡 Key evidence: ${keyIndicators.join(" | ")}`,
+					`🎯 CONFIRMED CREATOR (confidence: ${confidence}%, reason: ${analysis.reason})`,
 				);
-			}
 
-			// Record metrics for confirmed creator
-			if (metricsTracker) {
-				// Count vision API calls from comprehensive analysis
-				// Comprehensive analysis may use vision for low-confidence links or profile analysis
-				const visionCalls = analysis.screenshots.length; // Each screenshot likely involved vision analysis
-				for (let i = 0; i < visionCalls; i++) {
-					metricsTracker.recordVisionApiCall(0.001); // ~$0.001 per call
-					visionApiCalls++; // Increment cumulative counter
+				if (keyIndicators.length > 0) {
+					logger.info(
+						"ANALYSIS",
+						`💡 Key evidence: ${keyIndicators.join(" | ")}`,
+					);
 				}
-				metricsTracker.recordCreatorFound(username, confidence, visionCalls);
+
+				// Record metrics for confirmed creator
+				if (metricsTracker) {
+					// Count vision API calls from comprehensive analysis
+					// Comprehensive analysis may use vision for low-confidence links or profile analysis
+					const visionCalls = analysis.screenshots.length; // Each screenshot likely involved vision analysis
+					for (let i = 0; i < visionCalls; i++) {
+						metricsTracker.recordVisionApiCall(0.001); // ~$0.001 per call
+						visionApiCalls++; // Increment cumulative counter
+					}
+					metricsTracker.recordCreatorFound(username, confidence, visionCalls);
+				}
+			} else {
+				// Has creator indicators but confidence is too low
+				logger.info(
+					"ANALYSIS",
+					`⚠️  Potential creator detected (confidence: ${confidence}%, reason: ${analysis.reason}) but below threshold (${CONFIDENCE_THRESHOLD}%)`,
+				);
+				if (keyIndicators.length > 0) {
+					logger.info(
+						"ANALYSIS",
+						`💡 Key evidence: ${keyIndicators.join(" | ")}`,
+					);
+				}
 			}
 		}
 

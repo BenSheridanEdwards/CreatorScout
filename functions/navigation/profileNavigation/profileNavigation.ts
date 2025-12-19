@@ -49,7 +49,10 @@ async function navigateToProfileViaSearch(
 		try {
 			const element = await page.$(selector);
 			if (element) {
-				const tagName = await page.evaluate((el) => el.tagName.toLowerCase(), element);
+				const tagName = await page.evaluate(
+					(el) => el.tagName.toLowerCase(),
+					element,
+				);
 				if (tagName === "input") {
 					await element.click({ delay: 100 + Math.random() * 100 });
 					searchClicked = true;
@@ -57,7 +60,9 @@ async function navigateToProfileViaSearch(
 				} else {
 					await element.click({ delay: 100 + Math.random() * 100 });
 					await sleep(1500 + Math.random() * 1000);
-					const searchInput = await page.$('input[placeholder*="Search"], input[aria-label*="Search"]');
+					const searchInput = await page.$(
+						'input[placeholder*="Search"], input[aria-label*="Search"]',
+					);
 					if (searchInput) {
 						await searchInput.click({ delay: 100 + Math.random() * 100 });
 						searchClicked = true;
@@ -76,7 +81,9 @@ async function navigateToProfileViaSearch(
 			timeout,
 		});
 		await sleep(2000);
-		const searchInput = await page.$('input[placeholder*="Search"], input[aria-label*="Search"]');
+		const searchInput = await page.$(
+			'input[placeholder*="Search"], input[aria-label*="Search"]',
+		);
 		if (searchInput) {
 			await searchInput.click({ delay: 100 + Math.random() * 100 });
 			searchClicked = true;
@@ -108,7 +115,10 @@ async function navigateToProfileViaSearch(
 				text.includes(targetUsername) ||
 				text.includes(`@${targetUsername}`)
 			) {
-				if (href.match(/^\/[^\/]+\/?$/) || href.includes(`/${targetUsername}/`)) {
+				if (
+					href.match(/^\/[^\/]+\/?$/) ||
+					href.includes(`/${targetUsername}/`)
+				) {
 					(link as HTMLElement).click();
 					return true;
 				}
