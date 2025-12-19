@@ -6,6 +6,25 @@ import { jest } from "@jest/globals";
 import type { Page } from "puppeteer";
 import { createPageMock } from "../../__test__/testUtils.ts";
 
+// Mock sleep to avoid delays in tests
+const sleepMock = jest
+	.fn<(ms: number) => Promise<void>>()
+	.mockResolvedValue(undefined);
+
+// Mock database functions to avoid actual database operations
+const markDmSentMock = jest
+	.fn<(username: string, proofPath?: string | null) => Promise<void>>()
+	.mockResolvedValue(undefined);
+const markFollowedMock = jest
+	.fn<(username: string) => Promise<void>>()
+	.mockResolvedValue(undefined);
+const queueAddMock = jest
+	.fn<(username: string, priority: number, source: string) => Promise<void>>()
+	.mockResolvedValue(undefined);
+const wasVisitedMock = jest
+	.fn<(username: string) => Promise<boolean>>()
+	.mockResolvedValue(false);
+
 // Only mock external API calls (vision API)
 const analyzeDmProofMock = jest
 	.fn<
@@ -30,6 +49,26 @@ const analyzeDmProofMock = jest
 	});
 
 // Set up mocks before importing the module
+jest.unstable_mockModule("../../timing/sleep/sleep.ts", () => ({
+	sleep: sleepMock,
+}));
+
+// Mock query function - returns QueryResult with rows array
+const queryMock = jest
+	.fn<
+		<T = unknown>(sql: string, params?: unknown[]) => Promise<{ rows: T[] }>
+	>()
+	.mockResolvedValue({ rows: [] });
+
+jest.unstable_mockModule("../../shared/database/database.ts", () => ({
+	markDmSent: markDmSentMock,
+	markFollowed: markFollowedMock,
+	queueAdd: queueAddMock,
+	wasVisited: wasVisitedMock,
+	query: queryMock,
+	QueryResult: {} as { rows: unknown[] }, // Export the type if needed
+}));
+
 jest.unstable_mockModule("../vision/analyzeDmProof.ts", () => ({
 	analyzeDmProof: analyzeDmProofMock,
 }));
@@ -101,6 +140,11 @@ const {
 describe("profileActions", () => {
 	beforeEach(() => {
 		jest.clearAllMocks();
+		sleepMock.mockResolvedValue(undefined);
+		markDmSentMock.mockResolvedValue(undefined);
+		markFollowedMock.mockResolvedValue(undefined);
+		queueAddMock.mockResolvedValue(undefined);
+		wasVisitedMock.mockResolvedValue(false);
 		analyzeDmProofMock.mockResolvedValue({
 			dm_sent: true,
 			confidence: 90,
@@ -176,6 +220,13 @@ describe("profileActions", () => {
 					.mockImplementation(async (fn: unknown, ...args: unknown[]) => {
 						if (typeof fn === "function") {
 							try {
+								// Handle mouse position check (moveMouseToElement)
+								if (
+									fn.toString().includes("mouseX") ||
+									fn.toString().includes("mouseY")
+								) {
+									return { x: 100, y: 100 };
+								}
 								const result = await (fn as (...args: unknown[]) => unknown)(
 									...args,
 								);
@@ -207,21 +258,39 @@ describe("profileActions", () => {
 									return true; // in DM thread
 								}
 								// typeMessage - check text present (returns boolean)
+								// The evaluate function checks if textContent includes part of the message
+								// If the function returns a boolean, return true (text is present)
 								if (typeof result === "boolean") {
-									return result;
+									return true; // Text is present
 								}
-								// Mouse position for clickMessageButton
+								// getElementCenter - returns { x, y } for element center
 								if (
 									result &&
 									typeof result === "object" &&
 									"x" in result &&
 									"y" in result &&
-									!("width" in result)
+									!("width" in result) &&
+									!("height" in result)
+								) {
+									return { x: 50, y: 50 };
+								}
+								// Mouse position for clickMessageButton or getElementCenter
+								if (
+									result &&
+									typeof result === "object" &&
+									"x" in result &&
+									"y" in result
 								) {
 									return { x: 50, y: 50 };
 								}
 								return result;
 							} catch {
+								// If function throws (e.g., document.querySelector doesn't exist),
+								// check if it's a text check (typeMessage) and return true
+								// Otherwise return null
+								if (args && args.length >= 2 && typeof args[1] === "string") {
+									return true; // typeMessage text check - assume text is present
+								}
 								return null;
 							}
 						}
@@ -258,19 +327,31 @@ describe("profileActions", () => {
 					}) as unknown as Page["$"],
 				waitForSelector: jest
 					.fn<(selector: string, opts?: object) => Promise<unknown>>()
-					.mockResolvedValue({
-						click: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
-						boundingBox: jest
-							.fn<
-								() => Promise<{
-									x: number;
-									y: number;
-									width: number;
-									height: number;
-								} | null>
-							>()
-							.mockResolvedValue({ x: 0, y: 0, width: 100, height: 40 }),
-						textContent: "Hello!",
+					.mockImplementation(async (selector: string) => {
+						// Return element for message input selectors
+						if (
+							selector.includes('role="textbox"') ||
+							selector.includes("contenteditable") ||
+							selector.includes("Message")
+						) {
+							return {
+								click: jest
+									.fn<() => Promise<void>>()
+									.mockResolvedValue(undefined),
+								boundingBox: jest
+									.fn<
+										() => Promise<{
+											x: number;
+											y: number;
+											width: number;
+											height: number;
+										} | null>
+									>()
+									.mockResolvedValue({ x: 0, y: 0, width: 100, height: 40 }),
+								textContent: "Hello!",
+							};
+						}
+						return null;
 					}),
 				keyboard: {
 					press: jest
@@ -293,14 +374,12 @@ describe("profileActions", () => {
 				},
 			});
 
-			// The function may return false if database operations fail, which is acceptable in tests
 			const ok = await sendDMToUser(page as unknown as Page, "user123");
 
-			// Check that navigation was attempted (even if it ultimately failed)
+			expect(ok).toBe(true);
 			expect(page.goto).toHaveBeenCalled();
-			// Accept either true (success) or false (database/other error)
-			expect(typeof ok).toBe("boolean");
-		}, 15000); // 15 second timeout for real implementations
+			expect(markDmSentMock).toHaveBeenCalled();
+		}, 10000); // 10 second timeout
 
 		test("skips when conversation is not empty", async () => {
 			const page = createPageMock({
@@ -370,11 +449,7 @@ describe("profileActions", () => {
 
 	describe("followUserAccount", () => {
 		test("follows user when button is found", async () => {
-			// Set up a test database URL to avoid connection errors
-			if (!process.env.DATABASE_URL) {
-				process.env.DATABASE_URL = "postgresql://test:test@localhost:5432/test";
-			}
-
+			let callCount = 0;
 			const page = createPageMock({
 				goto: jest
 					.fn<(url: string, opts?: object) => Promise<void>>()
@@ -382,14 +457,25 @@ describe("profileActions", () => {
 				evaluate: jest
 					.fn<(fn: unknown) => Promise<boolean>>()
 					.mockImplementation(async (fn: unknown) => {
+						callCount++;
 						if (typeof fn === "function") {
-							const result = await (fn as () => unknown)();
-							// First call: check for follow button
-							if (typeof result === "boolean") {
-								return true; // follow button found
+							try {
+								const result = await (fn as () => unknown)();
+								// First call: check for follow button (returns boolean)
+								if (callCount === 1 && typeof result === "boolean") {
+									return true; // follow button found
+								}
+								// Second call: click button (returns void)
+								if (callCount === 2) {
+									return undefined;
+								}
+								return result;
+							} catch {
+								// If function throws (document.querySelector doesn't exist),
+								// return true for first call (button found), undefined for second (clicked)
+								if (callCount === 1) return true;
+								return undefined;
 							}
-							// Second call: click button (returns void)
-							return undefined;
 						}
 						return false;
 					}) as unknown as Page["evaluate"],
@@ -397,6 +483,7 @@ describe("profileActions", () => {
 
 			const ok = await followUserAccount(page as unknown as Page, "user123");
 
+			expect(ok).toBe(true);
 			expect(page.goto).toHaveBeenCalledWith(
 				"https://www.instagram.com/user123/",
 				expect.objectContaining({
@@ -404,8 +491,7 @@ describe("profileActions", () => {
 					timeout: 15000,
 				}),
 			);
-			// Accept either true (success) or false (database/other error)
-			expect(typeof ok).toBe("boolean");
+			expect(markFollowedMock).toHaveBeenCalledWith("user123");
 		});
 
 		test("returns false when no follow button", async () => {
@@ -478,6 +564,61 @@ describe("profileActions", () => {
 			// Should add users (actual count depends on database state)
 			expect(typeof added).toBe("number");
 			expect(added).toBeGreaterThanOrEqual(0);
+		});
+
+		test("skips already visited users", async () => {
+			wasVisitedMock.mockImplementation((u) => Promise.resolve(u === "user1")); // user1 already visited
+			const page = createPageMock({
+				keyboard: {
+					press: jest
+						.fn<(key: string) => Promise<void>>()
+						.mockResolvedValue(undefined),
+				},
+				waitForSelector: jest
+					.fn<(selector: string, opts?: object) => Promise<unknown>>()
+					.mockResolvedValue({}), // Modal found
+				$: jest
+					.fn<(selector: string) => Promise<unknown>>()
+					.mockImplementation(async (selector: string) => {
+						if (selector.includes("following") || selector.includes("modal")) {
+							return {
+								click: jest
+									.fn<() => Promise<void>>()
+									.mockResolvedValue(undefined),
+							};
+						}
+						return null;
+					}) as unknown as Page["$"],
+				$$: jest
+					.fn<(selector: string) => Promise<unknown[]>>()
+					.mockResolvedValue([
+						{
+							evaluate: jest
+								.fn<(fn: unknown) => Promise<string>>()
+								.mockResolvedValue("/user1/"),
+							textContent: "user1",
+						},
+						{
+							evaluate: jest
+								.fn<(fn: unknown) => Promise<string>>()
+								.mockResolvedValue("/user2/"),
+							textContent: "user2",
+						},
+					]),
+				evaluate: jest
+					.fn<(fn: unknown, ...args: unknown[]) => Promise<unknown>>()
+					.mockResolvedValue(["user1", "user2"]),
+			});
+
+			const added = await addFollowingToQueue(
+				page as unknown as Page,
+				"seed",
+				"source",
+			);
+
+			expect(added).toBe(1);
+			expect(queueAddMock).toHaveBeenCalledTimes(1);
+			expect(queueAddMock).toHaveBeenCalledWith("user2", 50, "source");
 		});
 
 		test("returns 0 when modal fails to open", async () => {
