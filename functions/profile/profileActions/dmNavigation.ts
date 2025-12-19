@@ -26,27 +26,173 @@ export interface ButtonInfo {
 }
 
 /**
- * Navigate to user's profile and wait for it to load
+ * Navigate to user's profile using search (more human-like, avoids detection)
  */
-export async function navigateToProfile(
+async function navigateToProfileViaSearch(
 	page: Page,
 	username: string,
 ): Promise<void> {
 	const u = username.toLowerCase().trim();
-	getLogger().info("ACTION", `Navigating to profile: @${u}`);
+	getLogger().info("ACTION", `Navigating to profile via search: @${u}`);
 
-	// Navigate to user's profile page
-	await executeWithCircuitBreaker(async () => {
-		await page.goto(`https://www.instagram.com/${u}/`, {
+	// Ensure we're on Instagram homepage (or any Instagram page)
+	const currentUrl = page.url();
+	if (!currentUrl.includes("instagram.com")) {
+		getLogger().info("ACTION", "Not on Instagram, navigating to homepage");
+		await page.goto("https://www.instagram.com/", {
 			waitUntil: "networkidle2",
 			timeout: 15000,
 		});
-	}, `navigate_profile_${username}`);
+		await sleep(2000 + Math.random() * 2000);
+	}
+
+	// Handle any popups
+	await handleInstagramPopups(page);
+
+	// Find and click the search icon/input
+	getLogger().info("ACTION", "Looking for search icon/input");
+	const searchSelectors = [
+		'a[href="/explore/"]',
+		'input[placeholder*="Search"]',
+		'input[aria-label*="Search"]',
+		'svg[aria-label="Search"]',
+		'a[aria-label="Search"]',
+		'div[role="link"][href="/explore/"]',
+	];
+
+	let searchClicked = false;
+	for (const selector of searchSelectors) {
+		try {
+			const element = await page.$(selector);
+			if (element) {
+				// If it's an input, just click it. If it's a link/icon, click to open search
+				const tagName = await page.evaluate((el) => el.tagName.toLowerCase(), element);
+				if (tagName === "input") {
+					await element.click({ delay: 100 + Math.random() * 100 });
+					searchClicked = true;
+					getLogger().info("ACTION", `Found and clicked search input: ${selector}`);
+					break;
+				} else {
+					// It's a link/icon - click to navigate to search page
+					await element.click({ delay: 100 + Math.random() * 100 });
+					await sleep(1500 + Math.random() * 1000);
+					// Now look for the search input on the search page
+					const searchInput = await page.$('input[placeholder*="Search"], input[aria-label*="Search"]');
+					if (searchInput) {
+						await searchInput.click({ delay: 100 + Math.random() * 100 });
+						searchClicked = true;
+						getLogger().info("ACTION", `Opened search page and clicked input`);
+						break;
+					}
+				}
+			}
+		} catch (err) {
+			continue;
+		}
+	}
+
+	if (!searchClicked) {
+		// Fallback: try navigating to explore/search page directly
+		getLogger().info("ACTION", "Search icon not found, navigating to explore page");
+		await page.goto("https://www.instagram.com/explore/", {
+			waitUntil: "networkidle2",
+			timeout: 15000,
+		});
+		await sleep(2000);
+		const searchInput = await page.$('input[placeholder*="Search"], input[aria-label*="Search"]');
+		if (searchInput) {
+			await searchInput.click({ delay: 100 + Math.random() * 100 });
+			searchClicked = true;
+		}
+	}
+
+	if (!searchClicked) {
+		throw new Error("Could not find or click search input");
+	}
+
+	// Wait a moment for search input to be ready
+	await sleep(500 + Math.random() * 500);
+
+	// Type the username character by character (human-like)
+	getLogger().info("ACTION", `Typing username: @${u}`);
+	for (const char of u) {
+		await page.keyboard.type(char, { delay: 100 + Math.random() * 150 });
+		await sleep(50 + Math.random() * 100);
+	}
+
+	// Wait for search results to appear
+	getLogger().info("ACTION", "Waiting for search results");
+	await sleep(1500 + Math.random() * 1000);
+
+	// Find and click the profile in search results
+	getLogger().info("ACTION", "Looking for profile in search results");
+	const profileFound = await page.evaluate((targetUsername) => {
+		// Look for profile links in search results
+		const links = Array.from(document.querySelectorAll('a[href*="/"]'));
+		for (const link of links) {
+			const href = link.getAttribute("href") || "";
+			const text = (link.textContent || "").toLowerCase();
+			// Match exact username in href or text
+			if (
+				href.includes(`/${targetUsername}/`) ||
+				text.includes(targetUsername) ||
+				text.includes(`@${targetUsername}`)
+			) {
+				// Make sure it's a profile link, not something else
+				if (href.match(/^\/[^\/]+\/?$/) || href.includes(`/${targetUsername}/`)) {
+					(link as HTMLElement).click();
+					return true;
+				}
+			}
+		}
+		return false;
+	}, u);
+
+	if (!profileFound) {
+		// Try alternative: look for divs with role="link" or buttons
+		const altFound = await page.evaluate((targetUsername) => {
+			const clickableElements = Array.from(
+				document.querySelectorAll('div[role="link"], div[role="button"], a'),
+			);
+			for (const el of clickableElements) {
+				const text = (el.textContent || "").toLowerCase();
+				const ariaLabel = (el.getAttribute("aria-label") || "").toLowerCase();
+				if (
+					text.includes(targetUsername) ||
+					text.includes(`@${targetUsername}`) ||
+					ariaLabel.includes(targetUsername)
+				) {
+					(el as HTMLElement).click();
+					return true;
+				}
+			}
+			return false;
+		}, u);
+
+		if (!altFound) {
+			throw new Error(`Could not find profile @${u} in search results`);
+		}
+	}
+
+	// Wait for profile page to load
+	getLogger().info("ACTION", "Waiting for profile page to load");
+	await sleep(2000 + Math.random() * 2000);
+
+	// Verify we're on the profile page
+	const finalUrl = page.url();
+	if (!finalUrl.includes(`/${u}/`)) {
+		// Wait a bit more and check again
+		await sleep(2000);
+		const finalUrl2 = page.url();
+		if (!finalUrl2.includes(`/${u}/`)) {
+			getLogger().warn(
+				"ACTION",
+				`Expected to be on profile @${u}, but URL is: ${finalUrl2}`,
+			);
+		}
+	}
 
 	getLogger().info("ACTION", `Current URL: ${page.url()}`);
-
-	// Wait for profile to load with human-like delay
-	await sleep(2000 + Math.random() * 2000); // 2-4 seconds
 
 	// Handle any popups that appeared during navigation
 	await handleInstagramPopups(page);
@@ -59,9 +205,9 @@ export async function navigateToProfile(
 	);
 	await sleep(1000 + Math.random() * 1000);
 
-	// Check if we're logged in
-	const currentUrl = page.url();
-	const isLoginPage = currentUrl.includes("/accounts/login/");
+	// Check if we're logged in (reuse finalUrl or get current URL)
+	const checkUrl = page.url();
+	const isLoginPage = checkUrl.includes("/accounts/login/");
 
 	if (isLoginPage) {
 		getLogger().info(
@@ -73,6 +219,68 @@ export async function navigateToProfile(
 
 	// Take debug screenshot
 	await snapshot(page, `dm_profile_debug_${username}`);
+}
+
+/**
+ * Navigate to user's profile and wait for it to load
+ * Uses search-based navigation to avoid detection
+ */
+export async function navigateToProfile(
+	page: Page,
+	username: string,
+): Promise<void> {
+	const u = username.toLowerCase().trim();
+	
+	try {
+		// Try search-based navigation first (more human-like)
+		await navigateToProfileViaSearch(page, username);
+	} catch (searchError) {
+		getLogger().warn(
+			"ACTION",
+			`Search-based navigation failed: ${searchError}. Falling back to direct URL navigation.`,
+		);
+		
+		// Fallback to direct URL navigation if search fails
+		getLogger().info("ACTION", `Navigating to profile via direct URL: @${u}`);
+
+		await executeWithCircuitBreaker(async () => {
+			await page.goto(`https://www.instagram.com/${u}/`, {
+				waitUntil: "networkidle2",
+				timeout: 15000,
+			});
+		}, `navigate_profile_${username}`);
+
+		getLogger().info("ACTION", `Current URL: ${page.url()}`);
+
+		// Wait for profile to load with human-like delay
+		await sleep(2000 + Math.random() * 2000); // 2-4 seconds
+
+		// Handle any popups that appeared during navigation
+		await handleInstagramPopups(page);
+
+		// Simulate reading the profile (mouse movement)
+		await page.mouse.move(
+			Math.random() * 500 + 200,
+			Math.random() * 300 + 200,
+			{ steps: 10 },
+		);
+		await sleep(1000 + Math.random() * 1000);
+
+		// Check if we're logged in
+		const currentUrl = page.url();
+		const isLoginPage = currentUrl.includes("/accounts/login/");
+
+		if (isLoginPage) {
+			getLogger().info(
+				"ACTION",
+				"Redirected to login page - session may have expired",
+			);
+			throw new Error("Not logged in - redirected to login page");
+		}
+
+		// Take debug screenshot
+		await snapshot(page, `dm_profile_debug_${username}`);
+	}
 }
 
 /**

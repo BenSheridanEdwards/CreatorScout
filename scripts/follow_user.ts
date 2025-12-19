@@ -133,6 +133,49 @@ async function followUser(
 		} else {
 			logger.warn("ACTION", `❌ Failed to follow @${username}`);
 
+			// Wait a moment for any navigation to complete
+			await new Promise((resolve) => setTimeout(resolve, 2000));
+
+			// Verify we're still on the profile page before taking screenshot
+			const currentUrl = page.url();
+			const isOnProfile =
+				currentUrl.includes(`/${username}/`) ||
+				currentUrl.includes(`/${username.toLowerCase()}/`);
+
+			if (!isOnProfile) {
+				logger.warn(
+					"NAVIGATION",
+					"⚠️  Not on profile page after follow failure, navigating back to capture screenshot...",
+				);
+				try {
+					await page.goto(`https://www.instagram.com/${username}/`, {
+						waitUntil: "networkidle2",
+						timeout: 15000,
+					});
+					await new Promise((resolve) => setTimeout(resolve, 2000));
+				} catch (navError) {
+					logger.error(
+						"NAVIGATION",
+						`⚠️  Could not navigate back to profile: ${navError}`,
+					);
+				}
+			}
+
+			// Verify we're still logged in
+			const stillLoggedIn = await page.evaluate(() => {
+				return (
+					document.querySelector('a[href="/direct/inbox/"]') !== null ||
+					document.querySelector('svg[aria-label="Home"]') !== null
+				);
+			});
+
+			if (!stillLoggedIn) {
+				logger.error(
+					"AUTH",
+					"⚠️  Session expired - cannot capture meaningful screenshot",
+				);
+			}
+
 			// Capture failure screenshot
 			const failPath = await saveScreenshot(page, "follow", username, "failed");
 			logger.info(

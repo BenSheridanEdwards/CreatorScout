@@ -19,12 +19,12 @@ function bezierPoint(
 
 /**
  * Human-like click on a specific ElementHandle.
- * 
+ *
  * Fully encapsulated - handles everything:
  * 1. Identifies the element target (gets bounding box)
  * 2. Moves cursor over it in a random curve like a human (Bezier curve)
  * 3. Clicks with the cursor (realistic mouse down/up timing)
- * 
+ *
  * @param page - Puppeteer page instance
  * @param handle - ElementHandle to click
  * @param options - Optional click behavior options
@@ -65,7 +65,9 @@ export async function humanLikeClickHandle(
 
 	const box = await handle.boundingBox();
 	if (!box) {
-		throw new Error("Cannot perform humanLikeClick: element has no bounding box");
+		throw new Error(
+			"Cannot perform humanLikeClick: element has no bounding box",
+		);
 	}
 
 	// Choose a point inside the element, away from the extreme edges
@@ -187,5 +189,3 @@ export async function humanLikeClickHandle(
 	// Small post-click pause to mimic human reaction time (preserved)
 	await sleep(60 + Math.random() * 180);
 }
-
-

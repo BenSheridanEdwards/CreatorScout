@@ -139,13 +139,11 @@ export async function followUserAccount(
 	username: string,
 ): Promise<boolean> {
 	try {
-		// Navigate to profile
-		await executeWithCircuitBreaker(async () => {
-			await page.goto(`https://www.instagram.com/${username}/`, {
-				waitUntil: "networkidle2",
-				timeout: 15000,
-			});
-		}, `navigate_profile_${username}`);
+		// Navigate to profile using search-based navigation (more human-like)
+		await navigateToProfile(page, username, {
+			timeout: 15000,
+			waitForHeader: true,
+		});
 
 		await sleep(3000); // Wait longer for page to fully load
 
@@ -200,6 +198,34 @@ export async function followUserAccount(
 				recordActivity("followed", username, "success");
 				return true;
 			} else {
+				// Wait a moment for page to stabilize
+				await sleep(1000);
+
+				// Verify we're still on the profile page
+				const currentUrl = page.url();
+				const isOnProfile =
+					currentUrl.includes(`/${username}/`) ||
+					currentUrl.includes(`/${username.toLowerCase()}/`);
+
+				if (!isOnProfile) {
+					logger.warn(
+						"NAVIGATION",
+						`⚠️  Page navigated away from profile during follow verification for @${username}. Current URL: ${currentUrl}`,
+					);
+					// Try to navigate back to profile using search
+					try {
+						await navigateToProfile(page, username, {
+							timeout: 15000,
+							waitForHeader: false,
+						});
+					} catch (navError) {
+						logger.error(
+							"NAVIGATION",
+							`⚠️  Could not navigate back to profile: ${navError}`,
+						);
+					}
+				}
+
 				// Take screenshot of failed state for debugging
 				const failedPath = await saveScreenshot(
 					page,
@@ -239,6 +265,46 @@ export async function followUserAccount(
 			});
 			return false;
 		} else {
+			// Wait a moment for page to stabilize
+			await sleep(1000);
+
+			// Verify we're still on the profile page before taking screenshot
+			const currentUrl = page.url();
+			const isOnProfile =
+				currentUrl.includes(`/${username}/`) ||
+				currentUrl.includes(`/${username.toLowerCase()}/`);
+
+			if (!isOnProfile) {
+				logger.warn(
+					"NAVIGATION",
+					`⚠️  Page navigated away from profile for @${username}. Current URL: ${currentUrl}`,
+				);
+				// Try to navigate back to profile using search
+				try {
+					await navigateToProfile(page, username, {
+						timeout: 15000,
+						waitForHeader: false,
+					});
+				} catch (navError) {
+					logger.error(
+						"NAVIGATION",
+						`⚠️  Could not navigate back to profile: ${navError}`,
+					);
+				}
+			}
+
+			// Take screenshot for debugging
+			const failedPath = await saveScreenshot(
+				page,
+				"follow",
+				username,
+				"failed",
+			);
+			logger.info(
+				"SCREENSHOT",
+				`📸 Follow button not found screenshot saved: ${failedPath}`,
+			);
+
 			logger.warn(
 				"ACTION",
 				`⚠️  Could not determine follow button state for @${username}. Button may not be visible or page structure changed.`,
