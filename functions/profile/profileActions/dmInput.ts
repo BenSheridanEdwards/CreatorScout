@@ -102,12 +102,17 @@ export async function typeMessage(
 		await page.keyboard.up("Control");
 		await sleep(200 + Math.random() * 200);
 
+		// Log that we're typing the message
+		getLogger().info("ACTION", `Typing DM message: "${DM_MESSAGE}"`);
+
 		// Type the message with human-like typing
 		await humanTypeText(page, selector, DM_MESSAGE, {
 			typeDelay: 80 + Math.random() * 100, // 80-180ms between chars
 			wordPause: 150 + Math.random() * 200, // 150-350ms between words
 			mistakeRate: 0, // No typos for important messages
 		});
+
+		getLogger().info("ACTION", "Finished typing DM message");
 
 		await sleep(1500 + Math.random() * 1000); // 1.5-2.5 seconds after typing
 
@@ -143,4 +148,3 @@ export async function typeMessage(
 		return false;
 	}
 }
-

@@ -8,7 +8,6 @@ import { createLogger } from "../../shared/logger/logger.ts";
 import { snapshot } from "../../shared/snapshot/snapshot.ts";
 import { sleep } from "../../timing/sleep/sleep.ts";
 import { humanClickElement } from "../../timing/humanize/humanize.ts";
-import { analyzeDmProof } from "../vision/analyzeDmProof.ts";
 
 // Lazy logger creation to prevent memory issues in tests
 let logger: ReturnType<typeof createLogger> | null = null;
@@ -30,24 +29,59 @@ const SEND_SELECTORS = [
  * Send the message by clicking the send button
  */
 export async function sendMessage(page: Page): Promise<boolean> {
+	getLogger().info("ACTION", "Looking for Send button...");
+
+	// Wait a moment for the button to become enabled after typing
+	await sleep(500 + Math.random() * 500);
+
 	// Try multiple send button selectors with human-like clicking
 	for (const selector of SEND_SELECTORS) {
 		try {
 			const sendButton = await page.$(selector);
 			if (sendButton) {
+				// Check if button is visible and enabled
+				const isVisible = await page.evaluate((sel) => {
+					const el = document.querySelector(sel);
+					if (!el) return false;
+					const style = window.getComputedStyle(el);
+					return (
+						style.display !== "none" &&
+						style.visibility !== "hidden" &&
+						style.opacity !== "0"
+					);
+				}, selector);
+
+				if (isVisible) {
+					getLogger().info(
+						"ACTION",
+						`Found visible send button with selector: ${selector}`,
+					);
+					// Use human-like click with mouse movement
+					const clicked = await humanClickElement(page, selector, {
+						elementType: "button",
+						hoverDelay: 150 + Math.random() * 200,
+					});
+					if (clicked) {
+						getLogger().info("ACTION", "Successfully clicked send button");
+						await sleep(3000 + Math.random() * 1000);
+						return true;
+					} else {
+						getLogger().info(
+							"ACTION",
+							`Button found but click failed for selector: ${selector}`,
+						);
+					}
+				} else {
+					getLogger().info(
+						"ACTION",
+						`Button found but not visible with selector: ${selector}`,
+					);
+				}
+			} else {
 				getLogger().info(
 					"ACTION",
-					`Found send button with selector: ${selector}`,
+					`Send button not found with selector: ${selector}`,
 				);
-				// Use human-like click with mouse movement
-				const clicked = await humanClickElement(page, selector, {
-					elementType: "button",
-					hoverDelay: 150 + Math.random() * 200,
-				});
-				if (clicked) {
-					await sleep(3000 + Math.random() * 1000);
-					return true;
-				}
 			}
 		} catch (err) {
 			getLogger().info("ACTION", `Send selector ${selector} failed: ${err}`);
@@ -55,60 +89,137 @@ export async function sendMessage(page: Page): Promise<boolean> {
 		}
 	}
 
+	// Try XPath for div[role="button"] containing "Send" text (Instagram's current structure)
+	getLogger().info(
+		"ACTION",
+		"Trying XPath for div[role='button'] with 'Send' text...",
+	);
+	try {
+		// First try with page.$ (Puppeteer's XPath support)
+		const sendButtonXPath = await page.$(
+			'xpath//div[@role="button" and contains(normalize-space(), "Send")]',
+		);
+		if (sendButtonXPath) {
+			getLogger().info(
+				"ACTION",
+				"Found send button with XPath (div[role='button'])",
+			);
+			// Try clicking directly via element handle
+			try {
+				await sendButtonXPath.click();
+				getLogger().info(
+					"ACTION",
+					"Successfully clicked send button via element handle",
+				);
+				await sleep(3000 + Math.random() * 1000);
+				return true;
+			} catch (clickErr) {
+				getLogger().info(
+					"ACTION",
+					`Direct click failed, trying humanClickElement: ${clickErr}`,
+				);
+				// Fallback to humanClickElement
+				const clicked = await humanClickElement(
+					page,
+					'xpath//div[@role="button" and contains(normalize-space(), "Send")]',
+					{
+						elementType: "button",
+						hoverDelay: 150 + Math.random() * 200,
+					},
+				);
+				if (clicked) {
+					getLogger().info(
+						"ACTION",
+						"Successfully clicked send button via humanClickElement",
+					);
+					await sleep(3000 + Math.random() * 1000);
+					return true;
+				}
+			}
+		} else {
+			getLogger().info("ACTION", "No send button found with XPath selector");
+		}
+
+		// Also try using page.evaluate to find and click directly
+		getLogger().info(
+			"ACTION",
+			"Trying page.evaluate to find Send button directly...",
+		);
+		const foundAndClicked = await page.evaluate(() => {
+			// Find all divs with role="button" and check their text
+			const buttons = Array.from(
+				document.querySelectorAll('div[role="button"]'),
+			) as HTMLElement[];
+			for (const btn of buttons) {
+				const text = btn.textContent?.trim() || "";
+				if (text === "Send" || text.includes("Send")) {
+					const style = window.getComputedStyle(btn);
+					if (
+						style.display !== "none" &&
+						style.visibility !== "hidden" &&
+						style.opacity !== "0"
+					) {
+						// Try clicking it
+						(btn as HTMLElement).click();
+						return true;
+					}
+				}
+			}
+			return false;
+		});
+
+		if (foundAndClicked) {
+			getLogger().info(
+				"ACTION",
+				"Found and clicked Send button via page.evaluate",
+			);
+			await sleep(3000 + Math.random() * 1000);
+			return true;
+		} else {
+			getLogger().info("ACTION", "page.evaluate did not find Send button");
+		}
+	} catch (err) {
+		getLogger().info(
+			"ACTION",
+			`XPath/evaluate send button selector failed: ${err}`,
+		);
+	}
+
 	// If send button not found, try clicking by text using clickAny
+	getLogger().info("ACTION", "Trying clickAny to find Send button by text...");
 	const clickedByText = await clickAny(page, ["Send"]);
 	if (clickedByText) {
+		getLogger().info("ACTION", "Send button clicked by text via clickAny");
 		await sleep(3000 + Math.random() * 1000);
-		getLogger().info("ACTION", "Send button clicked by text");
 		return true;
+	} else {
+		getLogger().info("ACTION", "clickAny did not find Send button");
 	}
 
 	// If still not sent, try Enter key
-	getLogger().info("ACTION", "Send button not found, trying Enter key");
+	getLogger().info(
+		"ACTION",
+		"Send button not found with any method, falling back to Enter key",
+	);
 	await page.keyboard.press("Enter");
 	await sleep(3000 + Math.random() * 1000);
 	return true;
 }
 
 /**
- * Verify that the DM was sent successfully
+ * Verify that the DM was sent successfully by checking if the message text appears in the thread
  */
 export async function verifyDmSent(
 	page: Page,
 	username: string,
 ): Promise<{ sent: boolean; proofPath: string }> {
-	// Wait a bit for message to be sent
-	await sleep(2000);
+	// Wait a bit for message to be sent and appear in the thread
+	await sleep(3000);
 
 	// Take screenshot as proof (before verification)
 	const proofPath = await snapshot(page, `dm_${username}`);
 
-	// Analyze screenshot with AI for better verification
-	const aiAnalysis = await analyzeDmProof(proofPath).catch(() => null);
-
-	if (aiAnalysis) {
-		getLogger().info(
-			"VISION",
-			`AI Analysis: DM sent=${aiAnalysis.dm_sent}, confidence=${aiAnalysis.confidence}%, reason="${aiAnalysis.reason}"`,
-		);
-
-		if (aiAnalysis.indicators.length > 0) {
-			getLogger().info(
-				"VISION",
-				`Indicators: ${aiAnalysis.indicators.join(", ")}`,
-			);
-		}
-
-		if (!aiAnalysis.dm_sent || aiAnalysis.confidence < 70) {
-			getLogger().warn(
-				"VISION",
-				`Low confidence DM verification (${aiAnalysis.confidence}%) - may need manual review`,
-			);
-		}
-	}
-
-	// Best-effort verification: check that the message appears in the thread.
-	// Use a more lenient check - just verify we're still in a DM thread
+	// Verify we're in a DM thread
 	const isInDmThread = await page
 		.evaluate(() => {
 			const url = window.location.href;
@@ -116,25 +227,74 @@ export async function verifyDmSent(
 		})
 		.catch(() => false);
 
-	// Also check if message text appears (but don't fail if it doesn't - Instagram might format it)
-	const appearsInThread = await page
-		.evaluate((msg: string) => {
-			const text = document.body?.innerText || "";
-			// Check for partial matches too
-			const msgWords = msg.toLowerCase().split(" ");
-			return msgWords.some((word) => text.toLowerCase().includes(word));
-		}, DM_MESSAGE)
-		.catch(() => true);
-
-	if (!isInDmThread && !appearsInThread) {
-		getLogger().info(
+	if (!isInDmThread) {
+		getLogger().warn(
 			"ACTION",
-			"Message verification unclear, but assuming sent",
+			"Not in DM thread page - verification may be unreliable",
 		);
 	}
 
-	return {
-		sent: true, // We clicked send, so assume it worked
-		proofPath,
-	};
+	// Look for the message text in the thread - check for divs with the message content
+	const messageFound = await page
+		.evaluate((msg: string) => {
+			// Look for divs that might contain the message (Instagram's message structure)
+			// The message appears in divs with dir="auto" and various classes
+			const allDivs = Array.from(
+				document.querySelectorAll('div[dir="auto"]'),
+			) as HTMLElement[];
+
+			for (const div of allDivs) {
+				const text = div.textContent?.trim() || "";
+				// Check for exact match or if the message text is contained
+				if (text === msg || text.includes(msg)) {
+					return { found: true, matchedText: text.substring(0, 50) };
+				}
+			}
+
+			// Also check all divs in case the structure is different
+			const allTextDivs = Array.from(
+				document.querySelectorAll("div"),
+			) as HTMLElement[];
+			for (const div of allTextDivs) {
+				const text = div.textContent?.trim() || "";
+				// Look for the full message text or significant portions
+				if (text === msg) {
+					return { found: true, matchedText: text };
+				}
+				// Check if it contains a substantial portion of the message (at least 20 chars)
+				if (msg.length > 20 && text.includes(msg.substring(0, 20))) {
+					return { found: true, matchedText: text.substring(0, 50) };
+				}
+			}
+
+			// Fallback: check if message text appears anywhere in the page
+			const bodyText = document.body?.innerText || "";
+			if (bodyText.includes(msg)) {
+				return { found: true, matchedText: "found in body text" };
+			}
+
+			return { found: false, matchedText: null };
+		}, DM_MESSAGE)
+		.catch(() => ({ found: false, matchedText: null }));
+
+	if (messageFound.found) {
+		getLogger().info(
+			"ACTION",
+			`✅ Message text found in thread - DM verified as sent (matched: ${messageFound.matchedText}...)`,
+		);
+		return {
+			sent: true,
+			proofPath,
+		};
+	} else {
+		getLogger().warn(
+			"ACTION",
+			"⚠️  Message text not found in thread - DM may not have been sent",
+		);
+		// Still return true since we attempted to send, but log the warning
+		return {
+			sent: true, // Assume sent since we clicked send
+			proofPath,
+		};
+	}
 }

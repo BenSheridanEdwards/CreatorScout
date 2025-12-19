@@ -6,8 +6,6 @@
  * Example: tsx scripts/dm_user.ts bensheridanedwards --confirm --force  # Bypass database check
  */
 
-import { mkdirSync } from "node:fs";
-// (no puppeteer types needed directly)
 import {
 	createBrowser,
 	createPage,
@@ -15,7 +13,7 @@ import {
 import { ensureLoggedIn } from "../functions/navigation/profileNavigation/profileNavigation.ts";
 import { sendDMToUser } from "../functions/profile/profileActions/profileActions.ts";
 import { wasDmSent } from "../functions/shared/database/database.ts";
-import { analyzeDmProof } from "../functions/profile/vision/analyzeDmProof.ts";
+import { saveScreenshot } from "../functions/shared/snapshot/snapshot.ts";
 
 async function dmUser(username: string, force: boolean = false): Promise<void> {
 	console.log(`💬 Sending DM to: @${username}`);
@@ -58,12 +56,13 @@ async function dmUser(username: string, force: boolean = false): Promise<void> {
 		await new Promise((resolve) => setTimeout(resolve, 5000));
 
 		// Take a screenshot to see what the page looks like after login
-		mkdirSync("tmp", { recursive: true });
-		{
-			const p = `tmp/login_state_${Date.now()}.png`;
-			await page.screenshot({ path: p, fullPage: true });
-			console.log(`📸 Login state screenshot saved: ${p}`);
-		}
+		const loginStatePath = await saveScreenshot(
+			page,
+			"login",
+			username,
+			"state",
+		);
+		console.log(`📸 Login state screenshot saved: ${loginStatePath}`);
 
 		// Verify we're still logged in before proceeding
 		const stillLoggedIn = await page.evaluate(() => {
@@ -107,63 +106,18 @@ async function dmUser(username: string, force: boolean = false): Promise<void> {
 				await new Promise((resolve) => setTimeout(resolve, 2000));
 			}
 
-			// Always capture proof for human verification
-			const proofPath = `tmp/dm_proof_${username}_${Date.now()}.png`;
-			await page.screenshot({ path: proofPath, fullPage: true });
+			// Capture proof screenshot
+			const proofPath = await saveScreenshot(page, "dm", username, "success");
 			console.log(`📸 DM proof screenshot saved: ${proofPath}`);
-
-			// Analyze screenshot with AI to verify DM was sent
-			console.log("🤖 Analyzing screenshot with AI...");
-			const analysis = await analyzeDmProof(proofPath);
-
-			if (analysis) {
-				console.log("\n📊 AI Analysis Results:");
-				console.log(
-					`   ✅ DM Sent: ${analysis.dm_sent ? "YES" : "NO"} (${analysis.confidence}% confidence)`,
-				);
-				console.log(
-					`   📱 Is DM Thread: ${analysis.is_dm_thread ? "YES" : "NO"}`,
-				);
-				console.log(
-					`   💬 Message Visible: ${analysis.message_visible ? "YES" : "NO"}`,
-				);
-				console.log(
-					`   ⚠️  Error Detected: ${analysis.error_detected ? "YES" : "NO"}`,
-				);
-				console.log(`   📝 Reason: ${analysis.reason}`);
-				if (analysis.indicators.length > 0) {
-					console.log(`   🔍 Indicators:`);
-					analysis.indicators.forEach((indicator) => {
-						console.log(`      - ${indicator}`);
-					});
-				}
-
-				if (!analysis.dm_sent || analysis.confidence < 70) {
-					console.log(
-						"\n⚠️  WARNING: AI analysis suggests DM may not have been sent successfully!",
-					);
-					console.log(`   Confidence: ${analysis.confidence}%`);
-					console.log(`   Review screenshot manually: ${proofPath}`);
-				} else {
-					console.log("\n✅ AI confirms DM was sent successfully!");
-				}
-			} else {
-				console.log(
-					"⚠️  Could not analyze screenshot with AI - review manually",
-				);
-			}
 		} else {
 			console.log("❌ DM failed to send");
-			const failPath = `tmp/dm_failed_${username}_${Date.now()}.png`;
-			await page.screenshot({ path: failPath, fullPage: true });
+			const failPath = await saveScreenshot(page, "dm", username, "failed");
 			console.log(`📸 DM failure screenshot saved: ${failPath}`);
 		}
 	} catch (error) {
 		console.error("❌ DM failed:", error);
 		try {
-			mkdirSync("tmp", { recursive: true });
-			const errPath = `tmp/dm_error_${username}_${Date.now()}.png`;
-			await page.screenshot({ path: errPath, fullPage: true });
+			const errPath = await saveScreenshot(page, "dm", username, "error");
 			console.log(`📸 Error screenshot saved: ${errPath}`);
 		} catch (screenshotErr) {
 			console.error("❌ Could not take error screenshot:", screenshotErr);

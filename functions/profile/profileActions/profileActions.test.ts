@@ -453,7 +453,9 @@ describe("profileActions", () => {
 			const mockButton = {
 				click: jest.fn(),
 				textContent: "Follow",
-				boundingBox: jest.fn().mockResolvedValue({ x: 0, y: 0, width: 100, height: 40 }),
+				boundingBox: jest
+					.fn()
+					.mockResolvedValue({ x: 0, y: 0, width: 100, height: 40 }),
 				evaluate: jest.fn().mockResolvedValue(undefined),
 			};
 			const page = createPageMock({
@@ -486,7 +488,8 @@ describe("profileActions", () => {
 								return result;
 							} catch {
 								// If function throws, return appropriate values
-								if (evaluateCallCount === 1) return { state: "can_follow", button: mockButton };
+								if (evaluateCallCount === 1)
+									return { state: "can_follow", button: mockButton };
 								return "following";
 							}
 						}

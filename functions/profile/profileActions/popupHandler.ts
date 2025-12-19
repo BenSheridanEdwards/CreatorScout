@@ -75,4 +75,3 @@ export async function handleInstagramPopups(page: Page): Promise<void> {
 		await handleInstagramPopups(page);
 	}
 }
-
