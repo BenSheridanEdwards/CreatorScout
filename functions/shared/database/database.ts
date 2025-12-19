@@ -224,10 +224,21 @@ export async function wasFollowed(username: string): Promise<boolean> {
 
 export async function markFollowed(username: string): Promise<void> {
 	const prisma = getPrisma();
+	const u = username.toLowerCase().trim();
 
-	await prisma.profile.update({
-		where: { username: username.toLowerCase().trim() },
-		data: { followed: true },
+	// Use upsert to create profile if it doesn't exist
+	await prisma.profile.upsert({
+		where: { username: u },
+		create: {
+			username: u,
+			followed: true,
+			visitedAt: new Date(),
+			lastSeen: new Date(),
+		},
+		update: {
+			followed: true,
+			lastSeen: new Date(),
+		},
 	});
 }
 
