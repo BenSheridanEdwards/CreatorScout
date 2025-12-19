@@ -15,7 +15,7 @@ import {
 	wasVisited,
 } from "../../shared/database/database.ts";
 import { createLogger } from "../../shared/logger/logger.ts";
-import { snapshot } from "../../shared/snapshot/snapshot.ts";
+import { snapshot, saveScreenshot } from "../../shared/snapshot/snapshot.ts";
 import { sleep } from "../../timing/sleep/sleep.ts";
 import {
 	navigateToProfile,
@@ -248,6 +248,18 @@ export async function followUserAccount(
 
 		// Step 4: If follow or follow back, click the button
 		if (buttonText.state === "can_follow") {
+			// Take "before" screenshot to show initial state
+			const beforePath = await saveScreenshot(
+				page,
+				"follow",
+				username,
+				"before",
+			);
+			logger.info(
+				"SCREENSHOT",
+				`📸 Before follow screenshot saved: ${beforePath}`,
+			);
+
 			// Click the button - find it by searching for "Follow" or "Follow Back" text
 			const clicked = await page.evaluate(() => {
 				const buttons = Array.from(document.querySelectorAll("button"));
@@ -341,6 +353,18 @@ export async function followUserAccount(
 				}
 
 				if (newButtonText === "following" || newButtonText === "requested") {
+					// Take "after" screenshot to show final state
+					const afterPath = await saveScreenshot(
+						page,
+						"follow",
+						username,
+						"after",
+					);
+					logger.info(
+						"SCREENSHOT",
+						`📸 After follow screenshot saved: ${afterPath}`,
+					);
+
 					await markFollowed(username);
 					const statusText =
 						newButtonText === "following" ? "Following" : "Requested";
@@ -351,6 +375,17 @@ export async function followUserAccount(
 					recordActivity("followed", username, "success");
 					return true;
 				} else {
+					// Take screenshot of failed state for debugging
+					const failedPath = await saveScreenshot(
+						page,
+						"follow",
+						username,
+						"verification_failed",
+					);
+					logger.info(
+						"SCREENSHOT",
+						`📸 Follow verification failed screenshot saved: ${failedPath}`,
+					);
 					logger.warn(
 						"ACTION",
 						`⚠️  Follow button clicked but did not change to "Following" or "Requested" for @${username} after ${maxAttempts} attempts. Button may not have updated in time.`,
