@@ -14,6 +14,36 @@ export interface ProfileStatus {
 }
 
 /**
+ * Wait for frame stability after navigation (critical for Browserless)
+ * This ensures any detached frames from previous navigation are cleared
+ */
+async function waitForFrameStability(page: Page, timeout: number = 5000): Promise<void> {
+	try {
+		// Wait for the main frame to be ready
+		await page.waitForFunction(
+			() => document.readyState === "complete",
+			{ timeout }
+		);
+		
+		// Additional wait for frame stability in Browserless
+		await sleep(1000);
+		
+		// Verify the main frame is accessible by checking page URL
+		try {
+			page.url(); // This will throw if frame is detached
+		} catch (frameError) {
+			// Wait a bit more and try again
+			await sleep(2000);
+			page.url(); // Verify again
+		}
+	} catch (err) {
+		// If frame stability check fails, log but continue
+		// The next operation will catch the actual error
+		console.warn(`Frame stability check timed out or failed: ${err}`);
+	}
+}
+
+/**
  * Navigate to a profile using search (more human-like, avoids detection)
  */
 async function navigateToProfileViaSearch(
@@ -31,6 +61,8 @@ async function navigateToProfileViaSearch(
 			waitUntil: "networkidle2",
 			timeout,
 		});
+		// Wait for frame stability after navigation (critical for Browserless)
+		await waitForFrameStability(page, 5000);
 		await sleep(2000 + Math.random() * 2000);
 	}
 
@@ -80,6 +112,8 @@ async function navigateToProfileViaSearch(
 			waitUntil: "networkidle2",
 			timeout,
 		});
+		// Wait for frame stability after navigation (critical for Browserless)
+		await waitForFrameStability(page, 5000);
 		await sleep(2000);
 		const searchInput = await page.$(
 			'input[placeholder*="Search"], input[aria-label*="Search"]',
@@ -157,7 +191,7 @@ async function navigateToProfileViaSearch(
 
 /**
  * Navigate to a profile and wait for it to load.
- * Uses search-based navigation to avoid detection, falls back to direct URL if search fails.
+ * Uses ONLY search-based navigation (no direct URL navigation) to avoid detection.
  */
 export async function navigateToProfile(
 	page: Page,
@@ -166,23 +200,9 @@ export async function navigateToProfile(
 ): Promise<void> {
 	const { timeout = 20000, waitForHeader = false } = options || {};
 
-	try {
-		// Try search-based navigation first (more human-like)
-		await navigateToProfileViaSearch(page, username, { timeout });
-	} catch (searchError) {
-		// Fallback to direct URL navigation if search fails
-		console.warn(
-			`Search-based navigation failed: ${searchError}. Falling back to direct URL navigation.`,
-		);
-
-		await page.goto(`https://www.instagram.com/${username}/`, {
-			waitUntil: "networkidle2",
-			timeout,
-		});
-
-		// Wait for profile content to load
-		await sleep(3000);
-	}
+	// Use ONLY search-based navigation - no fallback to direct URL
+	// This is more human-like and avoids frame detachment issues
+	await navigateToProfileViaSearch(page, username, { timeout });
 
 	if (waitForHeader) {
 		try {

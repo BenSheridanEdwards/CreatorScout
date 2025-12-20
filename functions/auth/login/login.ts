@@ -60,12 +60,51 @@ export async function login(
 	const attempt = options?.attempt ?? 1;
 	logger.info("ACTION", `Starting login process for user: ${creds.username}`);
 
+	// Helper function to wait for frame stability after navigation (critical for Browserless)
+	async function waitForFrameStability(page: Page, timeout: number = 5000): Promise<void> {
+		try {
+			// Wait for the main frame to be ready
+			await page.waitForFunction(
+				() => document.readyState === "complete",
+				{ timeout }
+			);
+			
+			// Additional wait for frame stability in Browserless
+			// This ensures any detached frames from previous navigation are cleared
+			await delay(1000);
+			
+			// Verify the main frame is accessible by checking page URL
+			try {
+				page.url(); // This will throw if frame is detached
+			} catch (frameError) {
+				logger.warn(
+					"ACTION",
+					`Frame stability check failed, retrying: ${frameError}`,
+				);
+				// Wait a bit more and try again
+				await delay(2000);
+				page.url(); // Verify again
+			}
+		} catch (err) {
+			// If frame stability check fails, log but continue
+			// The next operation will catch the actual error
+			logger.warn(
+				"ACTION",
+				`Frame stability check timed out or failed: ${err}`,
+			);
+		}
+	}
+
 	// Navigate to Instagram first (required before setting cookies)
 	logger.info("ACTION", "Navigating to Instagram homepage");
 	await page.goto("https://www.instagram.com/", {
 		waitUntil: "domcontentloaded",
 		timeout: 15000,
 	});
+	
+	// Wait for frame stability after navigation (critical for Browserless)
+	await waitForFrameStability(page, 5000);
+	
 	logger.info("ACTION", "Successfully navigated to Instagram homepage");
 	await debugSnapshot(page, `login_after_navigate_${Date.now()}`);
 
@@ -86,6 +125,10 @@ export async function login(
 			waitUntil: "networkidle2",
 			timeout: 15000,
 		});
+		
+		// Wait for frame stability after navigation (critical for Browserless)
+		await waitForFrameStability(page, 5000);
+		
 		logger.info("ACTION", "Page reloaded with cookies applied");
 
 		// Wait for page to fully load and hydrate
@@ -277,8 +320,10 @@ export async function login(
 		if (message.includes("detached Frame") && attempt < 3) {
 			logger.warn(
 				"ACTION",
-				`Login form detection failed due to detached frame (attempt ${attempt}). Retrying...`,
+				`Login form detection failed due to detached frame (attempt ${attempt}). Waiting for frame stability and retrying...`,
 			);
+			// Wait for frame stability before retrying
+			await waitForFrameStability(page, 5000);
 			// Short backoff before retrying detection
 			await delay(1000);
 			return await login(page, creds, {

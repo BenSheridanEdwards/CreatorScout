@@ -27,6 +27,7 @@ export const createPageMock = (overrides: Record<string, unknown> = {}) => {
 		goto: jest.fn<any>().mockResolvedValue(undefined),
 		content: jest.fn<any>().mockResolvedValue("<html></html>"),
 		url: jest.fn<any>().mockReturnValue("https://example.com"),
+		isClosed: jest.fn<any>().mockReturnValue(false),
 		screenshot: jest
 			.fn<any>()
 			.mockResolvedValue(Buffer.from("fake-screenshot")),
@@ -37,6 +38,8 @@ export const createPageMock = (overrides: Record<string, unknown> = {}) => {
 		mouse: {
 			click: jest.fn<any>().mockResolvedValue(undefined),
 			move: jest.fn<any>().mockResolvedValue(undefined),
+			down: jest.fn<any>().mockResolvedValue(undefined),
+			up: jest.fn<any>().mockResolvedValue(undefined),
 		},
 		cookies: jest.fn<any>().mockResolvedValue([]),
 		setCookie: jest.fn<any>().mockResolvedValue(undefined),
