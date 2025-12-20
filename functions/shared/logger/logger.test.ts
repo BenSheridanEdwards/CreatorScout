@@ -3,7 +3,7 @@ import type { Page } from "puppeteer";
 import { createLogger } from "./logger.ts";
 
 jest.mock("../snapshot/snapshot.ts", () => ({
-	snapshot: jest.fn<any>().mockResolvedValue("shot.png"),
+	snapshot: jest.fn<() => Promise<string>>().mockResolvedValue("shot.png"),
 }));
 
 describe("logger", () => {

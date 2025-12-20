@@ -21,7 +21,7 @@ export interface HealthCheck {
 	message: string;
 	duration: number; // milliseconds
 	timestamp: string;
-	details?: Record<string, any>;
+	details?: Record<string, unknown>;
 }
 
 export interface SystemHealth {
@@ -96,14 +96,15 @@ async function checkDatabase(): Promise<HealthCheck> {
 			timestamp: new Date().toISOString(),
 			details: { profileCount },
 		};
-	} catch (error: any) {
+	} catch (error: unknown) {
+		const errorMessage = error instanceof Error ? error.message : String(error);
 		return {
 			name: "database",
 			status: HealthStatus.FAIL,
-			message: `Database check failed: ${error.message}`,
+			message: `Database check failed: ${errorMessage}`,
 			duration: Date.now() - startTime,
 			timestamp: new Date().toISOString(),
-			details: { error: error.message },
+			details: { error: errorMessage },
 		};
 	}
 }
@@ -131,14 +132,15 @@ async function checkBrowser(): Promise<HealthCheck> {
 			timestamp: new Date().toISOString(),
 			details: { pageTitle: title },
 		};
-	} catch (error: any) {
+	} catch (error: unknown) {
+		const errorMessage = error instanceof Error ? error.message : String(error);
 		return {
 			name: "browser",
 			status: HealthStatus.FAIL,
-			message: `Browser check failed: ${error.message}`,
+			message: `Browser check failed: ${errorMessage}`,
 			duration: Date.now() - startTime,
 			timestamp: new Date().toISOString(),
-			details: { error: error.message },
+			details: { error: errorMessage },
 		};
 	}
 }
@@ -167,16 +169,24 @@ async function checkCircuitBreaker(): Promise<HealthCheck> {
 			message,
 			duration: Date.now() - startTime,
 			timestamp: new Date().toISOString(),
-			details: stats,
+			details: {
+				state: stats.state,
+				failures: stats.failures,
+				successes: stats.successes,
+				totalRequests: stats.totalRequests,
+				totalFailures: stats.totalFailures,
+				totalSuccesses: stats.totalSuccesses,
+			},
 		};
-	} catch (error: any) {
+	} catch (error: unknown) {
+		const errorMessage = error instanceof Error ? error.message : String(error);
 		return {
 			name: "circuit_breaker",
 			status: HealthStatus.FAIL,
-			message: `Circuit breaker check failed: ${error.message}`,
+			message: `Circuit breaker check failed: ${errorMessage}`,
 			duration: Date.now() - startTime,
 			timestamp: new Date().toISOString(),
-			details: { error: error.message },
+			details: { error: errorMessage },
 		};
 	}
 }
@@ -218,14 +228,15 @@ async function checkSystemResources(): Promise<HealthCheck> {
 			timestamp: new Date().toISOString(),
 			details: { memory: memUsageMB, cpu: cpuUsageMs },
 		};
-	} catch (error: any) {
+	} catch (error: unknown) {
+		const errorMessage = error instanceof Error ? error.message : String(error);
 		return {
 			name: "system_resources",
 			status: HealthStatus.FAIL,
-			message: `System resources check failed: ${error.message}`,
+			message: `System resources check failed: ${errorMessage}`,
 			duration: Date.now() - startTime,
 			timestamp: new Date().toISOString(),
-			details: { error: error.message },
+			details: { error: errorMessage },
 		};
 	}
 }
@@ -305,14 +316,15 @@ async function checkQueueStatus(): Promise<HealthCheck> {
 				recentActivity: recentStats,
 			},
 		};
-	} catch (error: any) {
+	} catch (error: unknown) {
+		const errorMessage = error instanceof Error ? error.message : String(error);
 		return {
 			name: "queue_status",
 			status: HealthStatus.FAIL,
-			message: `Queue status check failed: ${error.message}`,
+			message: `Queue status check failed: ${errorMessage}`,
 			duration: Date.now() - startTime,
 			timestamp: new Date().toISOString(),
-			details: { error: error.message },
+			details: { error: errorMessage },
 		};
 	}
 }

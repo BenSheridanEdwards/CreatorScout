@@ -122,7 +122,8 @@ export async function loadSeeds(
 		);
 		return seedsLoaded;
 	} catch (error) {
-		recordError(error, "loadSeeds", filePath);
+		const err = error instanceof Error ? error : new Error(String(error));
+		recordError(err, "loadSeeds", filePath);
 		return 0;
 	}
 }
@@ -211,10 +212,11 @@ export async function processProfile(
 		logger.debug("AUTH", `Confirmed logged in for @${username}`);
 	} catch (err) {
 		const errorMessage = err instanceof Error ? err.message : String(err);
-		recordError(err, `profile_load_${username}`, username);
+		const error = err instanceof Error ? err : new Error(String(err));
+		recordError(error, `profile_load_${username}`, username);
 
 		await logger.errorWithScreenshot(
-			"WARN",
+			"ERROR",
 			`Failed to load profile @${username}: ${errorMessage}`,
 			page,
 			`profile_load_${username}`,
@@ -234,8 +236,9 @@ export async function processProfile(
 	try {
 		analysis = await analyzeProfileComprehensive(page, username);
 	} catch (analysisError) {
+		const error = analysisError instanceof Error ? analysisError : new Error(String(analysisError));
 		recordError(
-			analysisError,
+			error,
 			`comprehensive_analysis_error_${username}`,
 			username,
 		);
@@ -438,7 +441,8 @@ export async function processProfile(
 						metricsTracker.recordDMSent(username);
 					}
 				} catch (dmError) {
-					recordError(dmError, `dm_send_${username}`, username);
+					const error = dmError instanceof Error ? dmError : new Error(String(dmError));
+					recordError(error, `dm_send_${username}`, username);
 					await logger.errorWithScreenshot(
 						"ERROR",
 						`DM send failed for @${username}: ${
@@ -481,7 +485,8 @@ export async function processProfile(
 						metricsTracker.recordFollowCompleted(username);
 					}
 				} catch (followError) {
-					recordError(followError, `follow_${username}`, username);
+					const error = followError instanceof Error ? followError : new Error(String(followError));
+					recordError(error, `follow_${username}`, username);
 					await logger.errorWithScreenshot(
 						"ERROR",
 						`Follow action failed for @${username}: ${
@@ -515,7 +520,8 @@ export async function processProfile(
 					logger.info("QUEUE", `Added ${added} profiles to queue`);
 				}
 			} catch (queueError) {
-				recordError(queueError, `queue_expansion_${username}`, username);
+				const error = queueError instanceof Error ? queueError : new Error(String(queueError));
+				recordError(error, `queue_expansion_${username}`, username);
 				await logger.errorWithScreenshot(
 					"ERROR",
 					`Queue expansion failed for @${username}: ${
@@ -549,7 +555,8 @@ export async function processProfile(
 		await sleep(profileWait * 1000);
 	} catch (err) {
 		const errorMessage = err instanceof Error ? err.message : String(err);
-		recordError(err, `profile_processing_${username}`, username);
+		const error = err instanceof Error ? err : new Error(String(err));
+		recordError(error, `profile_processing_${username}`, username);
 
 		if (metricsTracker) {
 			metricsTracker.recordError(
@@ -619,7 +626,8 @@ export async function processFollowingList(
 		await ensureLoggedIn(page);
 		logger.debug("AUTH", `Confirmed logged in for seed @${seedUsername}`);
 	} catch (err) {
-		recordError(err, `seed_profile_load_${seedUsername}`, seedUsername);
+		const error = err instanceof Error ? err : new Error(String(err));
+		recordError(error, `seed_profile_load_${seedUsername}`, seedUsername);
 		await logger.errorWithScreenshot(
 			"ERROR",
 			`Failed to load seed profile @${seedUsername}: ${
@@ -678,7 +686,7 @@ export async function processFollowingList(
 				logger.debug("NAVIGATION", "No more usernames in modal");
 				// Take screenshot to debug empty username extraction
 				await logger.errorWithScreenshot(
-					"DEBUG",
+					"ERROR",
 					`No usernames found in modal for @${seedUsername} at scroll position ${scrollIndex}`,
 					page,
 					`empty_usernames_${seedUsername}_${scrollIndex}`,
@@ -717,8 +725,9 @@ export async function processFollowingList(
 						);
 						processedInBatch++;
 					} catch (profileError) {
+						const error = profileError instanceof Error ? profileError : new Error(String(profileError));
 						recordError(
-							profileError,
+							error,
 							`profile_processing_${username}`,
 							username,
 						);
@@ -796,8 +805,9 @@ export async function processFollowingList(
 				break;
 			}
 		} catch (err) {
+			const error = err instanceof Error ? err : new Error(String(err));
 			recordError(
-				err,
+				error,
 				`following_batch_processing_${seedUsername}`,
 				seedUsername,
 			);
@@ -859,7 +869,8 @@ export async function runScrapeLoop(
 			// Process their following list
 			await processFollowingList(target, page, metricsTracker, true); // sendDM = true
 		} catch (err) {
-			recordError(err, `seed_processing_${target}`, target);
+			const error = err instanceof Error ? err : new Error(String(err));
+			recordError(error, `seed_processing_${target}`, target);
 			logger.error(
 				"ERROR",
 				`Failed to process seed @${target}, continuing to next`,
@@ -904,12 +915,9 @@ export async function runScrapeLoop(
 
 	// Log cycle summary
 	const cycleStatus = dmsSent >= MAX_DMS_PER_DAY ? "COMPLETED" : "INTERRUPTED";
-	endCycle(cycleStatus, {
-		seedsProcessed,
-		finalStats: stats,
-		reason:
-			dmsSent >= MAX_DMS_PER_DAY ? "DM limit reached" : "Cycle interrupted",
-	});
+	const reason =
+		dmsSent >= MAX_DMS_PER_DAY ? "DM limit reached" : "Cycle interrupted";
+	endCycle(cycleStatus, reason);
 }
 
 /**
@@ -950,7 +958,8 @@ export async function runScrapeLoopWithoutDM(
 			// Process their following list
 			await processFollowingList(target, page, metricsTracker, false); // sendDM = false
 		} catch (err) {
-			recordError(err, `seed_processing_${target}`, target);
+			const error = err instanceof Error ? err : new Error(String(err));
+			recordError(error, `seed_processing_${target}`, target);
 			logger.error(
 				"ERROR",
 				`Failed to process seed @${target}, continuing to next`,
@@ -985,11 +994,7 @@ export async function runScrapeLoopWithoutDM(
 	logger.info("STATS", `Seeds processed: ${seedsProcessed}`);
 
 	// Log cycle summary
-	endCycle("COMPLETED_DISCOVERY", {
-		seedsProcessed,
-		finalStats: stats,
-		reason: "Discovery mode completed",
-	});
+	endCycle("COMPLETED", `Discovery completed: ${seedsProcessed} seeds processed`);
 }
 
 /**
@@ -1058,7 +1063,8 @@ export async function scrape(debug: boolean = false): Promise<void> {
 		logger.info("ACTION", "🎉 Scraping session completed successfully");
 	} catch (err) {
 		const errorMessage = err instanceof Error ? err.message : String(err);
-		recordError(err, "scrape_fatal_error");
+		const error = err instanceof Error ? err : new Error(String(err));
+		recordError(error, "scrape_fatal_error");
 
 		endCycle("FAILED", errorMessage);
 
@@ -1187,14 +1193,15 @@ export async function scrapeWithoutDM(debug: boolean = false): Promise<void> {
 			`✅ Discovery session completed - Profiles: ${finalMetrics.profilesVisited}, Creators: ${finalMetrics.creatorsFound}`,
 		);
 
-		endCycle("COMPLETED_DISCOVERY");
+		endCycle("COMPLETED", "Discovery session completed");
 		await browser.close();
 		logger.info("ACTION", "🔍 Discovery session completed successfully");
 	} catch (err) {
 		const errorMessage = err instanceof Error ? err.message : String(err);
-		recordError(err, "scrape_discovery_fatal_error");
+		const error = err instanceof Error ? err : new Error(String(err));
+		recordError(error, "scrape_discovery_fatal_error");
 
-		endCycle("FAILED_DISCOVERY", errorMessage);
+		endCycle("FAILED", errorMessage);
 
 		logger.error("FATAL", `💥 Fatal error in discovery mode: ${errorMessage}`);
 

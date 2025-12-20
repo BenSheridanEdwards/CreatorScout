@@ -144,9 +144,12 @@ describe("modalOperations", () => {
 				({
 					evaluate: jest
 						.fn()
-						.mockImplementation(async (fn: any) =>
-							fn({ getAttribute: () => href }),
-						),
+						.mockImplementation(async (fn: unknown) => {
+							if (typeof fn === "function") {
+								return (fn as (arg: { getAttribute: () => string }) => unknown)({ getAttribute: () => href });
+							}
+							return undefined;
+						}),
 				}) as unknown as ElementHandle<Element>;
 
 			const items = [
@@ -193,7 +196,7 @@ describe("modalOperations", () => {
 
 		test("waits after scrolling to allow content to load", async () => {
 			const page = {
-				evaluate: jest.fn().mockResolvedValue(undefined),
+				evaluate: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
 			} as unknown as Page;
 
 			await scrollFollowingModal(page, 600);
@@ -202,7 +205,7 @@ describe("modalOperations", () => {
 		});
 
 		test("uses default scroll amount of 600px when not specified", async () => {
-			const evaluateMock = jest.fn().mockResolvedValue(undefined);
+			const evaluateMock = jest.fn<() => Promise<void>>().mockResolvedValue(undefined);
 			const page = {
 				evaluate: evaluateMock,
 			} as unknown as Page;

@@ -9,7 +9,7 @@
 		"allowSyntheticDefaultImports": true,
 		"resolveJsonModule": true,
 		"skipLibCheck": true,
-		"strict": false,
+		"strict": true,
 		"isolatedModules": true,
 		"types": ["node", "jest"]
 	},

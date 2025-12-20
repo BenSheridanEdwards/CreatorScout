@@ -101,7 +101,8 @@ export async function loadSeeds(
 		);
 		return seedsLoaded;
 	} catch (error) {
-		recordError(error, "loadSeeds", filePath);
+		const err = error instanceof Error ? error : new Error(String(error));
+		recordError(err, "loadSeeds", filePath);
 		return 0;
 	}
 }
@@ -176,7 +177,8 @@ export async function processProfile(
 		await ensureLoggedIn(page);
 	} catch (err) {
 		const errorMessage = err instanceof Error ? err.message : String(err);
-		recordError(err, `profile_load_${username}`, username);
+		const error = err instanceof Error ? err : new Error(String(err));
+		recordError(error, `profile_load_${username}`, username);
 
 		if (metricsTracker) {
 			metricsTracker.recordError(username, "profile_load_failed", errorMessage);
@@ -273,7 +275,8 @@ export async function processProfile(
 					}
 				}
 			} catch (visionError) {
-				recordError(visionError, `vision_analysis_${username}`, username);
+				const error = visionError instanceof Error ? visionError : new Error(String(visionError));
+				recordError(error, `vision_analysis_${username}`, username);
 				logger.warn(
 					"ANALYSIS",
 					`Vision analysis failed for @${username}, using bio score only`,
@@ -335,7 +338,8 @@ export async function processProfile(
 						metricsTracker.recordDMSent(username);
 					}
 				} catch (dmError) {
-					recordError(dmError, `dm_send_${username}`, username);
+					const error = dmError instanceof Error ? dmError : new Error(String(dmError));
+					recordError(error, `dm_send_${username}`, username);
 				}
 			} else {
 				logger.debug("ACTION", `DM already sent to @${username}`);
@@ -358,7 +362,8 @@ export async function processProfile(
 						metricsTracker.recordFollowCompleted(username);
 					}
 				} catch (followError) {
-					recordError(followError, `follow_${username}`, username);
+					const error = followError instanceof Error ? followError : new Error(String(followError));
+					recordError(error, `follow_${username}`, username);
 				}
 			} else {
 				logger.debug("ACTION", `Already following @${username}`);
@@ -382,7 +387,8 @@ export async function processProfile(
 					logger.info("QUEUE", `Added ${added} profiles to queue`);
 				}
 			} catch (queueError) {
-				recordError(queueError, `queue_expansion_${username}`, username);
+				const error = queueError instanceof Error ? queueError : new Error(String(queueError));
+				recordError(error, `queue_expansion_${username}`, username);
 			}
 
 			cycleManager.recordProfileProcessed(username, true);
@@ -404,7 +410,8 @@ export async function processProfile(
 		);
 		await sleep(profileWait * 1000);
 	} catch (err) {
-		recordError(err, `profile_processing_${username}`, username);
+		const error = err instanceof Error ? err : new Error(String(err));
+		recordError(error, `profile_processing_${username}`, username);
 
 		if (metricsTracker) {
 			const errorMessage = err instanceof Error ? err.message : String(err);
@@ -446,7 +453,8 @@ export async function processFollowingList(
 		// Ensure we're logged in
 		await ensureLoggedIn(page);
 	} catch (err) {
-		recordError(err, `seed_profile_load_${seedUsername}`, seedUsername);
+		const error = err instanceof Error ? err : new Error(String(err));
+		recordError(error, `seed_profile_load_${seedUsername}`, seedUsername);
 		return;
 	}
 
@@ -558,8 +566,9 @@ export async function processFollowingList(
 				break;
 			}
 		} catch (err) {
+			const error = err instanceof Error ? err : new Error(String(err));
 			recordError(
-				err,
+				error,
 				`following_batch_processing_${seedUsername}`,
 				seedUsername,
 			);
@@ -623,7 +632,8 @@ export async function runScrapeLoop(
 			);
 			await sleep(seedWait * 1000);
 		} catch (err) {
-			recordError(err, `seed_processing_${target}`, target);
+			const error = err instanceof Error ? err : new Error(String(err));
+			recordError(error, `seed_processing_${target}`, target);
 			// Continue to next seed despite errors
 		}
 	}
@@ -692,7 +702,8 @@ export async function scrape(debug: boolean = false): Promise<void> {
 		await browser.close();
 	} catch (err) {
 		const errorMessage = err instanceof Error ? err.message : String(err);
-		recordError(err, "scrape_fatal_error");
+		const error = err instanceof Error ? err : new Error(String(err));
+		recordError(error, "scrape_fatal_error");
 
 		endCycle("FAILED", errorMessage);
 

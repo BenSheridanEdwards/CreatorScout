@@ -125,7 +125,7 @@ export function decodeInstagramRedirect(url: string): string | null {
 			}
 		}
 		return url;
-	} catch (error) {
+	} catch {
 		return url; // Return original URL if decoding fails
 	}
 }

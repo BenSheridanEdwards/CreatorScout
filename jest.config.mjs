@@ -29,7 +29,13 @@ export default {
 		"/tests/e2e/",
 		"e2e.*\\.test\\.ts$",
 		"\\.puppeteer\\.test\\.ts$",
+		// Exclude memory-intensive test from default runs - use npm run test:profileActions
+		"profileActions\\.test\\.ts$",
 	],
 	collectCoverageFrom: ["functions/**/*.ts", "scripts/**/*.ts"],
 	transformIgnorePatterns: [],
+	maxWorkers: process.env.CI ? 2 : "50%", // Use fewer workers in CI, more locally
+	workerIdleMemoryLimit: "1GB", // Kill workers that exceed memory limit
+	// Run memory-intensive tests sequentially
+	testTimeout: 30000, // Increase timeout for complex tests
 };

@@ -16,12 +16,21 @@ const clickAnyMock = jest
 	.fn<(page: Page, texts: string[]) => Promise<boolean>>()
 	.mockResolvedValue(false);
 
+// Mock popup handler to avoid complex interactions
+const handleInstagramPopupsMock = jest
+	.fn<() => Promise<void>>()
+	.mockResolvedValue(undefined);
+
 jest.unstable_mockModule("../../timing/sleep/sleep.ts", () => ({
 	sleep: sleepMock,
 }));
 
 jest.unstable_mockModule("../../navigation/clickAny/clickAny.ts", () => ({
 	clickAny: clickAnyMock,
+}));
+
+jest.unstable_mockModule("./popupHandler.ts", () => ({
+	handleInstagramPopups: handleInstagramPopupsMock,
 }));
 
 // Import after mocks are set up

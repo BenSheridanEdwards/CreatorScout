@@ -11,8 +11,24 @@ const sleepMock = jest
 	.fn<(ms: number) => Promise<void>>()
 	.mockResolvedValue(undefined);
 
+// Mock popup handler to avoid complex interactions in tests
+const handleInstagramPopupsMock = jest
+	.fn<() => Promise<void>>()
+	.mockResolvedValue(undefined);
+
+// Mock snapshot to avoid file system operations in tests
+const snapshotMock = jest
+	.fn<() => Promise<string>>()
+	.mockResolvedValue("test-screenshot.png");
+
 jest.unstable_mockModule("../../timing/sleep/sleep.ts", () => ({
 	sleep: sleepMock,
+}));
+jest.unstable_mockModule("./popupHandler.ts", () => ({
+	handleInstagramPopups: handleInstagramPopupsMock,
+}));
+jest.unstable_mockModule("../../shared/snapshot/snapshot.ts", () => ({
+	snapshot: snapshotMock,
 }));
 
 // Import after mocks are set up
@@ -28,39 +44,148 @@ const {
 describe("dmNavigation", () => {
 	describe("navigateToProfile", () => {
 		test("navigates to profile successfully", async () => {
+			// Create mock element with boundingBox for popup handler
+			const mockElement = {
+				click: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
+				boundingBox: jest
+					.fn<
+						() => Promise<{
+							x: number;
+							y: number;
+							width: number;
+							height: number;
+						} | null>
+					>()
+					.mockResolvedValue({ x: 0, y: 0, width: 100, height: 40 }),
+				evaluate: jest.fn<() => Promise<string>>().mockResolvedValue(""),
+			} as unknown as import("puppeteer").ElementHandle<Element>;
+
 			const page = createPageMock({
 				goto: jest
 					.fn<(url: string, opts?: object) => Promise<void>>()
 					.mockResolvedValue(undefined),
 				url: jest
 					.fn<() => string>()
-					.mockReturnValue("https://www.instagram.com/user/"),
+					.mockReturnValue("https://www.instagram.com/testuser/"),
+				$: jest
+					.fn<
+						(
+							selector: string,
+						) => Promise<import("puppeteer").ElementHandle<Element> | null>
+					>()
+					.mockImplementation((selector: string) => {
+						// Return element for search input or popup buttons
+						if (
+							selector.includes("Search") ||
+							selector.includes("explore") ||
+							selector.includes("button")
+						) {
+							return Promise.resolve(mockElement);
+						}
+						return Promise.resolve(null);
+					}) as unknown as Page["$"],
+				$$: jest
+					.fn<
+						(
+							selector: string,
+						) => Promise<import("puppeteer").ElementHandle<Element>[]>
+					>()
+					.mockResolvedValue([mockElement]) as unknown as Page["$$"],
+				evaluate: jest
+					.fn<(pageFunction: unknown, ...args: unknown[]) => Promise<unknown>>()
+					.mockResolvedValueOnce({ found: false }) // Popup handler - no popups
+					.mockResolvedValueOnce(true) // Profile found in search results
+					.mockResolvedValue("") as unknown as Page["evaluate"],
+				waitForFunction: jest
+					.fn<() => Promise<void>>()
+					.mockResolvedValue(undefined),
 				mouse: {
 					move: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
+					down: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
+					up: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
+				},
+				keyboard: {
+					type: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
 				},
 			});
 
 			await navigateToProfile(page as unknown as Page, "testuser");
 
-			expect(page.goto).toHaveBeenCalledWith(
+			// Should use search, not direct URL navigation
+			expect(page.goto).not.toHaveBeenCalledWith(
 				"https://www.instagram.com/testuser/",
-				expect.objectContaining({
-					waitUntil: "networkidle2",
-					timeout: 15000,
-				}),
+				expect.anything(),
 			);
+			// Should have tried to find search input
+			expect(page.$).toHaveBeenCalled();
 		});
 
 		test("throws error when redirected to login page", async () => {
+			// Create mock element with boundingBox for popup handler
+			const mockElement = {
+				click: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
+				boundingBox: jest
+					.fn<
+						() => Promise<{
+							x: number;
+							y: number;
+							width: number;
+							height: number;
+						} | null>
+					>()
+					.mockResolvedValue({ x: 0, y: 0, width: 100, height: 40 }),
+				evaluate: jest.fn<() => Promise<string>>().mockResolvedValue(""),
+			} as unknown as import("puppeteer").ElementHandle<Element>;
+
 			const page = createPageMock({
 				goto: jest
 					.fn<(url: string, opts?: object) => Promise<void>>()
 					.mockResolvedValue(undefined),
 				url: jest
 					.fn<() => string>()
-					.mockReturnValue("https://www.instagram.com/accounts/login/"),
+					.mockReturnValueOnce("https://www.instagram.com/") // Initial URL
+					.mockReturnValueOnce("https://www.instagram.com/testuser/") // After search navigation
+					.mockReturnValueOnce("https://www.instagram.com/testuser/") // After popup handling
+					.mockReturnValueOnce("https://www.instagram.com/accounts/login/"), // After profile check - login page
+				isClosed: jest.fn<() => boolean>().mockReturnValue(false),
+				$: jest
+					.fn<
+						(
+							selector: string,
+						) => Promise<import("puppeteer").ElementHandle<Element> | null>
+					>()
+					.mockImplementation((selector: string) => {
+						if (
+							selector.includes("Search") ||
+							selector.includes("explore") ||
+							selector.includes("button")
+						) {
+							return Promise.resolve(mockElement);
+						}
+						return Promise.resolve(null);
+					}) as unknown as Page["$"],
+				$$: jest
+					.fn<
+						(
+							selector: string,
+						) => Promise<import("puppeteer").ElementHandle<Element>[]>
+					>()
+					.mockResolvedValue([mockElement]) as unknown as Page["$$"],
+				evaluate: jest
+					.fn<(pageFunction: unknown, ...args: unknown[]) => Promise<unknown>>()
+					.mockResolvedValueOnce({ found: false }) // Popup handler - no popups
+					.mockResolvedValueOnce(true) // Profile found in search
+					.mockResolvedValue("") as unknown as Page["evaluate"],
+				waitForFunction: jest
+					.fn<() => Promise<void>>()
+					.mockResolvedValue(undefined),
 				mouse: {
 					move: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
+					down: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
+					up: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
+				},
+				keyboard: {
+					type: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
 				},
 			});
 
@@ -78,6 +203,8 @@ describe("dmNavigation", () => {
 					.mockResolvedValue(undefined) as unknown as Page["evaluate"],
 				mouse: {
 					move: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
+					down: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
+					up: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
 				},
 			});
 
@@ -176,7 +303,7 @@ describe("dmNavigation", () => {
 							height: number;
 						}>
 					>()
-					.mockResolvedValueOnce(undefined) // scroll
+					.mockResolvedValueOnce({ x: 0, y: 0, width: 0, height: 0 }) // scroll
 					.mockResolvedValueOnce({
 						x: 100,
 						y: 200,
@@ -230,8 +357,13 @@ describe("dmNavigation", () => {
 	describe("navigateToDmThread", () => {
 		test("waits when message button was clicked", async () => {
 			const page = createPageMock({
+				evaluate: jest
+					.fn<(pageFunction: unknown, ...args: unknown[]) => Promise<unknown>>()
+					.mockResolvedValue({ found: false }) as unknown as Page["evaluate"], // Popup handler
 				mouse: {
 					move: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
+					down: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
+					up: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
 				},
 			});
 
@@ -241,7 +373,11 @@ describe("dmNavigation", () => {
 		});
 
 		test("uses fallback when message button was not clicked", async () => {
-			const page = createPageMock();
+			const page = createPageMock({
+				evaluate: jest
+					.fn<(pageFunction: unknown, ...args: unknown[]) => Promise<unknown>>()
+					.mockResolvedValue({ found: false }) as unknown as Page["evaluate"], // Popup handler
+			});
 
 			await navigateToDmThread(page as unknown as Page, "testuser", false);
 

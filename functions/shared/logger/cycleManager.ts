@@ -191,7 +191,7 @@ export class CycleManager {
 		this.currentContext.warnings.push(warning);
 
 		this.logger.warn(
-			"WARNING",
+			"PROFILE",
 			`${type}: ${message}${profile ? ` (@${profile})` : ""}`,
 		);
 	}
@@ -213,10 +213,7 @@ export class CycleManager {
 		if (criticalErrors >= 3) {
 			this.logger.error(
 				"CYCLE",
-				"Stopping cycle due to too many critical errors",
-				{
-					criticalErrors,
-				},
+				`Stopping cycle due to too many critical errors: ${criticalErrors}`,
 			);
 			return false;
 		}

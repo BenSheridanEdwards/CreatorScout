@@ -368,8 +368,8 @@ export async function clickMessageButton(
 		"Moving mouse in natural curved path to Message button",
 	);
 	const currentPos = await page.evaluate(() => ({
-		x: (window as any).mouseX || window.innerWidth / 2,
-		y: (window as any).mouseY || window.innerHeight / 2,
+		x: (window as Window & { mouseX?: number; mouseY?: number }).mouseX || window.innerWidth / 2,
+		y: (window as Window & { mouseX?: number; mouseY?: number }).mouseY || window.innerHeight / 2,
 	}));
 
 	// Create waypoints for natural curved movement

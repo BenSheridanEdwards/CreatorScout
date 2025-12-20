@@ -34,6 +34,11 @@ const analyzeDmProofMock = jest
 		error_detected: false,
 	});
 
+// Mock snapshot to avoid file system operations in tests
+const snapshotMock = jest
+	.fn<(page: Page, label: string) => Promise<string>>()
+	.mockResolvedValue("test-screenshot.png");
+
 // Set up mocks before importing
 jest.unstable_mockModule("../../timing/sleep/sleep.ts", () => ({
 	sleep: sleepMock,
@@ -41,6 +46,10 @@ jest.unstable_mockModule("../../timing/sleep/sleep.ts", () => ({
 
 jest.unstable_mockModule("../vision/analyzeDmProof.ts", () => ({
 	analyzeDmProof: analyzeDmProofMock,
+}));
+
+jest.unstable_mockModule("../../shared/snapshot/snapshot.ts", () => ({
+	snapshot: snapshotMock,
 }));
 
 // Import after mocks are set up
@@ -94,23 +103,33 @@ describe("dmSending", () => {
 					.fn<(fn: unknown, ...args: unknown[]) => Promise<unknown>>()
 					.mockImplementation(async (fn: unknown, ...args: unknown[]) => {
 						if (typeof fn === "function") {
-							// getElementCenter - return center coordinates
-							const result = await (fn as (...args: unknown[]) => unknown)(
-								...args,
-							);
-							if (
-								result &&
-								typeof result === "object" &&
-								"x" in result &&
-								"y" in result
-							) {
-								return { x: 50, y: 20 }; // Center of 100x40 box
-							}
-							// Mouse position tracking
-							if (typeof result === "object" && result !== null) {
+							try {
+								// Try to execute the function - if it accesses window, return mock value
+								const fnString = fn.toString();
+								if (fnString.includes("window") || fnString.includes("mouseX") || fnString.includes("mouseY")) {
+									return { x: 100, y: 100 }; // Mock mouse position
+								}
+								// getElementCenter - return center coordinates
+								const result = await (fn as (...args: unknown[]) => unknown)(
+									...args,
+								);
+								if (
+									result &&
+									typeof result === "object" &&
+									"x" in result &&
+									"y" in result
+								) {
+									return { x: 50, y: 20 }; // Center of 100x40 box
+								}
+								// Mouse position tracking
+								if (typeof result === "object" && result !== null) {
+									return { x: 100, y: 100 };
+								}
+								return result;
+							} catch {
+								// If function tries to access window, return mock mouse position
 								return { x: 100, y: 100 };
 							}
-							return result;
 						}
 						return undefined;
 					}) as unknown as Page["evaluate"],
@@ -156,21 +175,29 @@ describe("dmSending", () => {
 					.fn<(fn: unknown, ...args: unknown[]) => Promise<unknown>>()
 					.mockImplementation(async (fn: unknown, ...args: unknown[]) => {
 						if (typeof fn === "function") {
-							const result = await (fn as (...args: unknown[]) => unknown)(
-								...args,
-							);
-							if (
-								result &&
-								typeof result === "object" &&
-								"x" in result &&
-								"y" in result
-							) {
-								return { x: 50, y: 20 };
-							}
-							if (typeof result === "object" && result !== null) {
+							try {
+								const fnString = fn.toString();
+								if (fnString.includes("window") || fnString.includes("mouseX") || fnString.includes("mouseY")) {
+									return { x: 100, y: 100 }; // Mock mouse position
+								}
+								const result = await (fn as (...args: unknown[]) => unknown)(
+									...args,
+								);
+								if (
+									result &&
+									typeof result === "object" &&
+									"x" in result &&
+									"y" in result
+								) {
+									return { x: 50, y: 20 };
+								}
+								if (typeof result === "object" && result !== null) {
+									return { x: 100, y: 100 };
+								}
+								return result;
+							} catch {
 								return { x: 100, y: 100 };
 							}
-							return result;
 						}
 						return undefined;
 					}) as unknown as Page["evaluate"],
@@ -193,6 +220,11 @@ describe("dmSending", () => {
 						// All selectors fail, clickAny will also fail and fall back to Enter
 						return null;
 					}) as unknown as Page["$"],
+				mouse: {
+					move: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
+					down: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
+					up: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
+				},
 			});
 			const result = await sendMessage(page as unknown as Page);
 
@@ -219,6 +251,7 @@ describe("dmSending", () => {
 	describe("verifyDmSent", () => {
 		test("verifies DM sent successfully", async () => {
 			const page = createPageMock({
+				isClosed: jest.fn<() => boolean>().mockReturnValue(false),
 				evaluate: jest
 					.fn<(fn: unknown, ...args: unknown[]) => Promise<boolean>>()
 					.mockResolvedValue(true) as unknown as Page["evaluate"],
@@ -232,6 +265,7 @@ describe("dmSending", () => {
 
 		test("handles AI analysis with low confidence", async () => {
 			const page = createPageMock({
+				isClosed: jest.fn<() => boolean>().mockReturnValue(false),
 				evaluate: jest
 					.fn<(fn: unknown, ...args: unknown[]) => Promise<boolean>>()
 					.mockResolvedValue(true) as unknown as Page["evaluate"],
@@ -244,6 +278,7 @@ describe("dmSending", () => {
 
 		test("handles AI analysis failure gracefully", async () => {
 			const page = createPageMock({
+				isClosed: jest.fn<() => boolean>().mockReturnValue(false),
 				evaluate: jest
 					.fn<(fn: unknown, ...args: unknown[]) => Promise<boolean>>()
 					.mockResolvedValue(true) as unknown as Page["evaluate"],
@@ -256,6 +291,7 @@ describe("dmSending", () => {
 
 		test("verifies message appears in thread", async () => {
 			const page = createPageMock({
+				isClosed: jest.fn<() => boolean>().mockReturnValue(false),
 				evaluate: jest
 					.fn<(fn: unknown, ...args: unknown[]) => Promise<boolean>>()
 					.mockResolvedValueOnce(true) // isInDmThread

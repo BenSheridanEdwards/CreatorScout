@@ -49,6 +49,10 @@ export class InstagramCircuitBreaker {
 	private state: CircuitState = CircuitState.OPEN;
 	private failures = 0;
 	private successes = 0;
+
+	getConfig(): CircuitBreakerConfig {
+		return this.config;
+	}
 	private lastFailureTime: number | null = null;
 	private lastSuccessTime: number | null = null;
 	private totalRequests = 0;
@@ -232,8 +236,9 @@ export async function executeWithCircuitBreaker<T>(
 		return await circuitBreaker.execute(fn);
 	} catch (error) {
 		const stats = circuitBreaker.getStats();
+		const errorMessage = error instanceof Error ? error.message : String(error);
 
-		if (error.message.includes("Circuit breaker is CLOSED")) {
+		if (errorMessage.includes("Circuit breaker is CLOSED")) {
 			console.warn(
 				`🚫 ${context}: Circuit breaker open - Instagram rate limiting detected`,
 			);
@@ -241,7 +246,7 @@ export async function executeWithCircuitBreaker<T>(
 				`   State: ${stats.state}, Failures: ${stats.failures}, Total: ${stats.totalFailures}`,
 			);
 			console.warn(
-				`   Will retry in ${Math.ceil((circuitBreaker as any).config.recoveryTimeout / 60000)} minutes`,
+				`   Will retry in ${Math.ceil(circuitBreaker.getConfig().recoveryTimeout / 60000)} minutes`,
 			);
 		}
 

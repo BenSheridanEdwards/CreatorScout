@@ -124,7 +124,7 @@ describe("sessionManager", () => {
 			fs.writeFileSync(cookiesFilePath, JSON.stringify([{ name: "old" }]));
 
 			const newCookies = [{ name: "new", value: "value", domain: ".test.com" }];
-			page.cookies.mockResolvedValue(newCookies as any);
+			page.cookies.mockResolvedValue(newCookies as import("puppeteer").Cookie[]);
 
 			await saveCookies(page);
 

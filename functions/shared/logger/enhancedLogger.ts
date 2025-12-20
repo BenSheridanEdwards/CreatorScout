@@ -32,7 +32,7 @@ export interface CycleError {
 export interface EnhancedLogger extends Logger {
 	// Cycle management
 	startCycle(cycleId: string, context?: string): void;
-	endCycle(status: CycleStatus, summary?: Record<string, any>): void;
+	endCycle(status: CycleStatus, summary?: Record<string, unknown>): void;
 	getCurrentCycle(): CycleInfo | null;
 
 	// Enhanced error tracking
@@ -59,6 +59,10 @@ export interface EnhancedLogger extends Logger {
 
 	// File logging
 	flushLogs(): void;
+
+	// Cycle statistics
+	incrementProfilesProcessed(count?: number): void;
+	incrementCreatorsFound(count?: number): void;
 }
 
 class EnhancedLoggerImpl implements EnhancedLogger {
@@ -90,7 +94,7 @@ class EnhancedLoggerImpl implements EnhancedLogger {
 		prefix: string,
 		level: LogLevel,
 		message: string,
-		data?: any,
+		data?: Record<string, unknown>,
 	): void {
 		const timestamp = new Date().toISOString();
 		const logEntry = {
@@ -220,7 +224,7 @@ class EnhancedLoggerImpl implements EnhancedLogger {
 		});
 	}
 
-	endCycle(status: CycleStatus, summary?: Record<string, any>): void {
+	endCycle(status: CycleStatus, summary?: Record<string, unknown>): void {
 		if (!this.currentCycle) return;
 
 		this.currentCycle.endTime = new Date();

@@ -21,7 +21,8 @@ export type LogPrefix =
 	| "LIMIT"
 	| "DELAY"
 	| "VISION"
-	| "INTENTION";
+	| "INTENTION"
+	| "TIMER";
 
 export interface Logger {
 	debug(prefix: LogPrefix, message: string, ...args: unknown[]): void;

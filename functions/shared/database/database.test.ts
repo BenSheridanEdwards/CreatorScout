@@ -2,37 +2,37 @@ import { jest } from "@jest/globals";
 
 // Mock Prisma client
 const mockProfile = {
-	findUnique: jest.fn(),
-	findFirst: jest.fn(),
-	count: jest.fn(),
-	upsert: jest.fn(),
-	update: jest.fn(),
-	updateMany: jest.fn(),
-	create: jest.fn(),
-	delete: jest.fn(),
-	deleteMany: jest.fn(),
+	findUnique: jest.fn<() => Promise<unknown>>(),
+	findFirst: jest.fn<() => Promise<unknown>>(),
+	count: jest.fn<() => Promise<number>>(),
+	upsert: jest.fn<() => Promise<unknown>>(),
+	update: jest.fn<() => Promise<unknown>>(),
+	updateMany: jest.fn<() => Promise<unknown>>(),
+	create: jest.fn<() => Promise<unknown>>(),
+	delete: jest.fn<() => Promise<unknown>>(),
+	deleteMany: jest.fn<() => Promise<unknown>>(),
 };
 
 const mockQueueItem = {
-	findUnique: jest.fn(),
-	findFirst: jest.fn(),
-	count: jest.fn(),
-	upsert: jest.fn(),
-	update: jest.fn(),
-	create: jest.fn(),
-	delete: jest.fn(),
-	deleteMany: jest.fn(),
+	findUnique: jest.fn<() => Promise<unknown>>(),
+	findFirst: jest.fn<() => Promise<unknown>>(),
+	count: jest.fn<() => Promise<number>>(),
+	upsert: jest.fn<() => Promise<unknown>>(),
+	update: jest.fn<() => Promise<unknown>>(),
+	create: jest.fn<() => Promise<unknown>>(),
+	delete: jest.fn<() => Promise<unknown>>(),
+	deleteMany: jest.fn<() => Promise<unknown>>(),
 };
 
 const mockFollowingScraped = {
-	findUnique: jest.fn(),
-	upsert: jest.fn(),
+	findUnique: jest.fn<() => Promise<unknown>>(),
+	upsert: jest.fn<() => Promise<unknown>>(),
 };
 
 const mockMetric = {
-	create: jest.fn(),
-	updateMany: jest.fn(),
-	findMany: jest.fn(),
+	create: jest.fn<() => Promise<unknown>>(),
+	updateMany: jest.fn<() => Promise<unknown>>(),
+	findMany: jest.fn<() => Promise<unknown>>(),
 };
 
 const mockPrismaClient = {

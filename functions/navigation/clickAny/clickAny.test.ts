@@ -150,7 +150,8 @@ describe("clickAny", () => {
 			]);
 
 			expect(result).toBe(false);
-			expect(page.$).toHaveBeenCalledTimes(3);
+			// clickAny tries both button and div[role="button"] for each text, so 3 texts = 6 calls
+			expect(page.$).toHaveBeenCalledTimes(6);
 		});
 
 		test("does not call sleep when no element is clicked", async () => {

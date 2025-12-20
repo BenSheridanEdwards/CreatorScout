@@ -68,7 +68,7 @@ export class LoggingIntegration {
 		status: "COMPLETED" | "FAILED" | "INTERRUPTED",
 		reason?: string,
 	): void {
-		this.cycleManager.endCycle(status, { reason });
+		this.cycleManager.endCycle(status, reason);
 	}
 
 	/**
@@ -180,9 +180,22 @@ export class LoggingIntegration {
 	 * Get comprehensive cycle summary
 	 */
 	getCycleSummary(): {
-		currentCycle: any;
-		recentCycles: any[];
-		overallStats: any;
+		currentCycle: {
+			cycleId: string | null;
+			profilesProcessed: number;
+			creatorsFound: number;
+			errors: number;
+			warnings: number;
+			duration: number;
+		} | null;
+		recentCycles: import("./cycleManager.ts").CycleContext[];
+		overallStats: {
+			totalCycles: number;
+			successfulCycles: number;
+			failedCycles: number;
+			averageDuration: number;
+			totalErrors: number;
+		};
 	} {
 		return {
 			currentCycle: this.getCurrentCycleStatus(),
@@ -284,9 +297,3 @@ export function createLoggerWithCycleTracking(debug: boolean = false): {
 		shouldContinue: integration.shouldContinue.bind(integration),
 	};
 }
-
-
-
-
-
-

@@ -10,41 +10,47 @@ import type { Page } from "puppeteer";
  */
 export const createPageMock = (overrides: Record<string, unknown> = {}) => {
 	const baseMock = {
-		$: jest.fn<any>().mockResolvedValue(null),
-		$$: jest.fn<any>().mockResolvedValue([]),
-		$eval: jest.fn<any>().mockResolvedValue(null),
-		$$eval: jest.fn<any>().mockResolvedValue([]),
-		evaluate: jest.fn<any>().mockResolvedValue(undefined),
-		evaluateHandle: jest.fn<any>(),
+		$: jest.fn<Page["$"]>().mockResolvedValue(null),
+		$$: jest.fn<Page["$$"]>().mockResolvedValue([]),
+		$eval: jest.fn<Page["$eval"]>().mockResolvedValue(null),
+		$$eval: jest.fn<Page["$$eval"]>().mockResolvedValue([]),
+		evaluate: jest.fn<Page["evaluate"]>().mockResolvedValue(undefined),
+		evaluateHandle: jest.fn<Page["evaluateHandle"]>(),
 		waitForSelector: jest
-			.fn<any>()
+			.fn<Page["waitForSelector"]>()
 			.mockRejectedValue(new Error("Selector not found")),
 		waitForFunction: jest
-			.fn<any>()
+			.fn<Page["waitForFunction"]>()
 			.mockRejectedValue(new Error("Function timeout")),
-		click: jest.fn<any>().mockResolvedValue(undefined),
-		type: jest.fn<any>().mockResolvedValue(undefined),
-		goto: jest.fn<any>().mockResolvedValue(undefined),
-		content: jest.fn<any>().mockResolvedValue("<html></html>"),
-		url: jest.fn<any>().mockReturnValue("https://example.com"),
-		isClosed: jest.fn<any>().mockReturnValue(false),
+		click: jest.fn<Page["click"]>().mockResolvedValue(undefined),
+		type: jest.fn<Page["type"]>().mockResolvedValue(undefined),
+		goto: jest
+			.fn<Page["goto"]>()
+			.mockResolvedValue(null as unknown as Awaited<ReturnType<Page["goto"]>>),
+		content: jest
+			.fn<() => Promise<string>>()
+			.mockResolvedValue("<html></html>"),
+		url: jest.fn<() => string>().mockReturnValue("https://example.com"),
+		isClosed: jest.fn<() => boolean>().mockReturnValue(false),
 		screenshot: jest
-			.fn<any>()
+			.fn<Page["screenshot"]>()
 			.mockResolvedValue(Buffer.from("fake-screenshot")),
 		keyboard: {
-			press: jest.fn<any>().mockResolvedValue(undefined),
-			type: jest.fn<any>().mockResolvedValue(undefined),
+			press: jest.fn<Page["keyboard"]["press"]>().mockResolvedValue(undefined),
+			type: jest.fn<Page["keyboard"]["type"]>().mockResolvedValue(undefined),
 		},
 		mouse: {
-			click: jest.fn<any>().mockResolvedValue(undefined),
-			move: jest.fn<any>().mockResolvedValue(undefined),
-			down: jest.fn<any>().mockResolvedValue(undefined),
-			up: jest.fn<any>().mockResolvedValue(undefined),
+			click: jest.fn<Page["mouse"]["click"]>().mockResolvedValue(undefined),
+			move: jest.fn<Page["mouse"]["move"]>().mockResolvedValue(undefined),
+			down: jest.fn<Page["mouse"]["down"]>().mockResolvedValue(undefined),
+			up: jest.fn<Page["mouse"]["up"]>().mockResolvedValue(undefined),
 		},
-		cookies: jest.fn<any>().mockResolvedValue([]),
-		setCookie: jest.fn<any>().mockResolvedValue(undefined),
-		deleteCookie: jest.fn<any>().mockResolvedValue(undefined),
-		setExtraHTTPHeaders: jest.fn<any>().mockResolvedValue(undefined),
+		cookies: jest.fn<Page["cookies"]>().mockResolvedValue([]),
+		setCookie: jest.fn<Page["setCookie"]>().mockResolvedValue(undefined),
+		deleteCookie: jest.fn<Page["deleteCookie"]>().mockResolvedValue(undefined),
+		setExtraHTTPHeaders: jest
+			.fn<Page["setExtraHTTPHeaders"]>()
+			.mockResolvedValue(undefined),
 	};
 
 	return { ...baseMock, ...overrides } as unknown as Page;
@@ -57,26 +63,45 @@ export const createPageWithElementMock = (
 	elementOverrides: Record<string, unknown> = {},
 ) => {
 	const element = {
-		click: jest.fn<any>().mockResolvedValue(undefined),
+		click: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
 		// Provide a realistic boundingBox so helpers like humanLikeClickHandle
 		// can operate without throwing in tests.
-		boundingBox: jest.fn<any>().mockResolvedValue({
-			x: 0,
-			y: 0,
-			width: 100,
-			height: 40,
-		}),
-		type: jest.fn<any>().mockResolvedValue(undefined),
-		evaluate: jest.fn<any>(),
-		$: jest.fn<any>().mockResolvedValue(null),
-		$$: jest.fn<any>().mockResolvedValue([]),
+		boundingBox: jest
+			.fn<
+				() => Promise<{
+					x: number;
+					y: number;
+					width: number;
+					height: number;
+				} | null>
+			>()
+			.mockResolvedValue({
+				x: 0,
+				y: 0,
+				width: 100,
+				height: 40,
+			}),
+		type: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
+		evaluate: jest.fn<() => Promise<unknown>>(),
+		$: jest.fn<Page["$"]>().mockResolvedValue(null),
+		$$: jest.fn<Page["$$"]>().mockResolvedValue([]),
 		...elementOverrides,
 	};
 
 	return createPageMock({
-		$: jest.fn<any>().mockResolvedValue(element),
-		$$: jest.fn<any>().mockResolvedValue([element]),
-		waitForSelector: jest.fn<any>().mockResolvedValue(element),
+		$: jest
+			.fn<Page["$"]>()
+			.mockResolvedValue(element as unknown as Awaited<ReturnType<Page["$"]>>),
+		$$: jest
+			.fn<Page["$$"]>()
+			.mockResolvedValue([
+				element as unknown as Awaited<ReturnType<Page["$$"]>>[0],
+			]),
+		waitForSelector: jest
+			.fn<Page["waitForSelector"]>()
+			.mockResolvedValue(
+				element as unknown as Awaited<ReturnType<Page["waitForSelector"]>>,
+			),
 	});
 };
 
@@ -96,24 +121,37 @@ export const mockFactories = {
 		BROWSERLESS_TOKEN: "test-token",
 	}),
 
-	sleep: () => jest.fn<any>().mockResolvedValue(undefined),
+	sleep: () => jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
 
-	snapshot: () => jest.fn<any>().mockResolvedValue("test-screenshot.png"),
+	snapshot: () =>
+		jest.fn<() => Promise<string>>().mockResolvedValue("test-screenshot.png"),
 
 	database: () => ({
-		markDmSent: jest.fn<any>().mockResolvedValue(undefined),
-		markFollowed: jest.fn<any>().mockResolvedValue(undefined),
-		queueAdd: jest.fn<any>().mockResolvedValue(undefined),
-		wasVisited: jest.fn<any>().mockResolvedValue(false),
-		getQueuedUsers: jest.fn<any>().mockResolvedValue([]),
-		getUserStats: jest.fn<any>().mockResolvedValue({}),
+		markDmSent: jest
+			.fn<(username: string, proofPath?: string | null) => Promise<void>>()
+			.mockResolvedValue(undefined),
+		markFollowed: jest
+			.fn<(username: string) => Promise<void>>()
+			.mockResolvedValue(undefined),
+		queueAdd: jest
+			.fn<
+				(username: string, priority: number, source: string) => Promise<void>
+			>()
+			.mockResolvedValue(undefined),
+		wasVisited: jest
+			.fn<(username: string) => Promise<boolean>>()
+			.mockResolvedValue(false),
+		getQueuedUsers: jest.fn<() => Promise<string[]>>().mockResolvedValue([]),
+		getUserStats: jest
+			.fn<(username: string) => Promise<Record<string, unknown>>>()
+			.mockResolvedValue({}),
 	}),
 
 	sessionManager: () => ({
-		loadCookies: jest.fn<any>().mockResolvedValue(false),
-		saveCookies: jest.fn<any>().mockResolvedValue(undefined),
-		isLoggedIn: jest.fn<any>().mockResolvedValue(false),
-		getUserDataDir: jest.fn<any>().mockReturnValue("/tmp/test-data"),
+		loadCookies: jest.fn<() => Promise<boolean>>().mockResolvedValue(false),
+		saveCookies: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
+		isLoggedIn: jest.fn<() => Promise<boolean>>().mockResolvedValue(false),
+		getUserDataDir: jest.fn<() => string>().mockReturnValue("/tmp/test-data"),
 	}),
 };
 

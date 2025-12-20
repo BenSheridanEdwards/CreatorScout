@@ -137,7 +137,11 @@ export async function analyzeProfileComprehensive(
 
 	// Profile stats (follower ratio)
 	const stats = await getProfileStats(page);
-	result.stats = stats;
+	result.stats = {
+		followers: stats.followers ?? undefined,
+		following: stats.following ?? undefined,
+		ratio: stats.ratio ?? undefined,
+	};
 	if (stats.ratio && stats.ratio > 100) {
 		result.confidence = Math.max(result.confidence, 30);
 		result.indicators.push(`High follower ratio (${stats.ratio.toFixed(1)}x)`);
@@ -147,7 +151,7 @@ export async function analyzeProfileComprehensive(
 	const highlights = await getStoryHighlights(page);
 	result.highlights = highlights.map((h) => ({
 		title: h.title,
-		coverUrl: h.coverImageUrl,
+		coverUrl: h.coverImageUrl ?? undefined,
 	}));
 
 	if (highlights.length > 0) {

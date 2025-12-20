@@ -4,36 +4,36 @@
 import { jest } from "@jest/globals";
 
 // Mock all the dependencies
-const mockMouseWiggle = jest.fn<any>().mockResolvedValue(undefined);
-const mockNavigateToProfileAndCheck = jest.fn();
-const mockAnalyzeProfileComprehensive = jest.fn();
-const mockAnalyzeLinkWithVision = jest.fn(); // Keep for backwards compatibility
-const mockSnapshot = jest.fn();
-const mockMarkAsCreator = jest.fn();
-const mockSendDMToUser = jest.fn();
-const mockFollowUserAccount = jest.fn();
-const mockAddFollowingToQueue = jest.fn();
-const mockGetDelay = jest.fn();
-const mockSleep = jest.fn();
-const mockEnsureLoggedIn = jest.fn();
-const mockOpenFollowingModal = jest.fn();
-const mockExtractFollowingUsernames = jest.fn();
-const mockScrollFollowingModal = jest.fn();
-const mockWasVisited = jest.fn();
-const mockMarkVisited = jest.fn();
-const mockGetScrollIndex = jest.fn();
-const mockUpdateScrollIndex = jest.fn();
-const mockGetStats = jest.fn();
-const mockInitDb = jest.fn();
-const mockQueueAdd = jest.fn();
-const mockQueueCount = jest.fn();
-const mockQueueNext = jest.fn();
-const mockWasDmSent = jest.fn();
-const mockWasFollowed = jest.fn();
-const mockGetDailyMetrics = jest.fn();
-const mockCreateLogger = jest.fn();
-const mockCreateLoggerWithCycleTracking = jest.fn();
-const mockGetGlobalMetricsTracker = jest.fn();
+const mockMouseWiggle = jest.fn<() => Promise<void>>().mockResolvedValue(undefined);
+const mockNavigateToProfileAndCheck = jest.fn<() => Promise<import("../functions/navigation/profileNavigation/profileNavigation.ts").ProfileStatus>>();
+const mockAnalyzeProfileComprehensive = jest.fn<() => Promise<import("../functions/profile/profileAnalysis/profileAnalysis.ts").ComprehensiveAnalysisResult>>();
+const mockAnalyzeLinkWithVision = jest.fn<() => Promise<unknown>>(); // Keep for backwards compatibility
+const mockSnapshot = jest.fn<() => Promise<string>>();
+const mockMarkAsCreator = jest.fn<() => Promise<void>>();
+const mockSendDMToUser = jest.fn<() => Promise<boolean>>();
+const mockFollowUserAccount = jest.fn<() => Promise<boolean>>();
+const mockAddFollowingToQueue = jest.fn<() => Promise<number>>();
+const mockGetDelay = jest.fn<() => number>();
+const mockSleep = jest.fn<() => Promise<void>>();
+const mockEnsureLoggedIn = jest.fn<() => Promise<void>>();
+const mockOpenFollowingModal = jest.fn<() => Promise<void>>();
+const mockExtractFollowingUsernames = jest.fn<() => Promise<string[]>>();
+const mockScrollFollowingModal = jest.fn<() => Promise<void>>();
+const mockWasVisited = jest.fn<() => Promise<boolean>>();
+const mockMarkVisited = jest.fn<() => Promise<void>>();
+const mockGetScrollIndex = jest.fn<() => Promise<number>>();
+const mockUpdateScrollIndex = jest.fn<() => Promise<void>>();
+const mockGetStats = jest.fn<() => Promise<import("../functions/shared/database/database.ts").Stats>>();
+const mockInitDb = jest.fn<() => Promise<void>>();
+const mockQueueAdd = jest.fn<() => Promise<void>>();
+const mockQueueCount = jest.fn<() => Promise<number>>();
+const mockQueueNext = jest.fn<() => Promise<string | null>>();
+const mockWasDmSent = jest.fn<() => Promise<boolean>>();
+const mockWasFollowed = jest.fn<() => Promise<boolean>>();
+const mockGetDailyMetrics = jest.fn<() => Promise<import("../functions/shared/database/database.ts").DailyMetrics | null>>();
+const mockCreateLogger = jest.fn<() => import("../functions/shared/logger/logger.ts").Logger>();
+const mockCreateLoggerWithCycleTracking = jest.fn<() => ReturnType<typeof import("../functions/shared/logger/loggingIntegration.ts").createLoggerWithCycleTracking>>();
+const mockGetGlobalMetricsTracker = jest.fn<() => import("../functions/shared/metrics/metrics.ts").MetricsTracker>();
 
 // Mock the modules
 jest.unstable_mockModule("node:fs", () => ({
@@ -140,13 +140,18 @@ jest.unstable_mockModule("../functions/shared/metrics/metrics.ts", () => ({
 }));
 
 describe.skip("scrape.ts", () => {
-	let mockLogger: any;
-	let mockPage: any;
-	let mockCycleManager: any;
-	let mockStartCycle: any;
-	let mockEndCycle: any;
-	let mockRecordError: any;
-	let mockShouldContinue: any;
+	let mockLogger: import("../functions/shared/logger/logger.ts").Logger;
+	let mockPage: import("puppeteer").Page;
+	let mockCycleManager: {
+		recordWarning: jest.Mock;
+		recordProfileProcessed: jest.Mock;
+		recordDMSent: jest.Mock;
+		recordFollowCompleted: jest.Mock;
+	};
+	let mockStartCycle: jest.Mock;
+	let mockEndCycle: jest.Mock;
+	let mockRecordError: jest.Mock;
+	let mockShouldContinue: jest.Mock<() => boolean>;
 	const setShouldContinueLimit = (limit: number) => {
 		let callCount = 0;
 		mockShouldContinue.mockImplementation(() => {
@@ -161,24 +166,25 @@ describe.skip("scrape.ts", () => {
 		// Mocks are already set up at the top level, so resetModules is not needed
 
 		mockLogger = {
-			info: jest.fn<any>(),
-			debug: jest.fn<any>(),
-			warn: jest.fn<any>(),
-			error: jest.fn<any>(),
-			errorWithScreenshot: jest.fn<any>(),
-		};
+			info: jest.fn<(...args: unknown[]) => void>(),
+			debug: jest.fn<(...args: unknown[]) => void>(),
+			warn: jest.fn<(...args: unknown[]) => void>(),
+			error: jest.fn<(...args: unknown[]) => void>(),
+			errorWithScreenshot: jest.fn<(...args: unknown[]) => Promise<void>>(),
+		} as import("../functions/shared/logger/logger.ts").Logger;
 		mockCreateLogger.mockReturnValue(mockLogger);
 
 		mockPage = {
 			keyboard: {
-				press: jest.fn<any>().mockResolvedValue(undefined),
+				press: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
 			},
-		};
+		} as unknown as import("puppeteer").Page;
 
 		// Set up default mock returns
 		mockNavigateToProfileAndCheck.mockResolvedValue({
 			notFound: false,
 			isPrivate: false,
+			isAccessible: true,
 		});
 		mockAnalyzeProfileComprehensive.mockResolvedValue({
 			bio: "Test bio with content",
@@ -193,39 +199,39 @@ describe.skip("scrape.ts", () => {
 			isCreator: false,
 			reason: null,
 		});
-		mockGetDelay.mockReturnValue([1, 3]);
-		mockWasVisited.mockReturnValue(false);
-		mockGetScrollIndex.mockReturnValue(0);
-		mockGetStats.mockReturnValue({
+		mockGetDelay.mockReturnValue(2);
+		mockWasVisited.mockResolvedValue(false);
+		mockGetScrollIndex.mockResolvedValue(0);
+		mockGetStats.mockResolvedValue({
 			total_visited: 0,
 			confirmed_creators: 0,
 			dms_sent: 0,
 			queue_size: 0,
 		});
-		mockQueueCount.mockReturnValue(0);
-		mockQueueNext.mockReturnValue(null);
-		mockWasDmSent.mockReturnValue(false);
-		mockWasFollowed.mockReturnValue(false);
+		mockQueueCount.mockResolvedValue(0);
+		mockQueueNext.mockResolvedValue(null);
+		mockWasDmSent.mockResolvedValue(false);
+		mockWasFollowed.mockResolvedValue(false);
 		mockEnsureLoggedIn.mockResolvedValue(undefined);
 
 		mockCycleManager = {
-			recordWarning: jest.fn<any>(),
-			recordProfileProcessed: jest.fn<any>(),
-			recordDMSent: jest.fn<any>(),
-			recordFollowCompleted: jest.fn<any>(),
+			recordWarning: jest.fn<() => void>(),
+			recordProfileProcessed: jest.fn<() => void>(),
+			recordDMSent: jest.fn<() => void>(),
+			recordFollowCompleted: jest.fn<() => void>(),
 		};
-		mockStartCycle = jest.fn<any>();
-		mockEndCycle = jest.fn<any>();
-		mockRecordError = jest.fn<any>();
-		mockShouldContinue = jest.fn<any>();
+		mockStartCycle = jest.fn<() => void>();
+		mockEndCycle = jest.fn<() => void>();
+		mockRecordError = jest.fn<() => void>();
+		mockShouldContinue = jest.fn<() => boolean>();
 		setShouldContinueLimit(2);
 
 		mockCreateLoggerWithCycleTracking.mockReturnValue({
-			logger: mockLogger,
-			cycleManager: mockCycleManager,
-			startCycle: mockStartCycle,
-			endCycle: mockEndCycle,
-			recordError: mockRecordError,
+			logger: mockLogger as import("../functions/shared/logger/enhancedLogger.ts").EnhancedLogger,
+			cycleManager: mockCycleManager as unknown as import("../functions/shared/logger/cycleManager.ts").CycleManager,
+			startCycle: mockStartCycle as (seedUsername?: string, estimatedProfiles?: number) => string,
+			endCycle: mockEndCycle as (status: import("../functions/shared/logger/enhancedLogger.ts").CycleStatus, reason?: string) => void,
+			recordError: mockRecordError as (error: Error | string, context: string, profile?: string) => void,
 			shouldContinue: mockShouldContinue,
 		});
 		// Set up default metrics tracker mock
@@ -251,7 +257,7 @@ describe.skip("scrape.ts", () => {
 				visionApiCost: 0,
 			})),
 			getSessionId: jest.fn(() => "test-session"),
-		});
+		} as unknown as import("../functions/shared/metrics/metrics.ts").MetricsTracker);
 
 		// Default metrics tracker for individual tests
 		const defaultMetricsTracker = {
@@ -277,7 +283,7 @@ describe.skip("scrape.ts", () => {
 		it("returns 0 when file does not exist", async () => {
 			// Mock fs for this test
 			const fs = await import("node:fs");
-			const mockExistsSync = fs.existsSync as jest.MockedFunction<any>;
+			const mockExistsSync = fs.existsSync as jest.MockedFunction<(path: string) => boolean>;
 			mockExistsSync.mockReturnValue(false);
 
 			const { loadSeeds } = await import("./scrape.ts");
@@ -290,8 +296,8 @@ describe.skip("scrape.ts", () => {
 
 		it("returns 0 for empty file", async () => {
 			const fs = await import("node:fs");
-			const mockExistsSync = fs.existsSync as jest.MockedFunction<any>;
-			const mockReadFileSync = fs.readFileSync as jest.MockedFunction<any>;
+			const mockExistsSync = fs.existsSync as jest.MockedFunction<(path: string) => boolean>;
+			const mockReadFileSync = fs.readFileSync as jest.MockedFunction<(path: string, encoding?: BufferEncoding) => string | Buffer>;
 			mockExistsSync.mockReturnValue(true);
 			mockReadFileSync.mockReturnValue("");
 
@@ -306,8 +312,8 @@ describe.skip("scrape.ts", () => {
 
 		it("loads valid usernames and skips comments and empty lines", async () => {
 			const fs = await import("node:fs");
-			const mockExistsSync = fs.existsSync as jest.MockedFunction<any>;
-			const mockReadFileSync = fs.readFileSync as jest.MockedFunction<any>;
+			const mockExistsSync = fs.existsSync as jest.MockedFunction<(path: string) => boolean>;
+			const mockReadFileSync = fs.readFileSync as jest.MockedFunction<(path: string, encoding?: BufferEncoding) => string | Buffer>;
 			mockExistsSync.mockReturnValue(true);
 			mockReadFileSync.mockReturnValue(`# This is a comment
 user1
@@ -330,8 +336,8 @@ user3
 
 		it("trims whitespace and converts to lowercase", async () => {
 			const fs = await import("node:fs");
-			const mockExistsSync = fs.existsSync as jest.MockedFunction<any>;
-			const mockReadFileSync = fs.readFileSync as jest.MockedFunction<any>;
+			const mockExistsSync = fs.existsSync as jest.MockedFunction<(path: string) => boolean>;
+			const mockReadFileSync = fs.readFileSync as jest.MockedFunction<(path: string, encoding?: BufferEncoding) => string | Buffer>;
 			mockExistsSync.mockReturnValue(true);
 			mockReadFileSync.mockReturnValue("  USERNAME  \n  UserName2  ");
 
@@ -346,8 +352,8 @@ user3
 
 		it("skips lines starting with # and empty lines", async () => {
 			const fs = await import("node:fs");
-			const mockExistsSync = fs.existsSync as jest.MockedFunction<any>;
-			const mockReadFileSync = fs.readFileSync as jest.MockedFunction<any>;
+			const mockExistsSync = fs.existsSync as jest.MockedFunction<(path: string) => boolean>;
+			const mockReadFileSync = fs.readFileSync as jest.MockedFunction<(path: string, encoding?: BufferEncoding) => string | Buffer>;
 			mockExistsSync.mockReturnValue(true);
 			mockReadFileSync.mockReturnValue(`
 # comment
@@ -368,8 +374,8 @@ user2
 
 		it("handles custom file path", async () => {
 			const fs = await import("node:fs");
-			const mockExistsSync = fs.existsSync as jest.MockedFunction<any>;
-			const mockReadFileSync = fs.readFileSync as jest.MockedFunction<any>;
+			const mockExistsSync = fs.existsSync as jest.MockedFunction<(path: string) => boolean>;
+			const mockReadFileSync = fs.readFileSync as jest.MockedFunction<(path: string, encoding?: BufferEncoding) => string | Buffer>;
 			mockExistsSync.mockReturnValue(true);
 			mockReadFileSync.mockReturnValue("customuser");
 
@@ -403,7 +409,6 @@ user2
 				screenshots: [],
 				isCreator: false,
 				reason: null,
-				isLikely: false,
 			});
 
 			await processProfile("testuser", mockPage, "test_source");
@@ -424,6 +429,7 @@ user2
 			mockNavigateToProfileAndCheck.mockResolvedValue({
 				notFound: false,
 				isPrivate: true,
+				isAccessible: false,
 			});
 
 			await processProfile("privateuser", mockPage, "test_source");
@@ -446,6 +452,7 @@ user2
 			mockNavigateToProfileAndCheck.mockResolvedValue({
 				notFound: true,
 				isPrivate: false,
+				isAccessible: false,
 			});
 
 			await processProfile("notfounduser", mockPage, "test_source");
@@ -465,7 +472,7 @@ user2
 		it("skips already visited profiles", async () => {
 			const { processProfile } = await import("./scrape.ts");
 
-			mockWasVisited.mockReturnValue(true);
+			mockWasVisited.mockResolvedValue(true);
 
 			await processProfile("visiteduser", mockPage, "test_source");
 
@@ -589,7 +596,7 @@ user2
 				recordDMSent: jest.fn(),
 				recordFollowCompleted: jest.fn(),
 				recordError: jest.fn(),
-			};
+			} as unknown as import("../functions/shared/metrics/metrics.ts").MetricsTracker;
 			mockGetGlobalMetricsTracker.mockReturnValue(mockMetricsTracker);
 
 			// Simulate a critical error during bio analysis
@@ -666,8 +673,8 @@ user2
 				isLikely: true,
 			});
 			mockSendDMToUser.mockResolvedValue(false); // DM fails
-			mockWasDmSent.mockReturnValue(false);
-			mockWasFollowed.mockReturnValue(false);
+			mockWasDmSent.mockResolvedValue(false);
+			mockWasFollowed.mockResolvedValue(false);
 
 			await processProfile("dmerror", mockPage, "test_source");
 
@@ -694,8 +701,8 @@ user2
 			});
 			mockSendDMToUser.mockResolvedValue(true); // DM succeeds
 			mockFollowUserAccount.mockResolvedValue(false); // Follow fails
-			mockWasDmSent.mockReturnValue(false);
-			mockWasFollowed.mockReturnValue(false);
+			mockWasDmSent.mockResolvedValue(false);
+			mockWasFollowed.mockResolvedValue(false);
 
 			await processProfile("followerror", mockPage, "test_source");
 
@@ -728,8 +735,8 @@ user2
 			mockSendDMToUser.mockResolvedValue(true); // DM succeeds
 			mockFollowUserAccount.mockResolvedValue(true); // Follow succeeds
 			mockAddFollowingToQueue.mockResolvedValue(0); // Queue addition "fails" (returns 0)
-			mockWasDmSent.mockReturnValue(false);
-			mockWasFollowed.mockReturnValue(false);
+			mockWasDmSent.mockResolvedValue(false);
+			mockWasFollowed.mockResolvedValue(false);
 
 			await processProfile("queueerror", mockPage, "test_source");
 
@@ -752,7 +759,7 @@ user2
 				recordDMSent: jest.fn(),
 				recordFollowCompleted: jest.fn(),
 				recordError: jest.fn(),
-			};
+			} as unknown as import("../functions/shared/metrics/metrics.ts").MetricsTracker;
 			mockGetGlobalMetricsTracker.mockReturnValue(mockMetricsTracker);
 
 			mockAnalyzeProfileComprehensive.mockResolvedValue({
@@ -798,7 +805,7 @@ user2
 				recordDMSent: jest.fn(),
 				recordFollowCompleted: jest.fn(),
 				recordError: jest.fn(),
-			};
+			} as unknown as import("../functions/shared/metrics/metrics.ts").MetricsTracker;
 			mockGetGlobalMetricsTracker.mockReturnValue(mockMetricsTracker);
 
 			mockAnalyzeProfileComprehensive.mockResolvedValue({
@@ -849,7 +856,7 @@ user2
 				recordDMSent: jest.fn(),
 				recordFollowCompleted: jest.fn(),
 				recordError: jest.fn(),
-			};
+			} as unknown as import("../functions/shared/metrics/metrics.ts").MetricsTracker;
 			mockGetGlobalMetricsTracker.mockReturnValue(mockMetricsTracker);
 
 			mockAnalyzeProfileComprehensive.mockResolvedValue({
@@ -865,8 +872,8 @@ user2
 				reason: "test",
 				isLikely: true,
 			});
-			mockWasDmSent.mockReturnValue(false);
-			mockWasFollowed.mockReturnValue(false);
+			mockWasDmSent.mockResolvedValue(false);
+			mockWasFollowed.mockResolvedValue(false);
 
 			await processProfile(
 				"creatoruser",
@@ -898,7 +905,7 @@ user2
 				recordDMSent: jest.fn(),
 				recordFollowCompleted: jest.fn(),
 				recordError: jest.fn(),
-			};
+			} as unknown as import("../functions/shared/metrics/metrics.ts").MetricsTracker;
 			mockGetGlobalMetricsTracker.mockReturnValue(mockMetricsTracker);
 
 			mockNavigateToProfileAndCheck.mockRejectedValue(
@@ -973,8 +980,8 @@ user2
 				reason: "test",
 				isLikely: true,
 			});
-			mockWasDmSent.mockReturnValue(true);
-			mockWasFollowed.mockReturnValue(false);
+			mockWasDmSent.mockResolvedValue(true);
+			mockWasFollowed.mockResolvedValue(false);
 
 			await processProfile("alreadydm", mockPage, "test_source");
 
@@ -1003,8 +1010,8 @@ user2
 				reason: "test",
 				isLikely: true,
 			});
-			mockWasDmSent.mockReturnValue(false);
-			mockWasFollowed.mockReturnValue(true);
+			mockWasDmSent.mockResolvedValue(false);
+			mockWasFollowed.mockResolvedValue(true);
 
 			await processProfile("alreadyfollow", mockPage, "test_source");
 
@@ -1069,8 +1076,8 @@ user2
 				reason: "test",
 				isLikely: true,
 			});
-			mockWasDmSent.mockReturnValue(false);
-			mockWasFollowed.mockReturnValue(false);
+			mockWasDmSent.mockResolvedValue(false);
+			mockWasFollowed.mockResolvedValue(false);
 
 			await processProfile("mediumscore", mockPage, "test_source");
 
@@ -1241,15 +1248,15 @@ user2
 	describe("processFollowingList", () => {
 		beforeEach(() => {
 			mockExtractFollowingUsernames.mockResolvedValue(["user1", "user2"]);
-			mockOpenFollowingModal.mockResolvedValue(true);
-			mockWasVisited.mockReturnValue(false);
+			mockOpenFollowingModal.mockResolvedValue(undefined);
+			mockWasVisited.mockResolvedValue(false);
 		});
 
 		it("stops after consecutive all-visited batches", async () => {
 			const { processFollowingList } = await import("./scrape.ts");
 
 			// All users already visited
-			mockWasVisited.mockReturnValue(true);
+			mockWasVisited.mockResolvedValue(true);
 			mockExtractFollowingUsernames.mockResolvedValue(["user1", "user2"]);
 			setShouldContinueLimit(3);
 
@@ -1271,7 +1278,7 @@ user2
 			let callCount = 0;
 			mockWasVisited.mockImplementation(() => {
 				callCount++;
-				return callCount <= 2; // First 2 users visited, others not
+				return Promise.resolve(callCount <= 2); // First 2 users visited, others not
 			});
 
 			mockExtractFollowingUsernames
@@ -1298,7 +1305,7 @@ user2
 		it("closes modal before profile visits and reopens", async () => {
 			const { processFollowingList } = await import("./scrape.ts");
 
-			mockWasVisited.mockReturnValue(false); // New users
+			mockWasVisited.mockResolvedValue(false); // New users
 			mockExtractFollowingUsernames.mockResolvedValue(["user1"]);
 
 			await processFollowingList("seeduser", mockPage);
@@ -1323,6 +1330,7 @@ user2
 			mockNavigateToProfileAndCheck.mockResolvedValue({
 				notFound: true,
 				isPrivate: false,
+				isAccessible: false,
 			});
 
 			await processFollowingList("notfoundseed", mockPage);
@@ -1340,6 +1348,7 @@ user2
 			mockNavigateToProfileAndCheck.mockResolvedValue({
 				notFound: false,
 				isPrivate: true,
+				isAccessible: false,
 			});
 
 			await processFollowingList("privateseed", mockPage);
@@ -1371,7 +1380,7 @@ user2
 		it("handles modal opening failure", async () => {
 			const { processFollowingList } = await import("./scrape.ts");
 
-			mockOpenFollowingModal.mockResolvedValue(false);
+			mockOpenFollowingModal.mockResolvedValue(undefined);
 
 			await processFollowingList("modalerror", mockPage);
 
@@ -1387,8 +1396,8 @@ user2
 			const { processFollowingList } = await import("./scrape.ts");
 
 			setShouldContinueLimit(1);
-			mockGetScrollIndex.mockReturnValue(1000); // Already scrolled
-			mockWasVisited.mockReturnValue(false);
+			mockGetScrollIndex.mockResolvedValue(1000); // Already scrolled
+			mockWasVisited.mockResolvedValue(false);
 			mockExtractFollowingUsernames.mockResolvedValue(["user1"]);
 
 			await processFollowingList("scrollseed", mockPage);
@@ -1402,8 +1411,8 @@ user2
 		it("handles scroll restoration after profile processing", async () => {
 			const { processFollowingList } = await import("./scrape.ts");
 
-			mockGetScrollIndex.mockReturnValue(500);
-			mockWasVisited.mockReturnValue(false);
+			mockGetScrollIndex.mockResolvedValue(500);
+			mockWasVisited.mockResolvedValue(false);
 			mockExtractFollowingUsernames.mockResolvedValue(["user1"]);
 
 			await processFollowingList("scrollrestore", mockPage);
@@ -1422,7 +1431,7 @@ user2
 
 	describe("runScrapeLoop", () => {
 		it("starts the main scrape loop", async () => {
-			mockQueueNext.mockReturnValue(null); // Empty queue
+			mockQueueNext.mockResolvedValue(null); // Empty queue
 
 			const { runScrapeLoop } = await import("./scrape.ts");
 
@@ -1436,17 +1445,17 @@ user2
 	});
 
 	describe("scrape", () => {
-		let mockBrowser: any;
-		let mockCreateBrowser: any;
-		let mockCreatePage: any;
+		let mockBrowser: import("puppeteer").Browser;
+		let mockCreateBrowser: jest.Mock<() => Promise<import("puppeteer").Browser>>;
+		let mockCreatePage: jest.Mock<() => Promise<import("puppeteer").Page>>;
 
 		beforeEach(() => {
 			mockBrowser = {
-				close: jest.fn().mockResolvedValue(undefined),
-				newPage: jest.fn().mockResolvedValue(mockPage),
-			};
-			mockCreateBrowser = jest.fn().mockResolvedValue(mockBrowser);
-			mockCreatePage = jest.fn().mockResolvedValue(mockPage);
+				close: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
+				newPage: jest.fn<() => Promise<import("puppeteer").Page>>().mockResolvedValue(mockPage),
+			} as unknown as import("puppeteer").Browser;
+			mockCreateBrowser = jest.fn<() => Promise<import("puppeteer").Browser>>().mockResolvedValue(mockBrowser);
+			mockCreatePage = jest.fn<() => Promise<import("puppeteer").Page>>().mockResolvedValue(mockPage);
 
 			jest.unstable_mockModule(
 				"../functions/navigation/browser/browser.ts",
@@ -1460,7 +1469,7 @@ user2
 		it("runs full scraping workflow successfully", async () => {
 			const { scrape } = await import("./scrape.ts");
 
-			mockQueueNext.mockReturnValue(null); // Empty queue after seeds loaded
+			mockQueueNext.mockResolvedValue(null); // Empty queue after seeds loaded
 
 			await scrape(false);
 
@@ -1476,12 +1485,12 @@ user2
 		it("loads seeds and starts cycle tracking", async () => {
 			// Mock fs for this test to simulate loading 3 seeds
 			const fs = await import("node:fs");
-			const mockExistsSync = fs.existsSync as jest.MockedFunction<any>;
-			const mockReadFileSync = fs.readFileSync as jest.MockedFunction<any>;
+			const mockExistsSync = fs.existsSync as jest.MockedFunction<(path: string) => boolean>;
+			const mockReadFileSync = fs.readFileSync as jest.MockedFunction<(path: string, encoding?: BufferEncoding) => string | Buffer>;
 			mockExistsSync.mockReturnValue(true);
 			mockReadFileSync.mockReturnValue("seed1\nseed2\nseed3");
 
-			mockQueueNext.mockReturnValue(null); // Empty queue so it doesn't loop
+			mockQueueNext.mockResolvedValue(null); // Empty queue so it doesn't loop
 
 			const { scrape } = await import("./scrape.ts");
 
@@ -1496,7 +1505,7 @@ user2
 		it("handles no seeds loaded gracefully", async () => {
 			// Mock fs to return no seeds
 			const fs = await import("node:fs");
-			const mockExistsSync = fs.existsSync as jest.MockedFunction<any>;
+			const mockExistsSync = fs.existsSync as jest.MockedFunction<(path: string) => boolean>;
 			mockExistsSync.mockReturnValue(false);
 
 			const { scrape } = await import("./scrape.ts");
@@ -1509,7 +1518,7 @@ user2
 		it("supports debug mode", async () => {
 			const { scrape } = await import("./scrape.ts");
 
-			mockQueueNext.mockReturnValue(null);
+			mockQueueNext.mockResolvedValue(null);
 
 			await scrape(true);
 

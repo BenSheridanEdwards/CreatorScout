@@ -156,6 +156,15 @@ describe("profileActions", () => {
 		});
 	});
 
+	afterEach(() => {
+		// Aggressive cleanup to prevent memory leaks
+		jest.clearAllMocks();
+		// Force garbage collection hint (if available)
+		if (global.gc) {
+			global.gc();
+		}
+	});
+
 	describe("checkDmThreadEmpty", () => {
 		test("returns false when multiple nodes found", async () => {
 			const page = createPageMock({
@@ -220,22 +229,17 @@ describe("profileActions", () => {
 					.mockImplementation(async (fn: unknown, ...args: unknown[]) => {
 						if (typeof fn === "function") {
 							try {
-								// Handle mouse position check (moveMouseToElement)
-								if (
-									fn.toString().includes("mouseX") ||
-									fn.toString().includes("mouseY")
-								) {
-									return { x: 100, y: 100 };
-								}
 								const result = await (fn as (...args: unknown[]) => unknown)(
 									...args,
 								);
+								// Handle different return types without inspecting function strings
 								// findMessageButton - return button info
 								if (
 									result &&
 									typeof result === "object" &&
 									"x" in result &&
-									"y" in result
+									"y" in result &&
+									"width" in result
 								) {
 									return {
 										x: 100,
@@ -258,23 +262,10 @@ describe("profileActions", () => {
 									return true; // in DM thread
 								}
 								// typeMessage - check text present (returns boolean)
-								// The evaluate function checks if textContent includes part of the message
-								// If the function returns a boolean, return true (text is present)
 								if (typeof result === "boolean") {
 									return true; // Text is present
 								}
-								// getElementCenter - returns { x, y } for element center
-								if (
-									result &&
-									typeof result === "object" &&
-									"x" in result &&
-									"y" in result &&
-									!("width" in result) &&
-									!("height" in result)
-								) {
-									return { x: 50, y: 50 };
-								}
-								// Mouse position for clickMessageButton or getElementCenter
+								// getElementCenter or mouse position - returns { x, y }
 								if (
 									result &&
 									typeof result === "object" &&
@@ -285,11 +276,14 @@ describe("profileActions", () => {
 								}
 								return result;
 							} catch {
-								// If function throws (e.g., document.querySelector doesn't exist),
-								// check if it's a text check (typeMessage) and return true
-								// Otherwise return null
-								if (args && args.length >= 2 && typeof args[1] === "string") {
-									return true; // typeMessage text check - assume text is present
+								// If function throws, return appropriate defaults
+								// Mouse position check
+								if (args.length === 0) {
+									return { x: 100, y: 100 };
+								}
+								// typeMessage text check
+								if (args.length >= 2 && typeof args[1] === "string") {
+									return true;
 								}
 								return null;
 							}
@@ -451,12 +445,19 @@ describe("profileActions", () => {
 		test("follows user when button is found", async () => {
 			let evaluateCallCount = 0;
 			const mockButton = {
-				click: jest.fn(),
+				click: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
 				textContent: "Follow",
 				boundingBox: jest
-					.fn()
+					.fn<
+						() => Promise<{
+							x: number;
+							y: number;
+							width: number;
+							height: number;
+						} | null>
+					>()
 					.mockResolvedValue({ x: 0, y: 0, width: 100, height: 40 }),
-				evaluate: jest.fn().mockResolvedValue(undefined),
+				evaluate: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
 			};
 			const page = createPageMock({
 				goto: jest
@@ -464,11 +465,11 @@ describe("profileActions", () => {
 					.mockResolvedValue(undefined),
 				$: jest
 					.fn<(selector: string) => Promise<typeof mockButton | null>>()
-					.mockResolvedValue(mockButton as unknown as any),
+					.mockResolvedValue(mockButton as unknown as typeof mockButton),
 				mouse: {
-					move: jest.fn().mockResolvedValue(undefined),
-					down: jest.fn().mockResolvedValue(undefined),
-					up: jest.fn().mockResolvedValue(undefined),
+					move: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
+					down: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
+					up: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
 				},
 				evaluate: jest
 					.fn<(fn: unknown) => Promise<unknown>>()

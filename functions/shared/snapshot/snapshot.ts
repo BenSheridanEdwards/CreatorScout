@@ -195,7 +195,7 @@ async function waitForProfilePage(
 		}
 
 		const hasContent = await page.evaluate(() => {
-			return (
+			return Boolean(
 				document.body.textContent && document.body.textContent.length > 100
 			);
 		});

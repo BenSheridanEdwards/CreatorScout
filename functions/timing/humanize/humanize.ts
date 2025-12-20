@@ -176,8 +176,8 @@ export async function moveMouseToElement(
 
 	// Get current mouse position
 	const currentPos = await page.evaluate(() => ({
-		x: window.mouseX || 0,
-		y: window.mouseY || 0,
+		x: (window as { mouseX?: number }).mouseX || 0,
+		y: (window as { mouseY?: number }).mouseY || 0,
 	}));
 
 	// Calculate distance for dynamic duration
@@ -238,8 +238,8 @@ export async function moveMouseToElement(
 	// Update global mouse position for future movements
 	await page.evaluate(
 		({ x, y }) => {
-			(window as any).mouseX = x;
-			(window as any).mouseY = y;
+			(window as Window & { mouseX?: number; mouseY?: number }).mouseX = x;
+			(window as Window & { mouseX?: number; mouseY?: number }).mouseY = y;
 		},
 		{ x: targetX, y: targetY },
 	);
@@ -279,7 +279,9 @@ export async function humanClickElement(
 	}
 
 	// Import here to avoid circular dependencies
-	const { humanLikeClickHandle } = await import("../../navigation/humanClick/humanClick.ts");
+	const { humanLikeClickHandle } = await import(
+		"../../navigation/humanClick/humanClick.ts"
+	);
 
 	// Use the encapsulated humanLikeClickHandle
 	await humanLikeClickHandle(page, element, {

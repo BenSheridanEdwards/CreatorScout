@@ -608,7 +608,7 @@ describe("Metrics System Documentation", () => {
 				},
 			);
 			// Check that the 3rd call has visionApiCost close to 0.0045 (floating point precision)
-			const thirdCall = mockUpdateSessionMetrics.mock.calls[2][1];
+			const thirdCall = mockUpdateSessionMetrics.mock.calls[2][1] as { visionApiCost: number };
 			expect(thirdCall.visionApiCost).toBeCloseTo(0.0045);
 		});
 	});

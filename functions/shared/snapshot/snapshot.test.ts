@@ -3,14 +3,18 @@ import type { Page } from "puppeteer";
 import { snapshot } from "./snapshot.ts";
 
 jest.mock("node:fs/promises", () => ({
-	mkdir: jest.fn<any>(),
-	writeFile: jest.fn<any>(),
+	mkdir: jest.fn<() => Promise<void>>(),
+	writeFile: jest.fn<() => Promise<void>>(),
 }));
 
 const page = {
 	screenshot: jest
-		.fn<any>()
+		.fn<() => Promise<Buffer>>()
 		.mockResolvedValue(Buffer.from("fakepngbinary", "utf8")),
+	isClosed: jest.fn<() => boolean>().mockReturnValue(false),
+	waitForFunction: jest
+		.fn<() => Promise<unknown>>()
+		.mockResolvedValue(undefined),
 } as unknown as Page;
 
 describe("snapshot", () => {

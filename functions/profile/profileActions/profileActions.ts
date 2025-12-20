@@ -120,8 +120,9 @@ export async function sendDMToUser(
 		recordActivity("dm_sent", username, "success");
 		return true;
 	} catch (err) {
-		logger.error("ERROR", `Failed to send DM to @${username}: ${err}`);
-		recordActivity("dm_error", username, "error", err.message);
+		const errorMessage = err instanceof Error ? err.message : String(err);
+		logger.error("ERROR", `Failed to send DM to @${username}: ${errorMessage}`);
+		recordActivity("dm_error", username, "error", errorMessage);
 		return false;
 	}
 }
@@ -140,10 +141,7 @@ export async function followUserAccount(
 ): Promise<boolean> {
 	try {
 		// Navigate to profile using search-based navigation (more human-like)
-		await navigateToProfile(page, username, {
-			timeout: 15000,
-			waitForHeader: true,
-		});
+		await navigateToProfile(page, username);
 
 		await sleep(3000); // Wait longer for page to fully load
 
@@ -214,10 +212,7 @@ export async function followUserAccount(
 					);
 					// Try to navigate back to profile using search
 					try {
-						await navigateToProfile(page, username, {
-							timeout: 15000,
-							waitForHeader: false,
-						});
+						await navigateToProfile(page, username);
 					} catch (navError) {
 						logger.error(
 							"NAVIGATION",
@@ -281,10 +276,7 @@ export async function followUserAccount(
 				);
 				// Try to navigate back to profile using search
 				try {
-					await navigateToProfile(page, username, {
-						timeout: 15000,
-						waitForHeader: false,
-					});
+					await navigateToProfile(page, username);
 				} catch (navError) {
 					logger.error(
 						"NAVIGATION",
@@ -313,8 +305,9 @@ export async function followUserAccount(
 			return false;
 		}
 	} catch (err) {
-		logger.error("ERROR", `Failed to follow @${username}: ${err}`);
-		recordActivity("follow_failed", username, "error", err.message);
+		const errorMessage = err instanceof Error ? err.message : String(err);
+		logger.error("ERROR", `Failed to follow @${username}: ${errorMessage}`);
+		recordActivity("follow_failed", username, "error", errorMessage);
 		return false;
 	}
 }

@@ -77,8 +77,8 @@ export async function humanLikeClickHandle(
 	// STEP 2: Move cursor over it in a random curve like a human
 	// Get current mouse position
 	const currentPos = await page.evaluate(() => ({
-		x: (window as any).mouseX || 0,
-		y: (window as any).mouseY || 0,
+		x: (window as Window & { mouseX?: number; mouseY?: number }).mouseX || 0,
+		y: (window as Window & { mouseX?: number; mouseY?: number }).mouseY || 0,
 	}));
 
 	// Calculate distance for dynamic duration
@@ -155,8 +155,8 @@ export async function humanLikeClickHandle(
 	// Update global mouse position for future movements
 	await page.evaluate(
 		({ x, y }) => {
-			(window as any).mouseX = x;
-			(window as any).mouseY = y;
+			(window as Window & { mouseX?: number; mouseY?: number }).mouseX = x;
+			(window as Window & { mouseX?: number; mouseY?: number }).mouseY = y;
 		},
 		{ x: targetX, y: targetY },
 	);
