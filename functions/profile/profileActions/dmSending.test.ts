@@ -106,7 +106,11 @@ describe("dmSending", () => {
 							try {
 								// Try to execute the function - if it accesses window, return mock value
 								const fnString = fn.toString();
-								if (fnString.includes("window") || fnString.includes("mouseX") || fnString.includes("mouseY")) {
+								if (
+									fnString.includes("window") ||
+									fnString.includes("mouseX") ||
+									fnString.includes("mouseY")
+								) {
 									return { x: 100, y: 100 }; // Mock mouse position
 								}
 								// getElementCenter - return center coordinates
@@ -177,7 +181,11 @@ describe("dmSending", () => {
 						if (typeof fn === "function") {
 							try {
 								const fnString = fn.toString();
-								if (fnString.includes("window") || fnString.includes("mouseX") || fnString.includes("mouseY")) {
+								if (
+									fnString.includes("window") ||
+									fnString.includes("mouseX") ||
+									fnString.includes("mouseY")
+								) {
 									return { x: 100, y: 100 }; // Mock mouse position
 								}
 								const result = await (fn as (...args: unknown[]) => unknown)(
