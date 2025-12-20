@@ -134,27 +134,73 @@ export async function createPage(
 	await page.setUserAgent(userAgent);
 
 	// Set up console logging to capture errors and warnings
+	// Filter out non-critical errors that we can safely ignore
 	page.on("console", (msg) => {
 		const type = msg.type();
 		const text = msg.text();
-		if (type === "error" || type === "warn") {
+
+		// Filter out known non-critical warnings/errors
+		const ignoredPatterns = [
+			"Permissions-Policy header", // Browser feature warnings
+			"GroupMarkerNotSet", // Chrome internal warnings
+			"Automatic fallback to software WebGL", // WebGL warnings (non-critical)
+		];
+
+		const shouldIgnore = ignoredPatterns.some((pattern) =>
+			text.includes(pattern),
+		);
+
+		if ((type === "error" || type === "warn") && !shouldIgnore) {
 			// eslint-disable-next-line no-console
 			console.log(`[Browser Console ${type.toUpperCase()}]: ${text}`);
 		}
 	});
 
-	// Capture page errors
+	// Capture page errors - filter out known non-critical errors
 	page.on("pageerror", (error) => {
-		// eslint-disable-next-line no-console
-		console.log(`[Page Error]: ${error.message}`);
+		const errorMessage = error.message;
+
+		// Filter out known non-critical errors from Instagram's code
+		const ignoredErrors = [
+			"__name is not defined", // Instagram's internal code issue, not ours
+			"is not defined", // Generic undefined variable errors from Instagram
+		];
+
+		const shouldIgnore = ignoredErrors.some((pattern) =>
+			errorMessage.includes(pattern),
+		);
+
+		if (!shouldIgnore) {
+			// eslint-disable-next-line no-console
+			console.log(`[Page Error]: ${errorMessage}`);
+		}
 	});
 
-	// Capture failed requests
+	// Capture failed requests - filter out non-critical failures
 	page.on("requestfailed", (request) => {
-		// eslint-disable-next-line no-console
-		console.log(
-			`[Request Failed]: ${request.url()} - ${request.failure()?.errorText || "Unknown error"}`,
+		const url = request.url();
+		const errorText = request.failure()?.errorText || "Unknown error";
+
+		// Filter out non-critical request failures
+		const ignoredPatterns = [
+			"images/assets_DO_NOT_HARDCODE", // Instagram image assets (non-critical)
+			".png", // Image failures are usually non-critical
+			".jpg",
+			".jpeg",
+			".gif",
+			".webp",
+			"favicon.ico", // Favicon failures are non-critical
+			"net::ERR_ABORTED", // User-initiated aborts (often non-critical)
+		];
+
+		const shouldIgnore = ignoredPatterns.some(
+			(pattern) => url.includes(pattern) || errorText.includes(pattern),
 		);
+
+		if (!shouldIgnore) {
+			// eslint-disable-next-line no-console
+			console.log(`[Request Failed]: ${url} - ${errorText}`);
+		}
 	});
 
 	// Add human-like delays before any interaction (helps avoid detection)
