@@ -10,7 +10,7 @@ import {
 import { snapshot } from "../functions/shared/snapshot/snapshot.ts";
 import { waitForInstagramContent } from "../functions/shared/waitForContent/waitForContent.ts";
 
-async function inspectInstagramPage(): Promise<void> {
+async function testInstagramPage(): Promise<void> {
 	console.log("🔍 Starting Instagram page inspection...");
 
 	const browser = await createBrowser({ headless: false });
@@ -48,7 +48,7 @@ async function inspectInstagramPage(): Promise<void> {
 		});
 
 		if (isLoginPage) {
-			console.log("🔐 Detected: This appears to be a LOGIN PAGE");
+			console.log("🔐 Detected: You are on the LOGIN PAGE");
 		}
 
 		// Check for iframes
@@ -66,7 +66,7 @@ async function inspectInstagramPage(): Promise<void> {
 
 		// Take a screenshot
 		console.log("📸 Taking screenshot...");
-		const screenshotPath = await snapshot(page, "instagram_inspection");
+		const screenshotPath = await snapshot(page, "test_instagram_loads");
 		console.log(`✅ Screenshot saved: ${screenshotPath}`);
 
 		// Inspect what's actually on the page
@@ -294,7 +294,7 @@ async function inspectInstagramPage(): Promise<void> {
 	}
 }
 
-inspectInstagramPage().catch((err) => {
+testInstagramPage().catch((err) => {
 	console.error(err);
 	process.exit(1);
 });

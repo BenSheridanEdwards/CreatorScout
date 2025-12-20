@@ -22,7 +22,9 @@ export type LogPrefix =
 	| "DELAY"
 	| "VISION"
 	| "INTENTION"
-	| "TIMER";
+	| "TIMER"
+	| "VERIFY"
+	| "NAVIGATE";
 
 export interface Logger {
 	debug(prefix: LogPrefix, message: string, ...args: unknown[]): void;

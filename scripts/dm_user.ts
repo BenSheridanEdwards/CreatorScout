@@ -16,7 +16,7 @@ import { wasDmSent } from "../functions/shared/database/database.ts";
 import { saveScreenshot } from "../functions/shared/snapshot/snapshot.ts";
 
 async function dmUser(username: string, force: boolean = false): Promise<void> {
-	console.log(`💬 Sending DM to: @${username}`);
+	console.log(`💬 Started script to send DM to: @${username}`);
 
 	// Default to in-memory DB for this script unless user explicitly opts into Prisma.
 	// DMs are the primary goal; DB tracking is best-effort.
@@ -43,6 +43,7 @@ async function dmUser(username: string, force: boolean = false): Promise<void> {
 		console.log("⚡ Force mode: Bypassing database check");
 	}
 
+	// Create browser and begin
 	const browser = await createBrowser({ headless: false });
 	const page = await createPage(browser);
 

@@ -143,10 +143,11 @@ describe("dmNavigation", () => {
 					.mockResolvedValue(undefined),
 				url: jest
 					.fn<() => string>()
-					.mockReturnValueOnce("https://www.instagram.com/") // Initial URL
-					.mockReturnValueOnce("https://www.instagram.com/testuser/") // After search navigation
-					.mockReturnValueOnce("https://www.instagram.com/testuser/") // After popup handling
-					.mockReturnValueOnce("https://www.instagram.com/accounts/login/"), // After profile check - login page
+					.mockReturnValueOnce("https://www.instagram.com/") // Initial URL (line 92)
+					.mockReturnValueOnce("https://www.instagram.com/testuser/") // After search navigation (line 265)
+					.mockReturnValueOnce("https://www.instagram.com/testuser/") // After second check (line 269)
+					.mockReturnValueOnce("https://www.instagram.com/testuser/") // Logging (line 278)
+					.mockReturnValue("https://www.instagram.com/accounts/login/"), // After profile check - login page (line 292)
 				isClosed: jest.fn<() => boolean>().mockReturnValue(false),
 				$: jest
 					.fn<

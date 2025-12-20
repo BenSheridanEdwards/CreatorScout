@@ -137,11 +137,13 @@ export async function analyzeProfileComprehensive(
 
 	// Profile stats (follower ratio)
 	const stats = await getProfileStats(page);
+
 	result.stats = {
 		followers: stats.followers ?? undefined,
 		following: stats.following ?? undefined,
 		ratio: stats.ratio ?? undefined,
 	};
+
 	if (stats.ratio && stats.ratio > 100) {
 		result.confidence = Math.max(result.confidence, 30);
 		result.indicators.push(`High follower ratio (${stats.ratio.toFixed(1)}x)`);
@@ -239,6 +241,7 @@ export async function analyzeProfileComprehensive(
 				() => analyzeProfile(profileScreenshot),
 				`vision_analysis_${username}`,
 			);
+
 			if (visionResult?.is_adult_creator && visionResult.confidence > 60) {
 				result.isCreator = true;
 				result.confidence = Math.max(
@@ -250,7 +253,7 @@ export async function analyzeProfileComprehensive(
 				}
 				result.reason = visionResult.reason || "profile_vision";
 			}
-		} catch (error) {
+		} catch {
 			// Vision analysis failed, continue
 		}
 	}

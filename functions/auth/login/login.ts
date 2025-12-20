@@ -50,7 +50,7 @@ function delay(ms: number): Promise<void> {
 async function ensureFrameReady(page: Page): Promise<void> {
 	try {
 		// Check if page is closed
-		if (page.isClosed()) {
+		if (page?.isClosed()) {
 			throw new Error("Page is closed");
 		}
 
@@ -146,7 +146,7 @@ export async function login(
 	): Promise<boolean> {
 		try {
 			// Check if page is closed before starting
-			if (page.isClosed()) {
+			if (page?.isClosed()) {
 				throw new Error("Page is closed, cannot check frame stability");
 			}
 
@@ -156,7 +156,7 @@ export async function login(
 			});
 
 			// Check again after waitForFunction (page might have closed during wait)
-			if (page.isClosed()) {
+			if (page?.isClosed()) {
 				throw new Error("Page closed during frame stability check");
 			}
 
@@ -173,7 +173,7 @@ export async function login(
 					frameError instanceof Error ? frameError.message : String(frameError);
 
 				// Check if page closed
-				if (page.isClosed()) {
+				if (page?.isClosed()) {
 					throw new Error("Page closed while checking frame stability");
 				}
 
@@ -185,7 +185,7 @@ export async function login(
 				await delay(2000);
 
 				// Check again before retry
-				if (page.isClosed()) {
+				if (page?.isClosed()) {
 					throw new Error("Page closed during frame stability retry");
 				}
 
@@ -208,7 +208,7 @@ export async function login(
 
 			// Check if page closed
 			if (
-				page.isClosed() ||
+				page?.isClosed() ||
 				errorMsg.includes("Page is closed") ||
 				errorMsg.includes("Page closed")
 			) {
@@ -366,7 +366,7 @@ export async function login(
 	logger.info("ACTION", "Handling cookie consent and popups");
 
 	// Check if page is still open before trying to interact
-	if (page.isClosed()) {
+	if (page?.isClosed()) {
 		throw new Error("Page is closed, cannot handle cookie consent");
 	}
 

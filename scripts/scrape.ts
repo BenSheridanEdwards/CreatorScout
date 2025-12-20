@@ -236,12 +236,11 @@ export async function processProfile(
 	try {
 		analysis = await analyzeProfileComprehensive(page, username);
 	} catch (analysisError) {
-		const error = analysisError instanceof Error ? analysisError : new Error(String(analysisError));
-		recordError(
-			error,
-			`comprehensive_analysis_error_${username}`,
-			username,
-		);
+		const error =
+			analysisError instanceof Error
+				? analysisError
+				: new Error(String(analysisError));
+		recordError(error, `comprehensive_analysis_error_${username}`, username);
 		await logger.errorWithScreenshot(
 			"ERROR",
 			`Comprehensive analysis failed for @${username}: ${
@@ -441,7 +440,8 @@ export async function processProfile(
 						metricsTracker.recordDMSent(username);
 					}
 				} catch (dmError) {
-					const error = dmError instanceof Error ? dmError : new Error(String(dmError));
+					const error =
+						dmError instanceof Error ? dmError : new Error(String(dmError));
 					recordError(error, `dm_send_${username}`, username);
 					await logger.errorWithScreenshot(
 						"ERROR",
@@ -485,7 +485,10 @@ export async function processProfile(
 						metricsTracker.recordFollowCompleted(username);
 					}
 				} catch (followError) {
-					const error = followError instanceof Error ? followError : new Error(String(followError));
+					const error =
+						followError instanceof Error
+							? followError
+							: new Error(String(followError));
 					recordError(error, `follow_${username}`, username);
 					await logger.errorWithScreenshot(
 						"ERROR",
@@ -520,7 +523,10 @@ export async function processProfile(
 					logger.info("QUEUE", `Added ${added} profiles to queue`);
 				}
 			} catch (queueError) {
-				const error = queueError instanceof Error ? queueError : new Error(String(queueError));
+				const error =
+					queueError instanceof Error
+						? queueError
+						: new Error(String(queueError));
 				recordError(error, `queue_expansion_${username}`, username);
 				await logger.errorWithScreenshot(
 					"ERROR",
@@ -725,12 +731,11 @@ export async function processFollowingList(
 						);
 						processedInBatch++;
 					} catch (profileError) {
-						const error = profileError instanceof Error ? profileError : new Error(String(profileError));
-						recordError(
-							error,
-							`profile_processing_${username}`,
-							username,
-						);
+						const error =
+							profileError instanceof Error
+								? profileError
+								: new Error(String(profileError));
+						recordError(error, `profile_processing_${username}`, username);
 						logger.warn(
 							"ERROR",
 							`Failed to process @${username}, continuing...`,
@@ -994,7 +999,10 @@ export async function runScrapeLoopWithoutDM(
 	logger.info("STATS", `Seeds processed: ${seedsProcessed}`);
 
 	// Log cycle summary
-	endCycle("COMPLETED", `Discovery completed: ${seedsProcessed} seeds processed`);
+	endCycle(
+		"COMPLETED",
+		`Discovery completed: ${seedsProcessed} seeds processed`,
+	);
 }
 
 /**
@@ -1125,8 +1133,11 @@ export async function scrapeWithoutDM(debug: boolean = false): Promise<void> {
 			"ACTION",
 			`Connecting to browser (${usingLocalBrowser ? "visible" : "headless"})...`,
 		);
+
+		// Create browser session
 		browser = await createBrowser({ headless: !usingLocalBrowser });
 		const page = await createPage(browser);
+
 		logger.info("ACTION", "Browser connected successfully");
 
 		// Wait for browser window to be visible if using local browser

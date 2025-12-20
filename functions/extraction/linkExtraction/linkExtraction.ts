@@ -136,7 +136,6 @@ export function decodeInstagramRedirect(url: string): string | null {
 export async function analyzeExternalLink(
 	page: Page,
 	linkUrl: string,
-	username: string,
 ): Promise<{
 	isCreator: boolean;
 	confidence: number;

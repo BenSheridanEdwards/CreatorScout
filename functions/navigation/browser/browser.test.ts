@@ -169,6 +169,7 @@ describe("browser helpers", () => {
 				setUserAgent: jest
 					.fn<() => Promise<void>>()
 					.mockResolvedValue(undefined),
+				on: jest.fn<(event: string, handler: unknown) => void>(),
 			} as unknown as Page;
 			const mockBrowser = {
 				newPage: jest.fn<() => Promise<Page>>().mockResolvedValue(mockPage),
@@ -178,8 +179,8 @@ describe("browser helpers", () => {
 
 			await createPage(mockBrowser);
 
-			expect(mockPage.setDefaultNavigationTimeout).toHaveBeenCalledWith(20000);
-			expect(mockPage.setDefaultTimeout).toHaveBeenCalledWith(12000);
+			expect(mockPage.setDefaultNavigationTimeout).toHaveBeenCalledWith(30000);
+			expect(mockPage.setDefaultTimeout).toHaveBeenCalledWith(15000);
 			expect(mockPage.setViewport).toHaveBeenCalledWith({
 				width: 1440,
 				height: 900,
@@ -197,6 +198,7 @@ describe("browser helpers", () => {
 				setUserAgent: jest
 					.fn<() => Promise<void>>()
 					.mockResolvedValue(undefined),
+				on: jest.fn<(event: string, handler: unknown) => void>(),
 			} as unknown as Page;
 			const mockBrowser = {
 				newPage: jest.fn<() => Promise<Page>>().mockResolvedValue(mockPage),

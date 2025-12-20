@@ -5,7 +5,6 @@
  * Example: tsx scripts/analyze_profile.ts patreon_creator
  */
 
-import type { Browser, Page } from "puppeteer";
 import {
 	createBrowser,
 	createPage,
@@ -56,11 +55,13 @@ async function analyzeProfile(username: string): Promise<void> {
 
 		if (analysis.links && analysis.links.length > 0) {
 			console.log(`Links found: ${analysis.links.length}`);
+			// biome-ignore lint/suspicious/useIterableCallbackReturn: <explanation>
 			analysis.links.forEach((link) => console.log(`  • ${link}`));
 		}
 
-		if (analysis.indicators && analysis.indicators.length > 0) {
+		if (analysis.indicators?.length > 0) {
 			console.log("Key indicators:");
+			// biome-ignore lint/suspicious/useIterableCallbackReturn: <explanation>
 			analysis.indicators.forEach((indicator) =>
 				console.log(`  • ${indicator}`),
 			);
@@ -86,7 +87,3 @@ if (!username) {
 }
 
 analyzeProfile(username).catch(console.error);
-
-
-
-

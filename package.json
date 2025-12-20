@@ -17,7 +17,7 @@
 		"follow": "tsx scripts/follow_user.ts",
 		"dm": "tsx scripts/dm_user.ts",
 		"inbox": "tsx scripts/open_inbox.ts",
-		"inspect": "tsx scripts/inspect_instagram_page.ts",
+		"inspect": "tsx scripts/test_instagram_loads",
 		"following": "tsx scripts/get_following.ts",
 		"process": "tsx scripts/process_profiles.ts",
 		"health": "tsx scripts/health_check.ts",

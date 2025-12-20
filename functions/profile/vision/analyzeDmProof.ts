@@ -99,7 +99,7 @@ export async function analyzeDmProof(
 		try {
 			const parsed = JSON.parse(text.trim()) as DmProofAnalysisResult;
 			return parsed;
-		} catch (parseError) {
+		} catch {
 			console.error("Failed to parse DM proof vision response:", text);
 			return null;
 		}
@@ -108,5 +108,3 @@ export async function analyzeDmProof(
 		return null;
 	}
 }
-
-

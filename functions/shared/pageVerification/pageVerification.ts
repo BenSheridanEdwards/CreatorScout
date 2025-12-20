@@ -29,7 +29,7 @@ export async function verifyHomePageLoaded(page: Page): Promise<boolean> {
 
 			const hasMainContent =
 				document.querySelector("main") !== null ||
-				document.querySelector('article') !== null ||
+				document.querySelector("article") !== null ||
 				document.querySelector('div[role="main"]') !== null;
 
 			const hasSearchOrExplore =
@@ -88,7 +88,10 @@ export async function verifyProfilePageLoaded(
 		} catch (err) {
 			const errorMsg = err instanceof Error ? err.message : String(err);
 			if (errorMsg.includes("detached Frame")) {
-				logger.warn("VERIFY", `Frame is detached, cannot verify profile page: ${errorMsg}`);
+				logger.warn(
+					"VERIFY",
+					`Frame is detached, cannot verify profile page: ${errorMsg}`,
+				);
 				return false;
 			}
 			throw err;
@@ -102,7 +105,7 @@ export async function verifyProfilePageLoaded(
 			const hasCorrectUrl = url.includes(`/${targetUsername}/`);
 
 			const hasProfileHeader =
-				document.querySelector('header') !== null ||
+				document.querySelector("header") !== null ||
 				document.querySelector('section[role="region"]') !== null;
 
 			const hasProfileImage =
@@ -113,10 +116,10 @@ export async function verifyProfilePageLoaded(
 			const hasBio =
 				document.querySelector('div[dir="auto"]') !== null ||
 				document.querySelector('span[dir="auto"]') !== null ||
-				document.querySelector('h1') !== null;
+				document.querySelector("h1") !== null;
 
 			const hasPostsOrTabs =
-				document.querySelector('article') !== null ||
+				document.querySelector("article") !== null ||
 				document.querySelector('div[role="tablist"]') !== null ||
 				document.querySelector('a[href*="/p/"]') !== null;
 
@@ -170,7 +173,10 @@ export async function verifyExplorePageLoaded(page: Page): Promise<boolean> {
 		} catch (err) {
 			const errorMsg = err instanceof Error ? err.message : String(err);
 			if (errorMsg.includes("detached Frame")) {
-				logger.warn("VERIFY", `Frame is detached, cannot verify explore page: ${errorMsg}`);
+				logger.warn(
+					"VERIFY",
+					`Frame is detached, cannot verify explore page: ${errorMsg}`,
+				);
 				return false;
 			}
 			throw err;
@@ -185,8 +191,8 @@ export async function verifyExplorePageLoaded(page: Page): Promise<boolean> {
 				document.querySelector('input[aria-label*="Search"]') !== null;
 
 			const hasExploreContent =
-				document.querySelector('main') !== null ||
-				document.querySelector('article') !== null ||
+				document.querySelector("main") !== null ||
+				document.querySelector("article") !== null ||
 				document.querySelector('div[role="main"]') !== null;
 
 			return {
@@ -224,7 +230,10 @@ export async function verifyExplorePageLoaded(page: Page): Promise<boolean> {
  * Navigate to Instagram homepage using UI (clicking home icon/logo)
  */
 export async function navigateToHomeViaUI(page: Page): Promise<void> {
-	logger.info("NAVIGATE", "Navigating to homepage via UI (clicking home icon/logo)");
+	logger.info(
+		"NAVIGATE",
+		"Navigating to homepage via UI (clicking home icon/logo)",
+	);
 
 	// Check if page is closed
 	if (page.isClosed()) {
@@ -237,9 +246,7 @@ export async function navigateToHomeViaUI(page: Page): Promise<void> {
 	} catch (err) {
 		const errorMsg = err instanceof Error ? err.message : String(err);
 		if (errorMsg.includes("detached Frame")) {
-			throw new Error(
-				`Frame is detached, cannot navigate via UI: ${errorMsg}`,
-			);
+			throw new Error(`Frame is detached, cannot navigate via UI: ${errorMsg}`);
 		}
 		// Re-throw other errors
 		throw err;
@@ -266,13 +273,19 @@ export async function navigateToHomeViaUI(page: Page): Promise<void> {
 			if (homeElement) {
 				await homeElement.click({ delay: 100 + Math.random() * 100 });
 				clicked = true;
-				logger.info("NAVIGATE", `✅ Clicked home icon using selector: ${selector}`);
+				logger.info(
+					"NAVIGATE",
+					`✅ Clicked home icon using selector: ${selector}`,
+				);
 				break;
 			}
 		} catch (err) {
 			const errorMsg = err instanceof Error ? err.message : String(err);
 			// If frame is detached, rethrow immediately
-			if (errorMsg.includes("detached Frame") || errorMsg.includes("Target closed")) {
+			if (
+				errorMsg.includes("detached Frame") ||
+				errorMsg.includes("Target closed")
+			) {
 				throw err;
 			}
 			// Continue to next selector for other errors
@@ -289,10 +302,13 @@ export async function navigateToHomeViaUI(page: Page): Promise<void> {
 			}
 
 			const homeByText = await page.evaluate(() => {
-				const links = Array.from(document.querySelectorAll("a, div[role='link']"));
+				const links = Array.from(
+					document.querySelectorAll("a, div[role='link']"),
+				);
 				for (const link of links) {
 					const text = link.textContent?.toLowerCase() || "";
-					const ariaLabel = link.getAttribute("aria-label")?.toLowerCase() || "";
+					const ariaLabel =
+						link.getAttribute("aria-label")?.toLowerCase() || "";
 					if (text.includes("home") || ariaLabel.includes("home")) {
 						(link as HTMLElement).click();
 						return true;
@@ -308,7 +324,10 @@ export async function navigateToHomeViaUI(page: Page): Promise<void> {
 		} catch (err) {
 			const errorMsg = err instanceof Error ? err.message : String(err);
 			// If frame is detached, rethrow immediately
-			if (errorMsg.includes("detached Frame") || errorMsg.includes("Target closed")) {
+			if (
+				errorMsg.includes("detached Frame") ||
+				errorMsg.includes("Target closed")
+			) {
 				throw err;
 			}
 		}
@@ -326,7 +345,7 @@ export async function navigateToHomeViaUI(page: Page): Promise<void> {
 	if (!contentLoaded) {
 		logger.warn("NAVIGATE", "Instagram content did not load within timeout");
 	}
-	
+
 	// Check frame before verification
 	try {
 		if (!page.isClosed()) {
@@ -336,10 +355,15 @@ export async function navigateToHomeViaUI(page: Page): Promise<void> {
 	} catch (err) {
 		const errorMsg = err instanceof Error ? err.message : String(err);
 		if (errorMsg.includes("detached Frame")) {
-			logger.warn("VERIFY", "Frame detached after navigation, skipping verification");
+			logger.warn(
+				"VERIFY",
+				"Frame detached after navigation, skipping verification",
+			);
 		} else {
-			logger.warn("VERIFY", `Error verifying homepage after navigation: ${err}`);
+			logger.warn(
+				"VERIFY",
+				`Error verifying homepage after navigation: ${err}`,
+			);
 		}
 	}
 }
-

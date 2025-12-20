@@ -18,17 +18,19 @@ export interface ProfileStatus {
  * This ensures any detached frames from previous navigation are cleared
  * Returns true if frame is stable, throws recoverable error if permanently detached
  */
-async function waitForFrameStability(page: Page, timeout: number = 5000): Promise<boolean> {
+async function waitForFrameStability(
+	page: Page,
+	timeout: number = 5000,
+): Promise<boolean> {
 	try {
 		// Wait for the main frame to be ready
-		await page.waitForFunction(
-			() => document.readyState === "complete",
-			{ timeout }
-		);
-		
+		await page.waitForFunction(() => document.readyState === "complete", {
+			timeout,
+		});
+
 		// Additional wait for frame stability in Browserless
 		await sleep(1000);
-		
+
 		// Verify the main frame is accessible by checking page URL
 		try {
 			page.url(); // This will throw if frame is detached
@@ -36,10 +38,10 @@ async function waitForFrameStability(page: Page, timeout: number = 5000): Promis
 		} catch (frameError) {
 			const errorMsg =
 				frameError instanceof Error ? frameError.message : String(frameError);
-			
+
 			// Wait a bit more and try again
 			await sleep(2000);
-			
+
 			try {
 				page.url(); // Verify again
 				return true; // Frame recovered
@@ -54,12 +56,12 @@ async function waitForFrameStability(page: Page, timeout: number = 5000): Promis
 		}
 	} catch (err) {
 		const errorMsg = err instanceof Error ? err.message : String(err);
-		
+
 		// If it's a detached frame error, throw it as a recoverable error
 		if (errorMsg.includes("detached Frame")) {
 			throw new Error(`Frame is permanently detached: ${errorMsg}`);
 		}
-		
+
 		// For timeout or other errors, log and throw recoverable error
 		console.warn(`Frame stability check timed out or failed: ${err}`);
 		throw new Error(`Frame stability check failed: ${errorMsg}`);
@@ -74,7 +76,7 @@ async function navigateToProfileViaSearch(
 	username: string,
 	options?: { timeout?: number },
 ): Promise<void> {
-	const { timeout = 20000 } = options || {};
+	// const { timeout = 20000 } = options || {};
 	const u = username.toLowerCase().trim();
 
 	// Ensure we're on Instagram homepage (or any Instagram page) using UI
@@ -138,7 +140,10 @@ async function navigateToProfileViaSearch(
 
 	if (!searchClicked) {
 		// Navigate to explore page via UI (clicking explore link)
-		console.log("NAVIGATE", "Search icon not found, navigating to explore page via UI");
+		console.log(
+			"NAVIGATE",
+			"Search icon not found, navigating to explore page via UI",
+		);
 		try {
 			const exploreLink = await page.$('a[href="/explore/"]');
 			if (exploreLink) {
@@ -331,7 +336,7 @@ export async function ensureLoggedIn(page: Page): Promise<void> {
 	// Ensure frame is stable before attempting login (prevents detached frame errors)
 	try {
 		// Check if page is closed
-		if (page.isClosed()) {
+		if (page?.isClosed()) {
 			throw new Error("Page is closed, cannot login");
 		}
 
@@ -343,7 +348,9 @@ export async function ensureLoggedIn(page: Page): Promise<void> {
 
 		// If frame is detached, wait for stability before proceeding
 		if (errorMsg.includes("detached Frame")) {
-			console.warn("⚠️ Frame is detached, waiting for stability before login...");
+			console.warn(
+				"⚠️ Frame is detached, waiting for stability before login...",
+			);
 			await waitForFrameStability(page, 5000);
 
 			// Verify frame is now accessible
