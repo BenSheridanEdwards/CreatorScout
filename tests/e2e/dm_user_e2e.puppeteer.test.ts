@@ -112,6 +112,3 @@ describe("DM user E2E", () => {
 		expect(await wasDmSent(TARGET)).toBe(true);
 	}, 90000);
 });
-
-
-

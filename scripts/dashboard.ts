@@ -50,7 +50,3 @@ async function showDashboard(): Promise<void> {
 }
 
 showDashboard().catch(console.error);
-
-
-
-

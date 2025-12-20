@@ -76,7 +76,6 @@ async function navigateToProfileViaSearch(
 	username: string,
 	options?: { timeout?: number },
 ): Promise<void> {
-	// const { timeout = 20000 } = options || {};
 	const u = username.toLowerCase().trim();
 
 	// Ensure we're on Instagram homepage (or any Instagram page) using UI

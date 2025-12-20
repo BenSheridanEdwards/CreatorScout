@@ -172,8 +172,3 @@ See `scripts/scrapeWithLogging.ts` for a complete example of how to integrate th
 - **Historical data** - File logs provide audit trail
 - **Automated insights** - Error aggregation helps identify issues
 - **Backwards compatible** - Works with existing code
-
-
-
-
-

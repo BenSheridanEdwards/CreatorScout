@@ -224,5 +224,3 @@ After setup:
 3. ✅ Test with `npx prisma studio`
 4. ✅ (Optional) Migrate SQLite data if needed
 5. ✅ Start using the application!
-
-

@@ -83,8 +83,3 @@ CREATE INDEX "idx_metrics_date" ON "metrics"("date");
 
 -- CreateIndex
 CREATE INDEX "idx_metrics_session" ON "metrics"("session_id");
-
-
-
-
-
