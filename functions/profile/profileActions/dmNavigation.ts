@@ -28,8 +28,9 @@ export interface ButtonInfo {
 /**
  * Wait for frame stability after navigation (critical for Browserless)
  * This ensures any detached frames from previous navigation are cleared
+ * Returns true if frame is stable, throws recoverable error if permanently detached
  */
-async function waitForFrameStability(page: Page, timeout: number = 5000): Promise<void> {
+async function waitForFrameStability(page: Page, timeout: number = 5000): Promise<boolean> {
 	try {
 		// Wait for the main frame to be ready
 		await page.waitForFunction(
@@ -43,15 +44,37 @@ async function waitForFrameStability(page: Page, timeout: number = 5000): Promis
 		// Verify the main frame is accessible by checking page URL
 		try {
 			page.url(); // This will throw if frame is detached
+			return true; // Frame is stable
 		} catch (frameError) {
+			const errorMsg =
+				frameError instanceof Error ? frameError.message : String(frameError);
+			
 			// Wait a bit more and try again
 			await sleep(2000);
-			page.url(); // Verify again
+			
+			try {
+				page.url(); // Verify again
+				return true; // Frame recovered
+			} catch (retryError) {
+				// Frame is permanently detached - throw recoverable error
+				const retryMsg =
+					retryError instanceof Error ? retryError.message : String(retryError);
+				throw new Error(
+					`Frame remains detached after retry: ${retryMsg}. Original error: ${errorMsg}`,
+				);
+			}
 		}
 	} catch (err) {
-		// If frame stability check fails, log but continue
-		// The next operation will catch the actual error
+		const errorMsg = err instanceof Error ? err.message : String(err);
+		
+		// If it's a detached frame error, throw it as a recoverable error
+		if (errorMsg.includes("detached Frame")) {
+			throw new Error(`Frame is permanently detached: ${errorMsg}`);
+		}
+		
+		// For timeout or other errors, log and throw recoverable error
 		getLogger().warn("ACTION", `Frame stability check timed out or failed: ${err}`);
+		throw new Error(`Frame stability check failed: ${errorMsg}`);
 	}
 }
 
@@ -65,16 +88,22 @@ async function navigateToProfileViaSearch(
 	const u = username.toLowerCase().trim();
 	getLogger().info("ACTION", `Navigating to profile via search: @${u}`);
 
-	// Ensure we're on Instagram homepage (or any Instagram page)
+	// Ensure we're on Instagram homepage (or any Instagram page) using UI
 	const currentUrl = page.url();
 	if (!currentUrl.includes("instagram.com")) {
-		getLogger().info("ACTION", "Not on Instagram, navigating to homepage");
-		await page.goto("https://www.instagram.com/", {
-			waitUntil: "networkidle2",
-			timeout: 15000,
-		});
-		// Wait for frame stability after navigation (critical for Browserless)
-		await waitForFrameStability(page, 5000);
+		getLogger().info("ACTION", "Not on Instagram, navigating to homepage via UI");
+		try {
+			const { navigateToHomeViaUI, verifyHomePageLoaded } = await import(
+				"../../shared/pageVerification/pageVerification.ts"
+			);
+			await navigateToHomeViaUI(page);
+			await verifyHomePageLoaded(page);
+		} catch (err) {
+			getLogger().warn(
+				"ACTION",
+				`UI navigation to homepage failed (may already be on Instagram): ${err}`,
+			);
+		}
 		await sleep(2000 + Math.random() * 2000);
 	}
 
@@ -124,14 +153,24 @@ async function navigateToProfileViaSearch(
 	}
 
 	if (!searchClicked) {
-		// Fallback: try navigating to explore/search page directly
-		getLogger().info("ACTION", "Search icon not found, navigating to explore page");
-		await page.goto("https://www.instagram.com/explore/", {
-			waitUntil: "networkidle2",
-			timeout: 15000,
-		});
-		// Wait for frame stability after navigation (critical for Browserless)
-		await waitForFrameStability(page, 5000);
+		// Fallback: try navigating to explore/search page directly via UI
+		getLogger().info("ACTION", "Search icon not found, navigating to explore page via UI");
+		try {
+			const exploreLink = await page.$('a[href="/explore/"]');
+			if (exploreLink) {
+				await exploreLink.click({ delay: 100 + Math.random() * 100 });
+				getLogger().info("ACTION", "✅ Clicked explore link");
+				await sleep(2000);
+				const { verifyExplorePageLoaded } = await import(
+					"../../shared/pageVerification/pageVerification.ts"
+				);
+				await verifyExplorePageLoaded(page);
+			} else {
+				throw new Error("Could not find explore link");
+			}
+		} catch (err) {
+			getLogger().warn("ACTION", `UI navigation to explore page failed: ${err}`);
+		}
 		await sleep(2000);
 		const searchInput = await page.$('input[placeholder*="Search"], input[aria-label*="Search"]');
 		if (searchInput) {
@@ -211,6 +250,16 @@ async function navigateToProfileViaSearch(
 	// Wait for profile page to load
 	getLogger().info("ACTION", "Waiting for profile page to load");
 	await sleep(2000 + Math.random() * 2000);
+
+	// Verify profile page is loaded with content checks
+	try {
+		const { verifyProfilePageLoaded } = await import(
+			"../../shared/pageVerification/pageVerification.ts"
+		);
+		await verifyProfilePageLoaded(page, username);
+	} catch (err) {
+		getLogger().warn("ACTION", `Profile page verification failed: ${err}`);
+	}
 
 	// Verify we're on the profile page
 	const finalUrl = page.url();

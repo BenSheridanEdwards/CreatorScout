@@ -16,8 +16,9 @@ export interface ProfileStatus {
 /**
  * Wait for frame stability after navigation (critical for Browserless)
  * This ensures any detached frames from previous navigation are cleared
+ * Returns true if frame is stable, throws recoverable error if permanently detached
  */
-async function waitForFrameStability(page: Page, timeout: number = 5000): Promise<void> {
+async function waitForFrameStability(page: Page, timeout: number = 5000): Promise<boolean> {
 	try {
 		// Wait for the main frame to be ready
 		await page.waitForFunction(
@@ -31,15 +32,37 @@ async function waitForFrameStability(page: Page, timeout: number = 5000): Promis
 		// Verify the main frame is accessible by checking page URL
 		try {
 			page.url(); // This will throw if frame is detached
+			return true; // Frame is stable
 		} catch (frameError) {
+			const errorMsg =
+				frameError instanceof Error ? frameError.message : String(frameError);
+			
 			// Wait a bit more and try again
 			await sleep(2000);
-			page.url(); // Verify again
+			
+			try {
+				page.url(); // Verify again
+				return true; // Frame recovered
+			} catch (retryError) {
+				// Frame is permanently detached - throw recoverable error
+				const retryMsg =
+					retryError instanceof Error ? retryError.message : String(retryError);
+				throw new Error(
+					`Frame remains detached after retry: ${retryMsg}. Original error: ${errorMsg}`,
+				);
+			}
 		}
 	} catch (err) {
-		// If frame stability check fails, log but continue
-		// The next operation will catch the actual error
+		const errorMsg = err instanceof Error ? err.message : String(err);
+		
+		// If it's a detached frame error, throw it as a recoverable error
+		if (errorMsg.includes("detached Frame")) {
+			throw new Error(`Frame is permanently detached: ${errorMsg}`);
+		}
+		
+		// For timeout or other errors, log and throw recoverable error
 		console.warn(`Frame stability check timed out or failed: ${err}`);
+		throw new Error(`Frame stability check failed: ${errorMsg}`);
 	}
 }
 
@@ -54,15 +77,21 @@ async function navigateToProfileViaSearch(
 	const { timeout = 20000 } = options || {};
 	const u = username.toLowerCase().trim();
 
-	// Ensure we're on Instagram homepage (or any Instagram page)
+	// Ensure we're on Instagram homepage (or any Instagram page) using UI
 	const currentUrl = page.url();
 	if (!currentUrl.includes("instagram.com")) {
-		await page.goto("https://www.instagram.com/", {
-			waitUntil: "networkidle2",
-			timeout,
-		});
-		// Wait for frame stability after navigation (critical for Browserless)
-		await waitForFrameStability(page, 5000);
+		console.log("NAVIGATE", "Not on Instagram, navigating to homepage via UI");
+		try {
+			const { navigateToHomeViaUI, verifyHomePageLoaded } = await import(
+				"../../shared/pageVerification/pageVerification.ts"
+			);
+			await navigateToHomeViaUI(page);
+			await verifyHomePageLoaded(page);
+		} catch (err) {
+			console.warn(
+				`UI navigation to homepage failed (may already be on Instagram): ${err}`,
+			);
+		}
 		await sleep(2000 + Math.random() * 2000);
 	}
 
@@ -108,12 +137,24 @@ async function navigateToProfileViaSearch(
 	}
 
 	if (!searchClicked) {
-		await page.goto("https://www.instagram.com/explore/", {
-			waitUntil: "networkidle2",
-			timeout,
-		});
-		// Wait for frame stability after navigation (critical for Browserless)
-		await waitForFrameStability(page, 5000);
+		// Navigate to explore page via UI (clicking explore link)
+		console.log("NAVIGATE", "Search icon not found, navigating to explore page via UI");
+		try {
+			const exploreLink = await page.$('a[href="/explore/"]');
+			if (exploreLink) {
+				await exploreLink.click({ delay: 100 + Math.random() * 100 });
+				console.log("NAVIGATE", "✅ Clicked explore link");
+				await sleep(2000);
+				const { verifyExplorePageLoaded } = await import(
+					"../../shared/pageVerification/pageVerification.ts"
+				);
+				await verifyExplorePageLoaded(page);
+			} else {
+				throw new Error("Could not find explore link");
+			}
+		} catch (err) {
+			console.warn(`UI navigation to explore page failed: ${err}`);
+		}
 		await sleep(2000);
 		const searchInput = await page.$(
 			'input[placeholder*="Search"], input[aria-label*="Search"]',
@@ -204,6 +245,16 @@ export async function navigateToProfile(
 	// This is more human-like and avoids frame detachment issues
 	await navigateToProfileViaSearch(page, username, { timeout });
 
+	// Verify profile page is loaded
+	try {
+		const { verifyProfilePageLoaded } = await import(
+			"../../shared/pageVerification/pageVerification.ts"
+		);
+		await verifyProfilePageLoaded(page, username);
+	} catch (err) {
+		console.warn(`Profile page verification failed: ${err}`);
+	}
+
 	if (waitForHeader) {
 		try {
 			await page.waitForSelector("header", { timeout: 5000 });
@@ -275,6 +326,38 @@ export async function ensureLoggedIn(page: Page): Promise<void> {
 		throw new Error(
 			"Instagram credentials not configured. Set IG_USER and IG_PASS environment variables.",
 		);
+	}
+
+	// Ensure frame is stable before attempting login (prevents detached frame errors)
+	try {
+		// Check if page is closed
+		if (page.isClosed()) {
+			throw new Error("Page is closed, cannot login");
+		}
+
+		// Try to access frame - this will throw if detached
+		page.url();
+	} catch (frameError) {
+		const errorMsg =
+			frameError instanceof Error ? frameError.message : String(frameError);
+
+		// If frame is detached, wait for stability before proceeding
+		if (errorMsg.includes("detached Frame")) {
+			console.warn("⚠️ Frame is detached, waiting for stability before login...");
+			await waitForFrameStability(page, 5000);
+
+			// Verify frame is now accessible
+			try {
+				page.url();
+			} catch (retryError) {
+				throw new Error(
+					`Frame remains detached after stability wait: ${retryError instanceof Error ? retryError.message : String(retryError)}`,
+				);
+			}
+		} else {
+			// Re-throw other errors
+			throw frameError;
+		}
 	}
 
 	await login(page, { username: IG_USER, password: IG_PASS });

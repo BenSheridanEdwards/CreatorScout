@@ -85,7 +85,14 @@ export async function createBrowser(
 			);
 		}
 
-		// BrowserLess stealth includes residential proxies and all anti-detection by default
+		// BrowserLess stealth endpoint
+		// The /stealth endpoint automatically handles:
+		// - Fingerprint rotation (user agents, viewports, navigator properties)
+		// - Residential proxy rotation (automatically enabled on $50+ plans)
+		// - Advanced anti-detection techniques
+		// - Canvas/WebGL fingerprint spoofing
+		// Note: Residential proxies are configured in your Browserless dashboard
+		// and are automatically used with the /stealth endpoint on paid plans
 		const wsEndpoint = `wss://chrome.browserless.io/chrome/stealth?token=${BROWSERLESS_TOKEN}`;
 
 		return await extra.connect({
@@ -102,10 +109,10 @@ export async function createPage(
 	options: PageOptions = {},
 ): Promise<Page> {
 	const {
-		defaultNavigationTimeout = 20000,
-		defaultTimeout = 12000,
+		defaultNavigationTimeout = 30000, // Increased for better reliability
+		defaultTimeout = 15000, // Increased for better reliability
 		viewport = { width: 1440, height: 900 },
-		// Updated to latest Chrome version (as of 2024)
+		// Default user agent - Browserless stealth will handle fingerprint rotation automatically
 		userAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
 	} = options;
 
@@ -125,6 +132,36 @@ export async function createPage(
 	page.setDefaultTimeout(defaultTimeout);
 	await page.setViewport(viewport);
 	await page.setUserAgent(userAgent);
+
+	// Set up console logging to capture errors and warnings
+	page.on("console", (msg) => {
+		const type = msg.type();
+		const text = msg.text();
+		if (type === "error" || type === "warn") {
+			// eslint-disable-next-line no-console
+			console.log(`[Browser Console ${type.toUpperCase()}]: ${text}`);
+		}
+	});
+
+	// Capture page errors
+	page.on("pageerror", (error) => {
+		// eslint-disable-next-line no-console
+		console.log(`[Page Error]: ${error.message}`);
+	});
+
+	// Capture failed requests
+	page.on("requestfailed", (request) => {
+		// eslint-disable-next-line no-console
+		console.log(
+			`[Request Failed]: ${request.url()} - ${request.failure()?.errorText || "Unknown error"}`,
+		);
+	});
+
+	// Add human-like delays before any interaction (helps avoid detection)
+	// This simulates real user behavior - humans don't interact instantly
+	await new Promise((resolve) =>
+		setTimeout(resolve, 2000 + Math.random() * 3000),
+	);
 
 	// If we're using Browserless, request a Live Debugger URL and persist it for the UI.
 	if (!LOCAL_BROWSER && BROWSERLESS_TOKEN) {
@@ -184,6 +221,8 @@ export async function createPage(
 			});
 
 			// ===== Navigator Properties =====
+			// Note: Browserless stealth handles fingerprint rotation automatically
+			// We only set defaults here - Browserless will handle rotation
 			const languages = ["en-US", "en"];
 			Object.defineProperty(navigator, "languages", { get: () => languages });
 			Object.defineProperty(navigator, "platform", { get: () => "MacIntel" });
@@ -279,17 +318,17 @@ export async function createPage(
 	}
 
 	// Set extra HTTP headers to look more human
-	// NOTE: Removed "Upgrade-Insecure-Requests" header as it causes CORS issues with Instagram
+	// NOTE: Removed "Accept", "Cache-Control", and "Upgrade-Insecure-Requests" headers as they cause CORS issues with Instagram
+	// Let the browser use default headers for better compatibility
 	const pageWithHeaders = page as unknown as {
 		setExtraHTTPHeaders?: (headers: Record<string, string>) => Promise<void>;
 	};
 	if (typeof pageWithHeaders.setExtraHTTPHeaders === "function") {
 		await pageWithHeaders.setExtraHTTPHeaders({
-			Accept:
-				"text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+			// Removed "Accept" - causes CORS errors with Instagram CDN
 			"Accept-Encoding": "gzip, deflate, br, zstd",
 			"Accept-Language": "en-US,en;q=0.9",
-			"Cache-Control": "max-age=0",
+			// Removed "Cache-Control" - causes CORS errors with Instagram
 			"Sec-Ch-Ua":
 				'"Google Chrome";v="131", "Chromium";v="131", "Not_A Brand";v="24"',
 			"Sec-Ch-Ua-Mobile": "?0",

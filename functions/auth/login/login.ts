@@ -9,6 +9,10 @@ import {
 } from "../sessionManager/sessionManager.ts";
 import { createLogger } from "../../shared/logger/logger.ts";
 import { snapshot } from "../../shared/snapshot/snapshot.ts";
+import {
+	navigateToHomeViaUI,
+	verifyHomePageLoaded,
+} from "../../shared/pageVerification/pageVerification.ts";
 
 export type Credentials = {
 	username: string;
@@ -39,6 +43,80 @@ function delay(ms: number): Promise<void> {
 	return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+/**
+ * Ensure the page frame is ready and accessible before attempting navigation.
+ * Throws a recoverable error if frame is permanently detached.
+ */
+async function ensureFrameReady(page: Page): Promise<void> {
+	try {
+		// Check if page is closed
+		if (page.isClosed()) {
+			throw new Error("Page is closed");
+		}
+
+		// Try to access frame - this will throw if detached
+		page.url();
+
+		// If we get here, frame is accessible
+		return;
+	} catch (err) {
+		const errorMsg = err instanceof Error ? err.message : String(err);
+
+		// If frame is detached, wait and retry
+		if (errorMsg.includes("detached Frame")) {
+			logger.warn("ACTION", "Frame is detached, waiting for stability...");
+			await delay(2000);
+
+			// Try again
+			try {
+				page.url();
+				return;
+			} catch (retryErr) {
+				throw new Error(
+					`Frame remains detached after retry: ${retryErr instanceof Error ? retryErr.message : String(retryErr)}`,
+				);
+			}
+		}
+
+		// Re-throw other errors
+		throw err;
+	}
+}
+
+/**
+ * Safely navigate to a URL with frame stability checks and retry logic.
+ * Handles detached frame errors gracefully by checking frame state before navigation.
+ */
+async function safeNavigate(
+	page: Page,
+	url: string,
+	options: {
+		waitUntil?: "load" | "domcontentloaded" | "networkidle0" | "networkidle2";
+		timeout?: number;
+	} = {},
+): Promise<void> {
+	// Ensure frame is ready before navigation
+	await ensureFrameReady(page);
+
+	try {
+		await page.goto(url, options);
+	} catch (err) {
+		const errorMsg = err instanceof Error ? err.message : String(err);
+
+		if (errorMsg.includes("detached Frame")) {
+			logger.warn(
+				"ACTION",
+				"Navigation failed due to detached frame, retrying...",
+			);
+			await delay(2000);
+			await ensureFrameReady(page);
+			await page.goto(url, options);
+		} else {
+			throw err;
+		}
+	}
+}
+
 export async function login(
 	page: Page,
 	creds: Credentials,
@@ -61,51 +139,163 @@ export async function login(
 	logger.info("ACTION", `Starting login process for user: ${creds.username}`);
 
 	// Helper function to wait for frame stability after navigation (critical for Browserless)
-	async function waitForFrameStability(page: Page, timeout: number = 5000): Promise<void> {
+	// Returns true if frame is stable, throws recoverable error if permanently detached
+	async function waitForFrameStability(
+		page: Page,
+		timeout: number = 5000,
+	): Promise<boolean> {
 		try {
+			// Check if page is closed before starting
+			if (page.isClosed()) {
+				throw new Error("Page is closed, cannot check frame stability");
+			}
+
 			// Wait for the main frame to be ready
-			await page.waitForFunction(
-				() => document.readyState === "complete",
-				{ timeout }
-			);
-			
+			await page.waitForFunction(() => document.readyState === "complete", {
+				timeout,
+			});
+
+			// Check again after waitForFunction (page might have closed during wait)
+			if (page.isClosed()) {
+				throw new Error("Page closed during frame stability check");
+			}
+
 			// Additional wait for frame stability in Browserless
 			// This ensures any detached frames from previous navigation are cleared
 			await delay(1000);
-			
+
 			// Verify the main frame is accessible by checking page URL
 			try {
 				page.url(); // This will throw if frame is detached
+				return true; // Frame is stable
 			} catch (frameError) {
+				const errorMsg =
+					frameError instanceof Error ? frameError.message : String(frameError);
+
+				// Check if page closed
+				if (page.isClosed()) {
+					throw new Error("Page closed while checking frame stability");
+				}
+
 				logger.warn(
 					"ACTION",
 					`Frame stability check failed, retrying: ${frameError}`,
 				);
 				// Wait a bit more and try again
 				await delay(2000);
-				page.url(); // Verify again
+
+				// Check again before retry
+				if (page.isClosed()) {
+					throw new Error("Page closed during frame stability retry");
+				}
+
+				try {
+					page.url(); // Verify again
+					return true; // Frame recovered
+				} catch (retryError) {
+					// Frame is permanently detached - throw recoverable error
+					const retryMsg =
+						retryError instanceof Error
+							? retryError.message
+							: String(retryError);
+					throw new Error(
+						`Frame remains detached after retry: ${retryMsg}. Original error: ${errorMsg}`,
+					);
+				}
 			}
 		} catch (err) {
-			// If frame stability check fails, log but continue
-			// The next operation will catch the actual error
+			const errorMsg = err instanceof Error ? err.message : String(err);
+
+			// Check if page closed
+			if (
+				page.isClosed() ||
+				errorMsg.includes("Page is closed") ||
+				errorMsg.includes("Page closed")
+			) {
+				throw new Error(
+					`Page closed during frame stability check: ${errorMsg}`,
+				);
+			}
+
+			// If it's a detached frame error, throw it as a recoverable error
+			if (errorMsg.includes("detached Frame")) {
+				throw new Error(`Frame is permanently detached: ${errorMsg}`);
+			}
+
+			// For timeout or other errors, log and throw recoverable error
 			logger.warn(
 				"ACTION",
 				`Frame stability check timed out or failed: ${err}`,
 			);
+			throw new Error(`Frame stability check failed: ${errorMsg}`);
 		}
 	}
 
-	// Navigate to Instagram first (required before setting cookies)
-	logger.info("ACTION", "Navigating to Instagram homepage");
-	await page.goto("https://www.instagram.com/", {
-		waitUntil: "domcontentloaded",
-		timeout: 15000,
-	});
-	
-	// Wait for frame stability after navigation (critical for Browserless)
-	await waitForFrameStability(page, 5000);
-	
-	logger.info("ACTION", "Successfully navigated to Instagram homepage");
+	// Navigate to Instagram first (required before setting cookies) using UI
+	logger.info("ACTION", "Navigating to Instagram homepage via UI");
+	try {
+		// Check if frame is accessible before attempting UI navigation
+		try {
+			page.url();
+		} catch (frameErr) {
+			const frameMsg =
+				frameErr instanceof Error ? frameErr.message : String(frameErr);
+			if (frameMsg.includes("detached Frame")) {
+				logger.warn(
+					"ACTION",
+					`Frame is detached, cannot navigate via UI. Waiting for frame to recover...`,
+				);
+				// Wait a bit and check if frame recovers
+				await delay(2000);
+				try {
+					page.url();
+					logger.info("ACTION", "Frame recovered, continuing with navigation");
+				} catch {
+					throw new Error(
+						`Frame remains detached and cannot navigate: ${frameMsg}`,
+					);
+				}
+			} else {
+				throw frameErr;
+			}
+		}
+
+		await navigateToHomeViaUI(page);
+		logger.info(
+			"ACTION",
+			"Successfully navigated to Instagram homepage via UI",
+		);
+	} catch (err) {
+		const errorMsg = err instanceof Error ? err.message : String(err);
+
+		// If frame is detached, this is a fatal error - don't try to verify
+		if (errorMsg.includes("detached Frame")) {
+			throw new Error(
+				`Cannot navigate to homepage: frame is detached. ${errorMsg}`,
+			);
+		}
+
+		// If UI navigation fails for other reasons, we might not be on Instagram yet
+		// The browser should already be on Instagram if it was opened with a URL
+		logger.warn(
+			"ACTION",
+			`UI navigation to homepage failed (may already be on homepage): ${err}`,
+		);
+		// Try to verify we're on the homepage (this will handle detached frame gracefully)
+		try {
+			await verifyHomePageLoaded(page);
+		} catch (verifyErr) {
+			const verifyMsg =
+				verifyErr instanceof Error ? verifyErr.message : String(verifyErr);
+			// If verification fails due to detached frame, that's okay - we'll continue
+			if (!verifyMsg.includes("detached Frame")) {
+				logger.warn(
+					"ACTION",
+					`Homepage verification also failed: ${verifyErr}`,
+				);
+			}
+		}
+	}
 	await debugSnapshot(page, `login_after_navigate_${Date.now()}`);
 
 	// Try to load saved cookies after navigation (unless skipped)
@@ -118,18 +308,23 @@ export async function login(
 		logger.info("ACTION", "Skipping cookie loading as requested");
 	}
 
-	// If cookies were loaded, reload the page so they take effect
+	// If cookies were loaded, reload the page so they take effect using UI
 	if (cookiesLoaded) {
-		logger.info("ACTION", "Cookies loaded, reloading page to apply them...");
-		await page.goto("https://www.instagram.com/", {
-			waitUntil: "networkidle2",
-			timeout: 15000,
-		});
-		
-		// Wait for frame stability after navigation (critical for Browserless)
-		await waitForFrameStability(page, 5000);
-		
-		logger.info("ACTION", "Page reloaded with cookies applied");
+		logger.info(
+			"ACTION",
+			"Cookies loaded, reloading page via UI to apply them...",
+		);
+		try {
+			await navigateToHomeViaUI(page);
+			logger.info("ACTION", "Page reloaded with cookies applied via UI");
+		} catch (err) {
+			logger.warn(
+				"ACTION",
+				`UI reload failed, cookies may still apply: ${err}`,
+			);
+			// Verify we're still on homepage
+			await verifyHomePageLoaded(page);
+		}
 
 		// Wait for page to fully load and hydrate
 		await delay(3000);
@@ -169,18 +364,41 @@ export async function login(
 	}
 
 	logger.info("ACTION", "Handling cookie consent and popups");
-	await clickAny(page, [
-		"Allow all cookies",
-		"Allow essential and optional cookies",
-		"Decline optional cookies",
-		"Accept All",
-		"Accept",
-		"OK",
-		"Continue",
-	]);
 
-	// Handle "The messaging tab has a new look" popup that often appears
-	await clickAny(page, ["OK", "Got it", "Got It", "Dismiss"]);
+	// Check if page is still open before trying to interact
+	if (page.isClosed()) {
+		throw new Error("Page is closed, cannot handle cookie consent");
+	}
+
+	try {
+		await clickAny(page, [
+			"Allow all cookies",
+			"Allow essential and optional cookies",
+			"Decline optional cookies",
+			"Accept All",
+			"Accept",
+			"OK",
+			"Continue",
+		]);
+
+		// Handle "The messaging tab has a new look" popup that often appears
+		await clickAny(page, ["OK", "Got it", "Got It", "Dismiss"]);
+	} catch (err) {
+		const errorMsg = err instanceof Error ? err.message : String(err);
+
+		// If target is closed, this is a fatal error - rethrow
+		if (
+			errorMsg.includes("Target closed") ||
+			errorMsg.includes("TargetCloseError")
+		) {
+			throw new Error(
+				`Page target closed while handling cookie consent: ${errorMsg}`,
+			);
+		}
+
+		// For other errors (like element not found), log and continue
+		logger.warn("ACTION", `Error handling cookie consent popups: ${errorMsg}`);
+	}
 
 	logger.info("ACTION", "Popups handled");
 
@@ -320,10 +538,41 @@ export async function login(
 		if (message.includes("detached Frame") && attempt < 3) {
 			logger.warn(
 				"ACTION",
-				`Login form detection failed due to detached frame (attempt ${attempt}). Waiting for frame stability and retrying...`,
+				`Login form detection failed due to detached frame (attempt ${attempt}). Attempting to recover frame and retrying...`,
 			);
-			// Wait for frame stability before retrying
-			await waitForFrameStability(page, 5000);
+
+			// Try to recover from detached frame by navigating to a fresh page
+			// This will create a new frame context
+			try {
+				// Skip frame check since frame is already detached - UI navigation might recover it
+				logger.info(
+					"ACTION",
+					"Attempting to recover frame by navigating to fresh page via UI...",
+				);
+				await navigateToHomeViaUI(page);
+				// Wait for page to stabilize after navigation
+				await delay(3000);
+
+				// Now check if frame is stable
+				try {
+					await waitForFrameStability(page, 5000);
+					logger.info("ACTION", "Frame recovered successfully");
+				} catch (stabilityError) {
+					// Frame still not stable, but continue with retry anyway
+					logger.warn(
+						"ACTION",
+						`Frame stability check failed after recovery attempt: ${stabilityError}. Continuing with retry...`,
+					);
+				}
+			} catch (navError) {
+				// If navigation fails, log but continue with retry attempt
+				// The retry might work if the frame recovers on its own
+				logger.warn(
+					"ACTION",
+					`Could not recover frame by navigation: ${navError}. Continuing with retry attempt...`,
+				);
+			}
+
 			// Short backoff before retrying detection
 			await delay(1000);
 			return await login(page, creds, {
@@ -622,8 +871,8 @@ export async function login(
 					"ACTION",
 					"Still on onetap page after 20 seconds, navigating to home",
 				);
-				await page.goto("https://www.instagram.com/", {
-					waitUntil: "networkidle2",
+				await safeNavigate(page, "https://www.instagram.com/", {
+					waitUntil: "networkidle0",
 					timeout: 15000,
 				});
 				await delay(3000);
