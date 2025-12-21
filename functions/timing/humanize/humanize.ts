@@ -2,6 +2,7 @@
  * Humanization helpers - delays, timeouts, and human-like behaviors.
  */
 import type { Page } from "puppeteer";
+import { createCursor, type GhostCursor } from "ghost-cursor";
 import {
 	DELAY_CATEGORIES,
 	DELAY_SCALE,
@@ -88,8 +89,49 @@ export async function mouseWiggle(page: Page): Promise<void> {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// ADVANCED MOUSE MOVEMENT - HUMAN-LIKE CURVES TO UI ELEMENTS
+// ADVANCED MOUSE MOVEMENT - HUMAN-LIKE CURVES TO UI ELEMENTS (using ghost-cursor)
 // ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Get or create ghost cursor instance for a page
+ * We cache it on the page object to reuse the same cursor instance
+ */
+async function getGhostCursor(page: Page): Promise<GhostCursor> {
+	// Cache the cursor on the page object
+	const pageWithCursor = page as Page & { _ghostCursor?: GhostCursor };
+	if (!pageWithCursor._ghostCursor) {
+		pageWithCursor._ghostCursor = createCursor(page);
+	}
+	return pageWithCursor._ghostCursor;
+}
+
+/**
+ * Calculate context-aware hover delay based on element type
+ * Different element types elicit different hesitation patterns in humans:
+ * - Buttons: Quick, confident clicks (user knows what will happen)
+ * - Links: Very quick clicks (familiar navigation pattern)
+ * - Inputs: Slower, more careful (reading placeholder, considering input)
+ * - Generic: Standard hesitation
+ *
+ * This variation helps evade Instagram's ML models that detect uniform timing patterns.
+ */
+function getContextualHoverDelay(
+	elementType: "button" | "link" | "input" | "generic",
+	override?: number,
+): number {
+	if (override !== undefined) return override;
+
+	switch (elementType) {
+		case "button":
+			return 80 + Math.random() * 150; // 80-230ms - quick decision
+		case "link":
+			return 50 + Math.random() * 120; // 50-170ms - very quick
+		case "input":
+			return 120 + Math.random() * 200; // 120-320ms - more careful
+		default:
+			return 100 + Math.random() * 200; // 100-300ms - standard
+	}
+}
 
 /**
  * Get the center coordinates of a DOM element
@@ -119,23 +161,7 @@ export async function getElementCenter(
 }
 
 /**
- * Calculate a point on a quadratic Bezier curve
- */
-function bezierPoint(
-	start: { x: number; y: number },
-	control: { x: number; y: number },
-	end: { x: number; y: number },
-	t: number,
-): { x: number; y: number } {
-	const x =
-		(1 - t) * (1 - t) * start.x + 2 * (1 - t) * t * control.x + t * t * end.x;
-	const y =
-		(1 - t) * (1 - t) * start.y + 2 * (1 - t) * t * control.y + t * t * end.y;
-	return { x, y };
-}
-
-/**
- * Generate a smooth, human-like mouse movement to a UI element
+ * Generate a smooth, human-like mouse movement to a UI element using ghost-cursor
  */
 export async function moveMouseToElement(
 	page: Page,
@@ -144,112 +170,49 @@ export async function moveMouseToElement(
 		offsetX?: number; // Offset from center (for buttons, forms, etc.)
 		offsetY?: number;
 		duration?: number; // Total movement time in ms (auto-calculated if not provided)
-		steps?: number; // Number of movement steps
+		steps?: number; // Number of movement steps (ignored, ghost-cursor uses its own algorithm)
 		randomize?: boolean; // Add slight randomization
 		distance?: number; // Override distance calculation
 	} = {},
 ): Promise<boolean> {
-	const {
-		offsetX = 0,
-		offsetY = 0,
-		duration,
-		steps = 35, // Reduced from 50 for smoother movement
-		randomize = true,
-		distance: providedDistance,
-	} = options;
+	const { offsetX = 0, offsetY = 0, randomize = true } = options;
 
-	// Get target element position
-	const targetPos = await getElementCenter(page, selector);
-	if (!targetPos) {
-		console.warn(`Element not found: ${selector}`);
+	try {
+		const cursor = await getGhostCursor(page);
+
+		// Get target element
+		const element = await page.$(selector);
+		if (!element) {
+			console.warn(`Element not found: ${selector}`);
+			return false;
+		}
+
+		// Use ghost-cursor's move function which handles bezier curves automatically
+		// The paddingPercentage option adds randomization to the target point
+		await cursor.move(selector, {
+			paddingPercentage: randomize ? 0 : 100, // 0 = random point, 100 = center
+			moveDelay: 0, // We handle delays externally
+		});
+
+		// Apply additional offset if specified
+		if (offsetX !== 0 || offsetY !== 0) {
+			const boundingBox = await element.boundingBox();
+			if (boundingBox) {
+				const currentX = boundingBox.x + boundingBox.width / 2;
+				const currentY = boundingBox.y + boundingBox.height / 2;
+				await cursor.moveTo({ x: currentX + offsetX, y: currentY + offsetY });
+			}
+		}
+
+		return true;
+	} catch (error) {
+		console.warn(`Failed to move mouse to element: ${selector}`, error);
 		return false;
 	}
-
-	// Apply offset and randomization
-	let targetX = targetPos.x + offsetX;
-	let targetY = targetPos.y + offsetY;
-
-	if (randomize) {
-		targetX += (Math.random() - 0.5) * 16; // ±8px randomization (more precise)
-		targetY += (Math.random() - 0.5) * 16;
-	}
-
-	// Get current mouse position
-	const currentPos = await page.evaluate(() => ({
-		x: (window as { mouseX?: number }).mouseX || 0,
-		y: (window as { mouseY?: number }).mouseY || 0,
-	}));
-
-	// Calculate distance for dynamic duration
-	const distance =
-		providedDistance ??
-		Math.sqrt(
-			Math.pow(targetX - currentPos.x, 2) +
-				Math.pow(targetPos.y - currentPos.y, 2),
-		);
-
-	// Dynamic duration based on distance (50-200ms per 100px, more realistic)
-	const calculatedDuration =
-		duration ??
-		Math.max(
-			300, // Minimum 300ms
-			Math.min(1500, distance * 1.8 + 200), // 180ms per 100px + base delay
-		);
-
-	// Calculate control point for curved movement
-	const controlPoint = {
-		x:
-			currentPos.x +
-			(targetX - currentPos.x) * 0.5 +
-			(Math.random() - 0.5) * 100,
-		y:
-			currentPos.y +
-			(targetY - currentPos.y) * 0.3 +
-			(Math.random() - 0.5) * 50,
-	};
-
-	// Animate along the curve with dynamic timing
-	const stepDuration = calculatedDuration / steps;
-	for (let i = 0; i <= steps; i++) {
-		const t = i / steps;
-		const point = bezierPoint(
-			currentPos,
-			controlPoint,
-			{ x: targetX, y: targetY },
-			t,
-		);
-
-		// Add micro-randomization for each step (±1px for precision)
-		const microX = randomize ? point.x + (Math.random() - 0.5) * 2 : point.x;
-		const microY = randomize ? point.y + (Math.random() - 0.5) * 2 : point.y;
-
-		await page.mouse.move(microX, microY);
-
-		// Variable timing between steps (more human-like acceleration/deceleration)
-		let timingVariation = 1.0;
-		if (randomize) {
-			// Accelerate in middle, decelerate at ends (Fitts' Law)
-			const acceleration = Math.sin(t * Math.PI); // Sine wave for smooth acceleration
-			timingVariation = 0.7 + acceleration * 0.6; // 0.7-1.3x variation
-		}
-		await sleep(stepDuration * timingVariation);
-	}
-
-	// Update global mouse position for future movements
-	await page.evaluate(
-		({ x, y }) => {
-			(window as Window & { mouseX?: number; mouseY?: number }).mouseX = x;
-			(window as Window & { mouseX?: number; mouseY?: number }).mouseY = y;
-		},
-		{ x: targetX, y: targetY },
-	);
-
-	return true;
 }
 
 /**
- * Human-like click on a UI element with mouse movement (wrapper for selector-based usage)
- * This is a convenience function that finds the element and passes it to humanLikeClickHandle
+ * Human-like click on a UI element with mouse movement using ghost-cursor
  */
 export async function humanClickElement(
 	page: Page,
@@ -264,64 +227,61 @@ export async function humanClickElement(
 	} = {},
 ): Promise<boolean> {
 	const {
-		offsetX = 0,
-		offsetY = 0,
 		button = "left",
 		clickCount = 1,
 		hoverDelay,
 		elementType = "generic",
 	} = options;
 
-	// Find the element
-	const element = await page.$(selector);
-	if (!element) {
+	try {
+		const cursor = await getGhostCursor(page);
+
+		// Use ghost-cursor's click function which handles movement and clicking
+		await cursor.click(selector, {
+			hesitate: getContextualHoverDelay(elementType, hoverDelay),
+			waitForClick: 35 + Math.random() * 85, // Realistic press duration
+			moveDelay: 60 + Math.random() * 180, // Post-click pause
+			button: button as "left" | "right" | "middle",
+			clickCount: clickCount,
+			paddingPercentage: 30, // Click within 30-70% of element (more realistic)
+		});
+
+		return true;
+	} catch (error) {
+		console.warn(`Failed to click element: ${selector}`, error);
 		return false;
 	}
-
-	// Import here to avoid circular dependencies
-	const { humanLikeClickHandle } = await import(
-		"../../navigation/humanClick/humanClick.ts"
-	);
-
-	// Use the encapsulated humanLikeClickHandle
-	await humanLikeClickHandle(page, element, {
-		offsetX,
-		offsetY,
-		hoverDelay,
-		button,
-		elementType,
-	});
-
-	// Handle double/triple clicks (preserved behavior)
-	for (let i = 1; i < clickCount; i++) {
-		const doubleClickDelay = 120 + Math.random() * 180; // 120-300ms between clicks
-		await sleep(doubleClickDelay);
-		await page.mouse.down({ button });
-		await sleep(35 + Math.random() * 65); // Slightly faster subsequent clicks
-		await page.mouse.up({ button });
-	}
-
-	return true;
 }
 
 /**
- * Hover over an element with smooth mouse movement
+ * Hover over an element with smooth mouse movement using ghost-cursor
  */
 export async function humanHoverElement(
 	page: Page,
 	selector: string,
 	hoverDuration: number = 1000,
 ): Promise<boolean> {
-	const moved = await moveMouseToElement(page, selector);
-	if (!moved) return false;
+	try {
+		const cursor = await getGhostCursor(page);
 
-	// Add realistic hover duration
-	await sleep(hoverDuration + Math.random() * 500);
-	return true;
+		// Move to element
+		await cursor.move(selector, {
+			paddingPercentage: 30, // Random point within element
+			moveDelay: 0, // We handle delays separately
+		});
+
+		// Add realistic hover duration
+		await sleep(hoverDuration + Math.random() * 500);
+		return true;
+	} catch (error) {
+		console.warn(`Failed to hover over element: ${selector}`, error);
+		return false;
+	}
 }
 
 /**
  * Type text into a form field with human-like timing
+ * Uses ghost-cursor for clicking, manual typing for realistic character timing
  */
 export async function humanTypeText(
 	page: Page,
@@ -343,7 +303,7 @@ export async function humanTypeText(
 		correctionDelay = 300,
 	} = options;
 
-	// Click on the input field first (input-specific timing)
+	// Click on the input field first using ghost-cursor (input-specific timing)
 	const clicked = await humanClickElement(page, selector, {
 		elementType: "input",
 		hoverDelay: 150, // Longer hover for inputs (focus consideration)

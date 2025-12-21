@@ -1,6 +1,6 @@
 # Human Mouse Movement Guide
 
-This module provides advanced, human-like mouse interactions for Puppeteer automation with scientifically-accurate timing based on Fitts' Law and human behavior studies.
+This module provides advanced, human-like mouse interactions for Puppeteer automation using the [ghost-cursor](https://github.com/Xetera/ghost-cursor) library for realistic mouse movements, combined with scientifically-accurate timing based on Fitts' Law and human behavior studies.
 
 ## Basic Usage
 
@@ -159,12 +159,12 @@ await humanTypeText(page, 'input.sensitive', 'secret', {
 
 ## Technical Improvements
 
-### Mouse Movement Physics
-- **Distance-based duration**: 180ms per 100px + 200ms base
-- **Bezier curves**: Natural curved paths instead of straight lines
-- **Control points**: Randomized intermediate targets for realism
-- **Micro-randomization**: ±1-2px per step for precision
-- **Acceleration curves**: Sine-wave acceleration following Fitts' Law
+### Mouse Movement Physics (via ghost-cursor)
+- **Ghost-cursor integration**: Uses the industry-standard ghost-cursor library for realistic mouse movements
+- **Sophisticated Bezier curves**: Advanced path generation with multiple control points
+- **Fitts' Law compliance**: Movement speed automatically adjusts based on distance and target size
+- **Natural overshoot**: Realistic mouse overshoot and correction near targets
+- **Adaptive timing**: Intelligent speed adjustments based on movement context
 
 ### Click Timing Realism
 - **Click duration**: 35-120ms (based on human motor studies)

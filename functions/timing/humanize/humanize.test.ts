@@ -33,6 +33,17 @@ jest.unstable_mockModule("../../timing/sleep/sleep.ts", () => ({
 	sleep: sleepMock,
 }));
 
+// Mock ghost-cursor
+const mockCursor = {
+	move: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
+	click: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
+	moveTo: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
+};
+
+jest.unstable_mockModule("ghost-cursor", () => ({
+	createCursor: jest.fn(() => mockCursor),
+}));
+
 // Mock page and element
 const mockBoundingBox =
 	jest.fn<
@@ -75,6 +86,9 @@ describe("Humanize Functions", () => {
 		});
 		(mockPage.$ as jest.Mock<(selector: string) => Promise<unknown>>).mockResolvedValue(mockElement);
 		(mockPage.evaluate as jest.Mock<(fn: unknown, ...args: unknown[]) => Promise<unknown>>).mockResolvedValue({ x: 0, y: 0 });
+		mockCursor.move.mockResolvedValue(undefined);
+		mockCursor.click.mockResolvedValue(undefined);
+		mockCursor.moveTo.mockResolvedValue(undefined);
 	});
 
 	// ═══════════════════════════════════════════════════════════════════════════
@@ -126,7 +140,7 @@ describe("Humanize Functions", () => {
 	// ═══════════════════════════════════════════════════════════════════════════
 
 	describe("moveMouseToElement()", () => {
-		test("moves mouse to element using Bezier curve path", async () => {
+		test("moves mouse to element using ghost-cursor", async () => {
 			const { moveMouseToElement } = await import("./humanize.ts");
 
 			(mockPage.evaluate as jest.Mock<(fn: unknown, ...args: unknown[]) => Promise<unknown>>).mockResolvedValue({ x: 0, y: 0 });
@@ -140,7 +154,7 @@ describe("Humanize Functions", () => {
 			const result = await moveMouseToElement(mockPage, ".distant-element");
 
 			expect(result).toBe(true);
-			expect(mockPage.mouse.move).toHaveBeenCalled();
+			expect(mockCursor.move).toHaveBeenCalled();
 		});
 
 		test("applies offset and randomization to target position", async () => {
@@ -154,7 +168,7 @@ describe("Humanize Functions", () => {
 				randomize: true,
 			});
 
-			expect(mockPage.mouse.move).toHaveBeenCalled();
+			expect(mockCursor.move).toHaveBeenCalled();
 		});
 
 		test("uses custom duration when provided", async () => {
@@ -165,7 +179,7 @@ describe("Humanize Functions", () => {
 			});
 
 			expect(result).toBe(true);
-			expect(mockPage.mouse.move).toHaveBeenCalled();
+			expect(mockCursor.move).toHaveBeenCalled();
 		});
 
 		test("returns false when target element not found", async () => {
@@ -184,15 +198,13 @@ describe("Humanize Functions", () => {
 	// ═══════════════════════════════════════════════════════════════════════════
 
 	describe("humanClickElement()", () => {
-		test("performs complete click sequence: move → hover → down → up", async () => {
+		test("performs complete click sequence using ghost-cursor", async () => {
 			const { humanClickElement } = await import("./humanize.ts");
 
 			const result = await humanClickElement(mockPage, ".button");
 
 			expect(result).toBe(true);
-			expect(mockPage.mouse.move).toHaveBeenCalled();
-			expect(mockPage.mouse.down).toHaveBeenCalledWith({ button: "left" });
-			expect(mockPage.mouse.up).toHaveBeenCalledWith({ button: "left" });
+			expect(mockCursor.click).toHaveBeenCalled();
 		});
 
 		test("applies element-type-specific timing for buttons", async () => {
@@ -202,7 +214,7 @@ describe("Humanize Functions", () => {
 				elementType: "button",
 			});
 
-			expect(mockPage.mouse.move).toHaveBeenCalled();
+			expect(mockCursor.click).toHaveBeenCalled();
 		});
 
 		test("supports different mouse buttons (right click)", async () => {
@@ -212,8 +224,10 @@ describe("Humanize Functions", () => {
 				button: "right",
 			});
 
-			expect(mockPage.mouse.down).toHaveBeenCalledWith({ button: "right" });
-			expect(mockPage.mouse.up).toHaveBeenCalledWith({ button: "right" });
+			expect(mockCursor.click).toHaveBeenCalledWith(
+				".menu",
+				expect.objectContaining({ button: "right" })
+			);
 		});
 
 		test("supports multiple clicks (double-click)", async () => {
@@ -223,8 +237,10 @@ describe("Humanize Functions", () => {
 				clickCount: 2,
 			});
 
-			expect(mockPage.mouse.down).toHaveBeenCalledTimes(2);
-			expect(mockPage.mouse.up).toHaveBeenCalledTimes(2);
+			expect(mockCursor.click).toHaveBeenCalledWith(
+				".element",
+				expect.objectContaining({ clickCount: 2 })
+			);
 		});
 
 		test("respects custom hover delay before clicking", async () => {
@@ -308,13 +324,13 @@ describe("Humanize Functions", () => {
 	// ═══════════════════════════════════════════════════════════════════════════
 
 	describe("humanHoverElement()", () => {
-		test("moves to element and waits for hover duration", async () => {
+		test("moves to element and waits for hover duration using ghost-cursor", async () => {
 			const { humanHoverElement } = await import("./humanize.ts");
 
 			const result = await humanHoverElement(mockPage, ".tooltip", 1000);
 
 			expect(result).toBe(true);
-			expect(mockPage.mouse.move).toHaveBeenCalled();
+			expect(mockCursor.move).toHaveBeenCalled();
 		});
 
 		test("uses default hover duration when not specified", async () => {
@@ -331,7 +347,7 @@ describe("Humanize Functions", () => {
 	// ═══════════════════════════════════════════════════════════════════════════
 
 	describe("Distance-based timing calculations", () => {
-		test("calculates duration based on mouse travel distance", async () => {
+		test("uses ghost-cursor for natural movement timing", async () => {
 			const { moveMouseToElement } = await import("./humanize.ts");
 
 			(mockPage.evaluate as jest.Mock<(fn: unknown, ...args: unknown[]) => Promise<unknown>>).mockResolvedValue({ x: 0, y: 0 });
@@ -344,10 +360,10 @@ describe("Humanize Functions", () => {
 
 			await moveMouseToElement(mockPage, ".element");
 
-			expect(mockPage.mouse.move).toHaveBeenCalled();
+			expect(mockCursor.move).toHaveBeenCalled();
 		});
 
-		test("enforces minimum duration for very close elements", async () => {
+		test("handles close elements naturally", async () => {
 			const { moveMouseToElement } = await import("./humanize.ts");
 
 			(mockPage.evaluate as jest.Mock<(fn: unknown, ...args: unknown[]) => Promise<unknown>>).mockResolvedValue({ x: 0, y: 0 });
@@ -355,7 +371,7 @@ describe("Humanize Functions", () => {
 
 			await moveMouseToElement(mockPage, ".close");
 
-			expect(mockPage.mouse.move).toHaveBeenCalled();
+			expect(mockCursor.move).toHaveBeenCalled();
 		});
 	});
 
@@ -364,20 +380,21 @@ describe("Humanize Functions", () => {
 	// ═══════════════════════════════════════════════════════════════════════════
 
 	describe("Error handling", () => {
-		test("handles element not found gracefully", async () => {
+		test("handles element not found gracefully in click", async () => {
 			const { humanClickElement } = await import("./humanize.ts");
 
-			(mockPage.$ as jest.Mock<(selector: string) => Promise<unknown>>).mockResolvedValueOnce(null);
+			// Make ghost-cursor throw an error when element is not found
+			mockCursor.click.mockRejectedValueOnce(new Error("Element not found"));
 
 			const result = await humanClickElement(mockPage, ".missing");
 
 			expect(result).toBe(false);
 		});
 
-		test("handles bounding box errors gracefully", async () => {
+		test("handles element not found gracefully in move", async () => {
 			const { moveMouseToElement } = await import("./humanize.ts");
 
-			mockBoundingBox.mockResolvedValueOnce(null);
+			(mockPage.$ as jest.Mock<(selector: string) => Promise<unknown>>).mockResolvedValueOnce(null);
 
 			const result = await moveMouseToElement(mockPage, ".no-bounds");
 
