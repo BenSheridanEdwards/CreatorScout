@@ -16,10 +16,9 @@ console.log(
 );
 
 // Dynamic imports so config reads the env we just set
-const { createBrowser, createPage } = await import(
-	"../functions/navigation/browser/browser.ts"
+const { initializeInstagramSession } = await import(
+	"../functions/auth/sessionInitializer/sessionInitializer.ts"
 );
-const { login } = await import("../functions/auth/login/login.ts");
 const { IG_USER, IG_PASS } = await import(
 	"../functions/shared/config/config.ts"
 );
@@ -37,32 +36,23 @@ async function main() {
 	}
 
 	// Headful locally so you can see the window; headless for Browserless
-	const browser = await createBrowser({
+	const { browser } = await initializeInstagramSession({
 		headless: usingLocalBrowser ? false : true,
+		viewport: { width: 1440, height: 900 },
+		debug: true,
+		credentials: { username, password },
+		loginOptions: {
+			skipSubmit: true, // fill but don't log in
+		},
 	});
 
 	try {
-		const page = await createPage(browser, {
-			viewport: { width: 1440, height: 900 },
-		});
-
 		// Wait for browser window to be visible before continuing
 		if (usingLocalBrowser) {
 			console.log("🖥️  Browser window should now be visible on your desktop!");
 			console.log("💡  Check ALL desktops/spaces if you don't see it");
-			console.log("⏳ Waiting 3 seconds for browser to fully load...");
-			await new Promise((resolve) => setTimeout(resolve, 3000));
-			console.log("✅ Continuing with login process...");
+			console.log("✅ Login process completed");
 		}
-
-		await login(
-			page,
-			{ username, password },
-			{
-				skipSubmit: true, // fill but don't log in
-				// skipCookies: true, // uncomment to skip loading saved cookies
-			},
-		);
 	} finally {
 		// Close browser automatically for headless/browserless mode, or when inspect mode is disabled
 		if (!usingLocalBrowser || !inspectMode) {

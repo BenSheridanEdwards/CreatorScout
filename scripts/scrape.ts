@@ -19,19 +19,13 @@
 
 import { existsSync, readFileSync } from "node:fs";
 import type { Browser, Page } from "puppeteer";
-import {
-	createBrowser,
-	createPage,
-} from "../functions/navigation/browser/browser.ts";
+import { initializeInstagramSession } from "../functions/auth/sessionInitializer/sessionInitializer.ts";
 import {
 	extractFollowingUsernames,
 	openFollowingModal,
 	scrollFollowingModal,
 } from "../functions/navigation/modalOperations/modalOperations.ts";
-import {
-	ensureLoggedIn,
-	navigateToProfileAndCheck,
-} from "../functions/navigation/profileNavigation/profileNavigation.ts";
+import { navigateToProfileAndCheck } from "../functions/navigation/profileNavigation/profileNavigation.ts";
 import {
 	addFollowingToQueue,
 	followUserAccount,
@@ -207,9 +201,8 @@ export async function processProfile(
 			return;
 		}
 
-		// Ensure we're logged in
-		await ensureLoggedIn(page, logger);
-		logger.debug("AUTH", `Confirmed logged in for @${username}`);
+		// Session is already initialized and logged in from main function
+		logger.debug("AUTH", `Processing profile @${username}`);
 	} catch (err) {
 		const errorMessage = err instanceof Error ? err.message : String(err);
 		const error = err instanceof Error ? err : new Error(String(err));
@@ -628,9 +621,8 @@ export async function processFollowingList(
 			return;
 		}
 
-		// Ensure we're logged in
-		await ensureLoggedIn(page, logger);
-		logger.debug("AUTH", `Confirmed logged in for seed @${seedUsername}`);
+		// Session is already initialized and logged in from main function
+		logger.debug("AUTH", `Processing seed profile @${seedUsername}`);
 	} catch (err) {
 		const error = err instanceof Error ? err : new Error(String(err));
 		recordError(error, `seed_profile_load_${seedUsername}`, seedUsername);
@@ -1027,16 +1019,15 @@ export async function scrape(debug: boolean = false): Promise<void> {
 	let cycleId: string | null = null;
 
 	try {
-		// Connect to browser
-		logger.info("ACTION", "Connecting to browser...");
-		browser = await createBrowser({ headless: true });
-		const page = await createPage(browser);
-		logger.info("ACTION", "Browser connected successfully");
-
-		// Login (will use saved session if available)
-		logger.info("ACTION", "Logging in to Instagram...");
-		await ensureLoggedIn(page, logger);
-		logger.info("ACTION", "✅ Logged in successfully!");
+		// Initialize session (browser, page, and login)
+		logger.info("ACTION", "Initializing Instagram session...");
+		const session = await initializeInstagramSession({
+			headless: true,
+			debug: debug,
+		});
+		browser = session.browser;
+		const page = session.page;
+		logger.info("ACTION", "✅ Session initialized successfully!");
 
 		// Load seeds
 		const seedsLoaded = await loadSeeds();
@@ -1127,14 +1118,15 @@ export async function scrapeWithoutDM(debug: boolean = false): Promise<void> {
 	let cycleId: string | null = null;
 
 	try {
-		// Create browser session
-		browser = await createBrowser();
-		const page = await createPage(browser);
-
-		// Login (will use saved session if available)
-
-		await ensureLoggedIn(page, logger);
-		logger.info("ACTION", "✅ Logged in successfully!");
+		// Initialize session (browser, page, and login)
+		logger.info("ACTION", "Initializing Instagram session...");
+		const session = await initializeInstagramSession({
+			headless: true,
+			debug: debug,
+		});
+		browser = session.browser;
+		const page = session.page;
+		logger.info("ACTION", "✅ Session initialized successfully!");
 
 		// Load seeds
 		const seedsLoaded = await loadSeeds();

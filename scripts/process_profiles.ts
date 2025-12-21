@@ -6,14 +6,8 @@
  * Example: tsx scripts/process_profiles.ts user1 --analyze
  */
 
-import {
-	createBrowser,
-	createPage,
-} from "../functions/navigation/browser/browser.ts";
-import {
-	ensureLoggedIn,
-	navigateToProfileAndCheck,
-} from "../functions/navigation/profileNavigation/profileNavigation.ts";
+import { initializeInstagramSession } from "../functions/auth/sessionInitializer/sessionInitializer.ts";
+import { navigateToProfileAndCheck } from "../functions/navigation/profileNavigation/profileNavigation.ts";
 import {
 	followUserAccount,
 	sendDMToUser,
@@ -41,14 +35,12 @@ async function processProfiles(
 		options,
 	);
 
-	const browser = await createBrowser({ headless: false });
-	const page = await createPage(browser);
+	const { browser, page } = await initializeInstagramSession({
+		headless: false,
+		debug: true,
+	});
 
 	try {
-		console.log("🔐 Logging in...");
-		await ensureLoggedIn(page);
-		console.log("✅ Logged in successfully\n");
-
 		for (let i = 0; i < usernames.length; i++) {
 			const username = usernames[i];
 			console.log(`[${i + 1}/${usernames.length}] Processing @${username}`);

@@ -6,24 +6,15 @@
  * Example: tsx scripts/follow_user.ts bensheridanedwards --confirm --force  # Bypass database check
  */
 
-import {
-	createBrowser,
-	createPage,
-} from "../functions/navigation/browser/browser.ts";
-import { ensureLoggedIn } from "../functions/navigation/profileNavigation/profileNavigation.ts";
+import { initializeInstagramSession } from "../functions/auth/sessionInitializer/sessionInitializer.ts";
 import { followUserAccount } from "../functions/profile/profileActions/profileActions.ts";
 import { wasFollowed } from "../functions/shared/database/database.ts";
-import { createLogger } from "../functions/shared/logger/logger.ts";
 import { saveScreenshot } from "../functions/shared/snapshot/snapshot.ts";
-
-const logger = createLogger(true); // Enable logging for scripts
 
 async function followUser(
 	username: string,
 	force: boolean = false,
 ): Promise<void> {
-	logger.info("INTENTION", `👥 Following user: @${username}`);
-
 	// Default to in-memory DB for this script unless user explicitly opts into Prisma.
 	// Following is the primary goal; DB tracking is best-effort.
 	if (!process.env.SCOUT_DB_MODE) {
@@ -35,70 +26,36 @@ async function followUser(
 	if (!force) {
 		try {
 			if (await wasFollowed(username)) {
-				logger.info("PROFILE", "ℹ️  Already following this user");
-				logger.info(
-					"SYSTEM",
-					"💡 Use --force flag to bypass this check for testing",
-				);
+				console.log("ℹ️  Already following this user");
+				console.log("💡 Use --force flag to bypass this check for testing");
 				return;
 			}
 		} catch (err) {
-			logger.info(
-				"DATABASE",
+			console.log(
 				"ℹ️  Could not check follow history (DB unavailable); continuing anyway",
 			);
-			logger.error("ERROR", `Database check failed: ${err}`);
+			console.error("Database check failed:", err);
 		}
 	} else {
-		logger.info("SYSTEM", "⚡ Force mode: Bypassing database check");
+		console.log("⚡ Force mode: Bypassing database check");
 	}
 
-	const browser = await createBrowser({ headless: false });
-	const page = await createPage(browser);
+	const { browser, page, logger } = await initializeInstagramSession({
+		headless: false,
+		debug: true,
+	});
 
 	try {
-		logger.info("AUTH", "🔐 Logging in...");
-		await ensureLoggedIn(page, logger);
-		logger.info("AUTH", "✅ Logged in successfully");
-
-		// Wait for session to fully establish before navigating
-		logger.info("NAVIGATION", "⏳ Waiting for session to stabilize...");
-		await new Promise((resolve) => setTimeout(resolve, 5000));
-
-		// Take a screenshot to see what the page looks like after login
-		const loginStatePath = await saveScreenshot(
-			page,
-			"login",
-			username,
-			"state",
-		);
-		logger.info(
-			"SCREENSHOT",
-			`📸 Login state screenshot saved: ${loginStatePath}`,
-		);
-
-		// Verify we're still logged in before proceeding
-		const stillLoggedIn = await page.evaluate(() => {
-			return (
-				document.querySelector('a[href="/direct/inbox/"]') !== null ||
-				document.querySelector('svg[aria-label="Home"]') !== null
-			);
-		});
-
-		if (!stillLoggedIn) {
-			throw new Error(
-				"Session lost after login - Instagram may have detected automation",
-			);
-		}
+		console.log(`👥 Following user: @${username}`);
 
 		logger.info("ACTION", `📍 Attempting to follow @${username}...`);
 		const success = await followUserAccount(page, username);
 
 		if (success) {
-			logger.info("ACTION", `✅ Successfully followed @${username}`);
+			console.log(`✅ Successfully followed @${username}`);
 
 			// Wait for follow action to fully complete
-			logger.info("SYSTEM", "⏳ Waiting for follow action to stabilize...");
+			console.log("⏳ Waiting for follow action to stabilize...");
 			await new Promise((resolve) => setTimeout(resolve, 2000));
 
 			// Verify we're still on the profile page
@@ -108,8 +65,7 @@ async function followUser(
 				currentUrl.includes(`/${username.toLowerCase()}/`);
 
 			if (!isOnProfile) {
-				logger.warn(
-					"NAVIGATION",
+				console.log(
 					"⚠️  Not on profile page, navigating back to capture proof...",
 				);
 				await page.goto(`https://www.instagram.com/${username}/`, {
@@ -126,12 +82,9 @@ async function followUser(
 				username,
 				"success",
 			);
-			logger.info(
-				"SCREENSHOT",
-				`📸 Follow success screenshot saved: ${proofPath}`,
-			);
+			console.log(`📸 Follow success screenshot saved: ${proofPath}`);
 		} else {
-			logger.warn("ACTION", `❌ Failed to follow @${username}`);
+			console.log(`❌ Failed to follow @${username}`);
 
 			// Wait a moment for any navigation to complete
 			await new Promise((resolve) => setTimeout(resolve, 2000));
@@ -143,8 +96,7 @@ async function followUser(
 				currentUrl.includes(`/${username.toLowerCase()}/`);
 
 			if (!isOnProfile) {
-				logger.warn(
-					"NAVIGATION",
+				console.log(
 					"⚠️  Not on profile page after follow failure, navigating back to capture screenshot...",
 				);
 				try {
@@ -154,10 +106,7 @@ async function followUser(
 					});
 					await new Promise((resolve) => setTimeout(resolve, 2000));
 				} catch (navError) {
-					logger.error(
-						"NAVIGATION",
-						`⚠️  Could not navigate back to profile: ${navError}`,
-					);
+					console.error(`⚠️  Could not navigate back to profile: ${navError}`);
 				}
 			}
 
@@ -170,29 +119,22 @@ async function followUser(
 			});
 
 			if (!stillLoggedIn) {
-				logger.error(
-					"AUTH",
+				console.error(
 					"⚠️  Session expired - cannot capture meaningful screenshot",
 				);
 			}
 
 			// Capture failure screenshot
 			const failPath = await saveScreenshot(page, "follow", username, "failed");
-			logger.info(
-				"SCREENSHOT",
-				`📸 Follow failure screenshot saved: ${failPath}`,
-			);
+			console.log(`📸 Follow failure screenshot saved: ${failPath}`);
 		}
 	} catch (error) {
-		logger.error("ERROR", `❌ Follow operation failed with error: ${error}`);
+		console.error(`❌ Follow operation failed with error: ${error}`);
 		try {
 			const errPath = await saveScreenshot(page, "follow", username, "error");
-			logger.info("SCREENSHOT", `📸 Error screenshot saved: ${errPath}`);
+			console.log(`📸 Error screenshot saved: ${errPath}`);
 		} catch (screenshotErr) {
-			logger.error(
-				"ERROR",
-				`❌ Could not take error screenshot: ${screenshotErr}`,
-			);
+			console.error(`❌ Could not take error screenshot: ${screenshotErr}`);
 		}
 	} finally {
 		await browser.close();
@@ -206,23 +148,21 @@ const confirm =
 const force = args.includes("--force") || args.includes("-f");
 const username = args.find((a) => !a.startsWith("-"));
 if (!username) {
-	logger.error("ERROR", "❌ Please provide a username");
-	logger.error(
-		"ERROR",
+	console.error("❌ Please provide a username");
+	console.error(
 		"Usage: tsx scripts/follow_user.ts <username> [--confirm] [--force]",
 	);
 	process.exit(1);
 }
 
 if (!confirm) {
-	logger.info(
-		"SYSTEM",
+	console.log(
 		`🛑 Safety stop: not following any user. Re-run with --confirm to actually follow @${username}.`,
 	);
 	process.exit(0);
 }
 
 followUser(username, force).catch((error) => {
-	logger.error("ERROR", `Unhandled error in follow script: ${error}`);
+	console.error(`Unhandled error in follow script: ${error}`);
 	process.exit(1);
 });

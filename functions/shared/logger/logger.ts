@@ -26,7 +26,8 @@ export type LogPrefix =
 	| "VERIFY"
 	| "NAVIGATE"
 	| "WAIT"
-	| "SUCCESS";
+	| "SUCCESS"
+	| "SESSION";
 
 export interface Logger {
 	debug(prefix: LogPrefix, message: string, ...args: unknown[]): void;

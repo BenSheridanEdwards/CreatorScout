@@ -1,17 +1,6 @@
-import {
-	createBrowser,
-	createPage,
-} from "../functions/navigation/browser/browser.ts";
-import { ensureLoggedIn } from "../functions/navigation/profileNavigation/profileNavigation.ts";
-import { createLogger } from "../functions/shared/logger/logger.ts";
-import {
-	detectIfOnInstagramLogin,
-	waitForInstagramContent,
-} from "../functions/shared/waitForContent/waitForContent.ts";
+import { initializeInstagramSession } from "../functions/auth/sessionInitializer/sessionInitializer.ts";
 import { getConfirmedCreatorsNotDmBefore } from "../functions/shared/database/database.ts";
 import { sendDMToUser } from "../functions/profile/profileActions/profileActions.ts";
-
-const logger = createLogger(process.env.DEBUG_LOGS === "true");
 
 /**
  * Script to fetch confirmed creators from the database,
@@ -19,34 +8,16 @@ const logger = createLogger(process.env.DEBUG_LOGS === "true");
  * and message them sequentially
  */
 export async function sendDmsToKnownCreators(): Promise<void> {
-	logger.info(
-		"ACTION",
-		"Starting to send DMs to known creators that haven't been messaged yet",
-	);
-
-	// Create browser instance
-	const browser = await createBrowser({ headless: false });
-	const page = await createPage(browser);
-
-	// Navigate & verify Instagram login page has loaded successfully
+	const { browser, page, logger } = await initializeInstagramSession({
+		headless: false,
+		debug: process.env.DEBUG_LOGS === "true",
+	});
 
 	try {
-		logger.info("NAVIGATION", "📱 Navigating to Instagram...");
-
-		// Navigate directly to see what's there
-		await page.goto("https://www.instagram.com/", {
-			waitUntil: "networkidle0",
-			timeout: 30000,
-		});
-
-		// Wait for page to load
-		await waitForInstagramContent(page, 30000);
-
-		// Check if we're on the login page
-		await detectIfOnInstagramLogin(page);
-
-		// Login via username/password or cookies
-		await ensureLoggedIn(page, logger);
+		logger.info(
+			"ACTION",
+			"Starting to send DMs to known creators that haven't been messaged yet",
+		);
 
 		const confirmedCreatorsNotDmBefore =
 			await getConfirmedCreatorsNotDmBefore();

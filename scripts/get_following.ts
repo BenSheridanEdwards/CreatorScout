@@ -5,22 +5,12 @@
  * Example: tsx scripts/get_following.ts patreon_creator 50
  */
 
-import type { Browser, Page } from "puppeteer";
-import {
-	createBrowser,
-	createPage,
-} from "../functions/navigation/browser/browser.ts";
-import {
-	ensureLoggedIn,
-	navigateToProfileAndCheck,
-} from "../functions/navigation/profileNavigation/profileNavigation.ts";
+import { initializeInstagramSession } from "../functions/auth/sessionInitializer/sessionInitializer.ts";
+import { navigateToProfileAndCheck } from "../functions/navigation/profileNavigation/profileNavigation.ts";
 import {
 	extractFollowingUsernames,
 	openFollowingModal,
 } from "../functions/navigation/modalOperations/modalOperations.ts";
-import { createLogger } from "../functions/shared/logger/logger.ts";
-
-const logger = createLogger();
 
 async function getFollowing(
 	username: string,
@@ -28,14 +18,12 @@ async function getFollowing(
 ): Promise<void> {
 	console.log(`📋 Getting following list for: @${username} (max ${count})`);
 
-	const browser = await createBrowser({ headless: false });
-	const page = await createPage(browser);
+	const { browser, page } = await initializeInstagramSession({
+		headless: false,
+		debug: true,
+	});
 
 	try {
-		console.log("🔐 Logging in...");
-		await ensureLoggedIn(page, logger);
-		console.log("✅ Logged in successfully");
-
 		console.log(`📍 Navigating to @${username}...`);
 		const status = await navigateToProfileAndCheck(page, username, {
 			timeout: 15000,

@@ -6,17 +6,10 @@
  * Example: tsx scripts/dm_user.ts bensheridanedwards --confirm --force  # Bypass database check
  */
 
-import {
-	createBrowser,
-	createPage,
-} from "../functions/navigation/browser/browser.ts";
-import { ensureLoggedIn } from "../functions/navigation/profileNavigation/profileNavigation.ts";
+import { initializeInstagramSession } from "../functions/auth/sessionInitializer/sessionInitializer.ts";
 import { sendDMToUser } from "../functions/profile/profileActions/profileActions.ts";
 import { wasDmSent } from "../functions/shared/database/database.ts";
-import { createLogger } from "../functions/shared/logger/logger.ts";
 import { saveScreenshot } from "../functions/shared/snapshot/snapshot.ts";
-
-const logger = createLogger();
 
 async function dmUser(username: string, force: boolean = false): Promise<void> {
 	console.log(`💬 Started script to send DM to: @${username}`);
@@ -46,42 +39,12 @@ async function dmUser(username: string, force: boolean = false): Promise<void> {
 		console.log("⚡ Force mode: Bypassing database check");
 	}
 
-	// Create browser and begin
-	const browser = await createBrowser({ headless: false });
-	const page = await createPage(browser);
+	const { browser, page } = await initializeInstagramSession({
+		headless: false,
+		debug: true,
+	});
 
 	try {
-		console.log("🔐 Logging in...");
-		await ensureLoggedIn(page, logger);
-		console.log("✅ Logged in successfully");
-
-		// Wait for session to fully establish before navigating
-		console.log("⏳ Waiting for session to stabilize...");
-		await new Promise((resolve) => setTimeout(resolve, 5000));
-
-		// Take a screenshot to see what the page looks like after login
-		const loginStatePath = await saveScreenshot(
-			page,
-			"login",
-			username,
-			"state",
-		);
-		console.log(`📸 Login state screenshot saved: ${loginStatePath}`);
-
-		// Verify we're still logged in before proceeding
-		const stillLoggedIn = await page.evaluate(() => {
-			return (
-				document.querySelector('a[href="/direct/inbox/"]') !== null ||
-				document.querySelector('svg[aria-label="Home"]') !== null
-			);
-		});
-
-		if (!stillLoggedIn) {
-			throw new Error(
-				"Session lost after login - Instagram may have detected automation",
-			);
-		}
-
 		console.log(`📨 Sending DM to @${username}...`);
 		const success = await sendDMToUser(page, username);
 

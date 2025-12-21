@@ -5,28 +5,20 @@
  * Example: tsx scripts/analyze_profile.ts patreon_creator
  */
 
-import {
-	createBrowser,
-	createPage,
-} from "../functions/navigation/browser/browser.ts";
-import {
-	ensureLoggedIn,
-	navigateToProfileAndCheck,
-} from "../functions/navigation/profileNavigation/profileNavigation.ts";
+import { initializeInstagramSession } from "../functions/auth/sessionInitializer/sessionInitializer.ts";
+import { navigateToProfileAndCheck } from "../functions/navigation/profileNavigation/profileNavigation.ts";
 import { analyzeProfileComprehensive } from "../functions/profile/profileAnalysis/profileAnalysis.ts";
 import { CONFIDENCE_THRESHOLD } from "../functions/shared/config/config.ts";
 
 async function analyzeProfile(username: string): Promise<void> {
 	console.log(`🔍 Analyzing profile: @${username}`);
 
-	const browser = await createBrowser({ headless: false });
-	const page = await createPage(browser);
+	const { browser, page } = await initializeInstagramSession({
+		headless: false,
+		debug: true,
+	});
 
 	try {
-		console.log("🔐 Logging in...");
-		await ensureLoggedIn(page);
-		console.log("✅ Logged in successfully");
-
 		console.log(`📍 Navigating to @${username}...`);
 		const status = await navigateToProfileAndCheck(page, username, {
 			timeout: 15000,
@@ -55,16 +47,16 @@ async function analyzeProfile(username: string): Promise<void> {
 
 		if (analysis.links && analysis.links.length > 0) {
 			console.log(`Links found: ${analysis.links.length}`);
-			// biome-ignore lint/suspicious/useIterableCallbackReturn: <explanation>
-			analysis.links.forEach((link) => console.log(`  • ${link}`));
+			for (const link of analysis.links) {
+				console.log(`  • ${link}`);
+			}
 		}
 
 		if (analysis.indicators?.length > 0) {
 			console.log("Key indicators:");
-			// biome-ignore lint/suspicious/useIterableCallbackReturn: <explanation>
-			analysis.indicators.forEach((indicator) =>
-				console.log(`  • ${indicator}`),
-			);
+			for (const indicator of analysis.indicators) {
+				console.log(`  • ${indicator}`);
+			}
 		}
 
 		const meetsThreshold = analysis.confidence >= CONFIDENCE_THRESHOLD;

@@ -8,13 +8,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import dotenv from "dotenv";
 import type { Browser } from "puppeteer";
-import {
-	createBrowser,
-	createPage,
-} from "../functions/navigation/browser/browser.ts";
-import { login } from "../functions/auth/login/login.ts";
+import { initializeInstagramSession } from "../functions/auth/sessionInitializer/sessionInitializer.ts";
 import { analyzeProfileComprehensive } from "../functions/profile/profileAnalysis/profileAnalysis.ts";
-import { createLogger } from "../functions/shared/logger/logger.ts";
 import type { ProfileCheckResult } from "../functions/shared/types/types.ts";
 import { IG_USER, IG_PASS } from "../functions/shared/config/config.ts";
 
@@ -26,10 +21,7 @@ async function runProfileCheck(
 	username: string,
 	debug: boolean = false,
 ): Promise<ProfileCheckResult> {
-	const logger = createLogger(process.env.DEBUG_LOGS === "true" || debug);
 	const headless = process.env.HEADLESS !== "false";
-
-	// Note: Using unique user data directory for headed browsers to avoid conflicts
 
 	let browser: Browser | null = null;
 	const result: ProfileCheckResult = {
@@ -44,22 +36,23 @@ async function runProfileCheck(
 		reason: null,
 	};
 
-	logger.info(
-		"ACTION",
-		`Profile check start for @${username} (${headless ? "headless" : "headed"})`,
-	);
-
 	try {
-		browser = await createBrowser({ headless });
-		const page = await createPage(browser);
+		const session = await initializeInstagramSession({
+			headless,
+			debug: process.env.DEBUG_LOGS === "true" || debug,
+			credentials: {
+				username: IG_USER || process.env.INSTAGRAM_USERNAME!,
+				password: IG_PASS || process.env.INSTAGRAM_PASSWORD!,
+			},
+		});
+		browser = session.browser;
+		const page = session.page;
+		const logger = session.logger;
 
-		logger.info("ACTION", "Logging in...");
-		const loginCreds = {
-			username: IG_USER || process.env.INSTAGRAM_USERNAME!,
-			password: IG_PASS || process.env.INSTAGRAM_PASSWORD!,
-		};
-		await login(page, loginCreds);
-		logger.info("ACTION", "Login complete");
+		logger.info(
+			"ACTION",
+			`Profile check start for @${username} (${headless ? "headless" : "headed"})`,
+		);
 
 		logger.info("ACTION", `Navigating to profile @${username}...`);
 		await page.goto(`https://www.instagram.com/${username}/`, {

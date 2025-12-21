@@ -4,19 +4,13 @@
  */
 import { existsSync, readFileSync } from "node:fs";
 import type { Browser, Page } from "puppeteer";
-import {
-	createBrowser,
-	createPage,
-} from "../functions/navigation/browser/browser.ts";
+import { initializeInstagramSession } from "../functions/auth/sessionInitializer/sessionInitializer.ts";
 import {
 	extractFollowingUsernames,
 	openFollowingModal,
 	scrollFollowingModal,
 } from "../functions/navigation/modalOperations/modalOperations.ts";
-import {
-	ensureLoggedIn,
-	navigateToProfileAndCheck,
-} from "../functions/navigation/profileNavigation/profileNavigation.ts";
+import { navigateToProfileAndCheck } from "../functions/navigation/profileNavigation/profileNavigation.ts";
 import {
 	addFollowingToQueue,
 	followUserAccount,
@@ -173,8 +167,7 @@ export async function processProfile(
 			return;
 		}
 
-		// Ensure we're logged in
-		await ensureLoggedIn(page);
+		// Session is already initialized and logged in from main function
 	} catch (err) {
 		const errorMessage = err instanceof Error ? err.message : String(err);
 		const error = err instanceof Error ? err : new Error(String(err));
@@ -275,7 +268,10 @@ export async function processProfile(
 					}
 				}
 			} catch (visionError) {
-				const error = visionError instanceof Error ? visionError : new Error(String(visionError));
+				const error =
+					visionError instanceof Error
+						? visionError
+						: new Error(String(visionError));
 				recordError(error, `vision_analysis_${username}`, username);
 				logger.warn(
 					"ANALYSIS",
@@ -338,7 +334,8 @@ export async function processProfile(
 						metricsTracker.recordDMSent(username);
 					}
 				} catch (dmError) {
-					const error = dmError instanceof Error ? dmError : new Error(String(dmError));
+					const error =
+						dmError instanceof Error ? dmError : new Error(String(dmError));
 					recordError(error, `dm_send_${username}`, username);
 				}
 			} else {
@@ -362,7 +359,10 @@ export async function processProfile(
 						metricsTracker.recordFollowCompleted(username);
 					}
 				} catch (followError) {
-					const error = followError instanceof Error ? followError : new Error(String(followError));
+					const error =
+						followError instanceof Error
+							? followError
+							: new Error(String(followError));
 					recordError(error, `follow_${username}`, username);
 				}
 			} else {
@@ -387,7 +387,10 @@ export async function processProfile(
 					logger.info("QUEUE", `Added ${added} profiles to queue`);
 				}
 			} catch (queueError) {
-				const error = queueError instanceof Error ? queueError : new Error(String(queueError));
+				const error =
+					queueError instanceof Error
+						? queueError
+						: new Error(String(queueError));
 				recordError(error, `queue_expansion_${username}`, username);
 			}
 
@@ -450,8 +453,7 @@ export async function processFollowingList(
 			return;
 		}
 
-		// Ensure we're logged in
-		await ensureLoggedIn(page);
+		// Session is already initialized and logged in from main function
 	} catch (err) {
 		const error = err instanceof Error ? err : new Error(String(err));
 		recordError(error, `seed_profile_load_${seedUsername}`, seedUsername);
@@ -664,15 +666,15 @@ export async function scrape(debug: boolean = false): Promise<void> {
 	let cycleId: string | null = null;
 
 	try {
-		// Connect to browser
-		logger.info("ACTION", "Connecting to browser...");
-		browser = await createBrowser({ headless: true });
-		const page = await createPage(browser);
-
-		// Login (will use saved session if available)
-		logger.info("ACTION", "Logging in to Instagram...");
-		await ensureLoggedIn(page);
-		logger.info("ACTION", "Logged in!");
+		// Initialize session (browser, page, and login)
+		logger.info("ACTION", "Initializing Instagram session...");
+		const session = await initializeInstagramSession({
+			headless: true,
+			debug: debug,
+		});
+		browser = session.browser;
+		const page = session.page;
+		logger.info("ACTION", "✅ Session initialized successfully!");
 
 		// Load seeds
 		const seedsLoaded = await loadSeeds();

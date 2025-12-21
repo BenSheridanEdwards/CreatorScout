@@ -5,11 +5,7 @@
  *   tsx scripts/open_inbox.ts
  */
 
-import {
-	createBrowser,
-	createPage,
-} from "../functions/navigation/browser/browser.ts";
-import { ensureLoggedIn } from "../functions/navigation/profileNavigation/profileNavigation.ts";
+import { initializeInstagramSession } from "../functions/auth/sessionInitializer/sessionInitializer.ts";
 import { sendDMToUser } from "../functions/profile/profileActions/profileActions.ts";
 import { clickAny } from "../functions/navigation/clickAny/clickAny.ts";
 
@@ -52,19 +48,12 @@ async function handleInboxPopupsAndErrors(page: import("puppeteer").Page) {
 }
 
 async function openInbox(): Promise<void> {
-	// Always use a headed browser so you can see what's happening.
-	const browser = await createBrowser({ headless: false });
-	const page = await createPage(browser);
+	const { browser, page } = await initializeInstagramSession({
+		headless: false,
+		debug: true,
+	});
 
 	try {
-		console.log("🔐 Logging in (or restoring session)...");
-		await ensureLoggedIn(page);
-		console.log("✅ Logged in");
-
-		// Give the session a moment to stabilize
-		console.log("⏳ Waiting for session to stabilize...");
-		await new Promise((resolve) => setTimeout(resolve, 3000));
-
 		console.log("📥 Navigating to DM inbox...");
 		await page.goto("https://www.instagram.com/direct/inbox/", {
 			waitUntil: "networkidle2",

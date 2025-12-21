@@ -302,12 +302,19 @@ export async function verifyLoggedIn(page: Page): Promise<boolean> {
 }
 
 /**
+ * @deprecated Use initializeInstagramSession() from functions/auth/sessionInitializer/sessionInitializer.ts instead.
+ * This function is kept for backward compatibility but will be removed in a future version.
+ * 
  * Ensure we're logged in, re-logging if necessary.
  */
 export async function ensureLoggedIn(
 	page: Page,
 	logger: Logger,
 ): Promise<void> {
+	console.warn(
+		"⚠️  DEPRECATION WARNING: ensureLoggedIn() is deprecated. Use initializeInstagramSession() instead.",
+	);
+	
 	logger.info("WAIT", "Checking if logged in");
 
 	// Check if logged in by looking for multiple indicators.
