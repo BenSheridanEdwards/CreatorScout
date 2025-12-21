@@ -12,8 +12,7 @@ export async function waitForInstagramContent(
 	timeout: number = 30000,
 ): Promise<boolean> {
 	const startTime = Date.now();
-
-	logger.info("WAIT", "Waiting for Instagram content to load...");
+	logger.info("WAIT", "⏳ Waiting for Instagram content to load...");
 
 	while (Date.now() - startTime < timeout) {
 		try {
@@ -45,6 +44,21 @@ export async function waitForInstagramContent(
 					document.querySelector('input[type="password"]') !== null;
 
 				const hasAnyText = document.body?.innerText?.trim().length > 50;
+
+				if (
+					hasInstagramLogo ||
+					hasNavElements ||
+					hasMainContent ||
+					hasLoginForm ||
+					hasAnyText
+				) {
+					logger.info("SUCCESS", "✅ Instagram content detected!");
+				} else {
+					logger.info(
+						"ERROR",
+						"⚠️  Instagram content did not load within timeout",
+					);
+				}
 
 				return {
 					hasInstagramLogo,
@@ -84,8 +98,14 @@ export async function waitForInstagramContent(
 			await new Promise((resolve) => setTimeout(resolve, 1000));
 		} catch (err) {
 			const errorMsg = err instanceof Error ? err.message : String(err);
-			if (errorMsg.includes("detached Frame") || errorMsg.includes("Target closed")) {
-				logger.warn("WAIT", `Frame detached while waiting for content: ${errorMsg}`);
+			if (
+				errorMsg.includes("detached Frame") ||
+				errorMsg.includes("Target closed")
+			) {
+				logger.warn(
+					"WAIT",
+					`Frame detached while waiting for content: ${errorMsg}`,
+				);
 				return false;
 			}
 			// Continue waiting for other errors
@@ -106,12 +126,13 @@ export async function waitForPageInteractive(
 ): Promise<void> {
 	try {
 		// Wait for DOM to be ready
-		await page.waitForFunction(
-			() => document.readyState === "complete",
-			{ timeout: Math.min(timeout, 10000) },
-		).catch(() => {
-			logger.warn("WAIT", "readyState check timed out, continuing...");
-		});
+		await page
+			.waitForFunction(() => document.readyState === "complete", {
+				timeout: Math.min(timeout, 10000),
+			})
+			.catch(() => {
+				logger.warn("WAIT", "readyState check timed out, continuing...");
+			});
 
 		// Wait for network to be idle
 		await page.waitForLoadState?.("networkidle").catch(() => {
@@ -125,3 +146,19 @@ export async function waitForPageInteractive(
 	}
 }
 
+export async function detectIfOnInstagramLogin(page: Page): Promise<boolean> {
+	const isLoginPage = await page.evaluate(() => {
+		return (
+			window.location.href.includes("/accounts/login") ||
+			document.querySelector('input[name="username"]') !== null ||
+			document.querySelector('input[type="password"]') !== null ||
+			document.body?.innerText?.toLowerCase().includes("log in") ||
+			document.body?.innerText?.toLowerCase().includes("sign up")
+		);
+	});
+
+	if (isLoginPage)
+		logger.info("SUCCESS", "🔐 Detected: You are on the LOGIN PAGE");
+
+	return isLoginPage;
+}

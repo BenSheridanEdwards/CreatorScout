@@ -6,6 +6,7 @@ import { login } from "../../auth/login/login.ts";
 import { parseProfileStatus } from "../../profile/profileStatus/profileStatus.ts";
 import { IG_PASS, IG_USER } from "../../shared/config/config.ts";
 import { sleep } from "../../timing/sleep/sleep.ts";
+import type { Logger } from "../../shared/logger/logger.ts";
 
 export interface ProfileStatus {
 	isPrivate: boolean;
@@ -303,7 +304,12 @@ export async function verifyLoggedIn(page: Page): Promise<boolean> {
 /**
  * Ensure we're logged in, re-logging if necessary.
  */
-export async function ensureLoggedIn(page: Page): Promise<void> {
+export async function ensureLoggedIn(
+	page: Page,
+	logger: Logger,
+): Promise<void> {
+	logger.info("WAIT", "Checking if logged in");
+
 	// Check if logged in by looking for multiple indicators.
 	// Use element queries instead of page.evaluate so unit tests can mock easily.
 	const inboxLink = await page.$('a[href="/direct/inbox/"]');

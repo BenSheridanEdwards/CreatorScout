@@ -12,6 +12,9 @@ import {
 	BROWSERLESS_TOKEN,
 	LOCAL_BROWSER,
 } from "../../shared/config/config.ts";
+import { createLogger } from "../../shared/logger/logger.ts";
+
+const logger = createLogger();
 
 // Initialize puppeteer-extra with stealth and proxy plugins
 const extra = puppeteer as unknown as {
@@ -51,9 +54,18 @@ export function getUniqueUserDataDir(prefix: string = "browser"): string {
 export async function createBrowser(
 	options: BrowserOptions = {},
 ): Promise<Browser> {
-	const { headless = true, userDataDir: providedUserDataDir } = options;
+	const { userDataDir: providedUserDataDir } = options;
 
-	if (LOCAL_BROWSER) {
+	// Connect to browser (respect LOCAL_BROWSER setting for visibility)
+	const usingLocalBrowser = process.env.LOCAL_BROWSER === "true";
+	logger.info(
+		"ACTION",
+		`Connecting to browser (${usingLocalBrowser ? "visible" : "headless"})...`,
+	);
+
+	const headless = !usingLocalBrowser;
+
+	if (usingLocalBrowser) {
 		// For headed browsers, use unique directory to avoid singleton lock conflicts
 		// For headless browsers, use persistent directory to save cookies
 		const userDataDir =
@@ -77,6 +89,8 @@ export async function createBrowser(
 			userDataDir, // Persistent profile to save cookies
 		});
 
+		logger.info("SUCCESS", "Browser connected successfully");
+
 		return browser;
 	} else {
 		if (!BROWSERLESS_TOKEN) {
@@ -95,9 +109,13 @@ export async function createBrowser(
 		// and are automatically used with the /stealth endpoint on paid plans
 		const wsEndpoint = `wss://chrome.browserless.io/chrome/stealth?token=${BROWSERLESS_TOKEN}`;
 
-		return await extra.connect({
+		const browser = await extra.connect({
 			browserWSEndpoint: wsEndpoint,
 		});
+
+		logger.info("SUCCESS", "Browser connected successfully");
+
+		return browser;
 	}
 }
 

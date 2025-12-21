@@ -20,6 +20,7 @@
 
 import { jest } from "@jest/globals";
 import type { Page } from "puppeteer";
+import { createLogger } from "../../shared/logger/logger.ts";
 
 const loginMock =
 	jest.fn<
@@ -60,9 +61,8 @@ const pageMock = () =>
 		goto: jest
 			.fn<(url: string, opts?: object) => Promise<void>>()
 			.mockResolvedValue(undefined),
-		url: jest
-			.fn<() => string>()
-			.mockReturnValue("https://www.instagram.com/"),
+		url: jest.fn<() => string>().mockReturnValue("https://www.instagram.com/"),
+		isClosed: jest.fn<() => boolean>().mockReturnValue(false),
 		waitForSelector: jest
 			.fn<
 				(
@@ -98,6 +98,8 @@ const pageMock = () =>
 			type: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
 		},
 	}) as unknown as Page;
+
+const logger = createLogger();
 
 describe("profileNavigation", () => {
 	beforeEach(() => {
@@ -288,7 +290,9 @@ describe("profileNavigation", () => {
 
 		test("returns isAccessible: false when profile is private", async () => {
 			const page = pageMock();
-			page.evaluate = jest.fn<() => Promise<string>>().mockResolvedValue("text") as Page["evaluate"];
+			page.evaluate = jest
+				.fn<() => Promise<string>>()
+				.mockResolvedValue("text") as Page["evaluate"];
 			parseProfileStatusMock.mockReturnValue({
 				isPrivate: true,
 				notFound: false,
@@ -301,7 +305,9 @@ describe("profileNavigation", () => {
 
 		test("returns isAccessible: false when profile is not found", async () => {
 			const page = pageMock();
-			page.evaluate = jest.fn<() => Promise<string>>().mockResolvedValue("text") as Page["evaluate"];
+			page.evaluate = jest
+				.fn<() => Promise<string>>()
+				.mockResolvedValue("text") as Page["evaluate"];
 			parseProfileStatusMock.mockReturnValue({
 				isPrivate: false,
 				notFound: true,
@@ -358,7 +364,7 @@ describe("profileNavigation", () => {
 					{} as import("puppeteer").ElementHandle<Element>,
 				) as Page["$"];
 
-			await ensureLoggedIn(page);
+			await ensureLoggedIn(page, logger);
 
 			expect(loginMock).not.toHaveBeenCalled();
 		});
@@ -368,7 +374,7 @@ describe("profileNavigation", () => {
 			page.$ = jest.fn<() => Promise<null>>().mockResolvedValue(null);
 			loginMock.mockResolvedValue(undefined);
 
-			await ensureLoggedIn(page);
+			await ensureLoggedIn(page, logger);
 
 			expect(loginMock).toHaveBeenCalledWith(page, {
 				username: "u",
@@ -389,11 +395,9 @@ describe("profileNavigation", () => {
 				.mockResolvedValue(null) as Page["$"];
 
 			jest.resetModules();
-			const { ensureLoggedIn: freshEnsureLoggedIn } = await import(
-				"./profileNavigation.ts"
-			);
+			const { ensureLoggedIn } = await import("./profileNavigation.ts");
 
-			await expect(freshEnsureLoggedIn(page)).rejects.toThrow(
+			await expect(ensureLoggedIn(page, logger)).rejects.toThrow(
 				"Instagram credentials not configured",
 			);
 			expect(loginMock).not.toHaveBeenCalled();

@@ -13,7 +13,10 @@ import {
 import { ensureLoggedIn } from "../functions/navigation/profileNavigation/profileNavigation.ts";
 import { sendDMToUser } from "../functions/profile/profileActions/profileActions.ts";
 import { wasDmSent } from "../functions/shared/database/database.ts";
+import { createLogger } from "../functions/shared/logger/logger.ts";
 import { saveScreenshot } from "../functions/shared/snapshot/snapshot.ts";
+
+const logger = createLogger();
 
 async function dmUser(username: string, force: boolean = false): Promise<void> {
 	console.log(`💬 Started script to send DM to: @${username}`);
@@ -49,7 +52,7 @@ async function dmUser(username: string, force: boolean = false): Promise<void> {
 
 	try {
 		console.log("🔐 Logging in...");
-		await ensureLoggedIn(page);
+		await ensureLoggedIn(page, logger);
 		console.log("✅ Logged in successfully");
 
 		// Wait for session to fully establish before navigating

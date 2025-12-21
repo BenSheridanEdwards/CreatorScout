@@ -242,6 +242,16 @@ export async function markFollowed(username: string): Promise<void> {
 	});
 }
 
+export async function getConfirmedCreatorsNotDmBefore() {
+	const prisma = getPrisma();
+
+	const matchingProfiles = await prisma.profile.findMany({
+		where: { isCreator: true },
+	});
+
+	return matchingProfiles;
+}
+
 // === Following Scrape Tracking ===
 
 export async function getScrollIndex(username: string): Promise<number> {

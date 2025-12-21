@@ -117,6 +117,92 @@ async function safeNavigate(
 	}
 }
 
+// Helper function to wait for frame stability after navigation (critical for Browserless)
+// Returns true if frame is stable, throws recoverable error if permanently detached
+async function waitForFrameStability(
+	page: Page,
+	timeout: number = 5000,
+): Promise<boolean> {
+	try {
+		// Check if page is closed before starting
+		if (page?.isClosed()) {
+			throw new Error("Page is closed, cannot check frame stability");
+		}
+
+		// Wait for the main frame to be ready
+		await page.waitForFunction(() => document.readyState === "complete", {
+			timeout,
+		});
+
+		// Check again after waitForFunction (page might have closed during wait)
+		if (page?.isClosed()) {
+			throw new Error("Page closed during frame stability check");
+		}
+
+		// Additional wait for frame stability in Browserless
+		// This ensures any detached frames from previous navigation are cleared
+		await delay(1000);
+
+		// Verify the main frame is accessible by checking page URL
+		try {
+			page.url(); // This will throw if frame is detached
+			return true; // Frame is stable
+		} catch (frameError) {
+			const errorMsg =
+				frameError instanceof Error ? frameError.message : String(frameError);
+
+			// Check if page closed
+			if (page?.isClosed()) {
+				throw new Error("Page closed while checking frame stability");
+			}
+
+			logger.warn(
+				"ACTION",
+				`Frame stability check failed, retrying: ${frameError}`,
+			);
+			// Wait a bit more and try again
+			await delay(2000);
+
+			// Check again before retry
+			if (page?.isClosed()) {
+				throw new Error("Page closed during frame stability retry");
+			}
+
+			try {
+				page.url(); // Verify again
+				return true; // Frame recovered
+			} catch (retryError) {
+				// Frame is permanently detached - throw recoverable error
+				const retryMsg =
+					retryError instanceof Error ? retryError.message : String(retryError);
+				throw new Error(
+					`Frame remains detached after retry: ${retryMsg}. Original error: ${errorMsg}`,
+				);
+			}
+		}
+	} catch (err) {
+		const errorMsg = err instanceof Error ? err.message : String(err);
+
+		// Check if page closed
+		if (
+			page?.isClosed() ||
+			errorMsg.includes("Page is closed") ||
+			errorMsg.includes("Page closed")
+		) {
+			throw new Error(`Page closed during frame stability check: ${errorMsg}`);
+		}
+
+		// If it's a detached frame error, throw it as a recoverable error
+		if (errorMsg.includes("detached Frame")) {
+			throw new Error(`Frame is permanently detached: ${errorMsg}`);
+		}
+
+		// For timeout or other errors, log and throw recoverable error
+		logger.warn("ACTION", `Frame stability check timed out or failed: ${err}`);
+		throw new Error(`Frame stability check failed: ${errorMsg}`);
+	}
+}
+
 export async function login(
 	page: Page,
 	creds: Credentials,
@@ -137,99 +223,6 @@ export async function login(
 ): Promise<string | undefined> {
 	const attempt = options?.attempt ?? 1;
 	logger.info("ACTION", `Starting login process for user: ${creds.username}`);
-
-	// Helper function to wait for frame stability after navigation (critical for Browserless)
-	// Returns true if frame is stable, throws recoverable error if permanently detached
-	async function waitForFrameStability(
-		page: Page,
-		timeout: number = 5000,
-	): Promise<boolean> {
-		try {
-			// Check if page is closed before starting
-			if (page?.isClosed()) {
-				throw new Error("Page is closed, cannot check frame stability");
-			}
-
-			// Wait for the main frame to be ready
-			await page.waitForFunction(() => document.readyState === "complete", {
-				timeout,
-			});
-
-			// Check again after waitForFunction (page might have closed during wait)
-			if (page?.isClosed()) {
-				throw new Error("Page closed during frame stability check");
-			}
-
-			// Additional wait for frame stability in Browserless
-			// This ensures any detached frames from previous navigation are cleared
-			await delay(1000);
-
-			// Verify the main frame is accessible by checking page URL
-			try {
-				page.url(); // This will throw if frame is detached
-				return true; // Frame is stable
-			} catch (frameError) {
-				const errorMsg =
-					frameError instanceof Error ? frameError.message : String(frameError);
-
-				// Check if page closed
-				if (page?.isClosed()) {
-					throw new Error("Page closed while checking frame stability");
-				}
-
-				logger.warn(
-					"ACTION",
-					`Frame stability check failed, retrying: ${frameError}`,
-				);
-				// Wait a bit more and try again
-				await delay(2000);
-
-				// Check again before retry
-				if (page?.isClosed()) {
-					throw new Error("Page closed during frame stability retry");
-				}
-
-				try {
-					page.url(); // Verify again
-					return true; // Frame recovered
-				} catch (retryError) {
-					// Frame is permanently detached - throw recoverable error
-					const retryMsg =
-						retryError instanceof Error
-							? retryError.message
-							: String(retryError);
-					throw new Error(
-						`Frame remains detached after retry: ${retryMsg}. Original error: ${errorMsg}`,
-					);
-				}
-			}
-		} catch (err) {
-			const errorMsg = err instanceof Error ? err.message : String(err);
-
-			// Check if page closed
-			if (
-				page?.isClosed() ||
-				errorMsg.includes("Page is closed") ||
-				errorMsg.includes("Page closed")
-			) {
-				throw new Error(
-					`Page closed during frame stability check: ${errorMsg}`,
-				);
-			}
-
-			// If it's a detached frame error, throw it as a recoverable error
-			if (errorMsg.includes("detached Frame")) {
-				throw new Error(`Frame is permanently detached: ${errorMsg}`);
-			}
-
-			// For timeout or other errors, log and throw recoverable error
-			logger.warn(
-				"ACTION",
-				`Frame stability check timed out or failed: ${err}`,
-			);
-			throw new Error(`Frame stability check failed: ${errorMsg}`);
-		}
-	}
 
 	// Navigate to Instagram first (required before setting cookies) using UI
 	logger.info("ACTION", "Navigating to Instagram homepage via UI");

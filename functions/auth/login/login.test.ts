@@ -1,6 +1,21 @@
 import { jest } from "@jest/globals";
 import type { Page } from "puppeteer";
-import { login } from "./login.ts";
+
+// Mock pageVerification module BEFORE importing login
+const navigateToHomeViaUIMock = jest
+	.fn<() => Promise<void>>()
+	.mockResolvedValue(undefined);
+const verifyHomePageLoadedMock = jest
+	.fn<() => Promise<boolean>>()
+	.mockResolvedValue(true);
+
+jest.unstable_mockModule("../../shared/pageVerification/pageVerification.ts", () => ({
+	navigateToHomeViaUI: navigateToHomeViaUIMock,
+	verifyHomePageLoaded: verifyHomePageLoadedMock,
+}));
+
+// Import login after mocks are set up
+const { login } = await import("./login.ts");
 
 /**
  * Login Function Tests
@@ -82,6 +97,8 @@ describe("login", () => {
 
 	beforeEach(() => {
 		jest.clearAllMocks();
+		navigateToHomeViaUIMock.mockClear();
+		verifyHomePageLoadedMock.mockClear();
 		page = createMockPage();
 	});
 
@@ -93,10 +110,8 @@ describe("login", () => {
 		test("navigates to Instagram homepage on login attempt", async () => {
 			await login(page, { username: "testuser", password: "testpass" });
 
-			expect(page.goto).toHaveBeenCalledWith(
-				"https://www.instagram.com/",
-				expect.objectContaining({ waitUntil: "domcontentloaded" }),
-			);
+			// Login now uses navigateToHomeViaUI instead of page.goto
+			expect(navigateToHomeViaUIMock).toHaveBeenCalledWith(page);
 		});
 	});
 
@@ -110,7 +125,7 @@ describe("login", () => {
 			await login(page, { username: "testuser", password: "testpass" });
 
 			// Navigation must happen first before cookies can be loaded
-			expect(page.goto).toHaveBeenCalled();
+			expect(navigateToHomeViaUIMock).toHaveBeenCalled();
 		});
 
 		test("skips cookie loading when skipCookies option is true", async () => {
@@ -121,7 +136,7 @@ describe("login", () => {
 			);
 
 			// Should still navigate but skip cookie operations
-			expect(page.goto).toHaveBeenCalled();
+			expect(navigateToHomeViaUIMock).toHaveBeenCalled();
 		});
 	});
 
@@ -178,7 +193,7 @@ describe("login", () => {
 			// waitForFunction may be called for frame stability checks, but not for login completion
 			// The key is that skipSubmit means we don't wait for login success indicators
 			// Frame stability checks are separate and always happen
-			expect(page.goto).toHaveBeenCalled();
+			expect(navigateToHomeViaUIMock).toHaveBeenCalled();
 		});
 	});
 
@@ -226,10 +241,7 @@ describe("login", () => {
 			await login(page, { username: "testuser", password: "testpass" });
 
 			// Verify complete flow executed in order
-			expect(page.goto).toHaveBeenCalledWith(
-				"https://www.instagram.com/",
-				expect.objectContaining({ waitUntil: "domcontentloaded" }),
-			);
+			expect(navigateToHomeViaUIMock).toHaveBeenCalledWith(page);
 			expect(page.$).toHaveBeenCalled();
 			expect(page.$).toHaveBeenCalledWith('button[type="submit"]');
 		});

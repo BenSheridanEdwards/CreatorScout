@@ -7,49 +7,33 @@ import {
 	createBrowser,
 	createPage,
 } from "../functions/navigation/browser/browser.ts";
+import { createLogger } from "../functions/shared/logger/logger.ts";
 import { snapshot } from "../functions/shared/snapshot/snapshot.ts";
-import { waitForInstagramContent } from "../functions/shared/waitForContent/waitForContent.ts";
+import {
+	detectIfOnInstagramLogin,
+	waitForInstagramContent,
+} from "../functions/shared/waitForContent/waitForContent.ts";
+
+const logger = createLogger(process.env.DEBUG_LOGS === "true");
 
 async function testInstagramPage(): Promise<void> {
-	console.log("🔍 Starting Instagram page inspection...");
+	logger.info("ACTION", "🔍 Starting Instagram page inspection...");
 
 	const browser = await createBrowser({ headless: false });
 	const page = await createPage(browser);
 
 	try {
-		console.log("📱 Navigating to Instagram...");
+		logger.info("NAVIGATION", "📱 Navigating to Instagram...");
 		// Navigate directly to see what's there
 		await page.goto("https://www.instagram.com/", {
 			waitUntil: "networkidle0",
 			timeout: 30000,
 		});
 
-		console.log("⏳ Waiting for Instagram content to load...");
-		// Wait for Instagram-specific content to appear
-		const contentLoaded = await waitForInstagramContent(page, 30000);
-		if (!contentLoaded) {
-			console.log("⚠️  Instagram content did not load within timeout");
-		} else {
-			console.log("✅ Instagram content detected!");
-		}
-
-		// Wait additional time for dynamic content
-		await new Promise((resolve) => setTimeout(resolve, 3000));
+		await waitForInstagramContent(page, 30000);
 
 		// Check if we're on a login page
-		const isLoginPage = await page.evaluate(() => {
-			return (
-				window.location.href.includes("/accounts/login") ||
-				document.querySelector('input[name="username"]') !== null ||
-				document.querySelector('input[type="password"]') !== null ||
-				document.body?.innerText?.toLowerCase().includes("log in") ||
-				document.body?.innerText?.toLowerCase().includes("sign up")
-			);
-		});
-
-		if (isLoginPage) {
-			console.log("🔐 Detected: You are on the LOGIN PAGE");
-		}
+		await detectIfOnInstagramLogin(page);
 
 		// Check for iframes
 		const iframeCount = await page.evaluate(() => {

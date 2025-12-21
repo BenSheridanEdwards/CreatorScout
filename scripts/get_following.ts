@@ -18,6 +18,9 @@ import {
 	extractFollowingUsernames,
 	openFollowingModal,
 } from "../functions/navigation/modalOperations/modalOperations.ts";
+import { createLogger } from "../functions/shared/logger/logger.ts";
+
+const logger = createLogger();
 
 async function getFollowing(
 	username: string,
@@ -30,7 +33,7 @@ async function getFollowing(
 
 	try {
 		console.log("🔐 Logging in...");
-		await ensureLoggedIn(page);
+		await ensureLoggedIn(page, logger);
 		console.log("✅ Logged in successfully");
 
 		console.log(`📍 Navigating to @${username}...`);

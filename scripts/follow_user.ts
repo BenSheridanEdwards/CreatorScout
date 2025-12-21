@@ -58,7 +58,7 @@ async function followUser(
 
 	try {
 		logger.info("AUTH", "🔐 Logging in...");
-		await ensureLoggedIn(page);
+		await ensureLoggedIn(page, logger);
 		logger.info("AUTH", "✅ Logged in successfully");
 
 		// Wait for session to fully establish before navigating

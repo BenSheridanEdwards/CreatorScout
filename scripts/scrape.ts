@@ -208,7 +208,7 @@ export async function processProfile(
 		}
 
 		// Ensure we're logged in
-		await ensureLoggedIn(page);
+		await ensureLoggedIn(page, logger);
 		logger.debug("AUTH", `Confirmed logged in for @${username}`);
 	} catch (err) {
 		const errorMessage = err instanceof Error ? err.message : String(err);
@@ -629,7 +629,7 @@ export async function processFollowingList(
 		}
 
 		// Ensure we're logged in
-		await ensureLoggedIn(page);
+		await ensureLoggedIn(page, logger);
 		logger.debug("AUTH", `Confirmed logged in for seed @${seedUsername}`);
 	} catch (err) {
 		const error = err instanceof Error ? err : new Error(String(err));
@@ -1035,7 +1035,7 @@ export async function scrape(debug: boolean = false): Promise<void> {
 
 		// Login (will use saved session if available)
 		logger.info("ACTION", "Logging in to Instagram...");
-		await ensureLoggedIn(page);
+		await ensureLoggedIn(page, logger);
 		logger.info("ACTION", "✅ Logged in successfully!");
 
 		// Load seeds
@@ -1127,51 +1127,13 @@ export async function scrapeWithoutDM(debug: boolean = false): Promise<void> {
 	let cycleId: string | null = null;
 
 	try {
-		// Connect to browser (respect LOCAL_BROWSER setting for visibility)
-		const usingLocalBrowser = process.env.LOCAL_BROWSER === "true";
-		logger.info(
-			"ACTION",
-			`Connecting to browser (${usingLocalBrowser ? "visible" : "headless"})...`,
-		);
-
 		// Create browser session
-		browser = await createBrowser({ headless: !usingLocalBrowser });
+		browser = await createBrowser();
 		const page = await createPage(browser);
 
-		logger.info("ACTION", "Browser connected successfully");
-
-		// Wait for browser window to be visible if using local browser
-		if (usingLocalBrowser) {
-			logger.info(
-				"ACTION",
-				"🖥️  Browser window should now be visible on your desktop!",
-			);
-			logger.info(
-				"ACTION",
-				"💡  Check ALL desktops/spaces if you don't see it",
-			);
-			logger.info(
-				"ACTION",
-				"⏳ Waiting 3 seconds for browser to fully load...",
-			);
-
-			// System notification for browser ready
-			try {
-				const { execSync } = await import("child_process");
-				execSync(
-					`osascript -e 'display notification "Browser window is ready for Instagram discovery" with title "Scout Discovery" subtitle "Check your desktop" sound name "Ping"'`,
-				);
-			} catch (e) {
-				// Ignore notification errors on non-macOS systems
-			}
-
-			await new Promise((resolve) => setTimeout(resolve, 3000));
-			logger.info("ACTION", "✅ Continuing with scraping process...");
-		}
-
 		// Login (will use saved session if available)
-		logger.info("ACTION", "Logging in to Instagram...");
-		await ensureLoggedIn(page);
+
+		await ensureLoggedIn(page, logger);
 		logger.info("ACTION", "✅ Logged in successfully!");
 
 		// Load seeds
