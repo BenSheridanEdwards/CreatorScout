@@ -20,6 +20,7 @@
 		"reanalyze": "tsx scripts/reanalyze_profiles.ts --profile test-account",
 		"reanalyze:all": "tsx scripts/reanalyze_profiles.ts --profile test-account --skip-confirmed",
 		"reanalyze:limit": "tsx scripts/reanalyze_profiles.ts --profile test-account --limit 20",
+		"test:engagement": "tsx scripts/test_random_engagement.ts --profile test-account",
 		"follow": "tsx scripts/follow_user.ts",
 		"dm": "tsx scripts/dm_user.ts",
 		"inbox": "tsx scripts/open_inbox.ts",

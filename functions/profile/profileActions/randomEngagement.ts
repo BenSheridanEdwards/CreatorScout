@@ -2,13 +2,14 @@
  * Random Profile Engagement Module
  *
  * Provides natural-looking engagement actions on profiles to break bot patterns.
- * Implements randomized behavior: view posts, watch reels, like content.
+ * Implements randomized behavior: view posts, watch reels, like content, scroll feed.
  *
  * Distribution:
- * - 40% No action (quick check and leave)
+ * - 20% No action (quick check and leave)
  * - 30% View a post (2-4 seconds)
  * - 20% Watch a reel (5-12 seconds)
- * - 10% Like a post (1-2 seconds)
+ * - 15% Like a post (1-2 seconds)
+ * - 15% Scroll feed (1-3 seconds)
  */
 
 import type { Page } from "puppeteer";
@@ -23,7 +24,7 @@ import { createLogger } from "../../shared/logger/logger.ts";
 const logger = createLogger();
 
 export interface EngagementAction {
-	type: "none" | "view_post" | "watch_reel" | "like_post";
+	type: "none" | "view_post" | "watch_reel" | "like_post" | "scroll_feed";
 	duration: number; // seconds
 	success: boolean;
 }
@@ -39,28 +40,34 @@ export async function performRandomEngagement(
 	const action = Math.random();
 
 	try {
-		if (action < 0.4) {
-			// 40% - No action (quick check and leave)
+		if (action < 0.2) {
+			// 20% - No action (quick check and leave)
 			logger.debug("ENGAGEMENT", `@${username}: No engagement (quick check)`);
 			await microDelay(0.5, 1);
 			return { type: "none", duration: 0.5, success: true };
 		}
 
-		if (action < 0.7) {
+		if (action < 0.5) {
 			// 30% - View a post
 			logger.debug("ENGAGEMENT", `@${username}: Viewing post`);
 			return await viewRandomPost(page, username);
 		}
 
-		if (action < 0.9) {
+		if (action < 0.7) {
 			// 20% - Watch a reel
 			logger.debug("ENGAGEMENT", `@${username}: Watching reel`);
 			return await watchRandomReel(page, username);
 		}
 
-		// 10% - Like a post
-		logger.debug("ENGAGEMENT", `@${username}: Liking post`);
-		return await likeRandomPost(page, username);
+		if (action < 0.85) {
+			// 15% - Like a post
+			logger.debug("ENGAGEMENT", `@${username}: Liking post`);
+			return await likeRandomPost(page, username);
+		}
+
+		// 15% - Scroll feed
+		logger.debug("ENGAGEMENT", `@${username}: Scrolling feed`);
+		return await scrollProfileFeed(page, username);
 	} catch (error) {
 		logger.debug(
 			"ENGAGEMENT",
@@ -251,21 +258,68 @@ export async function likeRandomPost(
 
 /**
  * Decide whether to engage based on bio score
- * Higher scores = more likely to engage
+ * MORE CONSISTENT: Engage frequently on all profiles to avoid bot patterns
+ * Slight bias towards higher scores to appear more interested in good content
  */
 export function shouldEngageOnProfile(bioScore: number): boolean {
 	if (bioScore < 20) {
-		// Low score - rarely engage (10% chance)
-		return Math.random() < 0.1;
+		// Low score - still engage frequently (50% chance)
+		return Math.random() < 0.5;
 	}
 
 	if (bioScore < 40) {
-		// Medium score - sometimes engage (40% chance)
-		return Math.random() < 0.4;
+		// Medium score - engage most of the time (60% chance)
+		return Math.random() < 0.6;
 	}
 
-	// High score - usually engage (70% chance)
-	return Math.random() < 0.7;
+	// High score - almost always engage (75% chance)
+	return Math.random() < 0.75;
+}
+
+/**
+ * Scroll through the profile feed naturally
+ */
+export async function scrollProfileFeed(
+	page: Page,
+	username: string,
+): Promise<EngagementAction> {
+	const startTime = Date.now();
+
+	try {
+		// Random number of scrolls (1-3)
+		const scrollCount = 1 + Math.floor(Math.random() * 3);
+
+		for (let i = 0; i < scrollCount; i++) {
+			const scrollAmount = 200 + Math.random() * 300; // 200-500px
+			await page.evaluate((amount) => {
+				window.scrollBy(0, amount);
+			}, scrollAmount);
+
+			// Pause between scrolls (natural reading time)
+			await new Promise((resolve) =>
+				setTimeout(resolve, 500 + Math.random() * 1000),
+			);
+		}
+
+		// Scroll back up a bit (more natural behavior)
+		if (Math.random() > 0.5) {
+			await page.evaluate(() => {
+				window.scrollBy(0, -(100 + Math.random() * 150));
+			});
+			await microDelay(0.3, 0.8);
+		}
+
+		const elapsed = (Date.now() - startTime) / 1000;
+		logger.debug(
+			"ENGAGEMENT",
+			`@${username}: Scrolled feed ${scrollCount}x for ${elapsed.toFixed(1)}s`,
+		);
+
+		return { type: "scroll_feed", duration: elapsed, success: true };
+	} catch (error) {
+		const elapsed = (Date.now() - startTime) / 1000;
+		return { type: "scroll_feed", duration: elapsed, success: false };
+	}
 }
 
 /**
@@ -277,6 +331,7 @@ export function getEngagementStats(actions: EngagementAction[]): {
 	viewPost: number;
 	watchReel: number;
 	likePost: number;
+	scrollFeed: number;
 	totalDuration: number;
 } {
 	return {
@@ -285,6 +340,7 @@ export function getEngagementStats(actions: EngagementAction[]): {
 		viewPost: actions.filter((a) => a.type === "view_post").length,
 		watchReel: actions.filter((a) => a.type === "watch_reel").length,
 		likePost: actions.filter((a) => a.type === "like_post").length,
+		scrollFeed: actions.filter((a) => a.type === "scroll_feed").length,
 		totalDuration: actions.reduce((sum, a) => sum + a.duration, 0),
 	};
 }
