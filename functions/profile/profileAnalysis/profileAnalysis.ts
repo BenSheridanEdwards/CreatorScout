@@ -93,9 +93,9 @@ export async function analyzeProfileBasic(
 	// Queue referenced Instagram profiles for follow-up analysis
 	if (scoreData.referencedProfiles && scoreData.referencedProfiles.length > 0) {
 		logger.log(
-			`📎 Bio references other profiles: ${scoreData.referencedProfiles.map(p => '@' + p).join(', ')}`,
+			`📎 Bio references other profiles: ${scoreData.referencedProfiles.map((p) => "@" + p).join(", ")}`,
 		);
-		
+
 		for (const refProfile of scoreData.referencedProfiles) {
 			try {
 				await queueAdd(refProfile, 15, "referenced_profile");
@@ -170,9 +170,9 @@ export async function analyzeProfileComprehensive(
 		// Queue referenced Instagram profiles for follow-up analysis
 		if (bioScore.referencedProfiles && bioScore.referencedProfiles.length > 0) {
 			logger.log(
-				`📎 Bio references other profiles: ${bioScore.referencedProfiles.map(p => '@' + p).join(', ')}`,
+				`📎 Bio references other profiles: ${bioScore.referencedProfiles.map((p) => "@" + p).join(", ")}`,
 			);
-			
+
 			for (const refProfile of bioScore.referencedProfiles) {
 				try {
 					await queueAdd(refProfile, 15, "referenced_profile");
@@ -270,29 +270,31 @@ export async function analyzeProfileComprehensive(
 					// it's probably a generic content creator (fitness, gaming, etc.)
 					const bioScore = result.bioScore || 0;
 					let adjustedConfidence = linkAnalysis.confidence;
-					
+
 					if (linkAnalysis.confidence < 50 && bioScore < 40) {
 						// Both are weak signals - likely false positive
 						adjustedConfidence = Math.min(linkAnalysis.confidence, 35);
 						result.indicators.push(
-							"⚠️ Weak combined signals (generic content creator, not influencer)"
+							"⚠️ Weak combined signals (generic content creator, not influencer)",
 						);
-						console.log(`[ANALYSIS] ⚠️ Low link confidence (${linkAnalysis.confidence}%) + low bio score (${bioScore}) = likely NOT influencer`);
+						console.log(
+							`[ANALYSIS] ⚠️ Low link confidence (${linkAnalysis.confidence}%) + low bio score (${bioScore}) = likely NOT influencer`,
+						);
 					} else if (linkAnalysis.confidence >= 70 || bioScore >= 60) {
 						// At least one strong signal - trust it
 						result.isCreator = true;
 						adjustedConfidence = linkAnalysis.confidence;
 					} else {
 						// Medium signals - require BOTH to be decent
-						result.isCreator = (linkAnalysis.confidence + bioScore) >= 90;
+						result.isCreator = linkAnalysis.confidence + bioScore >= 90;
 						adjustedConfidence = linkAnalysis.confidence;
 						if (!result.isCreator) {
 							result.indicators.push(
-								`⚠️ Medium signals - needs stronger bio or link indicators`
+								`⚠️ Medium signals - needs stronger bio or link indicators`,
 							);
 						}
 					}
-					
+
 					result.confidence = Math.max(result.confidence, adjustedConfidence);
 					result.indicators.push(...linkAnalysis.indicators);
 					result.reason = linkAnalysis.reason;
@@ -332,26 +334,28 @@ export async function analyzeProfileComprehensive(
 						// Apply same combined signal logic
 						const bioScore = result.bioScore || 0;
 						let adjustedConfidence = linkAnalysis.confidence;
-						
+
 						if (linkAnalysis.confidence < 50 && bioScore < 40) {
 							adjustedConfidence = Math.min(linkAnalysis.confidence, 35);
 							result.indicators.push(
-								"⚠️ Weak combined signals (generic content creator)"
+								"⚠️ Weak combined signals (generic content creator)",
 							);
-							console.log(`[ANALYSIS] ⚠️ Low link confidence (${linkAnalysis.confidence}%) + low bio score (${bioScore}) = likely NOT influencer`);
+							console.log(
+								`[ANALYSIS] ⚠️ Low link confidence (${linkAnalysis.confidence}%) + low bio score (${bioScore}) = likely NOT influencer`,
+							);
 						} else if (linkAnalysis.confidence >= 70 || bioScore >= 60) {
 							result.isCreator = true;
 							adjustedConfidence = linkAnalysis.confidence;
 						} else {
-							result.isCreator = (linkAnalysis.confidence + bioScore) >= 90;
+							result.isCreator = linkAnalysis.confidence + bioScore >= 90;
 							adjustedConfidence = linkAnalysis.confidence;
 							if (!result.isCreator) {
 								result.indicators.push(
-									`⚠️ Medium signals - needs stronger indicators`
+									`⚠️ Medium signals - needs stronger indicators`,
 								);
 							}
 						}
-						
+
 						result.confidence = Math.max(result.confidence, adjustedConfidence);
 						result.indicators.push(...linkAnalysis.indicators);
 						result.reason = linkAnalysis.reason;

@@ -83,13 +83,13 @@ export async function snapshot(page: Page, label: string): Promise<string> {
 			try {
 				await page.screenshot({ path: file, fullPage: true });
 				console.log(`📸 Snapshot saved: ${file}`);
-				
+
 				// Associate with current run if available
 				const runId = getCurrentRunId();
 				if (runId) {
 					await addScreenshotToRun(runId, file);
 				}
-				
+
 				return file;
 			} catch (puppeteerErr) {
 				// If Puppeteer screenshot fails, try CDP directly
@@ -116,13 +116,13 @@ export async function snapshot(page: Page, label: string): Promise<string> {
 								const buffer = Buffer.from(screenshotData.data, "base64");
 								await fs.writeFile(file, buffer);
 								console.log(`📸 Snapshot saved via CDP: ${file}`);
-								
+
 								// Associate with current run if available
 								const runId = getCurrentRunId();
 								if (runId) {
 									await addScreenshotToRun(runId, file);
 								}
-								
+
 								return file;
 							}
 						}
@@ -139,13 +139,13 @@ export async function snapshot(page: Page, label: string): Promise<string> {
 			// For local browser, use standard Puppeteer screenshot
 			await page.screenshot({ path: file, fullPage: true });
 			console.log(`📸 Snapshot saved: ${file}`);
-			
+
 			// Associate with current run if available
 			const runId = getCurrentRunId();
 			if (runId) {
 				await addScreenshotToRun(runId, file);
 			}
-			
+
 			return file;
 		}
 	} catch (err) {

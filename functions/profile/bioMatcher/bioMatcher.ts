@@ -329,6 +329,13 @@ export function calculateScore(bio: string, username?: string): BioScoreResult {
 		{ text: "custom content", label: "CUSTOM CONTENT" },
 		{ text: "loyalfans", label: "LOYALFANS" },
 		{ text: "manyvids", label: "MANYVIDS" },
+		// Highlights = links hidden in Instagram story highlights (90%+ confidence signal)
+		{ text: "in my highlights", label: "LINKS IN HIGHLIGHTS" },
+		{ text: "check my highlights", label: "LINKS IN HIGHLIGHTS" },
+		{ text: "look at my highlights", label: "LINKS IN HIGHLIGHTS" },
+		{ text: "check highlights", label: "LINKS IN HIGHLIGHTS" },
+		{ text: "in highlights", label: "LINKS IN HIGHLIGHTS" },
+		{ text: "what you're looking for is in", label: "LINKS IN HIGHLIGHTS" },
 	];
 
 	for (const signal of definitiveSignals) {
