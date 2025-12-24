@@ -38,9 +38,9 @@ export interface SystemHealth {
 	};
 }
 
-import { query } from "../database/database.ts";
 import { createBrowser } from "../../navigation/browser/browser.ts";
 import { getInstagramCircuitBreaker } from "../circuitBreaker/circuitBreaker.ts";
+import { query } from "../database/database.ts";
 
 const START_TIME = Date.now();
 const VERSION = "1.0.0";
@@ -358,6 +358,3 @@ export function formatHealthStatus(health: SystemHealth): string {
 
 	return output;
 }
-
-
-

@@ -1,6 +1,6 @@
 import { initializeInstagramSession } from "../functions/auth/sessionInitializer/sessionInitializer.ts";
-import { getConfirmedCreatorsNotDmBefore } from "../functions/shared/database/database.ts";
 import { sendDMToUser } from "../functions/profile/profileActions/profileActions.ts";
+import { getConfirmedCreatorsNotDmBefore } from "../functions/shared/database/database.ts";
 
 /**
  * Script to fetch confirmed creators from the database,

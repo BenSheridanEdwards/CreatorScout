@@ -6,8 +6,8 @@
  */
 
 import {
-	getSystemHealth,
 	formatHealthStatus,
+	getSystemHealth,
 } from "../functions/shared/health/health.ts";
 
 async function healthCheck(): Promise<void> {

@@ -13,8 +13,8 @@
  * Returns: Bio text string or null if not found
  */
 
-import { jest } from "@jest/globals";
 import * as fs from "node:fs";
+import { jest } from "@jest/globals";
 import type { ElementHandle, Page } from "puppeteer";
 import {
 	createPageMock,
@@ -127,7 +127,9 @@ describe("getBioFromPage", () => {
 			].join("\n");
 
 			const headerEl = {
-				evaluate: jest.fn<() => Promise<string>>().mockResolvedValue(headerText),
+				evaluate: jest
+					.fn<() => Promise<string>>()
+					.mockResolvedValue(headerText),
 			};
 
 			const page = createPageMock({

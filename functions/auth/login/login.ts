@@ -1,18 +1,18 @@
-import type { Page } from "puppeteer";
 import fs from "node:fs/promises";
+import type { Page } from "puppeteer";
 import { clickAny } from "../../navigation/clickAny/clickAny.ts";
+import { createLogger } from "../../shared/logger/logger.ts";
+import {
+	navigateToHomeViaUI,
+	verifyHomePageLoaded,
+} from "../../shared/pageVerification/pageVerification.ts";
+import { snapshot } from "../../shared/snapshot/snapshot.ts";
 import { humanClickElement } from "../../timing/humanize/humanize.ts";
 import {
 	isLoggedIn,
 	loadCookies,
 	saveCookies,
 } from "../sessionManager/sessionManager.ts";
-import { createLogger } from "../../shared/logger/logger.ts";
-import { snapshot } from "../../shared/snapshot/snapshot.ts";
-import {
-	navigateToHomeViaUI,
-	verifyHomePageLoaded,
-} from "../../shared/pageVerification/pageVerification.ts";
 
 export type Credentials = {
 	username: string;
@@ -422,9 +422,7 @@ export async function login(
 				logger.info("ACTION", `Login form found with selector: ${selector}`);
 				formFound = true;
 				break;
-			} catch {
-				continue;
-			}
+			} catch {}
 		}
 
 		if (!formFound) {
@@ -610,9 +608,7 @@ export async function login(
 				);
 				break;
 			}
-		} catch {
-			continue;
-		}
+		} catch {}
 	}
 
 	if (!usernameField) {
@@ -673,9 +669,7 @@ export async function login(
 				);
 				break;
 			}
-		} catch {
-			continue;
-		}
+		} catch {}
 	}
 
 	if (!passwordField) {
@@ -745,9 +739,7 @@ export async function login(
 				submitClicked = true;
 				break;
 			}
-		} catch {
-			continue;
-		}
+		} catch {}
 	}
 
 	if (!submitClicked) {

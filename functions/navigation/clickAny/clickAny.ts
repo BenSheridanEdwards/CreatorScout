@@ -11,7 +11,7 @@ export async function clickAny(page: Page, texts: string[]): Promise<boolean> {
 	if (page.isClosed()) {
 		throw new Error("Page is closed, cannot click elements");
 	}
-	
+
 	for (const t of texts) {
 		try {
 			// Try button elements first
@@ -35,14 +35,14 @@ export async function clickAny(page: Page, texts: string[]): Promise<boolean> {
 			}
 		} catch (err) {
 			const errorMsg = err instanceof Error ? err.message : String(err);
-			
+
 			// If target is closed, rethrow immediately
-			if (errorMsg.includes("Target closed") || errorMsg.includes("TargetCloseError")) {
+			if (
+				errorMsg.includes("Target closed") ||
+				errorMsg.includes("TargetCloseError")
+			) {
 				throw err;
 			}
-			
-			// For other errors (like element not found), continue to next text
-			continue;
 		}
 	}
 	return false;

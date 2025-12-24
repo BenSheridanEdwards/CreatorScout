@@ -22,9 +22,8 @@ jest.unstable_mockModule("../../timing/sleep/sleep.ts", () => ({
 	sleep: sleepMock,
 }));
 
-const humanLikeClickHandleMock = jest.fn<
-	(page: Page, handle: ElementHandle<Element>) => Promise<void>
->();
+const humanLikeClickHandleMock =
+	jest.fn<(page: Page, handle: ElementHandle<Element>) => Promise<void>>();
 jest.unstable_mockModule("../humanClick/humanClick.ts", () => ({
 	humanLikeClickHandle: humanLikeClickHandleMock,
 }));
@@ -142,20 +141,17 @@ describe("modalOperations", () => {
 		test("filters out 'explore' paths and respects batch limit", async () => {
 			const makeItem = (href: string) =>
 				({
-					evaluate: jest
-						.fn()
-						.mockImplementation(async (fn: unknown) => {
-							if (typeof fn === "function") {
-								return (fn as (arg: { getAttribute: () => string }) => unknown)({ getAttribute: () => href });
-							}
-							return undefined;
-						}),
+					evaluate: jest.fn().mockImplementation(async (fn: unknown) => {
+						if (typeof fn === "function") {
+							return (fn as (arg: { getAttribute: () => string }) => unknown)({
+								getAttribute: () => href,
+							});
+						}
+						return undefined;
+					}),
 				}) as unknown as ElementHandle<Element>;
 
-			const items = [
-				makeItem("/explore/tags/"),
-				makeItem("/realuser/"),
-			];
+			const items = [makeItem("/explore/tags/"), makeItem("/realuser/")];
 
 			const page = {
 				waitForSelector: jest
@@ -205,7 +201,9 @@ describe("modalOperations", () => {
 		});
 
 		test("uses default scroll amount of 600px when not specified", async () => {
-			const evaluateMock = jest.fn<() => Promise<void>>().mockResolvedValue(undefined);
+			const evaluateMock = jest
+				.fn<() => Promise<void>>()
+				.mockResolvedValue(undefined);
 			const page = {
 				evaluate: evaluateMock,
 			} as unknown as Page;

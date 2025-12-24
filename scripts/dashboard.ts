@@ -6,8 +6,8 @@
  */
 
 import {
-	getDashboardMetrics,
 	formatDashboard,
+	getDashboardMetrics,
 } from "../functions/shared/dashboard/dashboard.ts";
 import { sleep } from "../functions/timing/sleep/sleep.ts";
 

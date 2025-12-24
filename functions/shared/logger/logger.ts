@@ -27,7 +27,18 @@ export type LogPrefix =
 	| "NAVIGATE"
 	| "WAIT"
 	| "SUCCESS"
-	| "SESSION";
+	| "SESSION"
+	| "GOLOGIN"
+	| "CRON"
+	| "PROFILES"
+	| "PROXY"
+	| "SCHEDULER"
+	| "COSTS"
+	| "ENGAGEMENT"
+	| "WARMUP"
+	| "LIMITS"
+	| "TEST"
+	| "RAMPUP";
 
 export interface Logger {
 	debug(prefix: LogPrefix, message: string, ...args: unknown[]): void;
@@ -158,16 +169,16 @@ export function createLogger(debug: boolean = false): Logger {
 	return new LoggerImpl(debug);
 }
 
+export {
+	type CycleContext,
+	type CycleError,
+	CycleManager,
+	type CycleWarning,
+} from "./cycleManager.ts";
 // Re-export enhanced logging functionality
 export { createEnhancedLogger, type EnhancedLogger } from "./enhancedLogger.ts";
 export {
-	CycleManager,
-	type CycleContext,
-	type CycleError,
-	type CycleWarning,
-} from "./cycleManager.ts";
-export {
-	createLoggingIntegration,
 	createLoggerWithCycleTracking,
+	createLoggingIntegration,
 	type LoggingConfig,
 } from "./loggingIntegration.ts";

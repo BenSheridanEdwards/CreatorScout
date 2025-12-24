@@ -4,7 +4,7 @@
 import { appendFileSync, existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import type { Page } from "puppeteer";
-import { createLogger, type LogPrefix, type Logger } from "./logger.ts";
+import { createLogger, type Logger, type LogPrefix } from "./logger.ts";
 
 export type LogLevel = "DEBUG" | "INFO" | "WARN" | "ERROR";
 export type CycleStatus = "STARTED" | "COMPLETED" | "FAILED" | "INTERRUPTED";

@@ -1,8 +1,9 @@
 /**
  * Humanization helpers - delays, timeouts, and human-like behaviors.
  */
-import type { Page } from "puppeteer";
+
 import { createCursor, type GhostCursor } from "ghost-cursor";
+import type { Page } from "puppeteer";
 import {
 	DELAY_CATEGORIES,
 	DELAY_SCALE,
@@ -51,6 +52,86 @@ export async function rnd(
 	const [lo, hi] = _scaledSleepBounds(minSec, maxSec);
 	const waitTime = lo + Math.random() * (hi - lo);
 	await sleep(waitTime * 1000);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// EFFICIENT DELAY FUNCTIONS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Simple random delay - efficient for routine actions
+ */
+export async function randomDelay(min: number, max: number): Promise<void> {
+	const [lo, hi] = _scaledSleepBounds(min, max);
+	const delayTime = lo + Math.random() * (hi - lo);
+	await sleep(delayTime * 1000);
+}
+
+/**
+ * Micro-delay for rapid actions (0.5-2s default)
+ * Use between quick consecutive actions
+ */
+export async function microDelay(
+	min: number = 0.5,
+	max: number = 2,
+): Promise<void> {
+	await randomDelay(min, max);
+}
+
+/**
+ * Short delay for routine actions (1-5s)
+ * Use for follows, discovery, scrolling
+ */
+export async function shortDelay(
+	min: number = 1,
+	max: number = 5,
+): Promise<void> {
+	await randomDelay(min, max);
+}
+
+/**
+ * Medium delay for engagement (3-8s)
+ * Use for watching reels, viewing stories
+ */
+export async function mediumDelay(
+	min: number = 3,
+	max: number = 8,
+): Promise<void> {
+	await randomDelay(min, max);
+}
+
+/**
+ * Long delay for high-risk actions (10-30s)
+ * Use ONLY for DMs - these are monitored closely
+ */
+export async function longDelay(
+	min: number = 10,
+	max: number = 30,
+): Promise<void> {
+	await randomDelay(min, max);
+}
+
+/**
+ * Gaussian random number generator using Box-Muller transform
+ * Creates more natural, bell-curve distribution
+ */
+function gaussianRandom(mean: number, stdDev: number): number {
+	const u1 = Math.random();
+	const u2 = Math.random();
+	const z0 = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+	return mean + z0 * stdDev;
+}
+
+/**
+ * Gaussian delay - use for high-risk actions (DMs)
+ * Creates more natural variation centered around the mean
+ */
+export async function gaussianDelay(min: number, max: number): Promise<void> {
+	const [lo, hi] = _scaledSleepBounds(min, max);
+	const mean = (lo + hi) / 2;
+	const stdDev = (hi - lo) / 6; // ~99.7% within range
+	const delayTime = Math.max(lo, Math.min(hi, gaussianRandom(mean, stdDev)));
+	await sleep(delayTime * 1000);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

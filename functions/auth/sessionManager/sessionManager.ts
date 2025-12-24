@@ -79,16 +79,25 @@ export async function isLoggedIn(page: Page): Promise<boolean> {
 			const createButton = !!document.querySelector('[aria-label*="create"]');
 			const homeIcon = !!document.querySelector('svg[aria-label="Home"]');
 			const feed = !!document.querySelector('[role="main"]');
-			const navigation = !!document.querySelector('nav');
-			
+			const navigation = !!document.querySelector("nav");
+
 			// Check for login form (if present, we're NOT logged in)
 			const loginForm = !!document.querySelector('input[name="username"]');
-			const loginButton = Array.from(document.querySelectorAll('button')).some(
-				btn => btn.textContent?.toLowerCase().includes('log in')
+			const loginButton = Array.from(document.querySelectorAll("button")).some(
+				(btn) => btn.textContent?.toLowerCase().includes("log in"),
 			);
-			
+
 			// We're logged in if we have any logged-in indicators AND no login form
-			return (inboxLink || profileLink || createButton || homeIcon || feed || navigation) && !loginForm && !loginButton;
+			return (
+				(inboxLink ||
+					profileLink ||
+					createButton ||
+					homeIcon ||
+					feed ||
+					navigation) &&
+				!loginForm &&
+				!loginButton
+			);
 		});
 		return loggedIn;
 	} catch {

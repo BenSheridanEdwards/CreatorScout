@@ -13,30 +13,30 @@ datasource db {
 }
 
 model Profile {
-  username               String    @id
-  displayName            String?   @map("display_name")
-  bioText                String?   @map("bio_text")
-  linkUrl                String?   @map("link_url")
-  bioScore               Int       @default(0) @map("bio_score")
-  isCreator             Boolean   @default(false) @map("is_patreon")
-  confidence             Int       @default(0)
-  dmSent                 Boolean   @default(false) @map("dm_sent")
-  dmSentAt               DateTime? @map("dm_sent_at") @db.Timestamptz(6)
-  followed               Boolean   @default(false)
-  proofPath              String?   @map("proof_path")
-  visitedAt              DateTime  @default(now()) @map("visited_at") @db.Timestamptz(6)
-  lastSeen               DateTime  @default(now()) @map("last_seen") @db.Timestamptz(6)
+  username    String    @id
+  displayName String?   @map("display_name")
+  bioText     String?   @map("bio_text")
+  linkUrl     String?   @map("link_url")
+  bioScore    Int       @default(0) @map("bio_score")
+  isCreator  Boolean   @default(false) @map("is_patreon")
+  confidence  Int       @default(0)
+  dmSent      Boolean   @default(false) @map("dm_sent")
+  dmSentAt    DateTime? @map("dm_sent_at") @db.Timestamptz(6)
+  followed    Boolean   @default(false)
+  proofPath   String?   @map("proof_path")
+  visitedAt   DateTime  @default(now()) @map("visited_at") @db.Timestamptz(6)
+  lastSeen    DateTime  @default(now()) @map("last_seen") @db.Timestamptz(6)
 
-  processingTimeSeconds  Int?      @map("processing_time_seconds")
-  discoverySource        String?   @map("discovery_source")
-  discoveryDepth         Int       @default(0) @map("discovery_depth")
-  sessionId              String?   @map("session_id")
-  contentCategories      Json?     @map("content_categories") @db.JsonB
-  engagementMetrics      Json?     @map("engagement_metrics") @db.JsonB
-  visionApiCalls         Int       @default(0) @map("vision_api_calls")
-  errorsEncountered      Json?     @map("errors_encountered") @db.JsonB
-  lastErrorAt            DateTime? @map("last_error_at") @db.Timestamptz(6)
-  sourceProfile          String?   @map("source_profile")
+  processingTimeSeconds Int?      @map("processing_time_seconds")
+  discoverySource       String?   @map("discovery_source")
+  discoveryDepth        Int       @default(0) @map("discovery_depth")
+  sessionId             String?   @map("session_id")
+  contentCategories     Json?     @map("content_categories") @db.JsonB
+  engagementMetrics     Json?     @map("engagement_metrics") @db.JsonB
+  visionApiCalls        Int       @default(0) @map("vision_api_calls")
+  errorsEncountered     Json?     @map("errors_encountered") @db.JsonB
+  lastErrorAt           DateTime? @map("last_error_at") @db.Timestamptz(6)
+  sourceProfile         String?   @map("source_profile")
 
   @@index([dmSent], map: "idx_dm_sent")
   @@index([isCreator], map: "idx_is_patreon")
@@ -45,10 +45,10 @@ model Profile {
 }
 
 model QueueItem {
-  username  String   @id
-  priority  Int      @default(10)
-  source    String?
-  addedAt   DateTime @default(now()) @map("added_at") @db.Timestamptz(6)
+  username String   @id
+  priority Int      @default(10)
+  source   String?
+  addedAt  DateTime @default(now()) @map("added_at") @db.Timestamptz(6)
 
   @@map("queue")
 }
@@ -62,22 +62,69 @@ model FollowingScraped {
 }
 
 model Metric {
-  id                      BigInt    @id @default(autoincrement())
-  date                    DateTime?  @db.Date
-  sessionId               String?    @map("session_id")
-  profilesVisited         Int        @default(0) @map("profiles_visited")
-  creatorsFound           Int        @default(0) @map("creators_found")
-  dmsSent                 Int        @default(0) @map("dms_sent")
-  followsCompleted        Int        @default(0) @map("follows_completed")
-  avgBioScore             Decimal?   @map("avg_bio_score") @db.Decimal(5, 2)
-  avgConfidence           Decimal?   @map("avg_confidence") @db.Decimal(5, 2)
-  visionApiCost           Decimal?   @map("vision_api_cost") @db.Decimal(6, 4)
+  id                       BigInt    @id @default(autoincrement())
+  date                     DateTime? @db.Date
+  sessionId                String?   @map("session_id")
+  profilesVisited          Int       @default(0) @map("profiles_visited")
+  creatorsFound            Int       @default(0) @map("creators_found")
+  dmsSent                  Int       @default(0) @map("dms_sent")
+  followsCompleted         Int       @default(0) @map("follows_completed")
+  avgBioScore              Decimal?  @map("avg_bio_score") @db.Decimal(5, 2)
+  avgConfidence            Decimal?  @map("avg_confidence") @db.Decimal(5, 2)
+  visionApiCost            Decimal?  @map("vision_api_cost") @db.Decimal(6, 4)
   avgProcessingTimeSeconds Decimal?  @map("avg_processing_time_seconds") @db.Decimal(6, 2)
-  errorsEncountered       Int        @default(0) @map("errors_encountered")
-  rateLimitsHit           Int        @default(0) @map("rate_limits_hit")
-  createdAt               DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  errorsEncountered        Int       @default(0) @map("errors_encountered")
+  rateLimitsHit            Int       @default(0) @map("rate_limits_hit")
+  createdAt                DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
 
   @@index([date], map: "idx_metrics_date")
   @@index([sessionId], map: "idx_metrics_session")
   @@map("metrics")
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// MULTI-PROFILE MANAGEMENT
+// ═══════════════════════════════════════════════════════════════════════════════
+
+model InstagramProfile {
+  id           String    @id @default(uuid())
+  username     String    @unique
+  password     String // Encrypted in production
+  type         String // 'main' | 'burner'
+  goLoginToken String    @unique @map("gologin_token")
+  proxyConfig  Json?     @map("proxy_config") @db.JsonB
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  archivedAt   DateTime? @map("archived_at") @db.Timestamptz(6)
+
+  // Daily counters (reset at midnight)
+  followsToday     Int      @default(0) @map("follows_today")
+  dmsToday         Int      @default(0) @map("dms_today")
+  discoveriesToday Int      @default(0) @map("discoveries_today")
+  lastResetAt      DateTime @default(now()) @map("last_reset_at") @db.Timestamptz(6)
+
+  // Limits (per profile type)
+  maxFollowsPerDay     Int @map("max_follows_per_day")
+  maxDmsPerDay         Int @map("max_dms_per_day")
+  maxDiscoveriesPerDay Int @map("max_discoveries_per_day")
+
+  // Relations
+  sessions ProfileSession[]
+
+  @@index([type, archivedAt], map: "idx_ig_profile_type")
+  @@map("instagram_profiles")
+}
+
+model ProfileSession {
+  id              String    @id @default(uuid())
+  profileId       String    @map("profile_id")
+  sessionId       String    @map("session_id")
+  startedAt       DateTime  @default(now()) @map("started_at") @db.Timestamptz(6)
+  endedAt         DateTime? @map("ended_at") @db.Timestamptz(6)
+  actions         Json?     @db.JsonB // Track actions in this session
+  durationMinutes Int?      @map("duration_minutes")
+
+  profile InstagramProfile @relation(fields: [profileId], references: [id])
+
+  @@index([profileId, startedAt], map: "idx_profile_session")
+  @@map("profile_sessions")
 }

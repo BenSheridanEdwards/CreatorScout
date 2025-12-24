@@ -54,8 +54,8 @@ export interface DashboardMetrics {
 	}>;
 }
 
-import { query } from "../database/database.ts";
 import { getInstagramCircuitBreaker } from "../circuitBreaker/circuitBreaker.ts";
+import { query } from "../database/database.ts";
 
 const ACTIVITY_LOG_SIZE = 50;
 let recentActivity: DashboardMetrics["recentActivity"] = [];
@@ -107,7 +107,10 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
 		total_errors: "0",
 	};
 
-	const profilesProcessed = Number.parseInt(dailyStats.profiles_processed ?? "0", 10);
+	const profilesProcessed = Number.parseInt(
+		dailyStats.profiles_processed ?? "0",
+		10,
+	);
 	const creatorsFound = Number.parseInt(dailyStats.creators_found ?? "0", 10);
 	const dmsSent = Number.parseInt(dailyStats.dms_sent ?? "0", 10);
 	const followsCompleted = Number.parseInt(
@@ -121,7 +124,8 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
 	// Efficiency metrics
 	const creatorDiscoveryRate =
 		profilesProcessed > 0 ? (creatorsFound / profilesProcessed) * 100 : 0;
-	const dmConversionRate = creatorsFound > 0 ? (dmsSent / creatorsFound) * 100 : 0;
+	const dmConversionRate =
+		creatorsFound > 0 ? (dmsSent / creatorsFound) * 100 : 0;
 
 	const visionCallsRes = await query<{ total_calls: string | null }>(
 		`SELECT COALESCE(SUM(COALESCE(vision_api_calls, 0)), 0)::text as total_calls
@@ -135,7 +139,9 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
 	);
 
 	const visionEfficiency =
-		totalVisionCalls > 0 ? profilesProcessed / totalVisionCalls : profilesProcessed;
+		totalVisionCalls > 0
+			? profilesProcessed / totalVisionCalls
+			: profilesProcessed;
 	const costPerCreator = creatorsFound > 0 ? visionApiCost / creatorsFound : 0;
 
 	// Circuit breaker status

@@ -288,8 +288,6 @@ export async function navigateToHomeViaUI(page: Page): Promise<void> {
 			) {
 				throw err;
 			}
-			// Continue to next selector for other errors
-			continue;
 		}
 	}
 

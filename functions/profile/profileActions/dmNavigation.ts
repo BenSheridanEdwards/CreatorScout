@@ -30,17 +30,19 @@ export interface ButtonInfo {
  * This ensures any detached frames from previous navigation are cleared
  * Returns true if frame is stable, throws recoverable error if permanently detached
  */
-async function waitForFrameStability(page: Page, timeout: number = 5000): Promise<boolean> {
+async function waitForFrameStability(
+	page: Page,
+	timeout: number = 5000,
+): Promise<boolean> {
 	try {
 		// Wait for the main frame to be ready
-		await page.waitForFunction(
-			() => document.readyState === "complete",
-			{ timeout }
-		);
-		
+		await page.waitForFunction(() => document.readyState === "complete", {
+			timeout,
+		});
+
 		// Additional wait for frame stability in Browserless
 		await sleep(1000);
-		
+
 		// Verify the main frame is accessible by checking page URL
 		try {
 			page.url(); // This will throw if frame is detached
@@ -48,10 +50,10 @@ async function waitForFrameStability(page: Page, timeout: number = 5000): Promis
 		} catch (frameError) {
 			const errorMsg =
 				frameError instanceof Error ? frameError.message : String(frameError);
-			
+
 			// Wait a bit more and try again
 			await sleep(2000);
-			
+
 			try {
 				page.url(); // Verify again
 				return true; // Frame recovered
@@ -66,14 +68,17 @@ async function waitForFrameStability(page: Page, timeout: number = 5000): Promis
 		}
 	} catch (err) {
 		const errorMsg = err instanceof Error ? err.message : String(err);
-		
+
 		// If it's a detached frame error, throw it as a recoverable error
 		if (errorMsg.includes("detached Frame")) {
 			throw new Error(`Frame is permanently detached: ${errorMsg}`);
 		}
-		
+
 		// For timeout or other errors, log and throw recoverable error
-		getLogger().warn("ACTION", `Frame stability check timed out or failed: ${err}`);
+		getLogger().warn(
+			"ACTION",
+			`Frame stability check timed out or failed: ${err}`,
+		);
 		throw new Error(`Frame stability check failed: ${errorMsg}`);
 	}
 }
@@ -91,7 +96,10 @@ async function navigateToProfileViaSearch(
 	// Ensure we're on Instagram homepage (or any Instagram page) using UI
 	const currentUrl = page.url();
 	if (!currentUrl.includes("instagram.com")) {
-		getLogger().info("ACTION", "Not on Instagram, navigating to homepage via UI");
+		getLogger().info(
+			"ACTION",
+			"Not on Instagram, navigating to homepage via UI",
+		);
 		try {
 			const { navigateToHomeViaUI, verifyHomePageLoaded } = await import(
 				"../../shared/pageVerification/pageVerification.ts"
@@ -127,18 +135,26 @@ async function navigateToProfileViaSearch(
 			const element = await page.$(selector);
 			if (element) {
 				// If it's an input, just click it. If it's a link/icon, click to open search
-				const tagName = await page.evaluate((el) => el.tagName.toLowerCase(), element);
+				const tagName = await page.evaluate(
+					(el) => el.tagName.toLowerCase(),
+					element,
+				);
 				if (tagName === "input") {
 					await element.click({ delay: 100 + Math.random() * 100 });
 					searchClicked = true;
-					getLogger().info("ACTION", `Found and clicked search input: ${selector}`);
+					getLogger().info(
+						"ACTION",
+						`Found and clicked search input: ${selector}`,
+					);
 					break;
 				} else {
 					// It's a link/icon - click to navigate to search page
 					await element.click({ delay: 100 + Math.random() * 100 });
 					await sleep(1500 + Math.random() * 1000);
 					// Now look for the search input on the search page
-					const searchInput = await page.$('input[placeholder*="Search"], input[aria-label*="Search"]');
+					const searchInput = await page.$(
+						'input[placeholder*="Search"], input[aria-label*="Search"]',
+					);
 					if (searchInput) {
 						await searchInput.click({ delay: 100 + Math.random() * 100 });
 						searchClicked = true;
@@ -147,14 +163,15 @@ async function navigateToProfileViaSearch(
 					}
 				}
 			}
-		} catch (err) {
-			continue;
-		}
+		} catch (err) {}
 	}
 
 	if (!searchClicked) {
 		// Fallback: try navigating to explore/search page directly via UI
-		getLogger().info("ACTION", "Search icon not found, navigating to explore page via UI");
+		getLogger().info(
+			"ACTION",
+			"Search icon not found, navigating to explore page via UI",
+		);
 		try {
 			const exploreLink = await page.$('a[href="/explore/"]');
 			if (exploreLink) {
@@ -169,10 +186,15 @@ async function navigateToProfileViaSearch(
 				throw new Error("Could not find explore link");
 			}
 		} catch (err) {
-			getLogger().warn("ACTION", `UI navigation to explore page failed: ${err}`);
+			getLogger().warn(
+				"ACTION",
+				`UI navigation to explore page failed: ${err}`,
+			);
 		}
 		await sleep(2000);
-		const searchInput = await page.$('input[placeholder*="Search"], input[aria-label*="Search"]');
+		const searchInput = await page.$(
+			'input[placeholder*="Search"], input[aria-label*="Search"]',
+		);
 		if (searchInput) {
 			await searchInput.click({ delay: 100 + Math.random() * 100 });
 			searchClicked = true;
@@ -212,7 +234,10 @@ async function navigateToProfileViaSearch(
 				text.includes(`@${targetUsername}`)
 			) {
 				// Make sure it's a profile link, not something else
-				if (href.match(/^\/[^\/]+\/?$/) || href.includes(`/${targetUsername}/`)) {
+				if (
+					href.match(/^\/[^/]+\/?$/) ||
+					href.includes(`/${targetUsername}/`)
+				) {
 					(link as HTMLElement).click();
 					return true;
 				}
@@ -281,11 +306,9 @@ async function navigateToProfileViaSearch(
 	await handleInstagramPopups(page);
 
 	// Simulate reading the profile (mouse movement)
-	await page.mouse.move(
-		Math.random() * 500 + 200,
-		Math.random() * 300 + 200,
-		{ steps: 10 },
-	);
+	await page.mouse.move(Math.random() * 500 + 200, Math.random() * 300 + 200, {
+		steps: 10,
+	});
 	await sleep(1000 + Math.random() * 1000);
 
 	// Check if we're logged in (reuse finalUrl or get current URL)
@@ -313,7 +336,7 @@ export async function navigateToProfile(
 	username: string,
 ): Promise<void> {
 	const u = username.toLowerCase().trim();
-	
+
 	// Use ONLY search-based navigation - no fallback to direct URL
 	// This is more human-like and avoids frame detachment issues
 	await navigateToProfileViaSearch(page, username);
@@ -345,7 +368,9 @@ export async function simulateNaturalBehavior(page: Page): Promise<void> {
 /**
  * Find the Message button on the profile page
  */
-export async function findMessageButton(page: Page): Promise<ButtonInfo | null> {
+export async function findMessageButton(
+	page: Page,
+): Promise<ButtonInfo | null> {
 	return await page.evaluate(() => {
 		// Modern IG often uses <div role="button"> for the Message control.
 		const buttons = Array.from(
@@ -417,8 +442,12 @@ export async function clickMessageButton(
 		"Moving mouse in natural curved path to Message button",
 	);
 	const currentPos = await page.evaluate(() => ({
-		x: (window as Window & { mouseX?: number; mouseY?: number }).mouseX || window.innerWidth / 2,
-		y: (window as Window & { mouseX?: number; mouseY?: number }).mouseY || window.innerHeight / 2,
+		x:
+			(window as Window & { mouseX?: number; mouseY?: number }).mouseX ||
+			window.innerWidth / 2,
+		y:
+			(window as Window & { mouseX?: number; mouseY?: number }).mouseY ||
+			window.innerHeight / 2,
 	}));
 
 	// Create waypoints for natural curved movement
@@ -490,7 +519,10 @@ export async function navigateToDmThread(
 ): Promise<void> {
 	if (!messageButtonClicked) {
 		// Fallback: try direct navigation to DM thread
-		getLogger().info("ACTION", "Message button not found, trying direct DM URL");
+		getLogger().info(
+			"ACTION",
+			"Message button not found, trying direct DM URL",
+		);
 		// await page.goto(`https://www.instagram.com/direct/t/${u}/`, {
 		// 	waitUntil: "networkidle2",
 		// 	timeout: 15000,
@@ -515,4 +547,3 @@ export async function navigateToDmThread(
 	// Handle any remaining popups before proceeding
 	await handleInstagramPopups(page);
 }
-

@@ -3,13 +3,13 @@
  */
 import { v4 as uuidv4 } from "uuid";
 import {
-	type SessionMetrics,
 	type DailyMetrics,
+	getDailyMetrics,
+	recordError as recordDbError,
+	recordProfileMetrics,
+	type SessionMetrics,
 	startSessionMetrics,
 	updateSessionMetrics,
-	recordProfileMetrics,
-	recordError as recordDbError,
-	getDailyMetrics,
 } from "../database/database.ts";
 
 export class MetricsTracker {

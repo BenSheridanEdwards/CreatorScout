@@ -6,11 +6,11 @@
  */
 
 import { initializeInstagramSession } from "../functions/auth/sessionInitializer/sessionInitializer.ts";
-import { navigateToProfileAndCheck } from "../functions/navigation/profileNavigation/profileNavigation.ts";
 import {
 	extractFollowingUsernames,
 	openFollowingModal,
 } from "../functions/navigation/modalOperations/modalOperations.ts";
+import { navigateToProfileAndCheck } from "../functions/navigation/profileNavigation/profileNavigation.ts";
 
 async function getFollowing(
 	username: string,

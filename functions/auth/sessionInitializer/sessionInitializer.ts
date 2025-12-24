@@ -4,19 +4,19 @@
  * Provides a single, consistent way to initialize Instagram sessions across all scripts.
  * Encapsulates browser creation, navigation, content verification, and authentication.
  *
- * This pattern is proven to work reliably with both local browsers and Browserless.
+ * Supports both GoLogin (production) and local browsers (development).
  */
 
 import type { Browser, Page } from "puppeteer";
 import { createBrowser, createPage } from "../../navigation/browser/browser.ts";
-import { login, type Credentials } from "../login/login.ts";
-import { isLoggedIn } from "../sessionManager/sessionManager.ts";
+import { IG_PASS, IG_USER } from "../../shared/config/config.ts";
 import { createLogger, type Logger } from "../../shared/logger/logger.ts";
 import {
-	waitForInstagramContent,
 	detectIfOnInstagramLogin,
+	waitForInstagramContent,
 } from "../../shared/waitForContent/waitForContent.ts";
-import { IG_USER, IG_PASS } from "../../shared/config/config.ts";
+import { type Credentials, login } from "../login/login.ts";
+import { isLoggedIn } from "../sessionManager/sessionManager.ts";
 
 export interface SessionOptions {
 	/**
@@ -58,6 +58,22 @@ export interface SessionOptions {
 		skipSubmit?: boolean;
 		skipCookies?: boolean;
 	};
+
+	/**
+	 * GoLogin profile token (for multi-profile support)
+	 * If provided, will connect to GoLogin instead of using local browser
+	 */
+	goLoginToken?: string;
+
+	/**
+	 * Use local Orbita instance instead of remote GoLogin
+	 */
+	useLocalOrbita?: boolean;
+
+	/**
+	 * Profile ID for tracking (for multi-profile automation)
+	 */
+	profileId?: string;
 }
 
 export interface SessionResult {
@@ -112,15 +128,35 @@ export async function initializeInstagramSession(
 		skipLogin = false,
 		credentials,
 		loginOptions,
+		goLoginToken,
+		useLocalOrbita,
+		profileId,
 	} = options;
 
 	// 1. Create logger with consistent config
 	const logger = createLogger(debug || process.env.DEBUG_LOGS === "true");
 	logger.info("SESSION", "🚀 Initializing Instagram session...");
 
+	if (profileId) {
+		logger.info("SESSION", `Profile ID: ${profileId}`);
+	}
+
 	// 2. Create browser with proper options
-	logger.info("SESSION", `Creating browser (headless: ${headless})...`);
-	const browser = await createBrowser({ headless });
+	const browserMode = goLoginToken
+		? useLocalOrbita
+			? "GoLogin (local Orbita)"
+			: "GoLogin (remote)"
+		: "local browser";
+	logger.info(
+		"SESSION",
+		`Creating browser (${browserMode}, headless: ${headless})...`,
+	);
+
+	const browser = await createBrowser({
+		headless,
+		goLoginToken,
+		useLocalOrbita,
+	});
 	logger.info("SESSION", "✅ Browser created successfully");
 
 	// 3. Create page with viewport
@@ -128,7 +164,10 @@ export async function initializeInstagramSession(
 		"SESSION",
 		`Creating page (viewport: ${viewport.width}x${viewport.height})...`,
 	);
-	const page = await createPage(browser, { viewport });
+	const page = await createPage(browser, {
+		viewport,
+		applyStealth: !goLoginToken,
+	});
 	logger.info("SESSION", "✅ Page created successfully");
 
 	try {

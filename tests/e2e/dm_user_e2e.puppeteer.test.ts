@@ -12,21 +12,22 @@
  * - If the DB already indicates a DM was sent to the target and `E2E_FORCE_DM`
  *   is not set, the test exits early to avoid spamming.
  */
+
+import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import dotenv from "dotenv";
-import { mkdirSync, writeFileSync } from "node:fs";
 import type { Browser, Page } from "puppeteer";
 import puppeteer from "puppeteer-extra";
 import StealthPlugin from "puppeteer-extra-plugin-stealth";
 import { login } from "../../functions/auth/login/login.ts";
 import { sendDMToUser } from "../../functions/profile/profileActions/profileActions.ts";
+import { DM_MESSAGE } from "../../functions/shared/config/config.ts";
 import {
 	closeDb,
 	initDb,
 	wasDmSent,
 } from "../../functions/shared/database/database.ts";
-import { DM_MESSAGE } from "../../functions/shared/config/config.ts";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

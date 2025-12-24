@@ -25,8 +25,8 @@
  * file reading step before any API calls are made.
  */
 
-import { jest } from "@jest/globals";
 import { mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
+import { jest } from "@jest/globals";
 import { analyzeLinktree, isConfirmedCreator } from "./vision.ts";
 
 describe("vision", () => {

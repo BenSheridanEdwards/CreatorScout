@@ -154,11 +154,12 @@ describe("getStoryHighlights", () => {
 
 	describe("Multiple highlights handling", () => {
 		test("extracts data from multiple highlight elements", async () => {
-			const createElement = (title: string, coverUrl: string) => ({
-				evaluate: jest
-					.fn<ElementHandle<Element>["evaluate"]>()
-					.mockResolvedValue({ title, coverImageUrl: coverUrl }),
-			}) as unknown as ElementHandle<Element>;
+			const createElement = (title: string, coverUrl: string) =>
+				({
+					evaluate: jest
+						.fn<ElementHandle<Element>["evaluate"]>()
+						.mockResolvedValue({ title, coverImageUrl: coverUrl }),
+				}) as unknown as ElementHandle<Element>;
 
 			const elements = [
 				createElement("Highlight 1", "cover1.jpg"),

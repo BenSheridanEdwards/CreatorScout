@@ -84,8 +84,14 @@ describe("Humanize Functions", () => {
 			width: 50,
 			height: 20,
 		});
-		(mockPage.$ as jest.Mock<(selector: string) => Promise<unknown>>).mockResolvedValue(mockElement);
-		(mockPage.evaluate as jest.Mock<(fn: unknown, ...args: unknown[]) => Promise<unknown>>).mockResolvedValue({ x: 0, y: 0 });
+		(
+			mockPage.$ as jest.Mock<(selector: string) => Promise<unknown>>
+		).mockResolvedValue(mockElement);
+		(
+			mockPage.evaluate as jest.Mock<
+				(fn: unknown, ...args: unknown[]) => Promise<unknown>
+			>
+		).mockResolvedValue({ x: 0, y: 0 });
 		mockCursor.move.mockResolvedValue(undefined);
 		mockCursor.click.mockResolvedValue(undefined);
 		mockCursor.moveTo.mockResolvedValue(undefined);
@@ -105,7 +111,9 @@ describe("Humanize Functions", () => {
 				width: 50,
 				height: 20,
 			});
-			(mockPage.$ as jest.Mock<(selector: string) => Promise<unknown>>).mockResolvedValueOnce(mockElement);
+			(
+				mockPage.$ as jest.Mock<(selector: string) => Promise<unknown>>
+			).mockResolvedValueOnce(mockElement);
 
 			const center = await getElementCenter(mockPage, ".test-element");
 
@@ -116,7 +124,9 @@ describe("Humanize Functions", () => {
 		test("returns null when element is not found", async () => {
 			const { getElementCenter } = await import("./humanize.ts");
 
-			(mockPage.$ as jest.Mock<(selector: string) => Promise<unknown>>).mockResolvedValueOnce(null);
+			(
+				mockPage.$ as jest.Mock<(selector: string) => Promise<unknown>>
+			).mockResolvedValueOnce(null);
 
 			const center = await getElementCenter(mockPage, ".missing-element");
 
@@ -127,7 +137,9 @@ describe("Humanize Functions", () => {
 			const { getElementCenter } = await import("./humanize.ts");
 
 			mockBoundingBox.mockResolvedValueOnce(null);
-			(mockPage.$ as jest.Mock<(selector: string) => Promise<unknown>>).mockResolvedValueOnce(mockElement);
+			(
+				mockPage.$ as jest.Mock<(selector: string) => Promise<unknown>>
+			).mockResolvedValueOnce(mockElement);
 
 			const center = await getElementCenter(mockPage, ".no-bounds");
 
@@ -143,7 +155,11 @@ describe("Humanize Functions", () => {
 		test("moves mouse to element using ghost-cursor", async () => {
 			const { moveMouseToElement } = await import("./humanize.ts");
 
-			(mockPage.evaluate as jest.Mock<(fn: unknown, ...args: unknown[]) => Promise<unknown>>).mockResolvedValue({ x: 0, y: 0 });
+			(
+				mockPage.evaluate as jest.Mock<
+					(fn: unknown, ...args: unknown[]) => Promise<unknown>
+				>
+			).mockResolvedValue({ x: 0, y: 0 });
 			mockBoundingBox.mockResolvedValue({
 				x: 200,
 				y: 200,
@@ -160,7 +176,11 @@ describe("Humanize Functions", () => {
 		test("applies offset and randomization to target position", async () => {
 			const { moveMouseToElement } = await import("./humanize.ts");
 
-			(mockPage.evaluate as jest.Mock<(fn: unknown, ...args: unknown[]) => Promise<unknown>>).mockResolvedValue({ x: 100, y: 100 });
+			(
+				mockPage.evaluate as jest.Mock<
+					(fn: unknown, ...args: unknown[]) => Promise<unknown>
+				>
+			).mockResolvedValue({ x: 100, y: 100 });
 
 			await moveMouseToElement(mockPage, ".element", {
 				offsetX: 10,
@@ -185,7 +205,9 @@ describe("Humanize Functions", () => {
 		test("returns false when target element not found", async () => {
 			const { moveMouseToElement } = await import("./humanize.ts");
 
-			(mockPage.$ as jest.Mock<(selector: string) => Promise<unknown>>).mockResolvedValueOnce(null);
+			(
+				mockPage.$ as jest.Mock<(selector: string) => Promise<unknown>>
+			).mockResolvedValueOnce(null);
 
 			const result = await moveMouseToElement(mockPage, ".missing");
 
@@ -226,7 +248,7 @@ describe("Humanize Functions", () => {
 
 			expect(mockCursor.click).toHaveBeenCalledWith(
 				".menu",
-				expect.objectContaining({ button: "right" })
+				expect.objectContaining({ button: "right" }),
 			);
 		});
 
@@ -239,7 +261,7 @@ describe("Humanize Functions", () => {
 
 			expect(mockCursor.click).toHaveBeenCalledWith(
 				".element",
-				expect.objectContaining({ clickCount: 2 })
+				expect.objectContaining({ clickCount: 2 }),
 			);
 		});
 
@@ -306,7 +328,9 @@ describe("Humanize Functions", () => {
 			const { humanTypeText } = await import("./humanize.ts");
 
 			const originalRandom = Math.random;
-			Math.random = jest.fn<() => number>().mockReturnValue(0.01) as () => number;
+			Math.random = jest
+				.fn<() => number>()
+				.mockReturnValue(0.01) as () => number;
 
 			const result = await humanTypeText(mockPage, "input", "hi", {
 				mistakeRate: 0.5,
@@ -350,7 +374,11 @@ describe("Humanize Functions", () => {
 		test("uses ghost-cursor for natural movement timing", async () => {
 			const { moveMouseToElement } = await import("./humanize.ts");
 
-			(mockPage.evaluate as jest.Mock<(fn: unknown, ...args: unknown[]) => Promise<unknown>>).mockResolvedValue({ x: 0, y: 0 });
+			(
+				mockPage.evaluate as jest.Mock<
+					(fn: unknown, ...args: unknown[]) => Promise<unknown>
+				>
+			).mockResolvedValue({ x: 0, y: 0 });
 			mockBoundingBox.mockResolvedValue({
 				x: 100,
 				y: 0,
@@ -366,7 +394,11 @@ describe("Humanize Functions", () => {
 		test("handles close elements naturally", async () => {
 			const { moveMouseToElement } = await import("./humanize.ts");
 
-			(mockPage.evaluate as jest.Mock<(fn: unknown, ...args: unknown[]) => Promise<unknown>>).mockResolvedValue({ x: 0, y: 0 });
+			(
+				mockPage.evaluate as jest.Mock<
+					(fn: unknown, ...args: unknown[]) => Promise<unknown>
+				>
+			).mockResolvedValue({ x: 0, y: 0 });
 			mockBoundingBox.mockResolvedValue({ x: 1, y: 1, width: 50, height: 20 });
 
 			await moveMouseToElement(mockPage, ".close");
@@ -394,7 +426,9 @@ describe("Humanize Functions", () => {
 		test("handles element not found gracefully in move", async () => {
 			const { moveMouseToElement } = await import("./humanize.ts");
 
-			(mockPage.$ as jest.Mock<(selector: string) => Promise<unknown>>).mockResolvedValueOnce(null);
+			(
+				mockPage.$ as jest.Mock<(selector: string) => Promise<unknown>>
+			).mockResolvedValueOnce(null);
 
 			const result = await moveMouseToElement(mockPage, ".no-bounds");
 

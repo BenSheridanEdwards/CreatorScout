@@ -3,8 +3,8 @@
  */
 import { randomBytes } from "node:crypto";
 import {
-	createEnhancedLogger,
 	type CycleStatus,
+	createEnhancedLogger,
 	type EnhancedLogger,
 } from "./enhancedLogger.ts";
 

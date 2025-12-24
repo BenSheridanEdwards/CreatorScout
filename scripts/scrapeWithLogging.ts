@@ -37,20 +37,19 @@ import {
 	wasFollowed,
 	wasVisited,
 } from "../functions/shared/database/database.ts";
+// Enhanced logging imports
+import { createLoggerWithCycleTracking } from "../functions/shared/logger/logger.ts";
+import {
+	getGlobalMetricsTracker,
+	type MetricsTracker,
+	startTimer,
+} from "../functions/shared/metrics/metrics.ts";
 import { snapshot } from "../functions/shared/snapshot/snapshot.ts";
 import {
 	getDelay,
 	mouseWiggle,
 } from "../functions/timing/humanize/humanize.ts";
 import { sleep } from "../functions/timing/sleep/sleep.ts";
-import {
-	getGlobalMetricsTracker,
-	startTimer,
-	type MetricsTracker,
-} from "../functions/shared/metrics/metrics.ts";
-
-// Enhanced logging imports
-import { createLoggerWithCycleTracking } from "../functions/shared/logger/logger.ts";
 
 // NOTE: Database init is async; queries will initialize schema on demand.
 

@@ -1,17 +1,10 @@
 /**
  * Browser Helper Tests
  *
- * The browser module provides unified browser creation with consistent configuration:
- *
- * Functions:
- * - createBrowser(options): Creates a Puppeteer browser instance
- *   - Local mode: Launches browser with stealth plugin and persistent profile
- *   - Cloud mode: Connects to Browserless.io for remote browser
- * - createPage(browser, options): Creates a configured page with:
- *   - Custom timeouts and viewport
- *   - Stealth techniques (webdriver override, navigator patches)
- *   - Human-like HTTP headers
- * - getUniqueUserDataDir(prefix): Generates unique profile paths to avoid conflicts
+ * Updated for GoLogin-first flow:
+ * - createBrowser() uses GoLogin when token is available and LOCAL_BROWSER is false
+ * - createBrowser() launches local Puppeteer when LOCAL_BROWSER is true
+ * - createPage() applies minimal stealth patches only when `applyStealth: true`
  */
 
 import { jest } from "@jest/globals";
@@ -19,30 +12,34 @@ import type { Browser, Page } from "puppeteer";
 
 // Mock external dependencies BEFORE importing the module
 const mockLaunch = jest.fn<(options: object) => Promise<Browser>>();
-const mockConnect = jest.fn<(options: object) => Promise<Browser>>();
-const mockUse = jest.fn<(plugin: unknown) => void>();
 const mockGetUserDataDir = jest
 	.fn<() => string>()
 	.mockReturnValue("/tmp/test-data");
 const mockConfig = {
 	LOCAL_BROWSER: true,
-	BROWSERLESS_TOKEN: "test-token",
+	GOLOGIN_API_TOKEN: "gologin-token",
+	GOLOGIN_USE_LOCAL: false,
+	GOLOGIN_VPS_IP: "localhost",
 };
 
-jest.unstable_mockModule("puppeteer-extra", () => ({
+jest.unstable_mockModule("puppeteer", () => ({
 	default: {
-		use: mockUse,
 		launch: mockLaunch,
-		connect: mockConnect,
 	},
-}));
-jest.unstable_mockModule("puppeteer-extra-plugin-stealth", () => ({
-	default: () => ({}),
 }));
 jest.unstable_mockModule("../../auth/sessionManager/sessionManager.ts", () => ({
 	getUserDataDir: mockGetUserDataDir,
 }));
 jest.unstable_mockModule("../../shared/config/config.ts", () => mockConfig);
+const mockConnectToGoLogin = jest
+	.fn<() => Promise<Browser>>()
+	.mockResolvedValue({
+		pages: jest.fn<() => Promise<Page[]>>().mockResolvedValue([]),
+	} as unknown as Browser);
+
+jest.unstable_mockModule("./goLoginConnector.ts", () => ({
+	connectToGoLoginProfile: mockConnectToGoLogin,
+}));
 
 // Helper to import module after any config tweaks
 const loadBrowserModule = async () => {
@@ -54,10 +51,8 @@ describe("browser helpers", () => {
 	beforeEach(() => {
 		jest.clearAllMocks();
 		mockConfig.LOCAL_BROWSER = true;
-		mockConfig.BROWSERLESS_TOKEN = "test-token";
-		// Set environment variable since browser.ts reads from process.env directly
+		mockConfig.GOLOGIN_API_TOKEN = "gologin-token";
 		process.env.LOCAL_BROWSER = "true";
-		process.env.BROWSERLESS_TOKEN = "test-token";
 	});
 
 	// ═══════════════════════════════════════════════════════════════════════════
@@ -65,7 +60,7 @@ describe("browser helpers", () => {
 	// ═══════════════════════════════════════════════════════════════════════════
 
 	describe("createBrowser() - Local browser mode", () => {
-		test("launches local browser with stealth plugin and standard arguments", async () => {
+		test("launches local browser with standard arguments", async () => {
 			// Ensure LOCAL_BROWSER is set for this test
 			process.env.LOCAL_BROWSER = "true";
 			const fakeBrowser = {
@@ -125,43 +120,34 @@ describe("browser helpers", () => {
 	});
 
 	// ═══════════════════════════════════════════════════════════════════════════
-	// createBrowser() - Cloud Mode (Browserless)
+	// createBrowser() - GoLogin mode
 	// ═══════════════════════════════════════════════════════════════════════════
 
-	describe("createBrowser() - Cloud browser mode (Browserless.io)", () => {
-		test("connects to Browserless.io with stealth endpoint when LOCAL_BROWSER is false", async () => {
+	describe("createBrowser() - GoLogin mode", () => {
+		test("connects to GoLogin when goLoginToken is available and LOCAL_BROWSER is false", async () => {
 			mockConfig.LOCAL_BROWSER = false;
-			mockConfig.BROWSERLESS_TOKEN = "token-123";
-			// Set environment variable to false for Browserless mode
 			delete process.env.LOCAL_BROWSER;
-			process.env.BROWSERLESS_TOKEN = "token-123";
-			const fakeBrowser = {
-				newPage: jest.fn<() => Promise<Page>>(),
-			} as unknown as Browser;
-			mockConnect.mockResolvedValue(fakeBrowser);
+			mockConfig.GOLOGIN_API_TOKEN = "token-123";
 			const { createBrowser } = await loadBrowserModule();
 
 			await createBrowser();
-
-			expect(mockConnect).toHaveBeenCalledWith({
-				browserWSEndpoint:
-					"wss://chrome.browserless.io/chrome/stealth?token=token-123",
-			});
+			// We don't assert internal connector args here; connector is unit-tested separately.
+			expect(mockLaunch).not.toHaveBeenCalled();
 		});
 
-		test("throws descriptive error when BROWSERLESS_TOKEN is missing", async () => {
+		test("falls back to local Puppeteer when no GoLogin token is configured", async () => {
 			mockConfig.LOCAL_BROWSER = false;
-			mockConfig.BROWSERLESS_TOKEN = "";
-			// Set environment variable to false for Browserless mode
+			mockConfig.GOLOGIN_API_TOKEN = undefined as unknown as string;
 			delete process.env.LOCAL_BROWSER;
-			delete process.env.BROWSERLESS_TOKEN;
+			const fakeBrowser = {
+				newPage: jest.fn<() => Promise<Page>>(),
+				pages: jest.fn<() => Promise<Page[]>>().mockResolvedValue([]),
+			} as unknown as Browser;
+			mockLaunch.mockResolvedValue(fakeBrowser);
 			const { createBrowser } = await loadBrowserModule();
 
-			await expect(createBrowser()).rejects.toThrow(
-				"BROWSERLESS_TOKEN must be set when not using LOCAL_BROWSER",
-			);
-			expect(mockConnect).not.toHaveBeenCalled();
-			expect(mockLaunch).not.toHaveBeenCalled();
+			await createBrowser();
+			expect(mockLaunch).toHaveBeenCalled();
 		});
 	});
 
@@ -180,6 +166,12 @@ describe("browser helpers", () => {
 				setUserAgent: jest
 					.fn<() => Promise<void>>()
 					.mockResolvedValue(undefined),
+				setExtraHTTPHeaders: jest
+					.fn<() => Promise<void>>()
+					.mockResolvedValue(undefined),
+				evaluateOnNewDocument: jest
+					.fn<() => Promise<void>>()
+					.mockResolvedValue(undefined),
 				on: jest.fn<(event: string, handler: unknown) => void>(),
 			} as unknown as Page;
 			const mockBrowser = {
@@ -188,7 +180,7 @@ describe("browser helpers", () => {
 			} as unknown as Browser;
 			const { createPage } = await loadBrowserModule();
 
-			await createPage(mockBrowser);
+			await createPage(mockBrowser, { applyStealth: false });
 
 			expect(mockPage.setDefaultNavigationTimeout).toHaveBeenCalledWith(30000);
 			expect(mockPage.setDefaultTimeout).toHaveBeenCalledWith(15000);
@@ -197,6 +189,7 @@ describe("browser helpers", () => {
 				height: 900,
 			});
 			expect(mockPage.setUserAgent).toHaveBeenCalled();
+			expect(mockPage.setExtraHTTPHeaders).toHaveBeenCalled();
 		});
 
 		test("allows overriding default page configuration", async () => {
@@ -207,6 +200,12 @@ describe("browser helpers", () => {
 					.fn<() => Promise<void>>()
 					.mockResolvedValue(undefined),
 				setUserAgent: jest
+					.fn<() => Promise<void>>()
+					.mockResolvedValue(undefined),
+				setExtraHTTPHeaders: jest
+					.fn<() => Promise<void>>()
+					.mockResolvedValue(undefined),
+				evaluateOnNewDocument: jest
 					.fn<() => Promise<void>>()
 					.mockResolvedValue(undefined),
 				on: jest.fn<(event: string, handler: unknown) => void>(),
@@ -222,6 +221,7 @@ describe("browser helpers", () => {
 				defaultTimeout: 4000,
 				viewport: { width: 800, height: 600 },
 				userAgent: "custom-agent",
+				applyStealth: false,
 			});
 
 			expect(mockPage.setDefaultNavigationTimeout).toHaveBeenCalledWith(5000);

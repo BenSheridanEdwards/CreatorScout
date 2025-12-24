@@ -36,7 +36,9 @@ describe("getLinkFromBio", () => {
 		test("extracts href from matching anchor element", async () => {
 			const page = createPageMock({
 				$: jest.fn<Page["$"]>().mockResolvedValue({
-					evaluate: jest.fn<Page["evaluate"]>().mockResolvedValue("https://example.com"),
+					evaluate: jest
+						.fn<Page["evaluate"]>()
+						.mockResolvedValue("https://example.com"),
 				} as unknown as Awaited<ReturnType<Page["$"]>>),
 			});
 
@@ -48,7 +50,9 @@ describe("getLinkFromBio", () => {
 		test("returns creator link when found first", async () => {
 			const page = createPageMock({
 				$: jest.fn<Page["$"]>().mockResolvedValue({
-					evaluate: jest.fn<Page["evaluate"]>().mockResolvedValue("https://patreon.com/creator"),
+					evaluate: jest
+						.fn<Page["evaluate"]>()
+						.mockResolvedValue("https://patreon.com/creator"),
 				} as unknown as Awaited<ReturnType<Page["$"]>>),
 			});
 
@@ -60,7 +64,9 @@ describe("getLinkFromBio", () => {
 		test("returns Linktree link when found", async () => {
 			const page = createPageMock({
 				$: jest.fn<Page["$"]>().mockResolvedValue({
-					evaluate: jest.fn<Page["evaluate"]>().mockResolvedValue("https://linktr.ee/username"),
+					evaluate: jest
+						.fn<Page["evaluate"]>()
+						.mockResolvedValue("https://linktr.ee/username"),
 				} as unknown as Awaited<ReturnType<Page["$"]>>),
 			});
 
@@ -126,7 +132,11 @@ describe("getLinkFromBio", () => {
 					.mockRejectedValue(new Error("Evaluation failed")),
 			};
 			const page = createPageWithElementMock({
-				$: jest.fn<Page["$"]>().mockResolvedValue(linkElement as unknown as Awaited<ReturnType<Page["$"]>>),
+				$: jest
+					.fn<Page["$"]>()
+					.mockResolvedValue(
+						linkElement as unknown as Awaited<ReturnType<Page["$"]>>,
+					),
 			});
 
 			const result = await getLinkFromBio(page);

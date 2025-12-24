@@ -4,9 +4,21 @@
 import { jest } from "@jest/globals";
 
 // Mock all the dependencies
-const mockMouseWiggle = jest.fn<() => Promise<void>>().mockResolvedValue(undefined);
-const mockNavigateToProfileAndCheck = jest.fn<() => Promise<import("../functions/navigation/profileNavigation/profileNavigation.ts").ProfileStatus>>();
-const mockAnalyzeProfileComprehensive = jest.fn<() => Promise<import("../functions/profile/profileAnalysis/profileAnalysis.ts").ComprehensiveAnalysisResult>>();
+const mockMouseWiggle = jest
+	.fn<() => Promise<void>>()
+	.mockResolvedValue(undefined);
+const mockNavigateToProfileAndCheck =
+	jest.fn<
+		() => Promise<
+			import("../functions/navigation/profileNavigation/profileNavigation.ts").ProfileStatus
+		>
+	>();
+const mockAnalyzeProfileComprehensive =
+	jest.fn<
+		() => Promise<
+			import("../functions/profile/profileAnalysis/profileAnalysis.ts").ComprehensiveAnalysisResult
+		>
+	>();
 const mockAnalyzeLinkWithVision = jest.fn<() => Promise<unknown>>(); // Keep for backwards compatibility
 const mockSnapshot = jest.fn<() => Promise<string>>();
 const mockMarkAsCreator = jest.fn<() => Promise<void>>();
@@ -23,17 +35,34 @@ const mockWasVisited = jest.fn<() => Promise<boolean>>();
 const mockMarkVisited = jest.fn<() => Promise<void>>();
 const mockGetScrollIndex = jest.fn<() => Promise<number>>();
 const mockUpdateScrollIndex = jest.fn<() => Promise<void>>();
-const mockGetStats = jest.fn<() => Promise<import("../functions/shared/database/database.ts").Stats>>();
+const mockGetStats =
+	jest.fn<
+		() => Promise<import("../functions/shared/database/database.ts").Stats>
+	>();
 const mockInitDb = jest.fn<() => Promise<void>>();
 const mockQueueAdd = jest.fn<() => Promise<void>>();
 const mockQueueCount = jest.fn<() => Promise<number>>();
 const mockQueueNext = jest.fn<() => Promise<string | null>>();
 const mockWasDmSent = jest.fn<() => Promise<boolean>>();
 const mockWasFollowed = jest.fn<() => Promise<boolean>>();
-const mockGetDailyMetrics = jest.fn<() => Promise<import("../functions/shared/database/database.ts").DailyMetrics | null>>();
-const mockCreateLogger = jest.fn<() => import("../functions/shared/logger/logger.ts").Logger>();
-const mockCreateLoggerWithCycleTracking = jest.fn<() => ReturnType<typeof import("../functions/shared/logger/loggingIntegration.ts").createLoggerWithCycleTracking>>();
-const mockGetGlobalMetricsTracker = jest.fn<() => import("../functions/shared/metrics/metrics.ts").MetricsTracker>();
+const mockGetDailyMetrics =
+	jest.fn<
+		() => Promise<
+			import("../functions/shared/database/database.ts").DailyMetrics | null
+		>
+	>();
+const mockCreateLogger =
+	jest.fn<() => import("../functions/shared/logger/logger.ts").Logger>();
+const mockCreateLoggerWithCycleTracking =
+	jest.fn<
+		() => ReturnType<
+			typeof import("../functions/shared/logger/loggingIntegration.ts").createLoggerWithCycleTracking
+		>
+	>();
+const mockGetGlobalMetricsTracker =
+	jest.fn<
+		() => import("../functions/shared/metrics/metrics.ts").MetricsTracker
+	>();
 
 // Mock the modules
 jest.unstable_mockModule("node:fs", () => ({
@@ -227,11 +256,23 @@ describe.skip("scrape.ts", () => {
 		setShouldContinueLimit(2);
 
 		mockCreateLoggerWithCycleTracking.mockReturnValue({
-			logger: mockLogger as import("../functions/shared/logger/enhancedLogger.ts").EnhancedLogger,
-			cycleManager: mockCycleManager as unknown as import("../functions/shared/logger/cycleManager.ts").CycleManager,
-			startCycle: mockStartCycle as (seedUsername?: string, estimatedProfiles?: number) => string,
-			endCycle: mockEndCycle as (status: import("../functions/shared/logger/enhancedLogger.ts").CycleStatus, reason?: string) => void,
-			recordError: mockRecordError as (error: Error | string, context: string, profile?: string) => void,
+			logger:
+				mockLogger as import("../functions/shared/logger/enhancedLogger.ts").EnhancedLogger,
+			cycleManager:
+				mockCycleManager as unknown as import("../functions/shared/logger/cycleManager.ts").CycleManager,
+			startCycle: mockStartCycle as (
+				seedUsername?: string,
+				estimatedProfiles?: number,
+			) => string,
+			endCycle: mockEndCycle as (
+				status: import("../functions/shared/logger/enhancedLogger.ts").CycleStatus,
+				reason?: string,
+			) => void,
+			recordError: mockRecordError as (
+				error: Error | string,
+				context: string,
+				profile?: string,
+			) => void,
 			shouldContinue: mockShouldContinue,
 		});
 		// Set up default metrics tracker mock
@@ -283,7 +324,9 @@ describe.skip("scrape.ts", () => {
 		it("returns 0 when file does not exist", async () => {
 			// Mock fs for this test
 			const fs = await import("node:fs");
-			const mockExistsSync = fs.existsSync as jest.MockedFunction<(path: string) => boolean>;
+			const mockExistsSync = fs.existsSync as jest.MockedFunction<
+				(path: string) => boolean
+			>;
 			mockExistsSync.mockReturnValue(false);
 
 			const { loadSeeds } = await import("./scrape.ts");
@@ -296,8 +339,12 @@ describe.skip("scrape.ts", () => {
 
 		it("returns 0 for empty file", async () => {
 			const fs = await import("node:fs");
-			const mockExistsSync = fs.existsSync as jest.MockedFunction<(path: string) => boolean>;
-			const mockReadFileSync = fs.readFileSync as jest.MockedFunction<(path: string, encoding?: BufferEncoding) => string | Buffer>;
+			const mockExistsSync = fs.existsSync as jest.MockedFunction<
+				(path: string) => boolean
+			>;
+			const mockReadFileSync = fs.readFileSync as jest.MockedFunction<
+				(path: string, encoding?: BufferEncoding) => string | Buffer
+			>;
 			mockExistsSync.mockReturnValue(true);
 			mockReadFileSync.mockReturnValue("");
 
@@ -312,8 +359,12 @@ describe.skip("scrape.ts", () => {
 
 		it("loads valid usernames and skips comments and empty lines", async () => {
 			const fs = await import("node:fs");
-			const mockExistsSync = fs.existsSync as jest.MockedFunction<(path: string) => boolean>;
-			const mockReadFileSync = fs.readFileSync as jest.MockedFunction<(path: string, encoding?: BufferEncoding) => string | Buffer>;
+			const mockExistsSync = fs.existsSync as jest.MockedFunction<
+				(path: string) => boolean
+			>;
+			const mockReadFileSync = fs.readFileSync as jest.MockedFunction<
+				(path: string, encoding?: BufferEncoding) => string | Buffer
+			>;
 			mockExistsSync.mockReturnValue(true);
 			mockReadFileSync.mockReturnValue(`# This is a comment
 user1
@@ -336,8 +387,12 @@ user3
 
 		it("trims whitespace and converts to lowercase", async () => {
 			const fs = await import("node:fs");
-			const mockExistsSync = fs.existsSync as jest.MockedFunction<(path: string) => boolean>;
-			const mockReadFileSync = fs.readFileSync as jest.MockedFunction<(path: string, encoding?: BufferEncoding) => string | Buffer>;
+			const mockExistsSync = fs.existsSync as jest.MockedFunction<
+				(path: string) => boolean
+			>;
+			const mockReadFileSync = fs.readFileSync as jest.MockedFunction<
+				(path: string, encoding?: BufferEncoding) => string | Buffer
+			>;
 			mockExistsSync.mockReturnValue(true);
 			mockReadFileSync.mockReturnValue("  USERNAME  \n  UserName2  ");
 
@@ -352,8 +407,12 @@ user3
 
 		it("skips lines starting with # and empty lines", async () => {
 			const fs = await import("node:fs");
-			const mockExistsSync = fs.existsSync as jest.MockedFunction<(path: string) => boolean>;
-			const mockReadFileSync = fs.readFileSync as jest.MockedFunction<(path: string, encoding?: BufferEncoding) => string | Buffer>;
+			const mockExistsSync = fs.existsSync as jest.MockedFunction<
+				(path: string) => boolean
+			>;
+			const mockReadFileSync = fs.readFileSync as jest.MockedFunction<
+				(path: string, encoding?: BufferEncoding) => string | Buffer
+			>;
 			mockExistsSync.mockReturnValue(true);
 			mockReadFileSync.mockReturnValue(`
 # comment
@@ -374,8 +433,12 @@ user2
 
 		it("handles custom file path", async () => {
 			const fs = await import("node:fs");
-			const mockExistsSync = fs.existsSync as jest.MockedFunction<(path: string) => boolean>;
-			const mockReadFileSync = fs.readFileSync as jest.MockedFunction<(path: string, encoding?: BufferEncoding) => string | Buffer>;
+			const mockExistsSync = fs.existsSync as jest.MockedFunction<
+				(path: string) => boolean
+			>;
+			const mockReadFileSync = fs.readFileSync as jest.MockedFunction<
+				(path: string, encoding?: BufferEncoding) => string | Buffer
+			>;
 			mockExistsSync.mockReturnValue(true);
 			mockReadFileSync.mockReturnValue("customuser");
 
@@ -1446,16 +1509,24 @@ user2
 
 	describe("scrape", () => {
 		let mockBrowser: import("puppeteer").Browser;
-		let mockCreateBrowser: jest.Mock<() => Promise<import("puppeteer").Browser>>;
+		let mockCreateBrowser: jest.Mock<
+			() => Promise<import("puppeteer").Browser>
+		>;
 		let mockCreatePage: jest.Mock<() => Promise<import("puppeteer").Page>>;
 
 		beforeEach(() => {
 			mockBrowser = {
 				close: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
-				newPage: jest.fn<() => Promise<import("puppeteer").Page>>().mockResolvedValue(mockPage),
+				newPage: jest
+					.fn<() => Promise<import("puppeteer").Page>>()
+					.mockResolvedValue(mockPage),
 			} as unknown as import("puppeteer").Browser;
-			mockCreateBrowser = jest.fn<() => Promise<import("puppeteer").Browser>>().mockResolvedValue(mockBrowser);
-			mockCreatePage = jest.fn<() => Promise<import("puppeteer").Page>>().mockResolvedValue(mockPage);
+			mockCreateBrowser = jest
+				.fn<() => Promise<import("puppeteer").Browser>>()
+				.mockResolvedValue(mockBrowser);
+			mockCreatePage = jest
+				.fn<() => Promise<import("puppeteer").Page>>()
+				.mockResolvedValue(mockPage);
 
 			jest.unstable_mockModule(
 				"../functions/navigation/browser/browser.ts",
@@ -1485,8 +1556,12 @@ user2
 		it("loads seeds and starts cycle tracking", async () => {
 			// Mock fs for this test to simulate loading 3 seeds
 			const fs = await import("node:fs");
-			const mockExistsSync = fs.existsSync as jest.MockedFunction<(path: string) => boolean>;
-			const mockReadFileSync = fs.readFileSync as jest.MockedFunction<(path: string, encoding?: BufferEncoding) => string | Buffer>;
+			const mockExistsSync = fs.existsSync as jest.MockedFunction<
+				(path: string) => boolean
+			>;
+			const mockReadFileSync = fs.readFileSync as jest.MockedFunction<
+				(path: string, encoding?: BufferEncoding) => string | Buffer
+			>;
 			mockExistsSync.mockReturnValue(true);
 			mockReadFileSync.mockReturnValue("seed1\nseed2\nseed3");
 
@@ -1505,7 +1580,9 @@ user2
 		it("handles no seeds loaded gracefully", async () => {
 			// Mock fs to return no seeds
 			const fs = await import("node:fs");
-			const mockExistsSync = fs.existsSync as jest.MockedFunction<(path: string) => boolean>;
+			const mockExistsSync = fs.existsSync as jest.MockedFunction<
+				(path: string) => boolean
+			>;
 			mockExistsSync.mockReturnValue(false);
 
 			const { scrape } = await import("./scrape.ts");

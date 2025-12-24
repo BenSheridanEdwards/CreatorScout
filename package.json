@@ -24,7 +24,12 @@
 		"dashboard": "tsx scripts/dashboard.ts",
 		"studio": "npx prisma studio",
 		"dev:frontend": "cd frontend && npm run dev",
-		"dev:server": "tsx server.ts"
+		"dev:server": "tsx server.ts",
+		"test:profile": "tsx scripts/test/test_profile.ts",
+		"test:rampup": "tsx scripts/test/ramp_up_test.ts",
+		"costs": "tsx scripts/monitoring/costMonitor.ts",
+		"cron:session": "tsx scripts/cron/sessionRunner.ts",
+		"cron:reset": "tsx scripts/cron/resetDailyCounters.ts"
 	},
 	"dependencies": {
 		"@prisma/adapter-pg": "^7.1.0",
@@ -35,8 +40,6 @@
 		"pg": "^8.16.3",
 		"prisma": "^7.1.0",
 		"puppeteer": "^22.13.1",
-		"puppeteer-extra": "^3.3.6",
-		"puppeteer-extra-plugin-stealth": "^2.11.2",
 		"uuid": "^9.0.1"
 	},
 	"devDependencies": {

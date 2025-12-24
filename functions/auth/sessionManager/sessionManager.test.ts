@@ -1,6 +1,6 @@
-import { jest } from "@jest/globals";
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { jest } from "@jest/globals";
 import type { ElementHandle, Page } from "puppeteer";
 import {
 	clearCookies,
@@ -124,7 +124,9 @@ describe("sessionManager", () => {
 			fs.writeFileSync(cookiesFilePath, JSON.stringify([{ name: "old" }]));
 
 			const newCookies = [{ name: "new", value: "value", domain: ".test.com" }];
-			page.cookies.mockResolvedValue(newCookies as import("puppeteer").Cookie[]);
+			page.cookies.mockResolvedValue(
+				newCookies as import("puppeteer").Cookie[],
+			);
 
 			await saveCookies(page);
 

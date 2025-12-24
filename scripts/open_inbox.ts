@@ -6,8 +6,8 @@
  */
 
 import { initializeInstagramSession } from "../functions/auth/sessionInitializer/sessionInitializer.ts";
-import { sendDMToUser } from "../functions/profile/profileActions/profileActions.ts";
 import { clickAny } from "../functions/navigation/clickAny/clickAny.ts";
+import { sendDMToUser } from "../functions/profile/profileActions/profileActions.ts";
 
 /**
  * Handle common inbox popups and error states.

@@ -124,7 +124,7 @@ export async function getBioFromPage(page: Page): Promise<string | null> {
 				const words = headerText.split(/\s+/);
 
 				// Find bio-like sequences in the header
-				let bioParts: string[] = [];
+				const bioParts: string[] = [];
 				let currentSequence = "";
 				let inBioSequence = false;
 

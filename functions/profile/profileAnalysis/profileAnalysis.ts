@@ -11,14 +11,14 @@ import {
 	isLinkInBioHighlight,
 } from "../../extraction/getStoryHighlights/getStoryHighlights.ts";
 import {
-	buildUniqueLinks,
-	hasDirectCreatorLink,
 	analyzeExternalLink,
-	shouldUseVisionAnalysis,
+	buildUniqueLinks,
 	decodeInstagramRedirect,
+	hasDirectCreatorLink,
+	shouldUseVisionAnalysis,
 } from "../../extraction/linkExtraction/linkExtraction.ts";
-import { SKIP_VISION } from "../../shared/config/config.ts";
 import { executeWithCircuitBreaker } from "../../shared/circuitBreaker/circuitBreaker.ts";
+import { SKIP_VISION } from "../../shared/config/config.ts";
 import { recordActivity } from "../../shared/dashboard/dashboard.ts";
 import { snapshot } from "../../shared/snapshot/snapshot.ts";
 import { sleep } from "../../timing/sleep/sleep.ts";

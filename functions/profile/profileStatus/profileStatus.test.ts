@@ -21,7 +21,8 @@ describe("parseProfileStatus", () => {
 
 	describe("Private account detection", () => {
 		test("detects private account from standard Instagram message", () => {
-			const text = "This account is private and you need to follow to see posts";
+			const text =
+				"This account is private and you need to follow to see posts";
 			const status = parseProfileStatus(text);
 
 			expect(status.isPrivate).toBe(true);
@@ -93,7 +94,9 @@ describe("parseProfileStatus", () => {
 
 		test("handles null/undefined input gracefully", () => {
 			const nullStatus = parseProfileStatus(null as unknown as string);
-			const undefinedStatus = parseProfileStatus(undefined as unknown as string);
+			const undefinedStatus = parseProfileStatus(
+				undefined as unknown as string,
+			);
 
 			expect(nullStatus.isPrivate).toBe(false);
 			expect(nullStatus.notFound).toBe(false);

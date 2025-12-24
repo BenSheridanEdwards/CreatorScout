@@ -1,5 +1,5 @@
-import type { ElementHandle, Page } from "puppeteer";
 import { createCursor, type GhostCursor } from "ghost-cursor";
+import type { ElementHandle, Page } from "puppeteer";
 import { sleep } from "../../timing/sleep/sleep.ts";
 
 /**

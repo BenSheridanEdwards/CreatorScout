@@ -2,12 +2,12 @@
  * Message sending logic - clicking send button and verification
  */
 import type { Page } from "puppeteer";
-import { DM_MESSAGE } from "../../shared/config/config.ts";
 import { clickAny } from "../../navigation/clickAny/clickAny.ts";
+import { DM_MESSAGE } from "../../shared/config/config.ts";
 import { createLogger } from "../../shared/logger/logger.ts";
 import { snapshot } from "../../shared/snapshot/snapshot.ts";
-import { sleep } from "../../timing/sleep/sleep.ts";
 import { humanClickElement } from "../../timing/humanize/humanize.ts";
+import { sleep } from "../../timing/sleep/sleep.ts";
 
 // Lazy logger creation to prevent memory issues in tests
 let logger: ReturnType<typeof createLogger> | null = null;
@@ -85,7 +85,6 @@ export async function sendMessage(page: Page): Promise<boolean> {
 			}
 		} catch (err) {
 			getLogger().info("ACTION", `Send selector ${selector} failed: ${err}`);
-			continue;
 		}
 	}
 

@@ -5,12 +5,12 @@ import type { Page } from "puppeteer";
 import { DM_MESSAGE } from "../../shared/config/config.ts";
 import { createLogger } from "../../shared/logger/logger.ts";
 import { snapshot } from "../../shared/snapshot/snapshot.ts";
-import { sleep } from "../../timing/sleep/sleep.ts";
 import {
-	humanTypeText,
 	humanClickElement,
+	humanTypeText,
 	moveMouseToElement,
 } from "../../timing/humanize/humanize.ts";
+import { sleep } from "../../timing/sleep/sleep.ts";
 import { handleInstagramPopups } from "./popupHandler.ts";
 
 // Lazy logger creation to prevent memory issues in tests
@@ -62,7 +62,6 @@ export async function findMessageInput(page: Page): Promise<string | null> {
 			}
 		} catch (err) {
 			getLogger().info("ACTION", `Selector ${selector} failed: ${err}`);
-			continue;
 		}
 	}
 

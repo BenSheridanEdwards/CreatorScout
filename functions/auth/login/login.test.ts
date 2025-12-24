@@ -9,10 +9,13 @@ const verifyHomePageLoadedMock = jest
 	.fn<() => Promise<boolean>>()
 	.mockResolvedValue(true);
 
-jest.unstable_mockModule("../../shared/pageVerification/pageVerification.ts", () => ({
-	navigateToHomeViaUI: navigateToHomeViaUIMock,
-	verifyHomePageLoaded: verifyHomePageLoadedMock,
-}));
+jest.unstable_mockModule(
+	"../../shared/pageVerification/pageVerification.ts",
+	() => ({
+		navigateToHomeViaUI: navigateToHomeViaUIMock,
+		verifyHomePageLoaded: verifyHomePageLoadedMock,
+	}),
+);
 
 // Import login after mocks are set up
 const { login } = await import("./login.ts");

@@ -53,20 +53,19 @@ import {
 	wasFollowed,
 	wasVisited,
 } from "../functions/shared/database/database.ts";
+// Enhanced logging imports
+import { createLoggerWithCycleTracking } from "../functions/shared/logger/logger.ts";
+import {
+	getGlobalMetricsTracker,
+	type MetricsTracker,
+	startTimer,
+} from "../functions/shared/metrics/metrics.ts";
 import { snapshot } from "../functions/shared/snapshot/snapshot.ts";
 import {
 	getDelay,
 	mouseWiggle,
 } from "../functions/timing/humanize/humanize.ts";
 import { sleep } from "../functions/timing/sleep/sleep.ts";
-import {
-	MetricsTracker,
-	getGlobalMetricsTracker,
-	startTimer,
-} from "../functions/shared/metrics/metrics.ts";
-
-// Enhanced logging imports
-import { createLoggerWithCycleTracking } from "../functions/shared/logger/logger.ts";
 
 // NOTE: Database init is async; we run it inside the main entrypoints.
 
@@ -139,7 +138,7 @@ export async function processProfile(
 
 	// Track metrics throughout processing
 	let visionApiCalls = 0;
-	let contentCategories: string[] = [];
+	const contentCategories: string[] = [];
 	let profileProcessedSuccessfully = false;
 
 	// Parse discovery source to extract depth and source profile (moved outside try for finally block access)
@@ -275,8 +274,8 @@ export async function processProfile(
 	try {
 		// Comprehensive analysis already includes advanced link detection
 		// Check if creator based on comprehensive analysis results
-		let confirmedCreator = analysis.isCreator;
-		let confidence = analysis.confidence;
+		const confirmedCreator = analysis.isCreator;
+		const confidence = analysis.confidence;
 
 		// Log potential creator indicators (even if confidence is low)
 		if (confirmedCreator) {

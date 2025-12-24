@@ -15,21 +15,21 @@ import {
 	wasVisited,
 } from "../../shared/database/database.ts";
 import { createLogger } from "../../shared/logger/logger.ts";
-import { snapshot, saveScreenshot } from "../../shared/snapshot/snapshot.ts";
+import { saveScreenshot, snapshot } from "../../shared/snapshot/snapshot.ts";
 import { sleep } from "../../timing/sleep/sleep.ts";
-import {
-	navigateToProfile,
-	simulateNaturalBehavior,
-	findMessageButton,
-	scrollToButtonIfNeeded,
-	clickMessageButton,
-	navigateToDmThread,
-} from "./dmNavigation.ts";
 import { findMessageInput, typeMessage } from "./dmInput.ts";
+import {
+	clickMessageButton,
+	findMessageButton,
+	navigateToDmThread,
+	navigateToProfile,
+	scrollToButtonIfNeeded,
+	simulateNaturalBehavior,
+} from "./dmNavigation.ts";
 import { sendMessage, verifyDmSent } from "./dmSending.ts";
 import {
-	detectFollowState,
 	clickFollowButton,
+	detectFollowState,
 	verifyFollowSucceeded,
 } from "./follow.ts";
 

@@ -1,0 +1,90 @@
+{
+	"$schema": "./profiles.schema.json",
+	"description": "Scout Instagram Profile Configuration - Copy to profiles.config.json and update with real values",
+	"profiles": [
+		{
+			"id": "main1",
+			"username": "your_main_account_1",
+			"type": "main",
+			"goLoginToken": "your-gologin-profile-token-here",
+			"limits": {
+				"followsPerDay": 2,
+				"dmsPerDay": 15,
+				"discoveriesPerDay": 100
+			},
+			"notes": "High-trust main account - light use only"
+		},
+		{
+			"id": "main2",
+			"username": "your_main_account_2",
+			"type": "main",
+			"goLoginToken": "your-gologin-profile-token-here",
+			"limits": {
+				"followsPerDay": 2,
+				"dmsPerDay": 15,
+				"discoveriesPerDay": 100
+			},
+			"notes": "High-trust main account - light use only"
+		},
+		{
+			"id": "burner1",
+			"username": "burner_account_1",
+			"type": "burner",
+			"goLoginToken": "your-gologin-profile-token-here",
+			"createdAt": "2025-01-01T00:00:00Z",
+			"limits": {
+				"followsPerDay": 100,
+				"dmsPerDay": 50,
+				"discoveriesPerDay": 2000
+			},
+			"notes": "Heavy outbound - archive after 2-3 weeks"
+		},
+		{
+			"id": "burner2",
+			"username": "burner_account_2",
+			"type": "burner",
+			"goLoginToken": "your-gologin-profile-token-here",
+			"createdAt": "2025-01-01T00:00:00Z",
+			"limits": {
+				"followsPerDay": 100,
+				"dmsPerDay": 50,
+				"discoveriesPerDay": 2000
+			},
+			"notes": "Heavy outbound - archive after 2-3 weeks"
+		},
+		{
+			"id": "burner3",
+			"username": "burner_account_3",
+			"type": "burner",
+			"goLoginToken": "your-gologin-profile-token-here",
+			"createdAt": "2025-01-01T00:00:00Z",
+			"limits": {
+				"followsPerDay": 100,
+				"dmsPerDay": 50,
+				"discoveriesPerDay": 2000
+			},
+			"notes": "Heavy outbound - archive after 2-3 weeks"
+		}
+	],
+	"settings": {
+		"sessionsPerDay": 3,
+		"sessionDurationMinutes": {
+			"min": 15,
+			"max": 20
+		},
+		"sessionStaggerMinutes": 15,
+		"warmupDurationMinutes": 1.5,
+		"engagementRatio": {
+			"min": 3,
+			"max": 4
+		}
+	},
+	"proxy": {
+		"provider": "smartproxy",
+		"stickySessionMinutes": {
+			"min": 15,
+			"max": 30
+		}
+	}
+}
+

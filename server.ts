@@ -1,10 +1,11 @@
-import http from "node:http";
 import { spawn } from "node:child_process";
-import { readFile, stat, readdir } from "node:fs/promises";
 import { createReadStream } from "node:fs";
+import { readdir, readFile, stat } from "node:fs/promises";
+import http from "node:http";
 import { extname, join } from "node:path";
 import {
 	BROWSERLESS_TOKEN,
+	GOLOGIN_API_TOKEN,
 	LOCAL_BROWSER,
 } from "./functions/shared/config/config.ts";
 
@@ -54,18 +55,27 @@ async function handleApi(
 ): Promise<void> {
 	const url = new URL(req.url ?? "/", `http://${req.headers.host}`);
 
+	if (req.method === "GET" && url.pathname === "/api/health") {
+		sendJson(res, 200, { ok: true, ts: Date.now() });
+		return;
+	}
+
 	if (req.method === "GET" && url.pathname === "/api/env/connection") {
 		const usingLocal = Boolean(LOCAL_BROWSER);
 		const hasBrowserless = Boolean(BROWSERLESS_TOKEN);
+		const hasGoLogin = Boolean(GOLOGIN_API_TOKEN);
 		const provider = usingLocal
 			? "local"
-			: hasBrowserless
-				? "browserless"
-				: "unknown";
+			: hasGoLogin
+				? "gologin"
+				: hasBrowserless
+					? "browserless"
+					: "unknown";
 
 		sendJson(res, 200, {
 			provider,
 			localBrowser: usingLocal,
+			goLoginConfigured: hasGoLogin,
 			browserlessConfigured: hasBrowserless,
 		});
 		return;

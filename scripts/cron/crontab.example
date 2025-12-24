@@ -1,0 +1,91 @@
+# Scout Instagram Automation - Cron Schedule
+# ============================================
+#
+# Install with: crontab -e and paste these lines
+# Make sure to update the paths to match your installation
+#
+# Format: minute hour day month weekday command
+#
+# Session times:
+# - Morning:   9:00 AM - 10:00 AM
+# - Afternoon: 2:00 PM - 3:00 PM
+# - Evening:   5:00 PM - 6:00 PM
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# MORNING SESSIONS (9:00 AM - 10:00 AM, staggered every 15 min)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# Main profile 1 - 9:00 AM
+0 9 * * * cd /path/to/scout && tsx scripts/cron/sessionRunner.ts --profile=main1 --type=morning >> logs/cron.log 2>&1
+
+# Main profile 2 - 9:15 AM
+15 9 * * * cd /path/to/scout && tsx scripts/cron/sessionRunner.ts --profile=main2 --type=morning >> logs/cron.log 2>&1
+
+# Burner profile 1 - 9:30 AM
+30 9 * * * cd /path/to/scout && tsx scripts/cron/sessionRunner.ts --profile=burner1 --type=morning >> logs/cron.log 2>&1
+
+# Burner profile 2 - 9:45 AM
+45 9 * * * cd /path/to/scout && tsx scripts/cron/sessionRunner.ts --profile=burner2 --type=morning >> logs/cron.log 2>&1
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# AFTERNOON SESSIONS (2:00 PM - 3:00 PM, staggered every 15 min)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# Main profile 1 - 2:00 PM
+0 14 * * * cd /path/to/scout && tsx scripts/cron/sessionRunner.ts --profile=main1 --type=afternoon >> logs/cron.log 2>&1
+
+# Main profile 2 - 2:15 PM
+15 14 * * * cd /path/to/scout && tsx scripts/cron/sessionRunner.ts --profile=main2 --type=afternoon >> logs/cron.log 2>&1
+
+# Burner profile 1 - 2:30 PM
+30 14 * * * cd /path/to/scout && tsx scripts/cron/sessionRunner.ts --profile=burner1 --type=afternoon >> logs/cron.log 2>&1
+
+# Burner profile 2 - 2:45 PM
+45 14 * * * cd /path/to/scout && tsx scripts/cron/sessionRunner.ts --profile=burner2 --type=afternoon >> logs/cron.log 2>&1
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# EVENING SESSIONS (5:00 PM - 6:00 PM, staggered every 15 min)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# Main profile 1 - 5:00 PM
+0 17 * * * cd /path/to/scout && tsx scripts/cron/sessionRunner.ts --profile=main1 --type=evening >> logs/cron.log 2>&1
+
+# Main profile 2 - 5:15 PM
+15 17 * * * cd /path/to/scout && tsx scripts/cron/sessionRunner.ts --profile=main2 --type=evening >> logs/cron.log 2>&1
+
+# Burner profile 1 - 5:30 PM
+30 17 * * * cd /path/to/scout && tsx scripts/cron/sessionRunner.ts --profile=burner1 --type=evening >> logs/cron.log 2>&1
+
+# Burner profile 2 - 5:45 PM
+45 17 * * * cd /path/to/scout && tsx scripts/cron/sessionRunner.ts --profile=burner2 --type=evening >> logs/cron.log 2>&1
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# MAINTENANCE JOBS
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# Daily counter reset - midnight
+0 0 * * * cd /path/to/scout && tsx scripts/cron/resetDailyCounters.ts >> logs/cron.log 2>&1
+
+# Weekly ramp-up check - every 3 days at 1:00 AM
+0 1 */3 * * cd /path/to/scout && tsx scripts/cron/rampUpLimits.ts >> logs/cron.log 2>&1
+
+# Log rotation - weekly on Sunday at 3:00 AM
+0 3 * * 0 find /path/to/scout/logs -name "*.log" -mtime +7 -delete
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# NOTES
+# ═══════════════════════════════════════════════════════════════════════════════
+#
+# 1. Replace /path/to/scout with your actual installation path
+# 2. Profile IDs (main1, main2, burner1, etc.) should match your database
+# 3. Adjust session times based on your target audience timezone
+# 4. Add/remove profiles as needed
+# 5. Consider using different stagger times for weekends
+#
+# Quick commands:
+# - View cron jobs: crontab -l
+# - Edit cron jobs: crontab -e
+# - View cron logs: tail -f /path/to/scout/logs/cron.log
+
+
+

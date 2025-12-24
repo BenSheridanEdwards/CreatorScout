@@ -183,10 +183,7 @@ async function waitForProfilePage(
 				}
 				await page.waitForSelector(selector, { timeout: 2000 });
 				return true;
-			} catch {
-				// Try next selector
-				continue;
-			}
+			} catch {}
 		}
 
 		// If no selector matched, check if page has loaded content
@@ -196,7 +193,7 @@ async function waitForProfilePage(
 
 		const hasContent = await page.evaluate(() => {
 			return Boolean(
-				document.body.textContent && document.body.textContent.length > 100
+				document.body.textContent && document.body.textContent.length > 100,
 			);
 		});
 

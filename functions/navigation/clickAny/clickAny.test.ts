@@ -89,9 +89,7 @@ describe("clickAny", () => {
 
 		test("clicks with a brief delay for natural timing", async () => {
 			const page = createPageMock({
-				$: jest
-					.fn<() => Promise<unknown | null>>()
-					.mockResolvedValue({}),
+				$: jest.fn<() => Promise<unknown | null>>().mockResolvedValue({}),
 			});
 
 			await clickAny(page, ["text"]);
@@ -143,11 +141,7 @@ describe("clickAny", () => {
 		test("returns false after exhausting all provided text options", async () => {
 			const page = createPageMock();
 
-			const result = await clickAny(page, [
-				"Option1",
-				"Option2",
-				"Option3",
-			]);
+			const result = await clickAny(page, ["Option1", "Option2", "Option3"]);
 
 			expect(result).toBe(false);
 			// clickAny tries both button and div[role="button"] for each text, so 3 texts = 6 calls

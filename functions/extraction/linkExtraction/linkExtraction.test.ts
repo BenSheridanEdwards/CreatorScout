@@ -81,7 +81,7 @@ describe("linkExtraction", () => {
 		});
 
 		test("allows Instagram redirect URLs (l.instagram.com)", () => {
-			const html = 'some text https://l.instagram.com/?u=https://example.com';
+			const html = "some text https://l.instagram.com/?u=https://example.com";
 			const links = buildUniqueLinks(html, [], null);
 
 			// Should allow l.instagram.com redirect URLs

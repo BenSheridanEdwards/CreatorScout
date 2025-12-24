@@ -178,7 +178,9 @@ describe("database", () => {
 			const username = getTestUsername();
 			mockProfile.update.mockResolvedValue({ username, isCreator: true });
 
-			await expect(markAsCreator(username, 85, "proof.png")).resolves.not.toThrow();
+			await expect(
+				markAsCreator(username, 85, "proof.png"),
+			).resolves.not.toThrow();
 			await expect(markAsCreator(username, 85)).resolves.not.toThrow();
 			expect(mockProfile.update).toHaveBeenCalled();
 		});

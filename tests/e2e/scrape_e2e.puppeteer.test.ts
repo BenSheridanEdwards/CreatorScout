@@ -36,9 +36,9 @@ import { checkDmThreadEmpty } from "../../functions/profile/profileActions/profi
 import { parseProfileStatus } from "../../functions/profile/profileStatus/profileStatus.ts";
 // Import TypeScript functions
 import {
+	closeDb,
 	getScrollIndex,
 	initDb,
-	closeDb,
 	markAsCreator,
 	markVisited,
 	queueAdd,

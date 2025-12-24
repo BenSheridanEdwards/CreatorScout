@@ -1,8 +1,9 @@
 /**
  * Logging Integration - Easy integration with existing scrape.ts
  */
-import { createEnhancedLogger, type EnhancedLogger } from "./enhancedLogger.ts";
+
 import { CycleManager } from "./cycleManager.ts";
+import { createEnhancedLogger, type EnhancedLogger } from "./enhancedLogger.ts";
 
 export interface LoggingConfig {
 	debug: boolean;

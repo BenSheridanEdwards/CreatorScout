@@ -4,7 +4,7 @@
  */
 
 import { jest } from "@jest/globals";
-import type { Browser, Page, HTTPResponse } from "puppeteer";
+import type { Browser, HTTPResponse, Page } from "puppeteer";
 
 // Mock all dependencies BEFORE importing the module under test
 const mockBrowser: jest.Mocked<Browser> = {
@@ -114,6 +114,14 @@ describe("sessionInitializer", () => {
 	});
 
 	describe("initializeInstagramSession", () => {
+		it("should disable stealth patches when goLoginToken is provided", async () => {
+			await initializeInstagramSession({ goLoginToken: "token-123" });
+			expect(createPageMock).toHaveBeenCalledWith(
+				mockBrowser,
+				expect.objectContaining({ applyStealth: false }),
+			);
+		});
+
 		it("should successfully initialize a session with default options", async () => {
 			const result = await initializeInstagramSession();
 
@@ -128,9 +136,11 @@ describe("sessionInitializer", () => {
 		it("should create browser with correct headless option", async () => {
 			await initializeInstagramSession({ headless: false });
 
-			expect(createBrowserMock).toHaveBeenCalledWith({
-				headless: false,
-			});
+			expect(createBrowserMock).toHaveBeenCalledWith(
+				expect.objectContaining({
+					headless: false,
+				}),
+			);
 		});
 
 		it("should create page with custom viewport", async () => {
@@ -138,9 +148,12 @@ describe("sessionInitializer", () => {
 
 			await initializeInstagramSession({ viewport: customViewport });
 
-			expect(createPageMock).toHaveBeenCalledWith(mockBrowser, {
-				viewport: customViewport,
-			});
+			expect(createPageMock).toHaveBeenCalledWith(
+				mockBrowser,
+				expect.objectContaining({
+					viewport: customViewport,
+				}),
+			);
 		});
 
 		it("should navigate to Instagram", async () => {

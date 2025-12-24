@@ -66,13 +66,13 @@ describe("Configuration", () => {
 		test("provides optimized delay ranges", async () => {
 			const { DELAYS } = await import("./config.ts");
 
-			// Navigation should be faster than before
-			expect(DELAYS.after_navigate).toEqual([1.5, 3.5]);
-			expect(DELAYS.after_click).toEqual([0.2, 0.8]);
+			// Efficient ranges (short for routine actions)
+			expect(DELAYS.after_navigate).toEqual([1, 3]);
+			expect(DELAYS.after_click).toEqual([0.3, 1]);
 
-			// Instagram-specific actions should be appropriate
-			expect(DELAYS.after_dm_send).toEqual([1.5, 3.5]);
-			expect(DELAYS.after_follow).toEqual([0.8, 1.8]);
+			// High-risk actions (DMs) should be longer
+			expect(DELAYS.after_dm_send).toEqual([10, 30]);
+			expect(DELAYS.after_follow).toEqual([1, 5]);
 		});
 
 		test("includes all required delay categories", async () => {

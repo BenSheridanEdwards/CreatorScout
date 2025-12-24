@@ -2,8 +2,8 @@
  * Database operations using PostgreSQL via Prisma.
  */
 
-import { PrismaClient, Prisma } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
+import { Prisma, PrismaClient } from "@prisma/client";
 import { Pool } from "pg";
 
 let prismaInstance: PrismaClient | null = null;
@@ -36,6 +36,25 @@ function getPrisma(): PrismaClient {
 		prismaInstance = new PrismaClient({ adapter });
 	}
 	return prismaInstance;
+}
+
+/**
+ * Get the Prisma client (preferred for typed DB access).
+ *
+ * Note: This is intentionally a function (not a top-level exported const) so we
+ * don't eagerly require DATABASE_URL at module import time for scripts/tests
+ * that don't touch the DB.
+ */
+export function getPrismaClient(): PrismaClient {
+	return getPrisma();
+}
+
+/**
+ * Convenience alias for callers that expect a Prisma-like client.
+ * Prefer `getPrismaClient()` for clarity.
+ */
+export function prisma(): PrismaClient {
+	return getPrisma();
 }
 
 /**

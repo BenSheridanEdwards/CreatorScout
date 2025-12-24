@@ -10,8 +10,8 @@ import dotenv from "dotenv";
 import type { Browser } from "puppeteer";
 import { initializeInstagramSession } from "../functions/auth/sessionInitializer/sessionInitializer.ts";
 import { analyzeProfileComprehensive } from "../functions/profile/profileAnalysis/profileAnalysis.ts";
+import { IG_PASS, IG_USER } from "../functions/shared/config/config.ts";
 import type { ProfileCheckResult } from "../functions/shared/types/types.ts";
-import { IG_USER, IG_PASS } from "../functions/shared/config/config.ts";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

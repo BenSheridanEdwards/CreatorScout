@@ -5,8 +5,8 @@ import type { Page } from "puppeteer";
 import { login } from "../../auth/login/login.ts";
 import { parseProfileStatus } from "../../profile/profileStatus/profileStatus.ts";
 import { IG_PASS, IG_USER } from "../../shared/config/config.ts";
-import { sleep } from "../../timing/sleep/sleep.ts";
 import type { Logger } from "../../shared/logger/logger.ts";
+import { sleep } from "../../timing/sleep/sleep.ts";
 
 export interface ProfileStatus {
 	isPrivate: boolean;
@@ -133,9 +133,7 @@ async function navigateToProfileViaSearch(
 					}
 				}
 			}
-		} catch {
-			continue;
-		}
+		} catch {}
 	}
 
 	if (!searchClicked) {
@@ -196,7 +194,7 @@ async function navigateToProfileViaSearch(
 				text.includes(`@${targetUsername}`)
 			) {
 				if (
-					href.match(/^\/[^\/]+\/?$/) ||
+					href.match(/^\/[^/]+\/?$/) ||
 					href.includes(`/${targetUsername}/`)
 				) {
 					(link as HTMLElement).click();
@@ -304,7 +302,7 @@ export async function verifyLoggedIn(page: Page): Promise<boolean> {
 /**
  * @deprecated Use initializeInstagramSession() from functions/auth/sessionInitializer/sessionInitializer.ts instead.
  * This function is kept for backward compatibility but will be removed in a future version.
- * 
+ *
  * Ensure we're logged in, re-logging if necessary.
  */
 export async function ensureLoggedIn(
@@ -314,7 +312,7 @@ export async function ensureLoggedIn(
 	console.warn(
 		"⚠️  DEPRECATION WARNING: ensureLoggedIn() is deprecated. Use initializeInstagramSession() instead.",
 	);
-	
+
 	logger.info("WAIT", "Checking if logged in");
 
 	// Check if logged in by looking for multiple indicators.
