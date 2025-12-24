@@ -36,7 +36,7 @@ function dbToProfileConfig(record: {
 	username: string;
 	password: string;
 	type: string;
-	goLoginToken: string;
+	adsPowerProfileId: string;
 	proxyConfig: unknown;
 	createdAt: Date;
 	archivedAt: Date | null;
@@ -55,7 +55,7 @@ function dbToProfileConfig(record: {
 		username: record.username,
 		password: record.password,
 		type: record.type as ProfileType,
-		goLoginToken: record.goLoginToken,
+		adsPowerProfileId: record.adsPowerProfileId,
 		proxyConfig: record.proxyConfig as ProfileConfig["proxyConfig"],
 		limits: {
 			followsPerDay: record.maxFollowsPerDay,
@@ -392,7 +392,7 @@ export async function createProfile(
 	username: string,
 	password: string,
 	type: ProfileType,
-	goLoginToken: string,
+	adsPowerProfileId: string,
 	customLimits?: Partial<ProfileLimits>,
 ): Promise<ProfileConfig> {
 	const defaults =
@@ -405,7 +405,7 @@ export async function createProfile(
 			username,
 			password,
 			type,
-			goLoginToken,
+			adsPowerProfileId,
 			maxFollowsPerDay: limits.followsPerDay,
 			maxDmsPerDay: limits.dmsPerDay,
 			maxDiscoveriesPerDay: limits.discoveriesPerDay,

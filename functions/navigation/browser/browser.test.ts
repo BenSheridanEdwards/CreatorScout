@@ -1,8 +1,8 @@
 /**
  * Browser Helper Tests
  *
- * Updated for GoLogin-first flow:
- * - createBrowser() uses GoLogin when token is available and LOCAL_BROWSER is false
+ * Updated for AdsPower-first flow:
+ * - createBrowser() uses AdsPower when adsPowerProfileId is available and LOCAL_BROWSER is false
  * - createBrowser() launches local Puppeteer when LOCAL_BROWSER is true
  * - createPage() applies minimal stealth patches only when `applyStealth: true`
  */
@@ -17,9 +17,6 @@ const mockGetUserDataDir = jest
 	.mockReturnValue("/tmp/test-data");
 const mockConfig = {
 	LOCAL_BROWSER: true,
-	GOLOGIN_API_TOKEN: "gologin-token",
-	GOLOGIN_USE_LOCAL: false,
-	GOLOGIN_VPS_IP: "localhost",
 };
 
 jest.unstable_mockModule("puppeteer", () => ({
@@ -31,14 +28,14 @@ jest.unstable_mockModule("../../auth/sessionManager/sessionManager.ts", () => ({
 	getUserDataDir: mockGetUserDataDir,
 }));
 jest.unstable_mockModule("../../shared/config/config.ts", () => mockConfig);
-const mockConnectToGoLogin = jest
+const mockConnectToAdsPower = jest
 	.fn<() => Promise<Browser>>()
 	.mockResolvedValue({
 		pages: jest.fn<() => Promise<Page[]>>().mockResolvedValue([]),
 	} as unknown as Browser);
 
-jest.unstable_mockModule("./goLoginConnector.ts", () => ({
-	connectToGoLoginProfile: mockConnectToGoLogin,
+jest.unstable_mockModule("./adsPowerConnector.ts", () => ({
+	connectToAdsPowerProfile: mockConnectToAdsPower,
 }));
 
 // Helper to import module after any config tweaks
@@ -51,7 +48,6 @@ describe("browser helpers", () => {
 	beforeEach(() => {
 		jest.clearAllMocks();
 		mockConfig.LOCAL_BROWSER = true;
-		mockConfig.GOLOGIN_API_TOKEN = "gologin-token";
 		process.env.LOCAL_BROWSER = "true";
 	});
 
@@ -120,24 +116,25 @@ describe("browser helpers", () => {
 	});
 
 	// ═══════════════════════════════════════════════════════════════════════════
-	// createBrowser() - GoLogin mode
+	// createBrowser() - AdsPower mode
 	// ═══════════════════════════════════════════════════════════════════════════
 
-	describe("createBrowser() - GoLogin mode", () => {
-		test("connects to GoLogin when goLoginToken is available and LOCAL_BROWSER is false", async () => {
+	describe("createBrowser() - AdsPower mode", () => {
+		test("connects to AdsPower when adsPowerProfileId is provided and LOCAL_BROWSER is false", async () => {
 			mockConfig.LOCAL_BROWSER = false;
 			delete process.env.LOCAL_BROWSER;
-			mockConfig.GOLOGIN_API_TOKEN = "token-123";
 			const { createBrowser } = await loadBrowserModule();
 
-			await createBrowser();
-			// We don't assert internal connector args here; connector is unit-tested separately.
+			await createBrowser({ adsPowerProfileId: "test-profile-123" });
+
+			expect(mockConnectToAdsPower).toHaveBeenCalledWith("test-profile-123", {
+				timeout: 30000,
+			});
 			expect(mockLaunch).not.toHaveBeenCalled();
 		});
 
-		test("falls back to local Puppeteer when no GoLogin token is configured", async () => {
+		test("falls back to local Puppeteer when no AdsPower profile ID is provided", async () => {
 			mockConfig.LOCAL_BROWSER = false;
-			mockConfig.GOLOGIN_API_TOKEN = undefined as unknown as string;
 			delete process.env.LOCAL_BROWSER;
 			const fakeBrowser = {
 				newPage: jest.fn<() => Promise<Page>>(),

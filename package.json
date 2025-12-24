@@ -30,7 +30,12 @@
 		"costs": "tsx scripts/monitoring/costMonitor.ts",
 		"cron:session": "tsx scripts/cron/sessionRunner.ts",
 		"cron:smart": "tsx scripts/cron/smartSessionRunner.ts",
-		"cron:reset": "tsx scripts/cron/resetDailyCounters.ts"
+		"cron:reset": "tsx scripts/cron/resetDailyCounters.ts",
+		"test:dm": "tsx scripts/test_dm_variation.ts",
+		"test:proxy": "tsx scripts/test_proxy.ts",
+		"test:single-profile": "tsx scripts/test_profile.ts",
+		"profiles:list": "tsx scripts/list_profiles.ts",
+		"adspower:list": "tsx scripts/list_adspower_profiles.ts"
 	},
 	"dependencies": {
 		"@prisma/adapter-pg": "^7.1.0",

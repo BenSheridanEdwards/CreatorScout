@@ -28,7 +28,7 @@ export type LogPrefix =
 	| "WAIT"
 	| "SUCCESS"
 	| "SESSION"
-	| "GOLOGIN"
+	| "ADSPOWER"
 	| "CRON"
 	| "PROFILES"
 	| "PROXY"

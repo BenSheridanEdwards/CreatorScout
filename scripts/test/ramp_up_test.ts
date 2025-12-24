@@ -155,7 +155,7 @@ async function runRampUpTest(args: RampUpArgs): Promise<RampUpResults> {
 
 	const session = await initializeInstagramSession({
 		headless: true,
-		goLoginToken: profile.goLoginToken,
+		goLoginProfileId: profile.goLoginProfileId,
 		profileId: profile.id,
 		debug: true,
 	});

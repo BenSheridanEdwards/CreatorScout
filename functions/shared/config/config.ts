@@ -164,19 +164,29 @@ export const IG_USER = process.env.INSTAGRAM_USERNAME;
 export const IG_PASS = process.env.INSTAGRAM_PASSWORD;
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// GOLOGIN CONFIGURATION
+// ADSPOWER CONFIGURATION (RECOMMENDED)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-export const GOLOGIN_API_TOKEN = process.env.GOLOGIN_API_TOKEN;
-export const GOLOGIN_USE_LOCAL = _flag("GOLOGIN_USE_LOCAL", false); // Use local Orbita
-export const GOLOGIN_VPS_IP = process.env.GOLOGIN_VPS_IP || "localhost";
-export const GOLOGIN_LOCAL_PORT = parseInt(
-	process.env.GOLOGIN_LOCAL_PORT || "9222",
-	10,
-);
+// AdsPower Local API base URL (default: http://127.0.0.1:50325)
+export const ADSPOWER_API_BASE =
+	process.env.ADSPOWER_API_BASE || "http://127.0.0.1:50325";
+
+// AdsPower API key (optional - only if API verification is enabled in AdsPower)
+export const ADSPOWER_API_KEY = process.env.ADSPOWER_API_KEY;
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// SMARTPROXY CONFIGURATION
+// DECODO PROXY CONFIGURATION (RECOMMENDED)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export const DECODO_USERNAME = process.env.DECODO_USERNAME;
+export const DECODO_PASSWORD = process.env.DECODO_PASSWORD;
+export const DECODO_HOST = process.env.DECODO_HOST || "gate.decodo.net";
+export const DECODO_PORT = parseInt(process.env.DECODO_PORT || "20011", 10);
+export const DECODO_STICKY_SESSION_MIN = 20; // minutes
+export const DECODO_STICKY_SESSION_MAX = 30;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SMARTPROXY CONFIGURATION (LEGACY)
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export const SMARTPROXY_USERNAME = process.env.SMARTPROXY_USERNAME;

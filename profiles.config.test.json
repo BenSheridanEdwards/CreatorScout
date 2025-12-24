@@ -1,0 +1,46 @@
+{
+	"$schema": "./profiles.config.schema.json",
+	"profiles": [
+		{
+			"id": "test-profile",
+			"username": "test_user",
+			"password": "test_pass",
+			"type": "main",
+			"adsPowerProfileId": "test_adspower_id",
+			"note": "Uses TEST_INSTAGRAM_USERNAME and TEST_INSTAGRAM_PASSWORD from .env",
+			"limits": {
+				"followsPerDay": 10,
+				"dmsPerDay": 15,
+				"discoveriesPerDay": 100
+			},
+			"sessions": {
+				"morning": {
+					"enabled": true,
+					"time": "08:15",
+					"durationMinutes": 18,
+					"dmWeight": 0.2
+				},
+				"afternoon": {
+					"enabled": true,
+					"time": "15:30",
+					"durationMinutes": 18,
+					"dmWeight": 0.5
+				},
+				"evening": {
+					"enabled": true,
+					"time": "20:45",
+					"durationMinutes": 18,
+					"dmWeight": 0.3
+				}
+			}
+		}
+	],
+	"globalSettings": {
+		"warmupMinutes": 1.5,
+		"engagementRatio": 4,
+		"sessionStaggerMinutes": 5,
+		"weeklyScheduleVariance": true,
+		"dmStrategy": "cold",
+		"enableVisionAI": false
+	}
+}

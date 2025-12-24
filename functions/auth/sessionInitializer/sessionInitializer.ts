@@ -4,7 +4,7 @@
  * Provides a single, consistent way to initialize Instagram sessions across all scripts.
  * Encapsulates browser creation, navigation, content verification, and authentication.
  *
- * Supports both GoLogin (production) and local browsers (development).
+ * Supports both AdsPower (production) and local browsers (development).
  */
 
 import type { Browser, Page } from "puppeteer";
@@ -60,15 +60,10 @@ export interface SessionOptions {
 	};
 
 	/**
-	 * GoLogin profile token (for multi-profile support)
-	 * If provided, will connect to GoLogin instead of using local browser
+	 * AdsPower profile ID (for multi-profile support)
+	 * If provided, will connect to AdsPower instead of using local browser
 	 */
-	goLoginToken?: string;
-
-	/**
-	 * Use local Orbita instance instead of remote GoLogin
-	 */
-	useLocalOrbita?: boolean;
+	adsPowerProfileId?: string;
 
 	/**
 	 * Profile ID for tracking (for multi-profile automation)
@@ -128,8 +123,7 @@ export async function initializeInstagramSession(
 		skipLogin = false,
 		credentials,
 		loginOptions,
-		goLoginToken,
-		useLocalOrbita,
+		adsPowerProfileId,
 		profileId,
 	} = options;
 
@@ -142,11 +136,7 @@ export async function initializeInstagramSession(
 	}
 
 	// 2. Create browser with proper options
-	const browserMode = goLoginToken
-		? useLocalOrbita
-			? "GoLogin (local Orbita)"
-			: "GoLogin (remote)"
-		: "local browser";
+	const browserMode = adsPowerProfileId ? "AdsPower" : "local browser";
 	logger.info(
 		"SESSION",
 		`Creating browser (${browserMode}, headless: ${headless})...`,
@@ -154,8 +144,7 @@ export async function initializeInstagramSession(
 
 	const browser = await createBrowser({
 		headless,
-		goLoginToken,
-		useLocalOrbita,
+		adsPowerProfileId,
 	});
 	logger.info("SESSION", "✅ Browser created successfully");
 
@@ -166,7 +155,7 @@ export async function initializeInstagramSession(
 	);
 	const page = await createPage(browser, {
 		viewport,
-		applyStealth: !goLoginToken,
+		applyStealth: !adsPowerProfileId,
 	});
 	logger.info("SESSION", "✅ Page created successfully");
 

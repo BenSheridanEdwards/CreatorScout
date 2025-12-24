@@ -1,22 +1,20 @@
 /**
  * Browser setup and page creation utilities.
- * Supports both GoLogin (production) and local browser (development).
+ * Supports:
+ * - AdsPower (Local API connection) - RECOMMENDED
+ * - Local Puppeteer (development)
  *
- * GoLogin handles all fingerprinting and proxy management automatically.
- * No stealth plugins needed when using GoLogin profiles.
+ * AdsPower handles fingerprinting automatically.
+ * No stealth plugins needed when using AdsPower profiles.
  */
 import { join } from "node:path";
 import type { Browser, Page } from "puppeteer";
 import puppeteer from "puppeteer";
 import { getUserDataDir } from "../../auth/sessionManager/sessionManager.ts";
-import {
-	GOLOGIN_API_TOKEN,
-	GOLOGIN_USE_LOCAL,
-	GOLOGIN_VPS_IP,
-	LOCAL_BROWSER,
-} from "../../shared/config/config.ts";
+import { LOCAL_BROWSER } from "../../shared/config/config.ts";
 import { createLogger } from "../../shared/logger/logger.ts";
-import { connectToGoLoginProfile } from "./goLoginConnector.ts";
+import { connectToAdsPowerProfile } from "./adsPowerConnector.ts";
+import { ProxyManager, createStickyProxy } from "../proxy/proxyManager.ts";
 
 const logger = createLogger();
 
@@ -24,13 +22,21 @@ export interface BrowserOptions {
 	headless?: boolean;
 	userDataDir?: string | null;
 	/**
-	 * GoLogin profile token (overrides GOLOGIN_API_TOKEN env var)
+	 * AdsPower profile user_id (from AdsPower app)
+	 * When provided, connects via AdsPower Local API
 	 */
-	goLoginToken?: string;
+	adsPowerProfileId?: string;
 	/**
-	 * Use local Orbita instead of remote GoLogin
+	 * ProxyManager instance for residential proxy (optional)
+	 * If not provided and proxy credentials exist, one will be created automatically
+	 * Note: AdsPower profiles typically have their own proxy configured
 	 */
-	useLocalOrbita?: boolean;
+	proxyManager?: ProxyManager;
+	/**
+	 * Geo-targeting for proxy (if auto-creating proxy)
+	 */
+	proxyCountry?: string;
+	proxyCity?: string;
 }
 
 export interface PageOptions {
@@ -40,7 +46,7 @@ export interface PageOptions {
 	userAgent?: string;
 	/**
 	 * Apply minimal local stealth patches (webdriver removal, basic navigator props).
-	 * Should be false when using GoLogin (it already handles fingerprinting/stealth).
+	 * Should be false when using AdsPower (it already handles fingerprinting/stealth).
 	 */
 	applyStealth?: boolean;
 }
@@ -60,7 +66,7 @@ export function getUniqueUserDataDir(prefix: string = "browser"): string {
  *
  * Priority:
  * 1. If LOCAL_BROWSER=true, use local Puppeteer
- * 2. If goLoginToken provided or GOLOGIN_API_TOKEN set, use GoLogin
+ * 2. If adsPowerProfileId provided, use AdsPower (RECOMMENDED)
  * 3. Otherwise, fall back to local Puppeteer
  */
 export async function createBrowser(
@@ -68,29 +74,24 @@ export async function createBrowser(
 ): Promise<Browser> {
 	const {
 		userDataDir: providedUserDataDir,
-		goLoginToken,
-		useLocalOrbita,
+		adsPowerProfileId,
+		proxyManager,
+		proxyCountry,
+		proxyCity,
 	} = options;
 
 	const usingLocalBrowser =
 		process.env.LOCAL_BROWSER === "true" || LOCAL_BROWSER;
-	const gologinToken = goLoginToken || GOLOGIN_API_TOKEN;
-	const useOrbita = useLocalOrbita ?? GOLOGIN_USE_LOCAL;
 
-	// If GoLogin token is available and not forcing local browser, use GoLogin
-	if (gologinToken && !usingLocalBrowser) {
-		logger.info(
-			"ACTION",
-			`Connecting to GoLogin ${useOrbita ? "(local Orbita)" : "(remote)"}...`,
-		);
+	// Priority 1: AdsPower (if profile ID provided and not forcing local browser)
+	if (adsPowerProfileId && !usingLocalBrowser) {
+		logger.info("ACTION", "Connecting to AdsPower profile...");
 
-		const browser = await connectToGoLoginProfile(gologinToken, {
-			headless: true,
-			local: useOrbita,
-			vpsIp: GOLOGIN_VPS_IP || "localhost",
+		const browser = await connectToAdsPowerProfile(adsPowerProfileId, {
+			timeout: 30000,
 		});
 
-		logger.info("SUCCESS", "GoLogin browser connected successfully");
+		logger.info("SUCCESS", "AdsPower browser connected successfully");
 		return browser;
 	}
 
@@ -111,17 +112,52 @@ export async function createBrowser(
 				? getUserDataDir()
 				: getUniqueUserDataDir();
 
+	// Setup proxy if provided or auto-create if credentials available
+	let proxy: ProxyManager | undefined = proxyManager;
+	if (!proxy && !usingLocalBrowser) {
+		try {
+			proxy = createStickyProxy({
+				country: proxyCountry,
+				city: proxyCity,
+			});
+			logger.info("PROXY", "Auto-created sticky proxy session");
+		} catch (error) {
+			logger.warn(
+				"PROXY",
+				"No proxy credentials found, launching without proxy",
+			);
+		}
+	}
+
+	// Build browser args
+	const args = [
+		"--no-sandbox",
+		"--disable-dev-shm-usage",
+		"--disable-features=VizDisplayCompositor", // Allow multiple instances
+		"--disable-blink-features=AutomationControlled", // Hide automation
+		"--disable-features=IsolateOrigins,site-per-process", // Better compatibility
+		"--disable-web-security", // Allow cross-origin requests
+		"--disable-features=BlockInsecurePrivateNetworkRequests", // Better compatibility
+	];
+
+	// Add proxy if available
+	if (proxy) {
+		const proxyUrl = proxy.getProxyUrl();
+		args.push(`--proxy-server=${proxyUrl}`);
+		logger.info("PROXY", `Using proxy: ${proxy.getProxyCredentials().server}`);
+
+		const sessionInfo = proxy.getSessionInfo();
+		if (sessionInfo) {
+			logger.info(
+				"PROXY",
+				`Sticky session: ${sessionInfo.sessionId} (${proxy.getTimeRemaining()}min remaining)`,
+			);
+		}
+	}
+
 	const browser = await puppeteer.launch({
 		headless,
-		args: [
-			"--no-sandbox",
-			"--disable-dev-shm-usage",
-			"--disable-features=VizDisplayCompositor", // Allow multiple instances
-			"--disable-blink-features=AutomationControlled", // Hide automation
-			"--disable-features=IsolateOrigins,site-per-process", // Better compatibility
-			"--disable-web-security", // Allow cross-origin requests
-			"--disable-features=BlockInsecurePrivateNetworkRequests", // Better compatibility
-		],
+		args,
 		userDataDir: userDataDir || undefined, // Persistent profile to save cookies
 	});
 
@@ -228,7 +264,7 @@ export async function createPage(
 	);
 
 	// Apply minimal stealth for local browser only.
-	// GoLogin handles all stealth automatically, so disable via `applyStealth: false`.
+	// AdsPower handles all stealth automatically, so disable via `applyStealth: false`.
 	if (applyStealth) {
 		await applyLocalBrowserStealth(page);
 	}
@@ -253,7 +289,7 @@ export async function createPage(
 
 /**
  * Apply minimal stealth techniques for local browser only.
- * GoLogin handles all stealth automatically, so this is only for local dev.
+ * AdsPower handles all stealth automatically, so this is only for local dev.
  */
 async function applyLocalBrowserStealth(page: Page): Promise<void> {
 	await page.evaluateOnNewDocument(() => {

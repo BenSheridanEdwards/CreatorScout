@@ -45,12 +45,13 @@ export interface ProfileConfig {
 	type: ProfileType;
 
 	/**
-	 * GoLogin profile token for authentication
+	 * AdsPower profile user_id for browser connection
+	 * Found in AdsPower app under profile settings
 	 */
-	goLoginToken: string;
+	adsPowerProfileId: string;
 
 	/**
-	 * Smartproxy configuration (optional - can use GoLogin's proxy)
+	 * Smartproxy configuration (optional - can use AdsPower's proxy)
 	 */
 	proxyConfig?: ProxyConfig;
 
@@ -120,7 +121,7 @@ export function createProfileConfig(
 	username: string,
 	password: string,
 	type: ProfileType,
-	goLoginToken: string,
+	adsPowerProfileId: string,
 	customLimits?: Partial<ProfileLimits>,
 ): ProfileConfig {
 	const defaultLimits =
@@ -131,7 +132,7 @@ export function createProfileConfig(
 		username,
 		password,
 		type,
-		goLoginToken,
+		adsPowerProfileId,
 		limits: { ...defaultLimits, ...customLimits },
 		createdAt: new Date(),
 		age: 0,

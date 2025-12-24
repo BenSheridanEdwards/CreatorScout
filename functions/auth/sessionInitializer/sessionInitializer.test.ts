@@ -114,8 +114,8 @@ describe("sessionInitializer", () => {
 	});
 
 	describe("initializeInstagramSession", () => {
-		it("should disable stealth patches when goLoginToken is provided", async () => {
-			await initializeInstagramSession({ goLoginToken: "token-123" });
+		it("should disable stealth patches when adsPowerProfileId is provided", async () => {
+			await initializeInstagramSession({ adsPowerProfileId: "profile-123" });
 			expect(createPageMock).toHaveBeenCalledWith(
 				mockBrowser,
 				expect.objectContaining({ applyStealth: false }),

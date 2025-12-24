@@ -5,7 +5,7 @@ import http from "node:http";
 import { extname, join } from "node:path";
 import {
 	BROWSERLESS_TOKEN,
-	GOLOGIN_API_TOKEN,
+	ADSPOWER_API_KEY,
 	LOCAL_BROWSER,
 } from "./functions/shared/config/config.ts";
 
@@ -63,11 +63,11 @@ async function handleApi(
 	if (req.method === "GET" && url.pathname === "/api/env/connection") {
 		const usingLocal = Boolean(LOCAL_BROWSER);
 		const hasBrowserless = Boolean(BROWSERLESS_TOKEN);
-		const hasGoLogin = Boolean(GOLOGIN_API_TOKEN);
+		const hasAdsPower = Boolean(ADSPOWER_API_KEY);
 		const provider = usingLocal
 			? "local"
-			: hasGoLogin
-				? "gologin"
+			: hasAdsPower
+				? "adspower"
 				: hasBrowserless
 					? "browserless"
 					: "unknown";
@@ -75,7 +75,7 @@ async function handleApi(
 		sendJson(res, 200, {
 			provider,
 			localBrowser: usingLocal,
-			goLoginConfigured: hasGoLogin,
+			adsPowerConfigured: hasAdsPower,
 			browserlessConfigured: hasBrowserless,
 		});
 		return;

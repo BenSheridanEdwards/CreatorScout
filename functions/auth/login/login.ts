@@ -365,11 +365,11 @@ export async function login(
 
 	try {
 		await clickAny(page, [
-			"Allow all cookies",
-			"Allow essential and optional cookies",
 			"Decline optional cookies",
 			"Accept All",
 			"Accept",
+			"Allow all cookies",
+			"Allow essential and optional cookies",
 			"OK",
 			"Continue",
 		]);

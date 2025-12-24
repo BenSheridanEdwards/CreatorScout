@@ -91,7 +91,7 @@ model InstagramProfile {
   username     String    @unique
   password     String // Encrypted in production
   type         String // 'main' | 'burner'
-  goLoginToken String    @unique @map("gologin_token")
+  adsPowerProfileId String    @unique @map("adspower_profile_id")
   proxyConfig  Json?     @map("proxy_config") @db.JsonB
   createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   archivedAt   DateTime? @map("archived_at") @db.Timestamptz(6)

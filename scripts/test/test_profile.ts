@@ -87,13 +87,13 @@ async function testProfile(args: TestArgs): Promise<void> {
 	logger.info("TEST", "");
 	logger.info("TEST", "🔗 Test 2: Check GoLogin connection...");
 
-	if (!profile.goLoginToken) {
+	if (!profile.goLoginProfileId) {
 		logger.error("TEST", "❌ No GoLogin token configured for this profile");
 		process.exit(1);
 	}
 
 	try {
-		const isAvailable = await isGoLoginProfileAvailable(profile.goLoginToken);
+		const isAvailable = await isGoLoginProfileAvailable(profile.goLoginProfileId);
 		if (isAvailable) {
 			logger.info("TEST", "✅ GoLogin profile is available");
 		} else {
@@ -134,7 +134,7 @@ async function testProfile(args: TestArgs): Promise<void> {
 	try {
 		const session = await initializeInstagramSession({
 			headless: true,
-			goLoginToken: profile.goLoginToken,
+			goLoginProfileId: profile.goLoginProfileId,
 			profileId: profile.id,
 			debug: true,
 		});
