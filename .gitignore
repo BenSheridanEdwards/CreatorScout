@@ -5,7 +5,7 @@ venv/
 # Environment
 .env
 .env.local
-.env.*.local
+
 
 # Database
 *.db
