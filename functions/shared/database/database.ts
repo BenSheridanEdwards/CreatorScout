@@ -271,6 +271,54 @@ export async function getConfirmedCreatorsNotDmBefore() {
 	return matchingProfiles;
 }
 
+/**
+ * Get confirmed creators whose following list hasn't been scraped yet.
+ * This is used to re-seed the queue when it's empty.
+ */
+export async function getCreatorsWithUnscrapedFollowing(): Promise<string[]> {
+	const prisma = getPrisma();
+
+	// Get all confirmed creators
+	const creators = await prisma.profile.findMany({
+		where: { isCreator: true },
+		select: { username: true },
+	});
+
+	// Get all profiles whose following has been scraped
+	const scraped = await prisma.followingScraped.findMany({
+		select: { username: true },
+	});
+
+	const scrapedSet = new Set(scraped.map((s) => s.username));
+
+	// Return creators not in scraped set
+	return creators
+		.map((c) => c.username)
+		.filter((username) => !scrapedSet.has(username));
+}
+
+/**
+ * Mark a profile's following list as having started scraping.
+ */
+export async function markFollowingScrapingStarted(
+	username: string,
+): Promise<void> {
+	const prisma = getPrisma();
+	const normalizedUsername = username.toLowerCase().trim();
+
+	await prisma.followingScraped.upsert({
+		where: { username: normalizedUsername },
+		create: {
+			username: normalizedUsername,
+			scrollIndex: 0,
+			scrapedAt: new Date(),
+		},
+		update: {
+			scrapedAt: new Date(),
+		},
+	});
+}
+
 // === Following Scrape Tracking ===
 
 export async function getScrollIndex(username: string): Promise<number> {

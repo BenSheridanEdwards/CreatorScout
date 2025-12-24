@@ -132,6 +132,7 @@ export function decodeInstagramRedirect(url: string): string | null {
 
 /**
  * Analyze an external link by following it and checking the destination content.
+ * If we're already on the target URL (or a related page), skip navigation.
  */
 export async function analyzeExternalLink(
 	page: Page,
@@ -152,9 +153,24 @@ export async function analyzeExternalLink(
 	let isAggregator = false; // Track if it's an aggregator for later use
 
 	try {
-		// Navigate to the external link
-		await page.goto(linkUrl, { waitUntil: "networkidle2", timeout: 15000 });
-		const finalUrl = page.url();
+		const currentUrl = page.url();
+
+		// Check if we're already on an external page (not Instagram)
+		// This happens when clickBioLink was used before calling this function
+		const isAlreadyOnExternalPage =
+			!currentUrl.includes("instagram.com") && currentUrl.includes("http");
+
+		let finalUrl: string;
+
+		if (isAlreadyOnExternalPage) {
+			console.log(`[LINK_ANALYSIS] Already on external page: ${currentUrl}`);
+			finalUrl = currentUrl;
+		} else {
+			// Navigate to the external link
+			console.log(`[LINK_ANALYSIS] Navigating to: ${linkUrl}`);
+			await page.goto(linkUrl, { waitUntil: "networkidle2", timeout: 15000 });
+			finalUrl = page.url();
+		}
 
 		// Check for direct creator platform redirects
 		const isCreatorPlatform = CREATOR_PLATFORMS.some((platform) =>

@@ -3,7 +3,10 @@
  */
 import type { Page } from "puppeteer";
 import { getBioFromPage } from "../../extraction/getBioFromPage/getBioFromPage.ts";
-import { getLinkFromBio } from "../../extraction/getLinkFromBio/getLinkFromBio.ts";
+import {
+	clickBioLink,
+	getLinkFromBio,
+} from "../../extraction/getLinkFromBio/getLinkFromBio.ts";
 import { getProfileStats } from "../../extraction/getProfileStats/getProfileStats.ts";
 import {
 	getHighlightTitlesText,
@@ -181,22 +184,28 @@ export async function analyzeProfileComprehensive(
 	// Analyze external links properly
 	const externalLinks = result.links
 		.map((link) => decodeInstagramRedirect(link)) // Decode Instagram redirects
-		.filter(
-			(link) =>
-				link && link.includes("http") && !link.includes("instagram.com"),
-		)
+		.filter((link) => link?.includes("http") && !link.includes("instagram.com"))
 		.filter((link, index, arr) => arr.indexOf(link) === index); // Remove duplicates
 
 	if (externalLinks.length > 0) {
 		result.indicators.push("External links in profile");
 
-		// Analyze each external link
-		for (const linkUrl of externalLinks) {
-			if (!linkUrl || result.confidence >= 70) break; // Stop if we already have high confidence
+		// Save current URL to return to profile
+		const profileUrl = page.url();
+
+		// First, try to click the bio link like a user would
+		console.log(`[ANALYSIS] Attempting to click bio link for @${username}...`);
+		const clickResult = await clickBioLink(page);
+
+		if (clickResult.success && clickResult.finalUrl) {
+			console.log(
+				`[ANALYSIS] Bio link clicked, now at: ${clickResult.finalUrl}`,
+			);
 
 			try {
+				// Analyze the page we landed on
 				const linkAnalysis = await executeWithCircuitBreaker(
-					() => analyzeExternalLink(page, linkUrl, username),
+					() => analyzeExternalLink(page, clickResult.finalUrl ?? ""),
 					`link_analysis_${username}`,
 				);
 
@@ -218,6 +227,56 @@ export async function analyzeProfileComprehensive(
 				}
 			} catch (error) {
 				result.errors?.push(`Link analysis failed: ${error}`);
+			}
+
+			// Navigate back to the profile
+			console.log(`[ANALYSIS] Navigating back to profile...`);
+			await page.goto(profileUrl, {
+				waitUntil: "networkidle2",
+				timeout: 15000,
+			});
+			await sleep(2000);
+		} else {
+			console.log(`[ANALYSIS] Could not click bio link: ${clickResult.error}`);
+
+			// Fallback: analyze each external link by navigating directly
+			for (const linkUrl of externalLinks) {
+				if (!linkUrl || result.confidence >= 70) break; // Stop if we already have high confidence
+
+				try {
+					const linkAnalysis = await executeWithCircuitBreaker(
+						() => analyzeExternalLink(page, linkUrl),
+						`link_analysis_${username}`,
+					);
+
+					if (linkAnalysis.isCreator) {
+						result.isCreator = true;
+						result.confidence = Math.max(
+							result.confidence,
+							linkAnalysis.confidence,
+						);
+						result.indicators.push(...linkAnalysis.indicators);
+						result.reason = linkAnalysis.reason;
+
+						// Take screenshot of the link page for records
+						const linkScreenshot = await snapshot(
+							page,
+							`link_analysis_${username}`,
+						);
+						result.screenshots.push(linkScreenshot);
+					}
+				} catch (error) {
+					result.errors?.push(`Link analysis failed: ${error}`);
+				}
+			}
+
+			// Navigate back to the profile if we navigated away
+			if (page.url() !== profileUrl) {
+				await page.goto(profileUrl, {
+					waitUntil: "networkidle2",
+					timeout: 15000,
+				});
+				await sleep(2000);
 			}
 		}
 	}

@@ -954,12 +954,18 @@ export async function runScrapeLoop(
 export async function runScrapeLoopWithoutDM(
 	page: Page,
 	metricsTracker?: MetricsTracker,
+	options?: {
+		maxSeeds?: number;
+		shouldContinue?: () => boolean;
+	},
 ): Promise<void> {
 	let seedsProcessed = 0;
+	const maxSeeds = options?.maxSeeds ?? 100;
+	const checkContinue = options?.shouldContinue ?? shouldContinue;
 
 	logger.info("CYCLE", "Starting main scrape loop (no DM mode)");
 
-	while (shouldContinue()) {
+	while (checkContinue() && seedsProcessed < maxSeeds) {
 		// Get next profile from queue
 		const target = await queueNext();
 

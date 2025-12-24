@@ -12,12 +12,12 @@
  */
 
 import type { Page } from "puppeteer";
-import { humanClickElement } from "../../../timing/humanize/humanize.ts";
+import { humanClickElement } from "../../timing/humanize/humanize.ts";
 import {
 	mediumDelay,
 	microDelay,
 	shortDelay,
-} from "../../../timing/humanize/humanize.ts";
+} from "../../timing/humanize/humanize.ts";
 import { createLogger } from "../../shared/logger/logger.ts";
 
 const logger = createLogger();
