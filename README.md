@@ -4,23 +4,82 @@ An Instagram automation agent that discovers influencers with monetization links
 
 ## Quick Start
 
-1. **Clone and install:**
-   ```bash
-   git clone <repo>
-   cd scout
-   npm install
-   ```
+### 1. Clone and Install
+```bash
+git clone <repo>
+cd scout
+npm install
+```
 
-2. **Configure environment:**
-   ```bash
-   cp .env.example .env
-   # Edit .env with your credentials
-   ```
+### 2. Setup Services
 
-3. **Run discovery:**
-   ```bash
-   npm run discover
-   ```
+**You'll need accounts for:**
+- **[GoLogin](https://gologin.com)** - Browser fingerprinting ($49/month, 100 profiles)
+- **[SmartProxy](https://smartproxy.com)** - Residential proxies ($12.5/GB)
+- **[OpenRouter](https://openrouter.ai)** - Vision AI ($10-30/month)
+- **Postgres Database** - Railway/Supabase/Neon (free tier available)
+
+**Detailed setup guide:** See [DEPLOYMENT.md](DEPLOYMENT.md)
+
+### 3. Configure Environment
+
+Create a `.env` file with your credentials:
+
+```bash
+# SmartProxy (get from smartproxy.com dashboard)
+SMARTPROXY_USERNAME=sp1234567
+SMARTPROXY_PASSWORD=your_password
+SMARTPROXY_HOST=gate.smartproxy.com
+SMARTPROXY_PORT=7000
+
+# GoLogin (get profile tokens from gologin.com)
+GOLOGIN_API_TOKEN=your-gologin-profile-token
+
+# Instagram
+INSTAGRAM_USERNAME=your_ig_username
+INSTAGRAM_PASSWORD=your_ig_password
+
+# OpenRouter (for vision AI)
+OPENROUTER_API_KEY=your_openrouter_key
+
+# Database
+DATABASE_URL=postgresql://user:pass@host:5432/scout
+```
+
+### 4. Setup Database
+
+```bash
+npx prisma migrate deploy
+```
+
+### 5. Configure Profiles
+
+```bash
+cp profiles.config.example.json profiles.config.json
+# Edit profiles.config.json with your GoLogin tokens and Instagram accounts
+```
+
+### 6. Run Discovery
+
+```bash
+npm run discover
+```
+
+## Deployment
+
+**Recommended: VPS** (Hetzner $4/mo or DigitalOcean $6/mo)
+
+- ✅ No risk of suspension for automation
+- ✅ Full control over your server
+- ✅ Auto-deploy from GitHub (push to deploy)
+- ✅ Cheaper than Railway
+
+**Quick start guides:**
+- 🚀 **[QUICKSTART_VPS.md](QUICKSTART_VPS.md)** - 15 minute setup (recommended)
+- 📖 **[VPS_SETUP.md](VPS_SETUP.md)** - Detailed walkthrough with troubleshooting
+- 🔧 **[DEPLOYMENT.md](DEPLOYMENT.md)** - All deployment options (VPS, Railway, Local)
+
+**Why not Railway?** They prohibit scraping/automation in ToS. VPS gives you freedom.
 
 ## Configuration
 
@@ -173,13 +232,28 @@ npm run scrape -- --debug
 
 ## Configuration
 
-Edit `.env`:
+### Environment Variables
 
-```env
-BROWSERLESS_TOKEN=your_browserless_io_token
-OPENROUTER_API_KEY=your_openrouter_key
-INSTAGRAM_USERNAME=your_ig_username
-INSTAGRAM_PASSWORD=your_ig_password
+All configuration is done via `.env` file. Required variables:
+
+```bash
+# Services (required)
+GOLOGIN_API_TOKEN=your-token           # GoLogin profile token
+SMARTPROXY_USERNAME=sp1234567          # SmartProxy username
+SMARTPROXY_PASSWORD=your-pass          # SmartProxy password
+OPENROUTER_API_KEY=your-key            # Vision AI API key
+
+# Instagram (required)
+INSTAGRAM_USERNAME=your-ig-user
+INSTAGRAM_PASSWORD=your-ig-pass
+
+# Database (required)
+DATABASE_URL=postgresql://...          # Postgres connection string
+
+# Development flags (optional)
+LOCAL_BROWSER=false                    # Skip GoLogin/proxy for testing
+DEBUG_LOGS=false                       # Verbose logging
+FAST_MODE=false                        # Reduced delays for testing
 ```
 
 ### Config Options (`functions/shared/config/config.ts`)
@@ -268,44 +342,51 @@ FAST_MODE=false
 SKIP_VISION=false
 ```
 
-### BrowserLess Stealth Setup
+### GoLogin + SmartProxy Setup
 
-**Why BrowserLess Stealth?**
+**Why This Stack?**
 
-BrowserLess provides **enterprise-grade anti-detection** that surpasses traditional stealth plugins:
-
-- **Advanced Fingerprinting Mitigation**: Spoofs WebGL, Canvas, WebRTC, screen properties, and system characteristics
-- **Entropy Injection**: Injects realistic human-like behavior patterns and timing
-- **Residential Proxy Integration**: Built-in clean residential IPs with automatic rotation
-- **CAPTCHA Handling**: Automatic detection and solving of CAPTCHA challenges
-- **Behavioral Simulation**: Path-based semantics that mimic real user interactions
+- **GoLogin**: Enterprise-grade browser fingerprinting and anti-detection
+  - Unique fingerprints per profile (Canvas, WebGL, WebRTC, fonts, etc.)
+  - Persistent browser sessions with cookies
+  - Remote browser execution (no local Chrome needed)
+  
+- **SmartProxy**: Rotating residential IPs with sticky sessions
+  - 15-30 minute sticky sessions for consistent IP
+  - Auto-rotation for safety
+  - Geo-targeting support (match browser timezone)
 
 **How It Works:**
 
-1. **Stealth Endpoint**: Connects to `/chrome/stealth` instead of regular Chrome
-2. **All-Inclusive**: Stealth features + residential proxies in one service
-3. **Zero Configuration**: Works out-of-the-box, no additional proxy setup needed
-4. **Professional Infrastructure**: Enterprise-grade anti-detection systems
-
-**Connection:**
-```typescript
-// Your browser connects to the stealth endpoint:
-wss://chrome.browserless.io/chrome/stealth?token=YOUR_TOKEN
-// (Residential proxies and stealth features included automatically)
+```
+Your Script → GoLogin (fingerprint) → SmartProxy (residential IP) → Instagram
 ```
 
-**What You Get:**
-- ✅ **Advanced browser fingerprint spoofing**
-- ✅ **Human-like behavior simulation**
-- ✅ **Clean residential IP rotation**
-- ✅ **Automatic CAPTCHA handling**
-- ✅ **99.9% uptime infrastructure**
+**Setup Steps:**
 
-**Cost Impact:**
-- **BrowserLess Stealth**: $50/month (everything included)
+1. **GoLogin Account**
+   - Sign up at [gologin.com](https://gologin.com)
+   - Create a browser profile for each Instagram account
+   - Copy profile tokens → `profiles.config.json`
+
+2. **SmartProxy Account**
+   - Sign up at [smartproxy.com](https://smartproxy.com)
+   - Get credentials from dashboard
+   - Add to `.env` → `SMARTPROXY_USERNAME` and `SMARTPROXY_PASSWORD`
+
+3. **Integration** (already implemented!)
+   - Code automatically connects GoLogin profile via WebSocket
+   - Injects SmartProxy credentials into browser
+   - Creates sticky sessions (15-30 min)
+   - Auto-rotates when session expires
+
+**Detailed setup guide:** See [DEPLOYMENT.md](DEPLOYMENT.md) for step-by-step instructions.
+
+**Cost:**
+- **GoLogin Professional**: $49/month (100 profiles)
+- **SmartProxy**: $12.5/GB (~10-50GB/month = $125-625)
 - **Vision API**: $10-30/month
-- **Total**: $60-80/month
-- **No additional proxy services needed**
+- **Total**: ~$190-700/month
 
 ## Tests
 
