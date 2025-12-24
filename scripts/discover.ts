@@ -1,9 +1,16 @@
 /**
  * Scout - Instagram Creator Discovery Agent
  *
- * Usage: tsx scripts/discover.ts --profile <profile> [--debug]
+ * Usage: tsx scripts/discover.ts --profile <profile> [--send-dms] [--debug]
  * Example: tsx scripts/discover.ts --profile test-account
- * Example: tsx scripts/discover.ts --profile test-account --debug
+ * Example: tsx scripts/discover.ts --profile test-account --send-dms
+ * Example: tsx scripts/discover.ts --profile test-account --send-dms --debug
+ *
+ * Flags:
+ *   --profile <id>  Profile ID from profiles.config.json (default: test-account)
+ *   --send-dms      Enable DM sending (default: discovery only, no DMs)
+ *   --dm            Alias for --send-dms
+ *   --debug, -d     Enable debug logging
  */
 
 import dotenv from "dotenv";
@@ -16,6 +23,7 @@ import { stopAdsPowerProfile } from "../functions/navigation/browser/adsPowerCon
 // Parse arguments
 const args = process.argv.slice(2);
 const debug = args.includes("--debug") || args.includes("-d");
+const sendDMs = args.includes("--send-dms") || args.includes("--dm");
 
 // Get profile
 let profileId = "test-account"; // default
@@ -37,11 +45,12 @@ console.log(`🌐 AdsPower ID: ${profileConfig.adsPowerProfileId}`);
 console.log("");
 
 // Dynamic imports
-const { loadSeeds, runScrapeLoopWithoutDM } = await import("./scrape.ts");
+const { loadSeeds, processFollowingList } = await import("./scrape.ts");
 const {
 	initDb,
 	queueCount,
 	queueAdd,
+	queueNext,
 	getCreatorsWithUnscrapedFollowing,
 	getStats,
 } = await import("../functions/shared/database/database.ts");
@@ -51,6 +60,11 @@ const { getGlobalMetricsTracker } = await import(
 const { createLoggerWithCycleTracking } = await import(
 	"../functions/shared/logger/logger.ts"
 );
+const { getDelay } = await import("../functions/timing/humanize/humanize.ts");
+const { sleep } = await import("../functions/timing/sleep/sleep.ts");
+const { MAX_DMS_PER_DAY } = await import(
+	"../functions/shared/config/config.ts"
+);
 
 async function main() {
 	console.log("🚀 Starting Instagram Creator Discovery...");
@@ -59,9 +73,16 @@ async function main() {
 	console.log("   • Analyze bios for influencer indicators");
 	console.log("   • 🔗 CLICK links in bios and analyze with AI vision");
 	console.log("   • 👥 Follow confirmed creators");
+	if (sendDMs) {
+		console.log("   • 💬 SEND DMs to confirmed creators");
+	}
 	console.log("   • 📊 Show real-time progress and notifications");
 	console.log("   • 🔄 Expand network by exploring following lists");
-	console.log("❌ This will NOT send DMs (discovery mode)");
+	if (sendDMs) {
+		console.log("✅ DM MODE ENABLED - Will message creators");
+	} else {
+		console.log("🔍 DISCOVERY MODE - No DMs (use --send-dms to enable)");
+	}
 	console.log("");
 
 	// Initialize database
@@ -145,21 +166,113 @@ async function main() {
 	try {
 		logger.info("ACTION", "✅ Session initialized!");
 
-		// Run discovery loop - IMPORTANT: pass shouldContinue from our cycle manager
-		await runScrapeLoopWithoutDM(page, metricsTracker, {
-			shouldContinue,
-		});
+		if (sendDMs) {
+			logger.info("ACTION", "🚀 Starting discovery loop with DMs enabled...");
+		} else {
+			logger.info("ACTION", "🔍 Starting discovery loop (no DMs)...");
+		}
+
+		// Main discovery loop with optional DM sending
+		let dmsSent = 0;
+		let seedsProcessed = 0;
+		const stats = await getStats();
+		dmsSent = stats.dms_sent;
+
+		while ((!sendDMs || dmsSent < MAX_DMS_PER_DAY) && shouldContinue()) {
+			// Get next profile from queue
+			const target = await queueNext();
+
+			if (!target) {
+				const [waitMin, waitMax] = getDelay("queue_empty");
+				const waitTime = waitMin + Math.random() * (waitMax - waitMin);
+				logger.info(
+					"QUEUE",
+					`Queue empty - sleeping ${Math.floor(waitTime)}s...`,
+				);
+				await sleep(waitTime * 1000);
+				continue;
+			}
+
+			seedsProcessed++;
+			const currentQueue = await queueCount();
+			logger.info("QUEUE", `Queue: ${currentQueue} remaining`);
+			logger.info("SEED", `Processing seed #${seedsProcessed}: @${target}`);
+
+			try {
+				// Process their following list with optional DM sending
+				await processFollowingList(
+					target,
+					page,
+					metricsTracker,
+					sendDMs, // sendDM based on flag
+					shouldContinue,
+				);
+			} catch (err) {
+				logger.error("ERROR", `Failed to process seed @${target}: ${err}`);
+			}
+
+			// Print stats
+			const currentStats = await getStats();
+			if (sendDMs) {
+				logger.info(
+					"STATS",
+					`Progress: Visited ${currentStats.total_visited} | Creators: ${currentStats.confirmed_creators} | DMs: ${currentStats.dms_sent} | Queue: ${currentStats.queue_size}`,
+				);
+			} else {
+				logger.info(
+					"STATS",
+					`Progress: Visited ${currentStats.total_visited} | Creators: ${currentStats.confirmed_creators} | Queue: ${currentStats.queue_size}`,
+				);
+			}
+
+			dmsSent = currentStats.dms_sent;
+
+			// Check if we've hit DM limit (only when sending DMs)
+			if (sendDMs && dmsSent >= MAX_DMS_PER_DAY) {
+				logger.info("LIMIT", `✅ Reached daily DM limit (${MAX_DMS_PER_DAY})`);
+				break;
+			}
+
+			// Long delay between seed profiles
+			const [seedDelayMin, seedDelayMax] = getDelay("between_seeds");
+			const seedWait =
+				seedDelayMin + Math.random() * (seedDelayMax - seedDelayMin);
+			logger.info(
+				"DELAY",
+				`Waiting ${Math.floor(seedWait)}s before next seed...`,
+			);
+			await sleep(seedWait * 1000);
+		}
+
+		logger.info("ACTION", "📊 Discovery loop completed");
+		logger.info("STATS", `Seeds processed: ${seedsProcessed}`);
+		if (sendDMs) {
+			logger.info("STATS", `DMs sent: ${dmsSent}`);
+		}
 
 		// End metrics session
 		metricsTracker.endSession();
 		const finalMetrics = metricsTracker.getSessionMetrics();
-		logger.info(
-			"METRICS",
-			`✅ Discovery completed - Profiles: ${finalMetrics.profilesVisited}, Creators: ${finalMetrics.creatorsFound}`,
-		);
+		if (sendDMs) {
+			logger.info(
+				"METRICS",
+				`✅ Discovery completed - Profiles: ${finalMetrics.profilesVisited}, Creators: ${finalMetrics.creatorsFound}, DMs: ${finalMetrics.dmsSent}`,
+			);
+		} else {
+			logger.info(
+				"METRICS",
+				`✅ Discovery completed - Profiles: ${finalMetrics.profilesVisited}, Creators: ${finalMetrics.creatorsFound}`,
+			);
+		}
 
 		// End cycle
-		endCycle("COMPLETED", "Discovery session completed");
+		const cycleStatus =
+			sendDMs && dmsSent >= MAX_DMS_PER_DAY ? "COMPLETED" : "INTERRUPTED";
+		const reason =
+			sendDMs && dmsSent >= MAX_DMS_PER_DAY
+				? "DM limit reached"
+				: "Cycle interrupted";
+		endCycle(cycleStatus, reason);
 
 		logger.info("ACTION", "🔍 Discovery session completed successfully");
 	} finally {

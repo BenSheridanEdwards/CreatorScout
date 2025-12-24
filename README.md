@@ -191,9 +191,9 @@ npm run analyze some_profile    # Test profile analysis
 npm run follow test_user        # Test following
 npm run dm test_user           # Test DM sending
 
-# Run full automation
-npm run discover               # Safe discovery (no DMs)
-npm run scrape                 # Full automation (with DMs)
+# Run discovery automation
+npm run discover               # Safe discovery (no DMs, just finds & follows)
+npm run discover:dm            # Full automation (finds, follows, AND sends DMs)
 ```
 
 ## 📋 Available Scripts
@@ -211,7 +211,15 @@ npm run process <users> [opts] # Batch process multiple profiles
 
 ### Full Automation Scripts
 ```bash
-npm run discover               # Find creators safely (no DMs)
+# Discovery (no DMs - safe for testing)
+npm run discover               # Find and follow creators (no DMs)
+npm run discover:debug         # Same with debug logging
+
+# Discovery with DMs (full automation)
+npm run discover:dm            # Find, follow, AND send DMs to creators
+npm run discover:dm:debug      # Same with debug logging
+
+# Legacy full automation
 npm run scrape                 # Full automation with DMs
 ```
 
