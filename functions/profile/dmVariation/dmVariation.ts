@@ -100,13 +100,10 @@ function capitalize(str: string): string {
 
 /**
  * Add random emoji with 60% chance
+ * DISABLED - emojis removed from DM generation
  */
 function maybeAddEmoji(text: string, emojis: string[]): string {
-	if (Math.random() < 0.6) {
-		const emoji = pickRandom(emojis);
-		// 50/50 chance of emoji at start or end
-		return Math.random() < 0.5 ? `${emoji} ${text}` : `${text} ${emoji}`;
-	}
+	// Emojis disabled - return text unchanged
 	return text;
 }
 
