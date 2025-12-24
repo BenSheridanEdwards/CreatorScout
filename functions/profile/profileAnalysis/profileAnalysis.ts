@@ -265,11 +265,35 @@ export async function analyzeProfileComprehensive(
 				);
 
 				if (linkAnalysis.isCreator) {
-					result.isCreator = true;
-					result.confidence = Math.max(
-						result.confidence,
-						linkAnalysis.confidence,
-					);
+					// Combine link confidence with bio score
+					// If link confidence is LOW (30-50%) AND bio score is also LOW (<40),
+					// it's probably a generic content creator (fitness, gaming, etc.)
+					const bioScore = result.bioScore || 0;
+					let adjustedConfidence = linkAnalysis.confidence;
+					
+					if (linkAnalysis.confidence < 50 && bioScore < 40) {
+						// Both are weak signals - likely false positive
+						adjustedConfidence = Math.min(linkAnalysis.confidence, 35);
+						result.indicators.push(
+							"⚠️ Weak combined signals (generic content creator, not influencer)"
+						);
+						console.log(`[ANALYSIS] ⚠️ Low link confidence (${linkAnalysis.confidence}%) + low bio score (${bioScore}) = likely NOT influencer`);
+					} else if (linkAnalysis.confidence >= 70 || bioScore >= 60) {
+						// At least one strong signal - trust it
+						result.isCreator = true;
+						adjustedConfidence = linkAnalysis.confidence;
+					} else {
+						// Medium signals - require BOTH to be decent
+						result.isCreator = (linkAnalysis.confidence + bioScore) >= 90;
+						adjustedConfidence = linkAnalysis.confidence;
+						if (!result.isCreator) {
+							result.indicators.push(
+								`⚠️ Medium signals - needs stronger bio or link indicators`
+							);
+						}
+					}
+					
+					result.confidence = Math.max(result.confidence, adjustedConfidence);
 					result.indicators.push(...linkAnalysis.indicators);
 					result.reason = linkAnalysis.reason;
 
@@ -305,11 +329,30 @@ export async function analyzeProfileComprehensive(
 					);
 
 					if (linkAnalysis.isCreator) {
-						result.isCreator = true;
-						result.confidence = Math.max(
-							result.confidence,
-							linkAnalysis.confidence,
-						);
+						// Apply same combined signal logic
+						const bioScore = result.bioScore || 0;
+						let adjustedConfidence = linkAnalysis.confidence;
+						
+						if (linkAnalysis.confidence < 50 && bioScore < 40) {
+							adjustedConfidence = Math.min(linkAnalysis.confidence, 35);
+							result.indicators.push(
+								"⚠️ Weak combined signals (generic content creator)"
+							);
+							console.log(`[ANALYSIS] ⚠️ Low link confidence (${linkAnalysis.confidence}%) + low bio score (${bioScore}) = likely NOT influencer`);
+						} else if (linkAnalysis.confidence >= 70 || bioScore >= 60) {
+							result.isCreator = true;
+							adjustedConfidence = linkAnalysis.confidence;
+						} else {
+							result.isCreator = (linkAnalysis.confidence + bioScore) >= 90;
+							adjustedConfidence = linkAnalysis.confidence;
+							if (!result.isCreator) {
+								result.indicators.push(
+									`⚠️ Medium signals - needs stronger indicators`
+								);
+							}
+						}
+						
+						result.confidence = Math.max(result.confidence, adjustedConfidence);
 						result.indicators.push(...linkAnalysis.indicators);
 						result.reason = linkAnalysis.reason;
 

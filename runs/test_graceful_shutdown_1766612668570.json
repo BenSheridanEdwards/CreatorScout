@@ -1,0 +1,16 @@
+{
+  "id": "test_graceful_shutdown_1766612668570",
+  "scriptName": "test_graceful_shutdown",
+  "startTime": "2025-12-24T21:44:28.570Z",
+  "status": "error",
+  "profilesProcessed": 0,
+  "creatorsFound": 0,
+  "errors": 0,
+  "screenshots": [],
+  "errorMessage": "Script terminated by SIGINT",
+  "endTime": "2025-12-24T21:44:31.064Z",
+  "stats": {
+    "duration": 2,
+    "successRate": 0
+  }
+}

@@ -1,0 +1,56 @@
+{
+  "id": "test_enhanced_1766612494345",
+  "scriptName": "test_enhanced",
+  "startTime": "2025-12-24T21:41:34.345Z",
+  "status": "completed",
+  "profilesProcessed": 15,
+  "creatorsFound": 3,
+  "errors": 2,
+  "screenshots": [
+    "/screenshots/2025-12-24/profile_test1.png",
+    "/screenshots/2025-12-24/profile_test2.png",
+    "/screenshots/2025-12-24/profile_test3.png"
+  ],
+  "creatorsFoundList": [
+    {
+      "username": "test_creator_1",
+      "confidence": 95,
+      "reason": "direct_patreon_link",
+      "timestamp": "2025-12-24T21:41:34.849Z",
+      "screenshotPath": "/screenshots/2025-12-24/profile_test_creator_1.png"
+    },
+    {
+      "username": "test_creator_2",
+      "confidence": 85,
+      "reason": "exclusive_content_in_bio",
+      "timestamp": "2025-12-24T21:41:35.856Z",
+      "screenshotPath": "/screenshots/2025-12-24/profile_test_creator_2.png"
+    },
+    {
+      "username": "test_creator_3",
+      "confidence": 100,
+      "reason": "patreon_link_found",
+      "timestamp": "2025-12-24T21:41:36.864Z"
+    }
+  ],
+  "errorLogs": [
+    {
+      "timestamp": "2025-12-24T21:41:35.353Z",
+      "username": "broken_profile",
+      "message": "Target closed: Session was terminated while processing",
+      "stack": "Error: Target closed\n    at navigateToProfile (/functions/navigation/profileNavigation.ts:45:10)\n    at analyzeProfileComprehensive (/functions/profile/profileAnalysis.ts:120:5)"
+    },
+    {
+      "timestamp": "2025-12-24T21:41:36.360Z",
+      "username": "rate_limited_profile",
+      "message": "429 Rate limit exceeded: free-models-per-day",
+      "stack": "APIError: 429 Rate limit exceeded\n    at analyzeProfile (/functions/profile/vision/vision.ts:449:22)\n    at analyzeProfileComprehensive (/functions/profile/profileAnalysis.ts:354:25)"
+    }
+  ],
+  "finalScreenshot": "/screenshots/2025-12-24/profile_test3.png",
+  "endTime": "2025-12-24T21:41:36.870Z",
+  "stats": {
+    "duration": 3,
+    "successRate": 86.66666666666667
+  }
+}

@@ -20,6 +20,13 @@ model Profile {
   bioScore    Int       @default(0) @map("bio_score")
   isCreator   Boolean   @default(false) @map("is_creator")
   confidence  Int       @default(0)
+  
+  // Manual override fields
+  manualOverride        Boolean   @default(false) @map("manual_override")
+  manuallyMarkedCreator Boolean?  @map("manually_marked_creator")
+  manualOverrideReason  String?   @map("manual_override_reason")
+  manualOverrideAt      DateTime? @map("manual_override_at") @db.Timestamptz(6)
+  
   dmSent      Boolean   @default(false) @map("dm_sent")
   dmSentAt    DateTime? @map("dm_sent_at") @db.Timestamptz(6)
   followed    Boolean   @default(false)

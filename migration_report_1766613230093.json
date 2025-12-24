@@ -1,0 +1,77 @@
+{
+  "timestamp": "2025-12-24T21:53:50.093Z",
+  "summary": {
+    "reviewed": 17,
+    "corrected": 8,
+    "unchanged": 0,
+    "bioOnly": 0,
+    "linkOnly": 0,
+    "noSignals": 0
+  },
+  "corrections": [
+    {
+      "username": "willlowhub.pod",
+      "oldConfidence": 75,
+      "newConfidence": 45,
+      "oldIsCreator": true,
+      "newIsCreator": false,
+      "reason": "Combined signals below threshold (likely generic content creator)"
+    },
+    {
+      "username": "alienamoore.x",
+      "oldConfidence": 75,
+      "newConfidence": 45,
+      "oldIsCreator": true,
+      "newIsCreator": false,
+      "reason": "Combined signals below threshold (likely generic content creator)"
+    },
+    {
+      "username": "gumihohannya",
+      "oldConfidence": 70,
+      "newConfidence": 45,
+      "oldIsCreator": true,
+      "newIsCreator": false,
+      "reason": "Combined signals below threshold (likely generic content creator)"
+    },
+    {
+      "username": "sophiie_xdt",
+      "oldConfidence": 70,
+      "newConfidence": 45,
+      "oldIsCreator": true,
+      "newIsCreator": false,
+      "reason": "Combined signals below threshold (likely generic content creator)"
+    },
+    {
+      "username": "jennybellycos",
+      "oldConfidence": 60,
+      "newConfidence": 45,
+      "oldIsCreator": true,
+      "newIsCreator": false,
+      "reason": "Combined signals below threshold (likely generic content creator)"
+    },
+    {
+      "username": "ed.people",
+      "oldConfidence": 40,
+      "newConfidence": 40,
+      "oldIsCreator": true,
+      "newIsCreator": false,
+      "reason": "Combined signals below threshold (likely generic content creator)"
+    },
+    {
+      "username": "dylanmulvaney",
+      "oldConfidence": 40,
+      "newConfidence": 40,
+      "oldIsCreator": true,
+      "newIsCreator": false,
+      "reason": "Combined signals below threshold (likely generic content creator)"
+    },
+    {
+      "username": "missvixennoir",
+      "oldConfidence": 35,
+      "newConfidence": 35,
+      "oldIsCreator": true,
+      "newIsCreator": false,
+      "reason": "Both link and bio signals too weak (likely fitness/gaming/art creator)"
+    }
+  ]
+}

@@ -241,11 +241,10 @@ export const ENGAGEMENT_RATIO_MAX = 4; // 4:1 for safety
 export const TARGET_ACTIONS_PER_SESSION = 75; // 50-100 actions per session
 
 // <<< BEST MODEL RIGHT NOW (Dec 2025) >>>
-export const VISION_MODEL = "google/gemini-2.0-flash-exp:free"; // fastest + cheapest winner
-export const VISION_MODEL_FALLBACK = "google/gemini-2.0-flash-exp"; // paid fallback when free tier is exhausted
+export const VISION_MODEL = "google/gemini-2.0-flash-exp:free"; // Free tier works!
+export const VISION_MODEL_FALLBACK = "openai/gpt-4o-mini"; // Reliable paid fallback when rate limited
 // Other options:
-// export const VISION_MODEL = 'google/gemini-pro-vision-2.5'; // max accuracy if you want
-// export const VISION_MODEL = 'anthropic/claude-3-5-sonnet-20241022';
+// export const VISION_MODEL_FALLBACK = 'anthropic/claude-3-5-sonnet'; // More expensive but very accurate
 
 export const CONFIDENCE_THRESHOLD = 70;
 export const MAX_DMS_PER_DAY = 120;

@@ -8,6 +8,13 @@ import {
 	ADSPOWER_API_KEY,
 	LOCAL_BROWSER,
 } from "./functions/shared/config/config.ts";
+import {
+	createRun,
+	updateRun,
+	getAllRuns,
+	getRun,
+	type RunMetadata,
+} from "./functions/shared/runs/runs.ts";
 
 const PORT = Number(process.env.PORT) || 4000;
 
@@ -39,6 +46,79 @@ interface RecordingState {
 const recordingState: RecordingState = {
 	enabled: false,
 };
+
+interface Screenshot {
+	username: string;
+	type: "profile" | "link" | "dm" | "unknown";
+	date: string;
+	path: string;
+	filename: string;
+}
+
+/**
+ * Parse screenshot filename to extract metadata
+ * Format: profile_username-timestamp.png
+ *         link_analysis_username-timestamp.png
+ *         dm_username-timestamp.png
+ */
+function parseScreenshotFilename(filename: string): Partial<Screenshot> {
+	const match = filename.match(
+		/(profile|link_analysis|dm)_([^-]+)-(\d+)\.png$/,
+	);
+	if (!match) {
+		return { type: "unknown", username: "unknown" };
+	}
+
+	const [, type, username, timestamp] = match;
+	const date = new Date(parseInt(timestamp));
+
+	return {
+		username,
+		type:
+			type === "link_analysis"
+				? "link"
+				: (type as "profile" | "dm" | "unknown"),
+		date: date.toISOString(),
+	};
+}
+
+/**
+ * Recursively scan screenshots directory
+ */
+async function scanScreenshots(): Promise<Screenshot[]> {
+	const screenshots: Screenshot[] = [];
+	const screenshotsDir = join(process.cwd(), "screenshots");
+
+	async function scan(dir: string, relativePath = "") {
+		try {
+			const entries = await readdir(dir, { withFileTypes: true });
+
+			for (const entry of entries) {
+				const fullPath = join(dir, entry.name);
+				const relPath = join(relativePath, entry.name);
+
+				if (entry.isDirectory()) {
+					await scan(fullPath, relPath);
+				} else if (entry.name.endsWith(".png")) {
+					const metadata = parseScreenshotFilename(entry.name);
+					const stats = await stat(fullPath);
+
+					screenshots.push({
+						...metadata,
+						date: metadata.date || stats.mtime.toISOString(),
+						path: `/screenshots/${relPath.replace(/\\/g, "/")}`,
+						filename: entry.name,
+					} as Screenshot);
+				}
+			}
+		} catch (error) {
+			// Silently skip directories we can't read
+		}
+	}
+
+	await scan(screenshotsDir);
+	return screenshots;
+}
 
 function sendJson(res: http.ServerResponse, status: number, data: unknown) {
 	const body = JSON.stringify(data);
@@ -93,21 +173,40 @@ async function handleApi(
 			return;
 		}
 
+		// Create a run for this script execution
+		const runId = await createRun(scriptName);
+
 		const tsCommand = process.env.TSX_PATH || "tsx";
 		const scriptPath = validScripts[scriptName as ScriptName];
 
 		const child = spawn(tsCommand, [scriptPath], {
 			stdio: "inherit",
-			env: process.env,
+			env: {
+				...process.env,
+				SCOUT_RUN_ID: runId, // Pass run ID to script
+			},
 		});
 
 		child.on("error", (err) => {
 			// eslint-disable-next-line no-console
 			console.error("Failed to start script", scriptName, err);
+			// Mark run as error
+			void updateRun(runId, {
+				status: "error",
+				errorMessage: err.message,
+			});
+		});
+
+		child.on("exit", (code) => {
+			// Update run status on exit
+			void updateRun(runId, {
+				status: code === 0 ? "completed" : "error",
+				errorMessage: code !== 0 ? `Exited with code ${code}` : undefined,
+			});
 		});
 
 		const startedAt = new Date().toISOString();
-		sendJson(res, 200, { script: scriptName, startedAt });
+		sendJson(res, 200, { script: scriptName, startedAt, runId });
 		return;
 	}
 
@@ -210,6 +309,46 @@ async function handleApi(
 		return;
 	}
 
+	if (url.pathname === "/api/screenshots" && req.method === "GET") {
+		try {
+			const screenshots = await scanScreenshots();
+			sendJson(res, 200, screenshots);
+		} catch (error) {
+			sendJson(res, 500, { error: "Failed to load screenshots" });
+		}
+		return;
+	}
+
+	if (url.pathname === "/api/runs" && req.method === "GET") {
+		try {
+			const runs = await getAllRuns();
+			sendJson(res, 200, runs);
+		} catch (error) {
+			sendJson(res, 500, { error: "Failed to load runs" });
+		}
+		return;
+	}
+
+	if (url.pathname.startsWith("/api/runs/") && req.method === "GET") {
+		const runId = url.pathname.split("/")[3];
+		if (!runId) {
+			sendJson(res, 400, { error: "Run ID required" });
+			return;
+		}
+
+		try {
+			const run = await getRun(runId);
+			if (!run) {
+				sendJson(res, 404, { error: "Run not found" });
+				return;
+			}
+			sendJson(res, 200, run);
+		} catch (error) {
+			sendJson(res, 500, { error: "Failed to load run" });
+		}
+		return;
+	}
+
 	res.writeHead(404);
 	res.end("Not found");
 }
@@ -258,10 +397,32 @@ async function getLatestLogFile(logsDir: string): Promise<string | null> {
 }
 
 const server = http.createServer((req, res) => {
-	if ((req.url ?? "").startsWith("/api/")) {
+	const url = req.url ?? "";
+
+	if (url.startsWith("/api/")) {
 		void handleApi(req, res);
 		return;
 	}
+
+	// Serve screenshot images
+	if (url.startsWith("/screenshots/")) {
+		const filePath = join(process.cwd(), url);
+		const ext = extname(filePath);
+		const contentType =
+			ext === ".png" ? "image/png" : "application/octet-stream";
+
+		const stream = createReadStream(filePath);
+		stream.on("open", () => {
+			res.writeHead(200, { "Content-Type": contentType });
+			stream.pipe(res);
+		});
+		stream.on("error", () => {
+			res.writeHead(404);
+			res.end("Screenshot not found");
+		});
+		return;
+	}
+
 	res.writeHead(404);
 	res.end("Not found");
 });

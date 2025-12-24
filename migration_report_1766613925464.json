@@ -1,0 +1,21 @@
+{
+  "timestamp": "2025-12-24T22:05:25.464Z",
+  "summary": {
+    "reviewed": 10,
+    "corrected": 1,
+    "unchanged": 0,
+    "bioOnly": 0,
+    "linkOnly": 0,
+    "noSignals": 0
+  },
+  "corrections": [
+    {
+      "username": "sophiie_xdt",
+      "oldConfidence": 45,
+      "newConfidence": 35,
+      "oldIsCreator": true,
+      "newIsCreator": false,
+      "reason": "Both link and bio signals too weak (likely fitness/gaming/art creator)"
+    }
+  ]
+}

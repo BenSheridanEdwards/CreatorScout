@@ -8,6 +8,28 @@ const AGGREGATOR_REGEX =
 
 const CREATOR_HOST_REGEX = /patreon\.com/i;
 
+// Domains that should NEVER be considered creator links
+const BLACKLISTED_DOMAINS = [
+	"meta.com",
+	"facebook.com",
+	"instagram.com",
+	"twitter.com",
+	"x.com",
+	"threads.net",
+	"threads.com",
+	"linkedin.com",
+	"youtube.com",
+	"tiktok.com",
+	"snapchat.com",
+	"imdb.com",
+	"wikipedia.org",
+	"amazon.com",
+	"ebay.com",
+	"google.com",
+	"spotify.com",
+	"apple.com",
+];
+
 const CREATOR_PLATFORMS = [
 	"patreon.com",
 	"ko-fi.com",
@@ -174,8 +196,22 @@ export async function analyzeExternalLink(
 			finalUrl = page.url();
 		}
 
-		// Check for direct creator platform redirects
+		// Check if the URL is blacklisted (non-creator domains)
 		const finalUrlLower = finalUrl.toLowerCase();
+		const isBlacklisted = BLACKLISTED_DOMAINS.some((domain) =>
+			finalUrlLower.includes(domain),
+		);
+
+		if (isBlacklisted) {
+			console.log(`[LINK_ANALYSIS] ⛔ Blacklisted domain detected: ${finalUrl}`);
+			result.isCreator = false;
+			result.confidence = 0;
+			result.reason = "blacklisted_domain";
+			result.indicators.push(`Blacklisted domain (not a creator platform): ${new URL(finalUrl).hostname}`);
+			return result;
+		}
+
+		// Check for direct creator platform redirects
 		const isCreatorPlatform = CREATOR_PLATFORMS.some((platform) =>
 			finalUrlLower.includes(platform),
 		);
@@ -205,9 +241,12 @@ export async function analyzeExternalLink(
 			result.indicators.push(
 				`Uses creator aggregator: ${new URL(finalUrl).hostname}`,
 			);
+			console.log(`[LINK_ANALYSIS] 📋 Detected aggregator platform: ${new URL(finalUrl).hostname}`);
 			// Don't return early - continue analyzing content for higher confidence
 		}
 
+		console.log(`[LINK_ANALYSIS] 🔎 Analyzing page content at: ${finalUrl}`);
+		
 		// Extract and analyze page content for keywords and creator indicators
 		const pageContent = await page.evaluate(() => {
 			// Get text content
@@ -282,10 +321,9 @@ export async function analyzeExternalLink(
 			});
 
 			// Look for creator-specific text patterns
+			// NOTE: These should be DEFINITIVE phrases, not generic words
 			const creatorTextPatterns = [
-				// Definitive signals
-				"exclusive content",
-				"premium content",
+				// Definitive creator platform signals
 				"patreon",
 				"creator link",
 				"ko-fi",
@@ -293,22 +331,24 @@ export async function analyzeExternalLink(
 				"loyalfans",
 				"loyal fans",
 				"manyvids",
+				"justforfans",
+				// Definitive content signals
+				"exclusive content",
+				"premium content",
 				"custom content",
+				"premium content",
 				"nsfw",
 				"exclusive",
 				"+18",
-				// Supporting signals
-				"vip",
-				"subscribe",
-				"fan",
-				"supporter",
-				"patron",
-				"premium content",
+				// Context-specific signals (must include context)
 				"private account",
 				"get access",
-				"limited time",
 				"my content",
 				"chat with me",
+				"subscribe to",
+				"subscribe for",
+				"vip access",
+				"vip content",
 			];
 
 			return {
@@ -331,6 +371,10 @@ export async function analyzeExternalLink(
 		const keywordMatches = CREATOR_KEYWORDS.filter((keyword) =>
 			pageContent.fullText.includes(keyword.toLowerCase()),
 		);
+		
+		if (keywordMatches.length > 0) {
+			console.log(`[LINK_ANALYSIS] 🔍 Found ${keywordMatches.length} keyword matches: ${keywordMatches.slice(0, 5).join(", ")}`);
+		}
 
 		// ULTIMATE SIGNALS: Definitive creator indicators = instant 100% confidence
 		const definitiveSignals = [
@@ -360,6 +404,8 @@ export async function analyzeExternalLink(
 				result.confidence = 100;
 				result.reason = signal.reason;
 				result.indicators.push(`${signal.label} - definitive creator signal`);
+				console.log(`[LINK_ANALYSIS] 🎯 Found definitive signal: ${signal.label}`);
+				console.log(`[LINK_ANALYSIS] Page text contains: "${signal.text}"`);
 				return result;
 			}
 		}
@@ -382,20 +428,43 @@ export async function analyzeExternalLink(
 					icon.toLowerCase().includes(platform),
 				),
 		);
+		
+		if (platformMatches.length > 0) {
+			console.log(`[LINK_ANALYSIS] 🔗 Found platform icons/links: ${platformMatches.join(", ")}`);
+		}
 
-		// Check for subscription/creator indicators
-		const hasCreatorIndicators =
+		// Check for ADULT/CREATOR-SPECIFIC indicators (not just generic "subscribe" or "fan")
+		// Generic content creators (fitness, gaming, etc.) also use these platforms
+		const hasDefinitiveCreatorIndicators =
+			pageContent.hasMonetizationIndicator ||
+			pageContent.creatorPatterns.some(pattern =>
+				["exclusive content", "premium content", "patreon", "creator link", 
+				 "ko-fi", "fanvue", "loyalfans", "manyvids", "custom content", 
+				 "nsfw", "exclusive", "+18", "private account", "chat with me"].includes(pattern)
+			) ||
+			platformMatches.length > 0; // Platform icons are still strong signals
+		
+		// Generic indicators that ANY creator might have (fitness, gaming, etc.)
+		const hasGenericCreatorIndicators =
 			pageContent.hasEmailForm ||
 			pageContent.hasSubscribeButton ||
-			pageContent.hasPricingIndicator ||
-			pageContent.hasMonetizationIndicator ||
-			pageContent.creatorPatterns.length > 0 ||
-			platformMatches.length > 0;
+			pageContent.hasPricingIndicator;
+		
+		// Log what indicators were found
+		const foundIndicators = [];
+		if (pageContent.hasEmailForm) foundIndicators.push("email form");
+		if (pageContent.hasSubscribeButton) foundIndicators.push("subscribe button");
+		if (pageContent.hasPricingIndicator) foundIndicators.push("pricing");
+		if (pageContent.hasMonetizationIndicator) foundIndicators.push("premium content");
+		if (pageContent.creatorPatterns.length > 0) foundIndicators.push(`patterns: ${pageContent.creatorPatterns.join(", ")}`);
+		
+		if (foundIndicators.length > 0) {
+			console.log(`[LINK_ANALYSIS] 💰 Creator indicators: ${foundIndicators.join(", ")}`);
+		}
 
-		// Combine all creator detection methods
-		const allMatches = [...keywordMatches, ...platformMatches];
-
-		if (allMatches.length > 0 || hasCreatorIndicators) {
+		// ONLY mark as creator if we have DEFINITIVE signals
+		// (Not just generic "subscribe" buttons that any content creator has)
+		if (hasDefinitiveCreatorIndicators) {
 			result.isCreator = true;
 
 			// Higher confidence for platform icons (most reliable)
@@ -405,48 +474,38 @@ export async function analyzeExternalLink(
 				result.indicators.push(
 					`Found platform icons: ${platformMatches.join(", ")}`,
 				);
-			} else if (
-				pageContent.hasPricingIndicator ||
-				pageContent.hasMonetizationIndicator
-			) {
-				// Strong indicators: pricing + premium content = high confidence
-				if (
-					pageContent.hasPricingIndicator &&
-					pageContent.hasMonetizationIndicator
-				) {
-					result.confidence = 85;
-					result.reason = "pricing_and_adult_content";
-					result.indicators.push(
-						"Has pricing/subscription and premium content indicators",
-					);
-				} else if (pageContent.hasPricingIndicator) {
-					result.confidence = 75;
-					result.reason = "pricing_indicator";
-					result.indicators.push("Has pricing/subscription indicator");
-				} else {
-					result.confidence = 70;
-					result.reason = "adult_content_indicator";
-					result.indicators.push("Has premium content indicator");
-				}
-			} else if (pageContent.hasEmailForm || pageContent.hasSubscribeButton) {
+			} else if (pageContent.hasMonetizationIndicator) {
 				result.confidence = 85;
-				result.reason = "subscription_form";
-				result.indicators.push("Has subscription/signup form");
-			} else {
+				result.reason = "adult_content_indicator";
+				result.indicators.push("Has premium content indicator");
+			} else if (pageContent.creatorPatterns.length > 0) {
 				result.confidence = 80;
-				result.reason = "content_keywords";
+				result.reason = "creator_patterns";
 				result.indicators.push(
-					`Page contains creator keywords: ${allMatches.slice(0, 3).join(", ")}`,
+					`Creator-specific text: ${pageContent.creatorPatterns.slice(0, 3).join(", ")}`,
 				);
 			}
 
 			// Add additional indicators
 			if (pageContent.creatorPatterns.length > 0) {
 				result.indicators.push(
-					`Creator text patterns: ${pageContent.creatorPatterns.join(", ")}`,
+					`Patterns found: ${pageContent.creatorPatterns.join(", ")}`,
 				);
 			}
 
+			return result;
+		}
+		
+		// If we ONLY have generic indicators (subscribe button, email form, pricing)
+		// WITHOUT any adult/creator-specific signals, give LOW confidence
+		// Many fitness coaches, artists, etc. have these without being creators
+		if (hasGenericCreatorIndicators && isAggregator) {
+			result.confidence = Math.max(result.confidence, 30); // Very low, just slightly above aggregator-only
+			result.reason = "generic_aggregator_link";
+			result.indicators.push(
+				"Has aggregator link with generic subscription features (no premium content signals)"
+			);
+			console.log(`[LINK_ANALYSIS] ⚠️  Generic aggregator detected (fitness coach, artist, etc.) - keeping low confidence`);
 			return result;
 		}
 
