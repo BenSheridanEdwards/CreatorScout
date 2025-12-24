@@ -459,7 +459,7 @@ export async function processProfile(
 				await sleep(dmWait * 1000);
 
 				try {
-					await sendDMToUser(page, username);
+					await sendDMToUser(page, username, true); // skipNavigation = true (already on profile)
 					logger.info("ACTION", `💬 DM sent to @${username}`);
 					cycleManager.recordDMSent(username);
 

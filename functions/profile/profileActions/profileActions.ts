@@ -54,14 +54,20 @@ export async function checkDmThreadEmpty(page: Page): Promise<boolean> {
 
 /**
  * Send a DM to a user by navigating to their profile and clicking Message.
+ * @param page - Puppeteer page instance
+ * @param username - Instagram username to message
+ * @param skipNavigation - If true, assumes already on the user's profile (default: false)
  */
 export async function sendDMToUser(
 	page: Page,
 	username: string,
+	skipNavigation: boolean = false,
 ): Promise<boolean> {
 	try {
-		// Navigate to profile
-		await navigateToProfile(page, username);
+		// Navigate to profile (skip if already on profile)
+		if (!skipNavigation) {
+			await navigateToProfile(page, username);
+		}
 
 		// Simulate natural behavior
 		await simulateNaturalBehavior(page);
