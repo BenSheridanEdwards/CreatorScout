@@ -37,6 +37,7 @@ import { snapshot } from "../../shared/snapshot/snapshot.ts";
 import { sleep } from "../../timing/sleep/sleep.ts";
 import { findKeywords, isLikelyCreator } from "../bioMatcher/bioMatcher.ts";
 import { analyzeProfile, isConfirmedCreator } from "../vision/vision.ts";
+import { queueAdd } from "../../shared/database/database.ts";
 
 export interface BasicAnalysisResult {
 	bio: string | null;
@@ -88,6 +89,22 @@ export async function analyzeProfileBasic(
 	// Bio matching
 	const [isLikely, scoreData] = isLikelyCreator(bio, 40, username);
 	const bioScore = scoreData.score;
+
+	// Queue referenced Instagram profiles for follow-up analysis
+	if (scoreData.referencedProfiles && scoreData.referencedProfiles.length > 0) {
+		logger.log(
+			`📎 Bio references other profiles: ${scoreData.referencedProfiles.map(p => '@' + p).join(', ')}`,
+		);
+		
+		for (const refProfile of scoreData.referencedProfiles) {
+			try {
+				await queueAdd(refProfile, 15, "referenced_profile");
+				logger.log(`  ➕ Added @${refProfile} to queue for analysis`);
+			} catch (error) {
+				logger.log(`  ⚠️ Failed to queue @${refProfile}: ${error}`);
+			}
+		}
+	}
 
 	// Extract link from bio
 	const linkFromBio = await getLinkFromBio(page);
@@ -148,6 +165,22 @@ export async function analyzeProfileComprehensive(
 		if (isLikely) {
 			result.confidence = Math.min(bioScore.score, 85);
 			result.indicators.push(...bioScore.reasons);
+		}
+
+		// Queue referenced Instagram profiles for follow-up analysis
+		if (bioScore.referencedProfiles && bioScore.referencedProfiles.length > 0) {
+			logger.log(
+				`📎 Bio references other profiles: ${bioScore.referencedProfiles.map(p => '@' + p).join(', ')}`,
+			);
+			
+			for (const refProfile of bioScore.referencedProfiles) {
+				try {
+					await queueAdd(refProfile, 15, "referenced_profile");
+					logger.log(`  ➕ Added @${refProfile} to queue for analysis`);
+				} catch (error) {
+					logger.log(`  ⚠️ Failed to queue @${refProfile}: ${error}`);
+				}
+			}
 		}
 	}
 

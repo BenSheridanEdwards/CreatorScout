@@ -257,12 +257,15 @@ export interface BioScoreResult {
 /**
  * Extract Instagram @username mentions from bio
  */
-function extractReferencedProfiles(bio: string, currentUsername?: string): string[] {
+function extractReferencedProfiles(
+	bio: string,
+	currentUsername?: string,
+): string[] {
 	// Match @username pattern (alphanumeric, underscores, periods)
 	const usernameRegex = /@([a-zA-Z0-9._]+)/g;
 	const matches = bio.matchAll(usernameRegex);
 	const profiles: string[] = [];
-	
+
 	for (const match of matches) {
 		const username = match[1].toLowerCase();
 		// Don't include the current profile's own username
@@ -271,13 +274,20 @@ function extractReferencedProfiles(bio: string, currentUsername?: string): strin
 		}
 		profiles.push(username);
 	}
-	
+
 	return [...new Set(profiles)]; // Remove duplicates
 }
 
 export function calculateScore(bio: string, username?: string): BioScoreResult {
 	if (!bio) {
-		return { score: 0, reasons: [], emojis: 0, keywords: [], links: [], referencedProfiles: [] };
+		return {
+			score: 0,
+			reasons: [],
+			emojis: 0,
+			keywords: [],
+			links: [],
+			referencedProfiles: [],
+		};
 	}
 
 	const emojiCount = countLinkEmojis(bio);
@@ -409,7 +419,9 @@ export function calculateScore(bio: string, username?: string): BioScoreResult {
 	// Boost confidence if referencing another Instagram profile
 	if (referencedProfiles.length > 0) {
 		score += 10;
-		reasons.push(`references Instagram profile(s): ${referencedProfiles.map(p => '@' + p).join(', ')}`);
+		reasons.push(
+			`references Instagram profile(s): ${referencedProfiles.map((p) => "@" + p).join(", ")}`,
+		);
 	}
 
 	return {
