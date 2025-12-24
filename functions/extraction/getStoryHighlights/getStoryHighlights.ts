@@ -97,41 +97,31 @@ export async function getStoryHighlights(
 export function isLinkInBioHighlight(title: string): boolean {
 	const titleLower = title.toLowerCase();
 	const linkPatterns = [
-		/my\s*🔗/i,
-		/link/i,
-		/links/i,
-		/official/i,
-		/account/i,
-		/accounts/i,
+		// DEFINITIVE platform mentions
 		/patreon/i,
 		/ko-fi/i,
-		/exclusive/i,
-		/premium/i,
-		/vip/i,
-		/private/i,
-		/custom/i,
-		/menu/i,
-		/rates/i,
+		/fanvue/i,
+		/loyalfans/i,
+		// Link indicators (must have emoji or very specific)
+		/my\s*🔗/i,
+		/🔗\s*link/i,
+		/link\s*🔗/i,
+		// Content indicators (must be specific)
+		/exclusive\s+content/i,
+		/premium\s+content/i,
+		/custom\s+content/i,
+		// Service indicators (requires context)
+		/menu/i,          // Price menu
+		/rates/i,         // Service rates
 		/pricing/i,
-		/tip/i,
-		/tips/i,
-		/booking/i,
-		/available/i,
-		/dm/i,
-		/dms/i,
-		/🔗/,
+		// Adult emojis (strong signal)
 		/💋/,
-		/🔥/,
 		/🍑/,
 		/💦/,
 		/😈/,
 		/👅/,
 		/🍒/,
 		/🥵/,
-		/🖤/,
-		/💜/,
-		/💕/,
-		/❤️/,
 	];
 
 	return linkPatterns.some((pattern) => pattern.test(titleLower));

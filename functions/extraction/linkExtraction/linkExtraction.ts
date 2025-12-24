@@ -203,11 +203,15 @@ export async function analyzeExternalLink(
 		);
 
 		if (isBlacklisted) {
-			console.log(`[LINK_ANALYSIS] ⛔ Blacklisted domain detected: ${finalUrl}`);
+			console.log(
+				`[LINK_ANALYSIS] ⛔ Blacklisted domain detected: ${finalUrl}`,
+			);
 			result.isCreator = false;
 			result.confidence = 0;
 			result.reason = "blacklisted_domain";
-			result.indicators.push(`Blacklisted domain (not a creator platform): ${new URL(finalUrl).hostname}`);
+			result.indicators.push(
+				`Blacklisted domain (not a creator platform): ${new URL(finalUrl).hostname}`,
+			);
 			return result;
 		}
 
@@ -219,8 +223,16 @@ export async function analyzeExternalLink(
 		if (isCreatorPlatform) {
 			result.isCreator = true;
 			// Major adult platforms = 100%, others = 95%
-			const majorPlatforms = ["patreon", "ko-fi", "fanvue", "loyalfans", "manyvids"];
-			const isMajorPlatform = majorPlatforms.some((p) => finalUrlLower.includes(p));
+			const majorPlatforms = [
+				"patreon",
+				"ko-fi",
+				"fanvue",
+				"loyalfans",
+				"manyvids",
+			];
+			const isMajorPlatform = majorPlatforms.some((p) =>
+				finalUrlLower.includes(p),
+			);
 			result.confidence = isMajorPlatform ? 100 : 95;
 			result.reason = "direct_creator_platform";
 			result.indicators.push(
@@ -241,12 +253,14 @@ export async function analyzeExternalLink(
 			result.indicators.push(
 				`Uses creator aggregator: ${new URL(finalUrl).hostname}`,
 			);
-			console.log(`[LINK_ANALYSIS] 📋 Detected aggregator platform: ${new URL(finalUrl).hostname}`);
+			console.log(
+				`[LINK_ANALYSIS] 📋 Detected aggregator platform: ${new URL(finalUrl).hostname}`,
+			);
 			// Don't return early - continue analyzing content for higher confidence
 		}
 
 		console.log(`[LINK_ANALYSIS] 🔎 Analyzing page content at: ${finalUrl}`);
-		
+
 		// Extract and analyze page content for keywords and creator indicators
 		const pageContent = await page.evaluate(() => {
 			// Get text content
@@ -371,27 +385,44 @@ export async function analyzeExternalLink(
 		const keywordMatches = CREATOR_KEYWORDS.filter((keyword) =>
 			pageContent.fullText.includes(keyword.toLowerCase()),
 		);
-		
+
 		if (keywordMatches.length > 0) {
-			console.log(`[LINK_ANALYSIS] 🔍 Found ${keywordMatches.length} keyword matches: ${keywordMatches.slice(0, 5).join(", ")}`);
+			console.log(
+				`[LINK_ANALYSIS] 🔍 Found ${keywordMatches.length} keyword matches: ${keywordMatches.slice(0, 5).join(", ")}`,
+			);
 		}
 
 		// ULTIMATE SIGNALS: Definitive creator indicators = instant 100% confidence
 		const definitiveSignals = [
-			{ text: "exclusive content", label: "EXCLUSIVE CONTENT", reason: "exclusive_content" },
+			{
+				text: "exclusive content",
+				label: "EXCLUSIVE CONTENT",
+				reason: "exclusive_content",
+			},
 			{ text: "patreon", label: "PATREON", reason: "patreon" },
 			{ text: "creator link", label: "PATREON", reason: "patreon" },
 			{ text: "ko-fi", label: "KO-FI", reason: "ko-fi" },
-			{ text: "premium content", label: "PREMIUM CONTENT", reason: "premium_content" },
+			{
+				text: "premium content",
+				label: "PREMIUM CONTENT",
+				reason: "premium_content",
+			},
 			{ text: "nsfw", label: "NSFW", reason: "nsfw" },
 			{ text: "exclusive", label: "exclusive", reason: "age_restricted" },
 			{ text: "18 +", label: "exclusive", reason: "age_restricted" },
 			{ text: "+18", label: "exclusive", reason: "age_restricted" },
 			{ text: "fanvue", label: "FANVUE", reason: "fanvue" },
-			{ text: "custom content", label: "CUSTOM CONTENT", reason: "custom_content" },
+			{
+				text: "custom content",
+				label: "CUSTOM CONTENT",
+				reason: "custom_content",
+			},
 			{ text: "loyalfans", label: "LOYALFANS", reason: "loyalfans" },
 			{ text: "loyal fans", label: "LOYALFANS", reason: "loyalfans" },
 			{ text: "manyvids", label: "MANYVIDS", reason: "manyvids" },
+			{ text: "my vip page", label: "VIP PAGE", reason: "vip_page" },
+			{ text: "vip page", label: "VIP PAGE", reason: "vip_page" },
+			{ text: "my vip", label: "VIP PAGE", reason: "vip_page" },
 		];
 
 		for (const signal of definitiveSignals) {
@@ -404,7 +435,9 @@ export async function analyzeExternalLink(
 				result.confidence = 100;
 				result.reason = signal.reason;
 				result.indicators.push(`${signal.label} - definitive creator signal`);
-				console.log(`[LINK_ANALYSIS] 🎯 Found definitive signal: ${signal.label}`);
+				console.log(
+					`[LINK_ANALYSIS] 🎯 Found definitive signal: ${signal.label}`,
+				);
 				console.log(`[LINK_ANALYSIS] Page text contains: "${signal.text}"`);
 				return result;
 			}
@@ -428,38 +461,60 @@ export async function analyzeExternalLink(
 					icon.toLowerCase().includes(platform),
 				),
 		);
-		
+
 		if (platformMatches.length > 0) {
-			console.log(`[LINK_ANALYSIS] 🔗 Found platform icons/links: ${platformMatches.join(", ")}`);
+			console.log(
+				`[LINK_ANALYSIS] 🔗 Found platform icons/links: ${platformMatches.join(", ")}`,
+			);
 		}
 
 		// Check for ADULT/CREATOR-SPECIFIC indicators (not just generic "subscribe" or "fan")
 		// Generic content creators (fitness, gaming, etc.) also use these platforms
 		const hasDefinitiveCreatorIndicators =
 			pageContent.hasMonetizationIndicator ||
-			pageContent.creatorPatterns.some(pattern =>
-				["exclusive content", "premium content", "patreon", "creator link", 
-				 "ko-fi", "fanvue", "loyalfans", "manyvids", "custom content", 
-				 "nsfw", "exclusive", "+18", "private account", "chat with me"].includes(pattern)
+			pageContent.creatorPatterns.some((pattern) =>
+				[
+					"exclusive content",
+					"premium content",
+					"patreon",
+					"creator link",
+					"ko-fi",
+					"fanvue",
+					"loyalfans",
+					"manyvids",
+					"custom content",
+					"nsfw",
+					"exclusive",
+					"+18",
+					"private account",
+					"chat with me",
+				].includes(pattern),
 			) ||
 			platformMatches.length > 0; // Platform icons are still strong signals
-		
+
 		// Generic indicators that ANY creator might have (fitness, gaming, etc.)
 		const hasGenericCreatorIndicators =
 			pageContent.hasEmailForm ||
 			pageContent.hasSubscribeButton ||
 			pageContent.hasPricingIndicator;
-		
+
 		// Log what indicators were found
 		const foundIndicators = [];
 		if (pageContent.hasEmailForm) foundIndicators.push("email form");
-		if (pageContent.hasSubscribeButton) foundIndicators.push("subscribe button");
+		if (pageContent.hasSubscribeButton)
+			foundIndicators.push("subscribe button");
 		if (pageContent.hasPricingIndicator) foundIndicators.push("pricing");
-		if (pageContent.hasMonetizationIndicator) foundIndicators.push("premium content");
-		if (pageContent.creatorPatterns.length > 0) foundIndicators.push(`patterns: ${pageContent.creatorPatterns.join(", ")}`);
-		
+		if (pageContent.hasMonetizationIndicator)
+			foundIndicators.push("premium content");
+		if (pageContent.creatorPatterns.length > 0)
+			foundIndicators.push(
+				`patterns: ${pageContent.creatorPatterns.join(", ")}`,
+			);
+
 		if (foundIndicators.length > 0) {
-			console.log(`[LINK_ANALYSIS] 💰 Creator indicators: ${foundIndicators.join(", ")}`);
+			console.log(
+				`[LINK_ANALYSIS] 💰 Creator indicators: ${foundIndicators.join(", ")}`,
+			);
 		}
 
 		// ONLY mark as creator if we have DEFINITIVE signals
@@ -495,7 +550,7 @@ export async function analyzeExternalLink(
 
 			return result;
 		}
-		
+
 		// If we ONLY have generic indicators (subscribe button, email form, pricing)
 		// WITHOUT any adult/creator-specific signals, give LOW confidence
 		// Many fitness coaches, artists, etc. have these without being creators
@@ -503,9 +558,11 @@ export async function analyzeExternalLink(
 			result.confidence = Math.max(result.confidence, 30); // Very low, just slightly above aggregator-only
 			result.reason = "generic_aggregator_link";
 			result.indicators.push(
-				"Has aggregator link with generic subscription features (no premium content signals)"
+				"Has aggregator link with generic subscription features (no premium content signals)",
 			);
-			console.log(`[LINK_ANALYSIS] ⚠️  Generic aggregator detected (fitness coach, artist, etc.) - keeping low confidence`);
+			console.log(
+				`[LINK_ANALYSIS] ⚠️  Generic aggregator detected (fitness coach, artist, etc.) - keeping low confidence`,
+			);
 			return result;
 		}
 
@@ -534,7 +591,7 @@ export async function analyzeExternalLink(
 
 /**
  * Threshold for skipping vision analysis when text-based analysis is confident enough.
- * Uses the same threshold as creator confirmation - if we're confident enough to 
+ * Uses the same threshold as creator confirmation - if we're confident enough to
  * confirm a creator, we're confident enough to skip expensive vision API calls.
  */
 export const VISION_SKIP_THRESHOLD = CONFIDENCE_THRESHOLD;
@@ -558,7 +615,9 @@ export function shouldUseVisionAnalysis(
 	// Only use vision if we have some signals that might indicate creator activity
 	const shouldUse = hasExternalLinks || hasHighlights;
 	if (!shouldUse) {
-		console.log(`[VISION] Skipping - no external links or highlights to analyze`);
+		console.log(
+			`[VISION] Skipping - no external links or highlights to analyze`,
+		);
 	}
 	return shouldUse;
 }

@@ -329,6 +329,10 @@ export function calculateScore(bio: string, username?: string): BioScoreResult {
 		{ text: "custom content", label: "CUSTOM CONTENT" },
 		{ text: "loyalfans", label: "LOYALFANS" },
 		{ text: "manyvids", label: "MANYVIDS" },
+		// VIP page = definitive creator signal
+		{ text: "my vip page", label: "VIP PAGE" },
+		{ text: "vip page", label: "VIP PAGE" },
+		{ text: "my vip", label: "VIP PAGE" },
 		// Highlights = links hidden in Instagram story highlights (90%+ confidence signal)
 		{ text: "in my highlights", label: "LINKS IN HIGHLIGHTS" },
 		{ text: "check my highlights", label: "LINKS IN HIGHLIGHTS" },

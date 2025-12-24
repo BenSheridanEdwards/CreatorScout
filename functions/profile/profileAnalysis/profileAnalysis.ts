@@ -232,7 +232,22 @@ export async function analyzeProfileComprehensive(
 			linkHighlights.forEach((h) => {
 				result.indicators.push(`Link highlight: "${h.title}"`);
 			});
-			result.confidence = Math.max(result.confidence, 25);
+			
+			// Boost confidence if bio also mentions highlights (but not too much)
+			const bioMentionsHighlights = result.bio && (
+				result.bio.toLowerCase().includes("in my highlight") ||
+				result.bio.toLowerCase().includes("check my highlight") ||
+				result.bio.toLowerCase().includes("what you're looking for is in")
+			);
+			
+			if (bioMentionsHighlights && linkHighlights.length > 0) {
+				// Bio directs to highlights + link names = medium-high signal (50%)
+				result.confidence = Math.max(result.confidence, 50);
+				result.indicators.push("Bio directs to highlights with link names");
+			} else {
+				// Link highlights alone = low-medium signal (30%)
+				result.confidence = Math.max(result.confidence, 30);
+			}
 		}
 	}
 
