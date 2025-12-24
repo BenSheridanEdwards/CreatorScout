@@ -5,7 +5,7 @@ describe("costTracker", () => {
 		const t = new CostTracker();
 		t.recordApiCall("vision", 0);
 		const costs = t.getMonthlyCosts({
-			gologinPlan: "professional",
+			adspowerPlan: "base",
 			vpsPlan: "recommended",
 			proxyPlan: "starter",
 		});
@@ -19,5 +19,3 @@ describe("costTracker", () => {
 		expect(Array.isArray(proj.recommendations)).toBe(true);
 	});
 });
-
-

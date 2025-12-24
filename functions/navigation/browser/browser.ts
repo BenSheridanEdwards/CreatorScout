@@ -89,6 +89,7 @@ export async function createBrowser(
 
 		const browser = await connectToAdsPowerProfile(adsPowerProfileId, {
 			timeout: 30000,
+			headless: options.headless,
 		});
 
 		logger.info("SUCCESS", "AdsPower browser connected successfully");

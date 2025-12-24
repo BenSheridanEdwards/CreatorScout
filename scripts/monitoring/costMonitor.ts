@@ -52,7 +52,7 @@ async function main() {
 
 		logger.info("COSTS", "");
 		logger.info("COSTS", "💰 Current Monthly Costs:");
-		logger.info("COSTS", `   GoLogin:    $${projection.breakdown.gologin}`);
+		logger.info("COSTS", `   AdsPower:   $${projection.breakdown.adspower}`);
 		logger.info("COSTS", `   VPS:        $${projection.breakdown.vps}`);
 		logger.info("COSTS", `   Proxy:      $${projection.breakdown.proxy}`);
 		logger.info(
@@ -109,5 +109,3 @@ main()
 		console.error("Cost monitor failed:", error);
 		process.exit(1);
 	});
-
-

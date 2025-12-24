@@ -51,10 +51,10 @@ SMARTPROXY_HOST=gate.smartproxy.com
 SMARTPROXY_PORT=7000
 
 # ===========================================
-# GOLOGIN CONFIGURATION
+# ADSPOWER CONFIGURATION
 # ===========================================
-GOLOGIN_API_TOKEN=your-gologin-profile-token-here
-GOLOGIN_USE_LOCAL=false
+ADSPOWER_API_BASE=http://127.0.0.1:50325
+ADSPOWER_API_KEY=  # Optional
 
 # ===========================================
 # INSTAGRAM CREDENTIALS
@@ -124,7 +124,7 @@ if [ ! -f "profiles.config.json" ]; then
     cp profiles.config.example.json profiles.config.json
     echo "✅ Created profiles.config.json"
     echo ""
-    echo "⚠️  Please edit profiles.config.json with your GoLogin tokens:"
+    echo "⚠️  Please edit profiles.config.json with your AdsPower profile IDs:"
     echo "   nano profiles.config.json"
     echo ""
 else

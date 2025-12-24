@@ -10,7 +10,7 @@ Step-by-step guide to deploy Scout on a VPS (Hetzner, DigitalOcean, Vultr, Linod
 ## 📋 Prerequisites
 
 Before starting, have these ready:
-- ✅ GoLogin account + profile tokens
+- ✅ AdsPower installed + Local API enabled
 - ✅ SmartProxy credentials
 - ✅ Instagram login credentials
 - ✅ OpenRouter API key
@@ -178,9 +178,9 @@ SMARTPROXY_HOST=gate.smartproxy.com
 SMARTPROXY_PORT=7000
 
 # ===========================================
-# GOLOGIN CONFIGURATION
+# ADSPOWER CONFIGURATION
 # ===========================================
-GOLOGIN_API_TOKEN=your-actual-gologin-token
+ADSPOWER_API_BASE=http://127.0.0.1:50325
 
 # ===========================================
 # INSTAGRAM CREDENTIALS
@@ -467,7 +467,7 @@ curl http://localhost:4000/api/health
 
 ### Running Costs
 - VPS: $4-6/mo
-- GoLogin: $49/mo
+- AdsPower: $9/mo base
 - SmartProxy: $12.5/GB (~$125-625/mo depending on usage)
 - OpenRouter: $10-30/mo
 - **Total:** ~$190-700/mo
@@ -481,7 +481,7 @@ Your Scout is now:
 - ✅ Auto-deploying on every git push
 - ✅ Backed by PostgreSQL
 - ✅ Managed by PM2 (auto-restart on crash)
-- ✅ Using GoLogin + SmartProxy for safety
+- ✅ Using AdsPower + SmartProxy for safety
 
 ### Quick Links
 - **Server:** `ssh scout@YOUR_SERVER_IP`

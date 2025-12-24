@@ -4,7 +4,7 @@ Simple deployment without Docker - using Railway + PM2 + managed Postgres.
 
 ## Why No Docker?
 
-- ✅ **GoLogin = remote browsers** (no Chrome install needed)
+- ✅ **AdsPower = local browser profiles** (no Chrome install needed)
 - ✅ **Managed Postgres** (Railway/Supabase - no container needed)
 - ✅ **Simple Node.js scripts** (just `npm run` commands)
 - ✅ **PM2 handles restarts** (no need for Docker restart policies)
@@ -50,7 +50,7 @@ In Railway dashboard → Variables tab, add:
 
 ```bash
 # Required
-GOLOGIN_API_TOKEN=your-gologin-token
+ADSPOWER_API_BASE=http://127.0.0.1:50325
 SMARTPROXY_USERNAME=sp1234567
 SMARTPROXY_PASSWORD=your-password
 INSTAGRAM_USERNAME=your-ig-username
@@ -60,7 +60,7 @@ OPENROUTER_API_KEY=your-openrouter-key
 # Optional (use defaults if not set)
 SMARTPROXY_HOST=gate.smartproxy.com
 SMARTPROXY_PORT=7000
-GOLOGIN_USE_LOCAL=false
+LOCAL_BROWSER=false
 LOCAL_BROWSER=false
 DEBUG_LOGS=false
 ```
@@ -134,7 +134,7 @@ jobs:
       - run: npm run cron:session
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          GOLOGIN_API_TOKEN: ${{ secrets.GOLOGIN_API_TOKEN }}
+          ADSPOWER_API_BASE: ${{ secrets.ADSPOWER_API_BASE }}
           SMARTPROXY_USERNAME: ${{ secrets.SMARTPROXY_USERNAME }}
           SMARTPROXY_PASSWORD: ${{ secrets.SMARTPROXY_PASSWORD }}
           INSTAGRAM_USERNAME: ${{ secrets.INSTAGRAM_USERNAME }}
@@ -377,7 +377,7 @@ Already configured! Railway auto-uses this.
 # Copy example
 cp profiles.config.example.json profiles.config.json
 
-# Edit with your GoLogin tokens and Instagram accounts
+# Edit with your AdsPower profile IDs and Instagram accounts
 nano profiles.config.json
 ```
 
@@ -456,16 +456,16 @@ sudo systemctl status postgresql
 psql -U scout -d scout -h localhost
 ```
 
-### "GoLogin connection failed"
+### "AdsPower connection failed"
 
 ```bash
-# Verify token in .env
-echo $GOLOGIN_API_TOKEN
+# Verify AdsPower Local API is running
+curl http://127.0.0.1:50325/api/v1/user/list
 
 # Test connection
 npm run test:profile your-profile-id
 
-# Check GoLogin dashboard - is profile running elsewhere?
+# Check AdsPower app - is profile running elsewhere?
 ```
 
 ### "Proxy authentication failed"

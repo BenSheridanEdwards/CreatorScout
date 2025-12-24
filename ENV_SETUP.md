@@ -26,16 +26,17 @@ SMARTPROXY_PORT=7000                       # Default port
 2. Go to Dashboard → Residential Proxies → Endpoints
 3. Copy username and password
 
-### GoLogin (Browser Fingerprinting)
+### AdsPower (Browser Fingerprinting)
 
-Get profile tokens from [gologin.com](https://gologin.com) dashboard:
+Setup AdsPower Local API:
 
 ```bash
-GOLOGIN_API_TOKEN=your-default-gologin-profile-token
+ADSPOWER_API_BASE=http://127.0.0.1:50325
+ADSPOWER_API_KEY=  # Optional - only if API verification enabled
 ```
 
 **How to get:**
-1. Sign up at gologin.com
+1. Download from adspower.net
 2. Create a browser profile
 3. Go to Profile Settings → API
 4. Copy the profile token
@@ -79,7 +80,7 @@ DATABASE_URL=postgresql://user:password@host:5432/scout
 ### Development Flags
 
 ```bash
-# Use local browser (skip GoLogin/proxy for testing)
+# Use local browser (skip AdsPower/proxy for testing)
 LOCAL_BROWSER=false
 
 # Enable verbose debug logging
@@ -92,17 +93,14 @@ FAST_MODE=false
 SKIP_VISION=false
 ```
 
-### GoLogin Advanced
+### AdsPower Advanced
 
 ```bash
-# Use local Orbita browser instead of remote GoLogin
-GOLOGIN_USE_LOCAL=false
+# AdsPower Local API base URL (default: http://127.0.0.1:50325)
+ADSPOWER_API_BASE=http://127.0.0.1:50325
 
-# VPS IP for local Orbita (only if GOLOGIN_USE_LOCAL=true)
-GOLOGIN_VPS_IP=localhost
-
-# Orbita port (only if using local)
-GOLOGIN_LOCAL_PORT=9222
+# AdsPower API key (optional - only if API verification is enabled)
+ADSPOWER_API_KEY=
 ```
 
 ## Complete .env Template
@@ -117,11 +115,10 @@ SMARTPROXY_HOST=gate.smartproxy.com
 SMARTPROXY_PORT=7000
 
 # ===========================================
-# GOLOGIN CONFIGURATION
+# ADSPOWER CONFIGURATION
 # ===========================================
-GOLOGIN_API_TOKEN=your-gologin-profile-token-here
-GOLOGIN_USE_LOCAL=false
-GOLOGIN_VPS_IP=localhost
+ADSPOWER_API_BASE=http://127.0.0.1:50325
+ADSPOWER_API_KEY=  # Optional
 
 # ===========================================
 # INSTAGRAM CREDENTIALS
@@ -192,7 +189,7 @@ curl -x gate.smartproxy.com:7000 \
   -U "user-YOUR_USERNAME-session-test:YOUR_PASSWORD" \
   https://ip.smartproxy.com
 
-# Test GoLogin (check token is valid)
+# Test AdsPower (check Local API is running)
 # Run: npm run test:profile your-profile-id
 
 # Test Instagram (try logging in manually first)

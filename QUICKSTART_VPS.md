@@ -64,7 +64,7 @@ nano .env
 ```bash
 SMARTPROXY_USERNAME=sp1234567
 SMARTPROXY_PASSWORD=your_password
-GOLOGIN_API_TOKEN=your_token
+ADSPOWER_API_BASE=http://127.0.0.1:50325
 INSTAGRAM_USERNAME=your_ig
 INSTAGRAM_PASSWORD=your_pass
 OPENROUTER_API_KEY=your_key
@@ -79,7 +79,7 @@ Save: `Ctrl+X`, `Y`, `Enter`
 ```bash
 # Copy profiles config
 cp profiles.config.example.json profiles.config.json
-nano profiles.config.json  # Add your GoLogin tokens
+nano profiles.config.json  # Add your AdsPower profile IDs
 
 # Run app setup
 bash scripts/deploy/app-setup.sh
@@ -185,7 +185,7 @@ npm run discover
 Your Scout is now:
 - ✅ Running 24/7 on VPS
 - ✅ Auto-deploying from GitHub
-- ✅ Using GoLogin + SmartProxy
+- ✅ Using AdsPower + SmartProxy
 - ✅ Managed by PM2
 
 **Total time:** ~15 minutes  

@@ -116,7 +116,7 @@ async function runSession(args: SessionArgs): Promise<void> {
 		logger.info("SESSION", "Initializing Instagram session...");
 		const session = await initializeInstagramSession({
 			headless: true,
-			goLoginProfileId: profile.goLoginProfileId,
+			adsPowerProfileId: profile.adsPowerProfileId,
 			debug: true,
 		});
 		browser = session.browser;

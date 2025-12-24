@@ -2,7 +2,7 @@
  * Cost Tracker
  *
  * Tracks infrastructure costs for Scout automation.
- * Monitors GoLogin, VPS, proxies, and API usage.
+ * Monitors AdsPower, VPS, proxies, and API usage.
  */
 import { createLogger } from "../logger/logger.ts";
 
@@ -13,12 +13,10 @@ const logger = createLogger();
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export const COST_ESTIMATES = {
-	// GoLogin plans
-	gologin: {
-		professional: 99, // 100 profiles
-		business: 199, // 300 profiles
-		enterprise: 399, // 1000 profiles
-		custom: 0, // Variable
+	// AdsPower plans
+	adspower: {
+		base: 9, // Base plan
+		custom: 0, // Variable based on profiles
 	},
 
 	// DigitalOcean VPS
@@ -48,7 +46,7 @@ export const COST_ESTIMATES = {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export interface MonthlyCosts {
-	gologin: number;
+	adspower: number;
 	vps: number;
 	proxy: number;
 	visionApi: number;
@@ -123,11 +121,11 @@ export class CostTracker {
 	 * Calculate current monthly costs based on usage
 	 */
 	getMonthlyCosts(config: {
-		gologinPlan: keyof typeof COST_ESTIMATES.gologin;
+		adspowerPlan: keyof typeof COST_ESTIMATES.adspower;
 		vpsPlan: keyof typeof COST_ESTIMATES.vps;
 		proxyPlan: keyof typeof COST_ESTIMATES.proxy;
 	}): MonthlyCosts {
-		const gologin = COST_ESTIMATES.gologin[config.gologinPlan];
+		const adspower = COST_ESTIMATES.adspower[config.adspowerPlan];
 		const vps = COST_ESTIMATES.vps[config.vpsPlan];
 		const proxy = COST_ESTIMATES.proxy[config.proxyPlan];
 
@@ -136,11 +134,11 @@ export class CostTracker {
 			this.usageStats.visionApiCalls * COST_ESTIMATES.visionApi.geminiFlash;
 
 		return {
-			gologin,
+			adspower,
 			vps,
 			proxy,
 			visionApi: visionApiCost,
-			total: gologin + vps + proxy + visionApiCost,
+			total: adspower + vps + proxy + visionApiCost,
 		};
 	}
 
@@ -151,17 +149,13 @@ export class CostTracker {
 		const recommendations: string[] = [];
 
 		// Determine plans based on profile count
-		let gologinPlan: keyof typeof COST_ESTIMATES.gologin = "professional";
+		let adspowerPlan: keyof typeof COST_ESTIMATES.adspower = "base";
 		let vpsPlan: keyof typeof COST_ESTIMATES.vps = "recommended";
 		let proxyPlan: keyof typeof COST_ESTIMATES.proxy = "starter";
 
-		if (profileCount > 100) {
-			gologinPlan = "business";
-			recommendations.push("Consider Business plan for 300 profiles");
-		}
-		if (profileCount > 300) {
-			gologinPlan = "enterprise";
-			recommendations.push("Enterprise plan recommended for 1000+ profiles");
+		if (profileCount > 10) {
+			adspowerPlan = "custom";
+			recommendations.push("Consider custom AdsPower plan for many profiles");
 		}
 
 		if (profileCount > 10) {
@@ -183,17 +177,12 @@ export class CostTracker {
 		}
 
 		const breakdown = this.getMonthlyCosts({
-			gologinPlan,
+			adspowerPlan,
 			vpsPlan,
 			proxyPlan,
 		});
 
 		// Cost savings tips
-		if (profileCount <= 5) {
-			recommendations.push(
-				"💡 Tip: Use annual billing for 20% savings on GoLogin",
-			);
-		}
 		if (this.usageStats.visionApiCalls > 1000) {
 			recommendations.push(
 				"💡 Tip: Consider caching vision results to reduce API costs",
@@ -271,10 +260,8 @@ export function printCostBreakdown(): void {
 	);
 
 	const formatCost = (projection: CostProjection, label: string) => {
-		console.log(
-			`📊 ${label} (${projection.breakdown.gologin > 199 ? "Enterprise" : projection.breakdown.gologin > 99 ? "Business" : "Professional"} tier)`,
-		);
-		console.log(`   GoLogin:    $${projection.breakdown.gologin}/mo`);
+		console.log(`📊 ${label}`);
+		console.log(`   AdsPower:   $${projection.breakdown.adspower}/mo`);
 		console.log(`   VPS:        $${projection.breakdown.vps}/mo`);
 		console.log(`   Proxy:      $${projection.breakdown.proxy}/mo`);
 		console.log(

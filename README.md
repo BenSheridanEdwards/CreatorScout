@@ -14,7 +14,7 @@ npm install
 ### 2. Setup Services
 
 **You'll need accounts for:**
-- **[GoLogin](https://gologin.com)** - Browser fingerprinting ($49/month, 100 profiles)
+- **[AdsPower](https://adspower.net)** - Browser fingerprinting ($9/month base)
 - **[SmartProxy](https://smartproxy.com)** - Residential proxies ($12.5/GB)
 - **[OpenRouter](https://openrouter.ai)** - Vision AI ($10-30/month)
 - **Postgres Database** - Railway/Supabase/Neon (free tier available)
@@ -32,8 +32,8 @@ SMARTPROXY_PASSWORD=your_password
 SMARTPROXY_HOST=gate.smartproxy.com
 SMARTPROXY_PORT=7000
 
-# GoLogin (get profile tokens from gologin.com)
-GOLOGIN_API_TOKEN=your-gologin-profile-token
+# AdsPower (Local API - default: http://127.0.0.1:50325)
+ADSPOWER_API_BASE=http://127.0.0.1:50325
 
 # Instagram
 INSTAGRAM_USERNAME=your_ig_username
@@ -56,7 +56,7 @@ npx prisma migrate deploy
 
 ```bash
 cp profiles.config.example.json profiles.config.json
-# Edit profiles.config.json with your GoLogin tokens and Instagram accounts
+# Edit profiles.config.json with your AdsPower profile IDs and Instagram accounts
 ```
 
 ### 6. Run Discovery
@@ -238,7 +238,7 @@ All configuration is done via `.env` file. Required variables:
 
 ```bash
 # Services (required)
-GOLOGIN_API_TOKEN=your-token           # GoLogin profile token
+ADSPOWER_API_BASE=http://127.0.0.1:50325  # AdsPower Local API
 SMARTPROXY_USERNAME=sp1234567          # SmartProxy username
 SMARTPROXY_PASSWORD=your-pass          # SmartProxy password
 OPENROUTER_API_KEY=your-key            # Vision AI API key
@@ -251,7 +251,7 @@ INSTAGRAM_PASSWORD=your-ig-pass
 DATABASE_URL=postgresql://...          # Postgres connection string
 
 # Development flags (optional)
-LOCAL_BROWSER=false                    # Skip GoLogin/proxy for testing
+LOCAL_BROWSER=false                    # Skip AdsPower/proxy for testing
 DEBUG_LOGS=false                       # Verbose logging
 FAST_MODE=false                        # Reduced delays for testing
 ```
@@ -342,14 +342,14 @@ FAST_MODE=false
 SKIP_VISION=false
 ```
 
-### GoLogin + SmartProxy Setup
+### AdsPower + SmartProxy Setup
 
 **Why This Stack?**
 
-- **GoLogin**: Enterprise-grade browser fingerprinting and anti-detection
+- **AdsPower**: Enterprise-grade browser fingerprinting and anti-detection
   - Unique fingerprints per profile (Canvas, WebGL, WebRTC, fonts, etc.)
   - Persistent browser sessions with cookies
-  - Remote browser execution (no local Chrome needed)
+  - Local API for automation
   
 - **SmartProxy**: Rotating residential IPs with sticky sessions
   - 15-30 minute sticky sessions for consistent IP
@@ -359,15 +359,16 @@ SKIP_VISION=false
 **How It Works:**
 
 ```
-Your Script → GoLogin (fingerprint) → SmartProxy (residential IP) → Instagram
+Your Script → AdsPower (fingerprint) → SmartProxy (residential IP) → Instagram
 ```
 
 **Setup Steps:**
 
-1. **GoLogin Account**
-   - Sign up at [gologin.com](https://gologin.com)
+1. **AdsPower Setup**
+   - Download from [adspower.net](https://www.adspower.net)
+   - Install and enable Local API (Settings → Local API → Enable)
    - Create a browser profile for each Instagram account
-   - Copy profile tokens → `profiles.config.json`
+   - Copy profile user_id → `profiles.config.json`
 
 2. **SmartProxy Account**
    - Sign up at [smartproxy.com](https://smartproxy.com)
@@ -375,18 +376,18 @@ Your Script → GoLogin (fingerprint) → SmartProxy (residential IP) → Instag
    - Add to `.env` → `SMARTPROXY_USERNAME` and `SMARTPROXY_PASSWORD`
 
 3. **Integration** (already implemented!)
-   - Code automatically connects GoLogin profile via WebSocket
+   - Code automatically connects to AdsPower via Local API
    - Injects SmartProxy credentials into browser
    - Creates sticky sessions (15-30 min)
    - Auto-rotates when session expires
 
-**Detailed setup guide:** See [DEPLOYMENT.md](DEPLOYMENT.md) for step-by-step instructions.
+**Detailed setup guide:** See [ADSPOWER_SETUP.md](ADSPOWER_SETUP.md) for step-by-step instructions.
 
 **Cost:**
-- **GoLogin Professional**: $49/month (100 profiles)
+- **AdsPower**: $9/month base (custom pricing for many profiles)
 - **SmartProxy**: $12.5/GB (~10-50GB/month = $125-625)
 - **Vision API**: $10-30/month
-- **Total**: ~$190-700/month
+- **Total**: ~$150-665/month
 
 ## Tests
 

@@ -155,7 +155,7 @@ async function runRampUpTest(args: RampUpArgs): Promise<RampUpResults> {
 
 	const session = await initializeInstagramSession({
 		headless: true,
-		goLoginProfileId: profile.goLoginProfileId,
+		adsPowerProfileId: profile.adsPowerProfileId,
 		profileId: profile.id,
 		debug: true,
 	});
@@ -304,4 +304,3 @@ runRampUpTest(parseArgs())
 		logger.error("RAMPUP", `Test failed: ${error}`);
 		process.exit(1);
 	});
-

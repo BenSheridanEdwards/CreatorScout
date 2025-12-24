@@ -129,7 +129,7 @@ async function runSmartSession(args: SessionArgs): Promise<void> {
 		logger.info("SESSION", "Initializing Instagram session...");
 		const session = await initializeInstagramSession({
 			headless: true,
-			goLoginProfileId: profile.goLoginProfileId,
+			adsPowerProfileId: profile.adsPowerProfileId,
 			profileId: profile.id,
 			debug: true,
 		});

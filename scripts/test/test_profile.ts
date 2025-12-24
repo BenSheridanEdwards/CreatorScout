@@ -1,8 +1,8 @@
 /**
  * Test Single Profile
  *
- * Tests a single GoLogin profile end-to-end:
- * - GoLogin connection
+ * Tests a single AdsPower profile end-to-end:
+ * - AdsPower connection
  * - Proxy rotation
  * - Session initialization
  * - Basic Instagram actions
@@ -10,7 +10,6 @@
  * Usage: tsx scripts/test/test_profile.ts --profile=<profile-id>
  */
 import { initializeInstagramSession } from "../../functions/auth/sessionInitializer/sessionInitializer.ts";
-import { isGoLoginProfileAvailable } from "../../functions/navigation/browser/goLoginConnector.ts";
 import {
 	getLimitStatus,
 	logLimitStatus,
@@ -83,28 +82,19 @@ async function testProfile(args: TestArgs): Promise<void> {
 	);
 	logLimitStatus(profile);
 
-	// Test 2: Check GoLogin availability
+	// Test 2: Check AdsPower configuration
 	logger.info("TEST", "");
-	logger.info("TEST", "🔗 Test 2: Check GoLogin connection...");
+	logger.info("TEST", "🔗 Test 2: Check AdsPower configuration...");
 
-	if (!profile.goLoginProfileId) {
-		logger.error("TEST", "❌ No GoLogin token configured for this profile");
+	if (!profile.adsPowerProfileId) {
+		logger.error(
+			"TEST",
+			"❌ No AdsPower profile ID configured for this profile",
+		);
 		process.exit(1);
 	}
 
-	try {
-		const isAvailable = await isGoLoginProfileAvailable(profile.goLoginProfileId);
-		if (isAvailable) {
-			logger.info("TEST", "✅ GoLogin profile is available");
-		} else {
-			logger.warn(
-				"TEST",
-				"⚠️ GoLogin profile not available (may need to start)",
-			);
-		}
-	} catch (error) {
-		logger.warn("TEST", `⚠️ Could not check GoLogin: ${error}`);
-	}
+	logger.info("TEST", `✅ AdsPower profile ID: ${profile.adsPowerProfileId}`);
 
 	// Test 3: Check proxy configuration
 	logger.info("TEST", "");
@@ -134,7 +124,7 @@ async function testProfile(args: TestArgs): Promise<void> {
 	try {
 		const session = await initializeInstagramSession({
 			headless: true,
-			goLoginProfileId: profile.goLoginProfileId,
+			adsPowerProfileId: profile.adsPowerProfileId,
 			profileId: profile.id,
 			debug: true,
 		});
@@ -223,4 +213,3 @@ testProfile(parseArgs())
 		logger.error("TEST", `Test suite failed: ${error}`);
 		process.exit(1);
 	});
-
