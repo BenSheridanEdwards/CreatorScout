@@ -13,6 +13,29 @@ export interface ProfileStats {
 	ratio: number | null; // followers / following ratio
 }
 
+/**
+ * Parse a count string like "314K", "1.2M", "5,234", "0" into a number
+ */
+function parseCount(text: string): number | null {
+	if (!text) return null;
+
+	// Clean the text
+	const cleaned = text.replace(/,/g, "").trim();
+
+	// Handle formats like "110K", "1.2M", "5234"
+	const match = cleaned.match(/([\d.]+)\s*([KMB])?/i);
+	if (!match) return null;
+
+	const num = parseFloat(match[1]);
+	const suffix = match[2]?.toUpperCase();
+
+	if (suffix === "K") return Math.round(num * 1000);
+	if (suffix === "M") return Math.round(num * 1000000);
+	if (suffix === "B") return Math.round(num * 1000000000);
+
+	return Math.round(num);
+}
+
 export async function getProfileStats(page: Page): Promise<ProfileStats> {
 	const stats: ProfileStats = {
 		followers: null,
@@ -22,80 +45,67 @@ export async function getProfileStats(page: Page): Promise<ProfileStats> {
 	};
 
 	try {
-		// Instagram stores stats in various places - try multiple selectors
 		const statsData = await page.evaluate(() => {
 			// Method 1: Look for links with href containing /followers/ or /following/
 			const links = Array.from(document.querySelectorAll("a"));
 			const followersLink = links.find((l) =>
-				l.getAttribute("href")?.includes("/followers/"),
+				l.getAttribute("href")?.includes("/followers"),
 			);
 			const followingLink = links.find((l) =>
-				l.getAttribute("href")?.includes("/following/"),
-			);
-			const postsLink = links.find((l) =>
-				l.getAttribute("href")?.includes("/p/"),
+				l.getAttribute("href")?.includes("/following"),
 			);
 
-			// Extract text from these links or their parent elements
-			const getCount = (link: Element | undefined): number | null => {
-				if (!link) return null;
-				const text = link.textContent?.trim() || "";
-				// Handle formats like "110K", "1.2M", "5,234"
-				const match = text.match(/([\d.]+)([KMB]?)/i);
-				if (!match) return null;
-				const num = parseFloat(match[1]);
-				const suffix = match[2].toUpperCase();
-				if (suffix === "K") return Math.round(num * 1000);
-				if (suffix === "M") return Math.round(num * 1000000);
-				if (suffix === "B") return Math.round(num * 1000000000);
-				return Math.round(num);
-			};
+			// Extract text from links
+			const followersText = followersLink?.textContent?.trim() || "";
+			const followingText = followingLink?.textContent?.trim() || "";
 
-			// Method 2: Look in header section for spans/divs with numbers
+			// Method 2: Parse from header text for edge cases (like 0 following)
 			const header = document.querySelector("header");
-			if (header) {
-				const allText = header.textContent || "";
-				// Try to find patterns like "110K followers", "194 following"
-				const followersMatch = allText.match(
-					/([\d.]+[KMB]?)\s*(followers?|follower)/i,
-				);
-				const followingMatch = allText.match(/([\d.]+[KMB]?)\s*(following)/i);
-				const postsMatch = allText.match(/([\d.]+[KMB]?)\s*(posts?|post)/i);
+			const headerText = header?.textContent || "";
 
-				const parseCount = (match: RegExpMatchArray | null): number | null => {
-					if (!match) return null;
-					const num = parseFloat(match[1]);
-					const suffix = match[1].match(/[KMB]/i)?.[0]?.toUpperCase();
-					if (suffix === "K") return Math.round(num * 1000);
-					if (suffix === "M") return Math.round(num * 1000000);
-					if (suffix === "B") return Math.round(num * 1000000000);
-					return Math.round(num);
-				};
-
-				return {
-					followers:
-						parseCount(followersMatch) || getCount(followersLink as Element),
-					following:
-						parseCount(followingMatch) || getCount(followingLink as Element),
-					posts: parseCount(postsMatch) || getCount(postsLink as Element),
-				};
-			}
+			// Look for patterns like "314K followers", "0 following", "31 posts"
+			const followersMatch = headerText.match(
+				/([\d,.]+[KMB]?)\s*followers?/i,
+			);
+			const followingMatch = headerText.match(
+				/([\d,.]+[KMB]?)\s*following/i,
+			);
+			const postsMatch = headerText.match(/([\d,.]+[KMB]?)\s*posts?/i);
 
 			return {
-				followers: getCount(followersLink as Element),
-				following: getCount(followingLink as Element),
-				posts: getCount(postsLink as Element),
+				followersText: followersText || followersMatch?.[1] || null,
+				followingText: followingText || followingMatch?.[1] || null,
+				postsText: postsMatch?.[1] || null,
+				// Check for 0 following specifically (no link created for 0)
+				hasZeroFollowing:
+					!followingLink && headerText.includes("0 following"),
 			};
 		});
 
-		stats.followers = statsData.followers;
-		stats.following = statsData.following;
-		stats.posts = statsData.posts;
+		// Parse the counts
+		if (statsData.hasZeroFollowing) {
+			stats.following = 0;
+		} else if (statsData.followingText) {
+			stats.following = parseCount(statsData.followingText);
+		}
+
+		if (statsData.followersText) {
+			stats.followers = parseCount(statsData.followersText);
+		}
+
+		if (statsData.postsText) {
+			stats.posts = parseCount(statsData.postsText);
+		}
 
 		// Calculate ratio
 		if (stats.followers && stats.following && stats.following > 0) {
 			stats.ratio = stats.followers / stats.following;
 		}
+
+		logger.debug(
+			"PROFILE",
+			`Stats: ${stats.followers} followers, ${stats.following} following, ${stats.posts} posts`,
+		);
 	} catch (error) {
 		logger.error("ERROR", `Error extracting profile stats: ${error}`);
 	}

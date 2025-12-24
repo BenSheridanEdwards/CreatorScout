@@ -44,6 +44,7 @@ import {
 	shouldEngageOnProfile,
 } from "../functions/profile/profileActions/randomEngagement.ts";
 import { calculateScore } from "../functions/profile/bioMatcher/bioMatcher.ts";
+import { getProfileStats } from "../functions/extraction/getProfileStats/getProfileStats.ts";
 import {
 	getScrollIndex,
 	getStats,
@@ -277,14 +278,18 @@ export async function processProfile(
 	const quickScore = calculateScore(analysis.bio, username).score;
 	logger.debug("ANALYSIS", `Quick bio score: ${quickScore}`);
 
+	// Use the higher of quickScore or analysis.confidence (which includes link analysis)
+	const effectiveConfidence = Math.max(quickScore, analysis.confidence);
+
 	// SMART FILTERING: Quick reject low-scoring profiles
-	if (quickScore < 20) {
-		// Very low score - quick reject (saves time)
+	// Only reject if BOTH bio score AND comprehensive analysis confidence are low
+	if (effectiveConfidence < 20 && !analysis.isCreator) {
+		// Very low score from all signals - quick reject (saves time)
 		logger.debug(
 			"ANALYSIS",
-			`Quick reject: Low bio score (${quickScore} < 20)`,
+			`Quick reject: Low combined score (bio: ${quickScore}, analysis: ${analysis.confidence} < 20)`,
 		);
-		await markVisited(username, undefined, analysis.bio, quickScore);
+		await markVisited(username, undefined, analysis.bio, effectiveConfidence);
 		cycleManager.recordProfileProcessed(username, false);
 		return;
 	}
@@ -630,6 +635,7 @@ export async function processFollowingList(
 	page: Page,
 	metricsTracker?: MetricsTracker,
 	sendDM: boolean = true,
+	checkContinue: () => boolean = shouldContinue,
 ): Promise<void> {
 	logger.info("PROFILE", `Processing following list of @${seedUsername}`);
 
@@ -666,6 +672,25 @@ export async function processFollowingList(
 		);
 		return;
 	}
+
+	// Check if profile has any following before trying to open modal
+	const stats = await getProfileStats(page);
+	if (stats.following === 0) {
+		logger.warn(
+			"PROFILE",
+			`@${seedUsername} has 0 following, skipping following list`,
+		);
+		cycleManager.recordWarning(
+			"PROFILE_NOT_FOUND",
+			"Profile has 0 following",
+			seedUsername,
+		);
+		return;
+	}
+	logger.debug(
+		"PROFILE",
+		`@${seedUsername} has ${stats.following} following, ${stats.followers} followers`,
+	);
 
 	// Open following modal
 	logger.debug("NAVIGATION", `Opening following modal for @${seedUsername}`);
@@ -704,7 +729,7 @@ export async function processFollowingList(
 	let consecutiveAllVisited = 0;
 	const maxConsecutiveAllVisited = 3;
 
-	while (consecutiveAllVisited < maxConsecutiveAllVisited && shouldContinue()) {
+	while (consecutiveAllVisited < maxConsecutiveAllVisited && checkContinue()) {
 		try {
 			// Extract usernames from modal
 			logger.debug("NAVIGATION", `Extracting batch of ${batchSize} usernames`);
@@ -894,7 +919,13 @@ export async function runScrapeLoop(
 
 		try {
 			// Process their following list
-			await processFollowingList(target, page, metricsTracker, true); // sendDM = true
+			await processFollowingList(
+				target,
+				page,
+				metricsTracker,
+				true,
+				shouldContinue,
+			); // sendDM = true
 		} catch (err) {
 			const error = err instanceof Error ? err : new Error(String(err));
 			recordError(error, `seed_processing_${target}`, target);
@@ -989,7 +1020,13 @@ export async function runScrapeLoopWithoutDM(
 
 		try {
 			// Process their following list
-			await processFollowingList(target, page, metricsTracker, false); // sendDM = false
+			await processFollowingList(
+				target,
+				page,
+				metricsTracker,
+				false,
+				checkContinue,
+			); // sendDM = false
 		} catch (err) {
 			const error = err instanceof Error ? err : new Error(String(err));
 			recordError(error, `seed_processing_${target}`, target);

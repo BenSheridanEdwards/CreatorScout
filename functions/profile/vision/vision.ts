@@ -185,6 +185,74 @@ export async function isConfirmedCreator(
 	return [isConfirmed, data];
 }
 
+const BIO_VALIDATION_PROMPT = `You are analyzing a screenshot of an Instagram profile page to verify if a bio is visible.
+
+Look at the profile header/bio area (below the profile picture, above the story highlights).
+
+Return EXACTLY this JSON:
+{
+  "bio_visible": true or false,
+  "bio_text": "the exact bio text you see" or null if no bio,
+  "reason": "brief explanation of what you see"
+}
+
+IMPORTANT:
+- The bio is the descriptive text about the person, NOT their name or username
+- Look for text like descriptions, emojis, links, or personal information
+- If you see text like "DM me", "Link in bio", descriptions, or emojis in the bio area, bio_visible = true
+- If the bio area is empty or only contains the username/name, bio_visible = false`;
+
+export interface BioValidationResult {
+	bio_visible: boolean;
+	bio_text: string | null;
+	reason: string;
+}
+
+/**
+ * Validate whether a bio is visible on a profile screenshot.
+ * Used to verify bio extraction is working correctly.
+ */
+export async function validateBioWithVision(
+	imagePath: string,
+): Promise<BioValidationResult | null> {
+	try {
+		const imageBuffer = readFileSync(imagePath);
+		const base64 = imageBuffer.toString("base64");
+
+		const response = await client.chat.completions.create({
+			model: VISION_MODEL,
+			messages: [
+				{
+					role: "user",
+					content: [
+						{ type: "text", text: BIO_VALIDATION_PROMPT },
+						{
+							type: "image_url",
+							image_url: { url: `data:image/png;base64,${base64}` },
+						},
+					],
+				},
+			],
+			max_tokens: 300,
+			temperature: 0.0,
+		});
+
+		let text = response.choices[0]?.message?.content || "";
+		text = text
+			.trim()
+			.replace(/^```json/, "")
+			.replace(/^```/, "")
+			.replace(/```$/, "");
+
+		return JSON.parse(text.trim()) as BioValidationResult;
+	} catch (e) {
+		if (process.env.NODE_ENV !== "test" && !process.env.JEST_WORKER_ID) {
+			console.error(`  Bio validation vision failed: ${e}`);
+		}
+		return null;
+	}
+}
+
 /**
  * Analyze an Instagram profile screenshot (includes bio, highlights, header).
  * Uses PROFILE_PROMPT which is optimized for profile pages.

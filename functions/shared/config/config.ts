@@ -241,7 +241,7 @@ export const ENGAGEMENT_RATIO_MAX = 4; // 4:1 for safety
 export const TARGET_ACTIONS_PER_SESSION = 75; // 50-100 actions per session
 
 // <<< BEST MODEL RIGHT NOW (Dec 2025) >>>
-export const VISION_MODEL = "google/gemini-flash-1.5"; // fastest + cheapest winner
+export const VISION_MODEL = "google/gemini-2.0-flash-exp:free"; // fastest + cheapest winner
 // export const VISION_MODEL = "google/gemini-2.0-flash-exp"; // alternative experimental version
 // export const VISION_MODEL = 'google/gemini-pro-vision-2.5'; // max accuracy if you want
 // export const VISION_MODEL = 'anthropic/claude-3-5-sonnet-20241022';

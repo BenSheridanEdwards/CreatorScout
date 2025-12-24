@@ -2,7 +2,10 @@
  * Profile analysis functions - basic and comprehensive analysis.
  */
 import type { Page } from "puppeteer";
-import { getBioFromPage } from "../../extraction/getBioFromPage/getBioFromPage.ts";
+import {
+	getBioFromPage,
+	validateBioExtraction,
+} from "../../extraction/getBioFromPage/getBioFromPage.ts";
 import {
 	clickBioLink,
 	getLinkFromBio,
@@ -22,6 +25,9 @@ import {
 } from "../../extraction/linkExtraction/linkExtraction.ts";
 import { executeWithCircuitBreaker } from "../../shared/circuitBreaker/circuitBreaker.ts";
 import { SKIP_VISION } from "../../shared/config/config.ts";
+import { createLogger } from "../../shared/logger/logger.ts";
+
+const logger = createLogger(process.env.DEBUG_LOGS === "true");
 import { recordActivity } from "../../shared/dashboard/dashboard.ts";
 import { snapshot } from "../../shared/snapshot/snapshot.ts";
 import { sleep } from "../../timing/sleep/sleep.ts";
@@ -116,6 +122,18 @@ export async function analyzeProfileComprehensive(
 
 	// Extract bio
 	result.bio = await getBioFromPage(page);
+
+	// Validate bio extraction if it looks short or empty
+	if (!result.bio || result.bio.length < 30) {
+		const validation = await validateBioExtraction(page, result.bio, username);
+		if (!validation.valid && validation.correctedBio) {
+			logger.warn(
+				"ANALYSIS",
+				`Bio validation corrected: "${result.bio}" -> "${validation.correctedBio}"`,
+			);
+			result.bio = validation.correctedBio;
+		}
+	}
 
 	// Bio analysis with username
 	if (result.bio) {

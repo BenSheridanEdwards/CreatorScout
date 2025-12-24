@@ -1,8 +1,57 @@
 import type { Page } from "puppeteer";
 import { createLogger } from "../../shared/logger/logger.ts";
 import { snapshot } from "../../shared/snapshot/snapshot.ts";
+import { validateBioWithVision } from "../../profile/vision/vision.ts";
 
 const logger = createLogger(process.env.DEBUG_LOGS === "true");
+
+/**
+ * Validate an extracted bio with vision to ensure we didn't miss content.
+ * Call this when the bio looks suspiciously short or empty.
+ */
+export async function validateBioExtraction(
+	page: Page,
+	extractedBio: string | null,
+	username: string,
+): Promise<{ valid: boolean; correctedBio: string | null }> {
+	// If bio looks complete (reasonable length), skip validation
+	if (extractedBio && extractedBio.length > 30) {
+		return { valid: true, correctedBio: null };
+	}
+
+	try {
+		const screenshotPath = await snapshot(page, `bio_validation_${username}`);
+		const visionResult = await validateBioWithVision(screenshotPath);
+
+		if (visionResult) {
+			if (visionResult.bio_visible && visionResult.bio_text) {
+				const visionBioLength = visionResult.bio_text.length;
+				const extractedLength = extractedBio?.length || 0;
+
+				// If vision found significantly more content, flag as bug
+				if (visionBioLength > extractedLength + 20) {
+					logger.error(
+						"ERROR",
+						`🚨 BIO EXTRACTION INCOMPLETE: Vision found more content!`,
+					);
+					logger.error("ERROR", `Username: @${username}`);
+					logger.error("ERROR", `Extracted: "${extractedBio}"`);
+					logger.error("ERROR", `Vision found: "${visionResult.bio_text}"`);
+					logger.error("ERROR", `Screenshot: ${screenshotPath}`);
+
+					return { valid: false, correctedBio: visionResult.bio_text };
+				}
+			}
+
+			// Bio extraction matches vision
+			return { valid: true, correctedBio: null };
+		}
+	} catch (e) {
+		logger.warn("ANALYSIS", `Bio validation failed: ${e}`);
+	}
+
+	return { valid: true, correctedBio: null };
+}
 
 export async function getBioFromPage(page: Page): Promise<string | null> {
 	const selectors = [
@@ -197,20 +246,55 @@ export async function getBioFromPage(page: Page): Promise<string | null> {
 		// Fallback failed
 	}
 
-	// Take failure screenshot when running locally
-	const isLocal = process.env.HEADLESS === "false" || !process.env.CI;
-	if (isLocal) {
-		try {
-			const screenshotPath = await snapshot(page, "bio_extraction_failed");
-			logger.error(
-				"ERROR",
-				`Bio extraction failed - screenshot saved: ${screenshotPath}`,
-			);
-		} catch (e) {
-			logger.error("ERROR", `Failed to take screenshot: ${e}`);
+	// Take screenshot and validate with vision when bio extraction fails
+	try {
+		const username = await page.evaluate(() => {
+			const urlParts = window.location.pathname.split("/").filter(Boolean);
+			return urlParts[0] || "unknown";
+		});
+
+		const screenshotPath = await snapshot(page, `bio_extraction_failed_${username}`);
+		logger.warn(
+			"ANALYSIS",
+			`Bio extraction failed for @${username} - validating with vision...`,
+		);
+
+		// Use vision to check if a bio is actually visible
+		const visionResult = await validateBioWithVision(screenshotPath);
+
+		if (visionResult) {
+			if (visionResult.bio_visible && visionResult.bio_text) {
+				// Vision sees a bio but we couldn't extract it - this is a bug!
+				logger.error(
+					"ERROR",
+					`🚨 BIO EXTRACTION BUG: Vision found bio but extraction failed!`,
+				);
+				logger.error(
+					"ERROR",
+					`Username: @${username}`,
+				);
+				logger.error(
+					"ERROR",
+					`Vision found: "${visionResult.bio_text}"`,
+				);
+				logger.error(
+					"ERROR",
+					`Screenshot: ${screenshotPath}`,
+				);
+
+				// Return what vision found so we don't miss the bio entirely
+				return visionResult.bio_text;
+			} else {
+				logger.info(
+					"ANALYSIS",
+					`Vision confirms no bio for @${username}: ${visionResult.reason}`,
+				);
+			}
+		} else {
+			logger.warn("ANALYSIS", "Vision validation failed, cannot confirm bio status");
 		}
-	} else {
-		logger.warn("ANALYSIS", "Bio extraction failed");
+	} catch (e) {
+		logger.error("ERROR", `Failed to validate bio with vision: ${e}`);
 	}
 
 	return null;
