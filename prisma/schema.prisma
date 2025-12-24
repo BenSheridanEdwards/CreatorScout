@@ -18,7 +18,7 @@ model Profile {
   bioText     String?   @map("bio_text")
   linkUrl     String?   @map("link_url")
   bioScore    Int       @default(0) @map("bio_score")
-  isCreator  Boolean   @default(false) @map("is_patreon")
+  isCreator   Boolean   @default(false) @map("is_creator")
   confidence  Int       @default(0)
   dmSent      Boolean   @default(false) @map("dm_sent")
   dmSentAt    DateTime? @map("dm_sent_at") @db.Timestamptz(6)
@@ -39,7 +39,7 @@ model Profile {
   sourceProfile         String?   @map("source_profile")
 
   @@index([dmSent], map: "idx_dm_sent")
-  @@index([isCreator], map: "idx_is_patreon")
+  @@index([isCreator], map: "idx_is_creator")
   @@index([visitedAt], map: "idx_visited")
   @@map("profiles")
 }

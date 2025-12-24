@@ -86,7 +86,7 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
 	}>(
 		`SELECT
 			COUNT(*)::text as profiles_processed,
-			COALESCE(SUM(CASE WHEN is_patreon THEN 1 ELSE 0 END), 0)::text as creators_found,
+			COALESCE(SUM(CASE WHEN is_creator THEN 1 ELSE 0 END), 0)::text as creators_found,
 			COALESCE(SUM(CASE WHEN dm_sent THEN 1 ELSE 0 END), 0)::text as dms_sent,
 			COALESCE(SUM(CASE WHEN followed THEN 1 ELSE 0 END), 0)::text as follows_completed,
 			COALESCE(AVG(processing_time_seconds), 0)::text as avg_processing_time,
