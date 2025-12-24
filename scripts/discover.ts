@@ -131,13 +131,14 @@ async function main() {
 	console.log(`🔄 Started cycle: ${cycleId}`);
 
 	// Initialize session with AdsPower
+	// Note: AdsPower doesn't support headless mode well - use Xvfb on Linux for invisible browser
 	const { browser, page, logger } = await initializeInstagramSession({
 		headless: false,
 		debug,
-		adsPowerProfileId: profileConfig.adsPowerProfileId,
+		adsPowerProfileId: profileConfig?.adsPowerProfileId,
 		credentials: {
-			username: profileConfig.username,
-			password: profileConfig.password,
+			username: profileConfig?.username || "",
+			password: profileConfig?.password || "",
 		},
 	});
 
@@ -165,7 +166,7 @@ async function main() {
 		browser.disconnect();
 
 		// Stop AdsPower profile
-		if (profileConfig.adsPowerProfileId) {
+		if (profileConfig?.adsPowerProfileId) {
 			try {
 				await stopAdsPowerProfile(profileConfig.adsPowerProfileId);
 				console.log("✅ AdsPower profile stopped");
