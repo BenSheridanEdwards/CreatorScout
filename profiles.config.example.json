@@ -68,16 +68,31 @@
 	],
 	"settings": {
 		"sessionsPerDay": 3,
-		"sessionDurationMinutes": {
-			"min": 15,
-			"max": 20
+		"sessionSchedule": {
+			"morning": {
+				"time": "08:00",
+				"weight": 0.2,
+				"durationRange": { "min": 20, "max": 30 }
+			},
+			"afternoon": {
+				"time": "15:00",
+				"weight": 0.5,
+				"durationRange": { "min": 40, "max": 55 }
+			},
+			"evening": {
+				"time": "20:00",
+				"weight": 0.3,
+				"durationRange": { "min": 30, "max": 40 }
+			}
 		},
 		"sessionStaggerMinutes": 15,
 		"warmupDurationMinutes": 1.5,
 		"engagementRatio": {
 			"min": 3,
 			"max": 4
-		}
+		},
+		"fuzzyTargets": true,
+		"weekendMultiplier": 1.2
 	},
 	"proxy": {
 		"provider": "smartproxy",
@@ -87,4 +102,3 @@
 		}
 	}
 }
-

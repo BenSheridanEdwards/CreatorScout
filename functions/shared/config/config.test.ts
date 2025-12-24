@@ -71,7 +71,7 @@ describe("Configuration", () => {
 			expect(DELAYS.after_click).toEqual([0.3, 1]);
 
 			// High-risk actions (DMs) should be longer
-			expect(DELAYS.after_dm_send).toEqual([10, 30]);
+			expect(DELAYS.after_dm_send).toEqual([5, 15]);
 			expect(DELAYS.after_follow).toEqual([1, 5]);
 		});
 

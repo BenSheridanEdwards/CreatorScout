@@ -29,6 +29,7 @@
 		"test:rampup": "tsx scripts/test/ramp_up_test.ts",
 		"costs": "tsx scripts/monitoring/costMonitor.ts",
 		"cron:session": "tsx scripts/cron/sessionRunner.ts",
+		"cron:smart": "tsx scripts/cron/smartSessionRunner.ts",
 		"cron:reset": "tsx scripts/cron/resetDailyCounters.ts"
 	},
 	"dependencies": {

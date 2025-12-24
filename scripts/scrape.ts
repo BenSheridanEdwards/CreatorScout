@@ -40,6 +40,11 @@ import {
 	MAX_DMS_PER_DAY,
 } from "../functions/shared/config/config.ts";
 import {
+	performRandomEngagement,
+	shouldEngageOnProfile,
+} from "../functions/profile/profileActions/randomEngagement.ts";
+import { calculateScore } from "../functions/profile/bioMatcher/bioMatcher.ts";
+import {
 	getScrollIndex,
 	getStats,
 	initDb,
@@ -267,6 +272,32 @@ export async function processProfile(
 	);
 	logger.info("ANALYSIS", `Confidence: ${analysis.confidence}%`);
 	logger.debug("ANALYSIS", `Is creator: ${analysis.isCreator}`);
+
+	// Quick bio scoring for smart filtering
+	const quickScore = calculateScore(analysis.bio, username).score;
+	logger.debug("ANALYSIS", `Quick bio score: ${quickScore}`);
+
+	// SMART FILTERING: Quick reject low-scoring profiles
+	if (quickScore < 20) {
+		// Very low score - quick reject (saves time)
+		logger.debug(
+			"ANALYSIS",
+			`Quick reject: Low bio score (${quickScore} < 20)`,
+		);
+		await markVisited(username, undefined, analysis.bio, quickScore);
+		cycleManager.recordProfileProcessed(username, false);
+		return;
+	}
+
+	// RANDOM ENGAGEMENT: Break bot patterns with natural actions
+	if (shouldEngageOnProfile(quickScore)) {
+		logger.debug("ENGAGEMENT", `Performing random engagement on @${username}`);
+		const engagement = await performRandomEngagement(page, username);
+		logger.debug(
+			"ENGAGEMENT",
+			`Action: ${engagement.type}, Duration: ${engagement.duration.toFixed(1)}s, Success: ${engagement.success}`,
+		);
+	}
 
 	// Mark as visited with bio and confidence score
 	await markVisited(username, undefined, analysis.bio, analysis.confidence);
