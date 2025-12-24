@@ -1,6 +1,9 @@
 import type { ElementHandle, Page } from "puppeteer";
 import { sleep } from "../../timing/sleep/sleep.ts";
-import { humanLikeClickHandle } from "../../navigation/humanClick/humanClick.ts";
+import {
+	humanLikeClickAt,
+	humanLikeClickHandle,
+} from "../../navigation/humanClick/humanClick.ts";
 
 /**
  * Get the bio link URL from the profile page (without clicking).
@@ -66,7 +69,11 @@ export async function findBioLinkElement(
 			if (el) {
 				const href = await el.evaluate((node) => node.getAttribute("href"));
 				// Skip internal Instagram links
-				if (href && !href.includes("/accounts/") && !href.includes("/explore/")) {
+				if (
+					href &&
+					!href.includes("/accounts/") &&
+					!href.includes("/explore/")
+				) {
 					console.log(`[BIO_LINK] Found bio link with selector: ${sel}`);
 					console.log(`[BIO_LINK] Link href: ${href}`);
 					return el;
@@ -135,6 +142,7 @@ export async function findBioLinkElement(
 
 /**
  * Click the bio link on the profile page like a user would.
+ * Uses ghost-cursor for human-like clicking.
  * Returns the URL we ended up on after clicking (handles Instagram redirects).
  */
 export async function clickBioLink(page: Page): Promise<{
@@ -159,43 +167,19 @@ export async function clickBioLink(page: Page): Promise<{
 	console.log(`[BIO_LINK] Found link href: ${linkHref}`);
 
 	try {
-		// Strategy 1: Ghost cursor click (most human-like)
-		try {
-			console.log("[BIO_LINK] Trying ghost-cursor click...");
-			await humanLikeClickHandle(page, linkElement, { elementType: "link" });
-			await sleep(3000);
+		// Click with ghost-cursor (human-like)
+		console.log("[BIO_LINK] Clicking with ghost-cursor...");
+		await humanLikeClickHandle(page, linkElement, { elementType: "link" });
+		await sleep(3000);
 
-			// Check if we navigated away (link might open in new tab)
-			const currentUrl = page.url();
-			if (currentUrl !== originalUrl && !currentUrl.includes("instagram.com")) {
-				console.log(`[BIO_LINK] Ghost-cursor click worked, now at: ${currentUrl}`);
-				return { success: true, finalUrl: currentUrl };
-			}
-		} catch (e) {
-			console.log(`[BIO_LINK] Ghost-cursor click failed: ${e}`);
+		// Check if we navigated away (link might stay on same page or open in new tab)
+		const currentUrl = page.url();
+		if (currentUrl !== originalUrl && !currentUrl.includes("instagram.com")) {
+			console.log(`[BIO_LINK] Navigated to: ${currentUrl}`);
+			return { success: true, finalUrl: currentUrl };
 		}
 
-		// Strategy 2: Direct element click
-		try {
-			console.log("[BIO_LINK] Trying direct element click...");
-			await linkElement.evaluate((el) => {
-				(el as HTMLElement).scrollIntoView({ block: "center" });
-			});
-			await sleep(500);
-			await linkElement.click({ delay: 100 + Math.random() * 100 });
-			await sleep(3000);
-
-			const currentUrl = page.url();
-			if (currentUrl !== originalUrl && !currentUrl.includes("instagram.com")) {
-				console.log(`[BIO_LINK] Direct click worked, now at: ${currentUrl}`);
-				return { success: true, finalUrl: currentUrl };
-			}
-		} catch (e) {
-			console.log(`[BIO_LINK] Direct click failed: ${e}`);
-		}
-
-		// Strategy 3: Check for new tab/window (links with target="_blank")
-		// If the click opened a new tab, we need to switch to it
+		// Check for new tab/window (links with target="_blank")
 		const pages = await page.browser().pages();
 		if (pages.length > 1) {
 			// Find the new page (not the original, not about:blank, not devtools)
@@ -220,15 +204,67 @@ export async function clickBioLink(page: Page): Promise<{
 
 				// Navigate to the external URL
 				if (newUrl && !newUrl.includes("instagram.com")) {
-					await page.goto(newUrl, { waitUntil: "networkidle2", timeout: 15000 });
+					await page.goto(newUrl, {
+						waitUntil: "networkidle2",
+						timeout: 15000,
+					});
 					return { success: true, finalUrl: page.url() };
 				}
 			}
 		}
 
-		// Strategy 4: Extract URL and navigate directly (last resort)
+		// If click didn't navigate, try clicking at coordinates
+		console.log("[BIO_LINK] Trying coordinate-based click...");
+		const box = await linkElement.boundingBox();
+		if (box) {
+			const x = box.x + box.width / 2;
+			const y = box.y + box.height / 2;
+
+			await humanLikeClickAt(page, x, y, { elementType: "link" });
+			await sleep(3000);
+
+			// Check again for navigation or new tab
+			const afterClickUrl = page.url();
+			if (
+				afterClickUrl !== originalUrl &&
+				!afterClickUrl.includes("instagram.com")
+			) {
+				console.log(`[BIO_LINK] Coordinate click navigated to: ${afterClickUrl}`);
+				return { success: true, finalUrl: afterClickUrl };
+			}
+
+			// Check for new tabs again
+			const pagesAfter = await page.browser().pages();
+			const newTabAfter = pagesAfter.find((p) => {
+				if (p === page) return false;
+				const url = p.url();
+				return (
+					url !== "about:blank" &&
+					!url.startsWith("devtools://") &&
+					!url.startsWith("chrome://") &&
+					!url.startsWith("chrome-extension://") &&
+					url.includes("http")
+				);
+			});
+
+			if (newTabAfter) {
+				const tabUrl = newTabAfter.url();
+				console.log(`[BIO_LINK] Coordinate click opened new tab: ${tabUrl}`);
+				await newTabAfter.close();
+
+				if (tabUrl && !tabUrl.includes("instagram.com")) {
+					await page.goto(tabUrl, {
+						waitUntil: "networkidle2",
+						timeout: 15000,
+					});
+					return { success: true, finalUrl: page.url() };
+				}
+			}
+		}
+
+		// Last resort: extract URL and navigate (if all clicks failed)
 		if (linkHref) {
-			console.log("[BIO_LINK] Fallback: navigating directly to href...");
+			console.log("[BIO_LINK] Clicks didn't navigate, extracting URL...");
 
 			// Decode Instagram redirect URL if needed
 			let targetUrl = linkHref;
@@ -243,6 +279,7 @@ export async function clickBioLink(page: Page): Promise<{
 				}
 			}
 
+			console.log(`[BIO_LINK] Navigating to extracted URL: ${targetUrl}`);
 			await page.goto(targetUrl, { waitUntil: "networkidle2", timeout: 15000 });
 			const finalUrl = page.url();
 			console.log(`[BIO_LINK] Navigated to: ${finalUrl}`);
@@ -252,7 +289,7 @@ export async function clickBioLink(page: Page): Promise<{
 		return {
 			success: false,
 			finalUrl: null,
-			error: "Could not click or navigate to bio link",
+			error: "Click did not navigate to external page",
 		};
 	} catch (error) {
 		const errorMsg = error instanceof Error ? error.message : String(error);

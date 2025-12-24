@@ -3,88 +3,14 @@
  */
 import type { ElementHandle, Page } from "puppeteer";
 import { sleep } from "../../timing/sleep/sleep.ts";
-import { humanLikeClickHandle } from "../humanClick/humanClick.ts";
-
-/**
- * Try to click an element using ghost-cursor first, then fallback to direct click
- */
-async function clickWithFallback(
-	page: Page,
-	handle: ElementHandle,
-	description: string,
-): Promise<boolean> {
-	// Strategy 1: Ghost cursor (primary - most human-like)
-	try {
-		console.log(`[MODAL] Clicking ${description} with ghost-cursor...`);
-		await humanLikeClickHandle(page, handle, { elementType: "link" });
-		await sleep(2000);
-
-		// Check if modal opened
-		const modalOpened = await page
-			.$('div[role="dialog"]')
-			.then((el) => el !== null);
-		if (modalOpened) {
-			console.log(`[MODAL] Ghost-cursor click worked for ${description}`);
-			return true;
-		}
-		console.log(`[MODAL] Ghost-cursor click didn't open modal, trying fallback...`);
-	} catch (e) {
-		console.log(`[MODAL] Ghost-cursor failed: ${e}`);
-	}
-
-	// Strategy 2: Direct element.click() as fallback
-	try {
-		console.log(`[MODAL] Trying direct element.click() for ${description}...`);
-		await handle.evaluate((el: Element) => {
-			// Ensure element is in view
-			(el as HTMLElement).scrollIntoView({ block: "center" });
-		});
-		await sleep(500);
-
-		await handle.click({ delay: 100 + Math.random() * 100 });
-		await sleep(2000);
-
-		const modalOpened = await page
-			.$('div[role="dialog"]')
-			.then((el) => el !== null);
-		if (modalOpened) {
-			console.log(`[MODAL] Direct click worked for ${description}`);
-			return true;
-		}
-	} catch (e) {
-		console.log(`[MODAL] Direct click failed: ${e}`);
-	}
-
-	// Strategy 3: Dispatch click event manually
-	try {
-		console.log(`[MODAL] Trying dispatched click event for ${description}...`);
-		await handle.evaluate((el: Element) => {
-			const event = new MouseEvent("click", {
-				bubbles: true,
-				cancelable: true,
-				view: window,
-			});
-			el.dispatchEvent(event);
-		});
-		await sleep(2000);
-
-		const modalOpened = await page
-			.$('div[role="dialog"]')
-			.then((el) => el !== null);
-		if (modalOpened) {
-			console.log(`[MODAL] Dispatched click worked for ${description}`);
-			return true;
-		}
-	} catch (e) {
-		console.log(`[MODAL] Dispatched click failed: ${e}`);
-	}
-
-	return false;
-}
+import {
+	humanLikeClickAt,
+	humanLikeClickHandle,
+} from "../humanClick/humanClick.ts";
 
 /**
  * Open the "Following" modal for a profile.
- * Uses ghost-cursor for human-like clicking with fallbacks.
+ * Uses ghost-cursor for human-like clicking.
  */
 export async function openFollowingModal(page: Page): Promise<boolean> {
 	console.log("[MODAL] Attempting to open following modal...");
@@ -110,7 +36,7 @@ export async function openFollowingModal(page: Page): Promise<boolean> {
 	selectors.push('a[href$="/following"]');
 	selectors.push('li a[href*="/following"]');
 
-	// Strategy 1: Try each selector with ghost-cursor click
+	// Try each selector with ghost-cursor click
 	for (const sel of selectors) {
 		try {
 			console.log(`[MODAL] Looking for selector: ${sel}`);
@@ -125,36 +51,43 @@ export async function openFollowingModal(page: Page): Promise<boolean> {
 					(el: Element) => el.textContent || "",
 				);
 
-				console.log(`[MODAL] Found element - href: ${href}, text: ${text.trim()}`);
+				console.log(
+					`[MODAL] Found element - href: ${href}, text: ${text.trim()}`,
+				);
 
 				// Skip if it's a followers link
-				if (href?.includes("/followers") || text.toLowerCase().includes("followers")) {
+				if (
+					href?.includes("/followers") ||
+					text.toLowerCase().includes("followers")
+				) {
 					console.log(`[MODAL] Skipping - this is a followers link`);
 					continue;
 				}
 
-				// Try clicking with fallback strategies
-				const success = await clickWithFallback(page, handle, `following link (${sel})`);
-				if (success) {
-					// Verify modal has content
-					await sleep(1000);
-					const hasContent = await page.$('div[role="dialog"] a[href^="/"]');
-					if (hasContent) {
-						console.log("[MODAL] Modal opened with content!");
-						return true;
-					}
-					console.log("[MODAL] Modal opened but no content yet, waiting...");
-					await sleep(2000);
+				// Click with ghost-cursor
+				console.log(`[MODAL] Clicking with ghost-cursor...`);
+				await humanLikeClickHandle(page, handle, { elementType: "link" });
+				await sleep(3000);
+
+				// Check if modal opened
+				const modalOpened = await page
+					.$('div[role="dialog"]')
+					.then((el) => el !== null);
+
+				if (modalOpened) {
+					console.log("[MODAL] Modal opened successfully!");
 					return true;
 				}
+
+				console.log("[MODAL] Modal did not open, trying next selector...");
 			}
 		} catch (e) {
 			console.log(`[MODAL] Selector ${sel} failed: ${e}`);
 		}
 	}
 
-	// Strategy 2: Find by evaluating page content
-	console.log("[MODAL] Trying page.evaluate to find following link...");
+	// Fallback: Find by evaluating page content and click at coordinates
+	console.log("[MODAL] Trying coordinate-based click...");
 	try {
 		const linkInfo = await page.evaluate(() => {
 			const links = Array.from(document.querySelectorAll("a"));
@@ -168,7 +101,7 @@ export async function openFollowingModal(page: Page): Promise<boolean> {
 					!href.includes("/followers") &&
 					!text.includes("followers")
 				) {
-					// Get bounding rect for clicking
+					// Get center coordinates
 					const rect = link.getBoundingClientRect();
 					return {
 						href,
@@ -184,52 +117,28 @@ export async function openFollowingModal(page: Page): Promise<boolean> {
 
 		if (linkInfo.found && linkInfo.x && linkInfo.y) {
 			console.log(`[MODAL] Found following link via evaluate: ${linkInfo.href}`);
-			console.log(`[MODAL] Clicking at coordinates: (${linkInfo.x}, ${linkInfo.y})`);
+			console.log(
+				`[MODAL] Clicking at coordinates: (${linkInfo.x}, ${linkInfo.y})`,
+			);
 
-			// Click at the coordinates using ghost-cursor approach
-			const { createCursor } = await import("ghost-cursor");
-			const cursor = createCursor(page);
-
-			await cursor.moveTo({ x: linkInfo.x, y: linkInfo.y });
-			await sleep(100 + Math.random() * 200);
-			await page.mouse.down();
-			await sleep(50 + Math.random() * 50);
-			await page.mouse.up();
+			// Click at coordinates using ghost-cursor
+			await humanLikeClickAt(page, linkInfo.x, linkInfo.y, {
+				elementType: "link",
+			});
 
 			await sleep(3000);
 
 			const modalOpened = await page
 				.$('div[role="dialog"]')
 				.then((el) => el !== null);
+
 			if (modalOpened) {
 				console.log("[MODAL] Modal opened via coordinate click!");
 				return true;
 			}
-
-			// Fallback: direct click via evaluate
-			console.log("[MODAL] Coordinate click didn't work, trying direct click...");
-			await page.evaluate(() => {
-				const links = Array.from(document.querySelectorAll("a"));
-				for (const link of links) {
-					const href = link.getAttribute("href") || "";
-					if (href.includes("/following") && !href.includes("/followers")) {
-						(link as HTMLElement).click();
-						return;
-					}
-				}
-			});
-
-			await sleep(3000);
-			const modalOpenedFallback = await page
-				.$('div[role="dialog"]')
-				.then((el) => el !== null);
-			if (modalOpenedFallback) {
-				console.log("[MODAL] Modal opened via direct evaluate click!");
-				return true;
-			}
 		}
 	} catch (e) {
-		console.log(`[MODAL] Evaluate strategy failed: ${e}`);
+		console.log(`[MODAL] Coordinate click failed: ${e}`);
 	}
 
 	// Take debug screenshot on failure
@@ -309,7 +218,9 @@ export async function extractFollowingUsernames(
 		return found;
 	}, batchSize);
 
-	console.log(`[MODAL] Extracted ${usernames.length} usernames: ${usernames.join(", ")}`);
+	console.log(
+		`[MODAL] Extracted ${usernames.length} usernames: ${usernames.join(", ")}`,
+	);
 	return usernames;
 }
 
@@ -326,8 +237,9 @@ export async function scrollFollowingModal(
 			if (!dialog) return;
 
 			// Find scrollable container within dialog
-			const scrollable = dialog.querySelector('div[style*="overflow"]') ||
-				dialog.querySelector('ul')?.parentElement ||
+			const scrollable =
+				dialog.querySelector('div[style*="overflow"]') ||
+				dialog.querySelector("ul")?.parentElement ||
 				dialog;
 
 			// Try to scroll it
