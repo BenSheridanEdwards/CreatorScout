@@ -1,4 +1,5 @@
 import type { Page } from "puppeteer";
+import { CONFIDENCE_THRESHOLD } from "../../shared/config/config.ts";
 
 const INSTAGRAM_HOST = "instagram.com";
 
@@ -424,14 +425,32 @@ export async function analyzeExternalLink(
 }
 
 /**
+ * Threshold for skipping vision analysis when text-based analysis is confident enough.
+ * Uses the same threshold as creator confirmation - if we're confident enough to 
+ * confirm a creator, we're confident enough to skip expensive vision API calls.
+ */
+export const VISION_SKIP_THRESHOLD = CONFIDENCE_THRESHOLD;
+
+/**
  * Determine if vision analysis should be used based on current confidence and signals.
  */
-export async function shouldUseVisionAnalysis(
+export function shouldUseVisionAnalysis(
 	currentConfidence: number,
 	hasExternalLinks: boolean,
 	hasHighlights: boolean,
-): Promise<boolean> {
-	// Only use vision analysis if confidence is below 70%
-	// AND we have some signals that might indicate creator activity
-	return currentConfidence < 70 && (hasExternalLinks || hasHighlights);
+): boolean {
+	// Skip vision if text-based analysis already has high confidence
+	if (currentConfidence >= VISION_SKIP_THRESHOLD) {
+		console.log(
+			`[VISION] Skipping - text confidence ${currentConfidence}% >= ${VISION_SKIP_THRESHOLD}% threshold`,
+		);
+		return false;
+	}
+
+	// Only use vision if we have some signals that might indicate creator activity
+	const shouldUse = hasExternalLinks || hasHighlights;
+	if (!shouldUse) {
+		console.log(`[VISION] Skipping - no external links or highlights to analyze`);
+	}
+	return shouldUse;
 }

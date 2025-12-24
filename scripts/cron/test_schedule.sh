@@ -51,3 +51,4 @@ echo "   3. Monitor logs:"
 echo "      tail -f logs/cron-$PROFILE-$(date +%Y-%m-%d).log"
 echo ""
 
+

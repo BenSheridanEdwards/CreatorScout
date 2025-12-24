@@ -253,7 +253,10 @@ export async function getBioFromPage(page: Page): Promise<string | null> {
 			return urlParts[0] || "unknown";
 		});
 
-		const screenshotPath = await snapshot(page, `bio_extraction_failed_${username}`);
+		const screenshotPath = await snapshot(
+			page,
+			`bio_extraction_failed_${username}`,
+		);
 		logger.warn(
 			"ANALYSIS",
 			`Bio extraction failed for @${username} - validating with vision...`,
@@ -269,18 +272,9 @@ export async function getBioFromPage(page: Page): Promise<string | null> {
 					"ERROR",
 					`🚨 BIO EXTRACTION BUG: Vision found bio but extraction failed!`,
 				);
-				logger.error(
-					"ERROR",
-					`Username: @${username}`,
-				);
-				logger.error(
-					"ERROR",
-					`Vision found: "${visionResult.bio_text}"`,
-				);
-				logger.error(
-					"ERROR",
-					`Screenshot: ${screenshotPath}`,
-				);
+				logger.error("ERROR", `Username: @${username}`);
+				logger.error("ERROR", `Vision found: "${visionResult.bio_text}"`);
+				logger.error("ERROR", `Screenshot: ${screenshotPath}`);
 
 				// Return what vision found so we don't miss the bio entirely
 				return visionResult.bio_text;
@@ -291,7 +285,10 @@ export async function getBioFromPage(page: Page): Promise<string | null> {
 				);
 			}
 		} else {
-			logger.warn("ANALYSIS", "Vision validation failed, cannot confirm bio status");
+			logger.warn(
+				"ANALYSIS",
+				"Vision validation failed, cannot confirm bio status",
+			);
 		}
 	} catch (e) {
 		logger.error("ERROR", `Failed to validate bio with vision: ${e}`);

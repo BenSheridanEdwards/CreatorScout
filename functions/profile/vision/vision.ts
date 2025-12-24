@@ -4,6 +4,7 @@
 import { readFileSync } from "node:fs";
 import { OpenAI } from "openai";
 import {
+	CONFIDENCE_THRESHOLD,
 	OPENROUTER_API_KEY,
 	VISION_MODEL,
 } from "../../shared/config/config.ts";
@@ -159,7 +160,7 @@ function _hasExclusiveDiscountSignal(data: VisionAnalysisResult): boolean {
 
 export async function isConfirmedCreator(
 	imagePath: string,
-	threshold: number = 70,
+	threshold: number = CONFIDENCE_THRESHOLD,
 ): Promise<[boolean, VisionAnalysisResult | null]> {
 	const data = await analyzeLinktree(imagePath);
 	if (!data) {

@@ -64,12 +64,8 @@ export async function getProfileStats(page: Page): Promise<ProfileStats> {
 			const headerText = header?.textContent || "";
 
 			// Look for patterns like "314K followers", "0 following", "31 posts"
-			const followersMatch = headerText.match(
-				/([\d,.]+[KMB]?)\s*followers?/i,
-			);
-			const followingMatch = headerText.match(
-				/([\d,.]+[KMB]?)\s*following/i,
-			);
+			const followersMatch = headerText.match(/([\d,.]+[KMB]?)\s*followers?/i);
+			const followingMatch = headerText.match(/([\d,.]+[KMB]?)\s*following/i);
 			const postsMatch = headerText.match(/([\d,.]+[KMB]?)\s*posts?/i);
 
 			return {
@@ -77,8 +73,7 @@ export async function getProfileStats(page: Page): Promise<ProfileStats> {
 				followingText: followingText || followingMatch?.[1] || null,
 				postsText: postsMatch?.[1] || null,
 				// Check for 0 following specifically (no link created for 0)
-				hasZeroFollowing:
-					!followingLink && headerText.includes("0 following"),
+				hasZeroFollowing: !followingLink && headerText.includes("0 following"),
 			};
 		});
 

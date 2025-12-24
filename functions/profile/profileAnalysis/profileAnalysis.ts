@@ -22,9 +22,13 @@ import {
 	decodeInstagramRedirect,
 	hasDirectCreatorLink,
 	shouldUseVisionAnalysis,
+	VISION_SKIP_THRESHOLD,
 } from "../../extraction/linkExtraction/linkExtraction.ts";
 import { executeWithCircuitBreaker } from "../../shared/circuitBreaker/circuitBreaker.ts";
-import { SKIP_VISION } from "../../shared/config/config.ts";
+import {
+	CONFIDENCE_THRESHOLD,
+	SKIP_VISION,
+} from "../../shared/config/config.ts";
 import { createLogger } from "../../shared/logger/logger.ts";
 
 const logger = createLogger(process.env.DEBUG_LOGS === "true");
@@ -259,7 +263,7 @@ export async function analyzeProfileComprehensive(
 
 			// Fallback: analyze each external link by navigating directly
 			for (const linkUrl of externalLinks) {
-				if (!linkUrl || result.confidence >= 70) break; // Stop if we already have high confidence
+				if (!linkUrl || result.confidence >= CONFIDENCE_THRESHOLD) break; // Stop if we already have high confidence
 
 				try {
 					const linkAnalysis = await executeWithCircuitBreaker(
@@ -342,8 +346,8 @@ export async function analyzeProfileComprehensive(
 		result.reason = "direct_patreon_link";
 	}
 
-	// Final decision - require higher confidence threshold
-	if (!result.isCreator && result.confidence >= 70) {
+	// Final decision - require confidence threshold
+	if (!result.isCreator && result.confidence >= CONFIDENCE_THRESHOLD) {
 		result.isCreator = true;
 		result.reason = result.reason || "combined_signals";
 	}

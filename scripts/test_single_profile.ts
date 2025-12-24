@@ -336,7 +336,9 @@ async function testProfile(username: string): Promise<ProfileTestResult> {
 				);
 
 				// Only call vision if text analysis confidence is below threshold
-				const VISION_SKIP_THRESHOLD = 80;
+				const { VISION_SKIP_THRESHOLD } = await import(
+					"../functions/extraction/linkExtraction/linkExtraction.ts"
+				);
 				if (textAnalysis.confidence >= VISION_SKIP_THRESHOLD) {
 					console.log(
 						`[VISION] Skipping link page vision - text confidence ${textAnalysis.confidence}% >= ${VISION_SKIP_THRESHOLD}% threshold`,
