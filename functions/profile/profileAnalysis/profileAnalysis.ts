@@ -342,7 +342,7 @@ export async function analyzeProfileComprehensive(
 	// Direct Patreon shortcut (fallback for backward compatibility)
 	if (hasDirectCreatorLink(result.links)) {
 		result.isCreator = true;
-		result.confidence = Math.max(result.confidence, 90);
+		result.confidence = 100;
 		result.reason = "direct_patreon_link";
 	}
 

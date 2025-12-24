@@ -10,6 +10,7 @@ const CREATOR_HOST_REGEX = /patreon\.com/i;
 
 const CREATOR_PLATFORMS = [
 	"patreon.com",
+	"ko-fi.com",
 	"fanvue.com",
 	"loyalfans.com",
 	"manyvids.com",
@@ -174,13 +175,17 @@ export async function analyzeExternalLink(
 		}
 
 		// Check for direct creator platform redirects
+		const finalUrlLower = finalUrl.toLowerCase();
 		const isCreatorPlatform = CREATOR_PLATFORMS.some((platform) =>
-			finalUrl.toLowerCase().includes(platform),
+			finalUrlLower.includes(platform),
 		);
 
 		if (isCreatorPlatform) {
 			result.isCreator = true;
-			result.confidence = 95;
+			// Major adult platforms = 100%, others = 95%
+			const majorPlatforms = ["patreon", "ko-fi", "fanvue", "loyalfans", "manyvids"];
+			const isMajorPlatform = majorPlatforms.some((p) => finalUrlLower.includes(p));
+			result.confidence = isMajorPlatform ? 100 : 95;
 			result.reason = "direct_creator_platform";
 			result.indicators.push(
 				`Direct link to creator platform: ${new URL(finalUrl).hostname}`,
@@ -278,14 +283,26 @@ export async function analyzeExternalLink(
 
 			// Look for creator-specific text patterns
 			const creatorTextPatterns = [
+				// Definitive signals
 				"exclusive content",
 				"premium content",
+				"patreon",
+				"creator link",
+				"ko-fi",
+				"fanvue",
+				"loyalfans",
+				"loyal fans",
+				"manyvids",
+				"custom content",
+				"nsfw",
+				"exclusive",
+				"+18",
+				// Supporting signals
 				"vip",
 				"subscribe",
 				"fan",
 				"supporter",
 				"patron",
-				"patreon",
 				"premium content",
 				"private account",
 				"get access",
@@ -314,6 +331,38 @@ export async function analyzeExternalLink(
 		const keywordMatches = CREATOR_KEYWORDS.filter((keyword) =>
 			pageContent.fullText.includes(keyword.toLowerCase()),
 		);
+
+		// ULTIMATE SIGNALS: Definitive creator indicators = instant 100% confidence
+		const definitiveSignals = [
+			{ text: "exclusive content", label: "EXCLUSIVE CONTENT", reason: "exclusive_content" },
+			{ text: "patreon", label: "PATREON", reason: "patreon" },
+			{ text: "creator link", label: "PATREON", reason: "patreon" },
+			{ text: "ko-fi", label: "KO-FI", reason: "ko-fi" },
+			{ text: "premium content", label: "PREMIUM CONTENT", reason: "premium_content" },
+			{ text: "nsfw", label: "NSFW", reason: "nsfw" },
+			{ text: "exclusive", label: "exclusive", reason: "age_restricted" },
+			{ text: "18 +", label: "exclusive", reason: "age_restricted" },
+			{ text: "+18", label: "exclusive", reason: "age_restricted" },
+			{ text: "fanvue", label: "FANVUE", reason: "fanvue" },
+			{ text: "custom content", label: "CUSTOM CONTENT", reason: "custom_content" },
+			{ text: "loyalfans", label: "LOYALFANS", reason: "loyalfans" },
+			{ text: "loyal fans", label: "LOYALFANS", reason: "loyalfans" },
+			{ text: "manyvids", label: "MANYVIDS", reason: "manyvids" },
+		];
+
+		for (const signal of definitiveSignals) {
+			if (
+				pageContent.fullText.includes(signal.text) ||
+				keywordMatches.includes(signal.text) ||
+				pageContent.creatorPatterns.includes(signal.text)
+			) {
+				result.isCreator = true;
+				result.confidence = 100;
+				result.reason = signal.reason;
+				result.indicators.push(`${signal.label} - definitive creator signal`);
+				return result;
+			}
+		}
 
 		// Look for social media platform indicators in image alts and icons
 		const platformIndicators = [

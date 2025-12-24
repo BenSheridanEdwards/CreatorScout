@@ -251,16 +251,39 @@ export interface BioScoreResult {
 	emojis: number;
 	keywords: string[];
 	links: string[];
+	referencedProfiles: string[]; // Instagram @username mentions in bio
+}
+
+/**
+ * Extract Instagram @username mentions from bio
+ */
+function extractReferencedProfiles(bio: string, currentUsername?: string): string[] {
+	// Match @username pattern (alphanumeric, underscores, periods)
+	const usernameRegex = /@([a-zA-Z0-9._]+)/g;
+	const matches = bio.matchAll(usernameRegex);
+	const profiles: string[] = [];
+	
+	for (const match of matches) {
+		const username = match[1].toLowerCase();
+		// Don't include the current profile's own username
+		if (currentUsername && username === currentUsername.toLowerCase()) {
+			continue;
+		}
+		profiles.push(username);
+	}
+	
+	return [...new Set(profiles)]; // Remove duplicates
 }
 
 export function calculateScore(bio: string, username?: string): BioScoreResult {
 	if (!bio) {
-		return { score: 0, reasons: [], emojis: 0, keywords: [], links: [] };
+		return { score: 0, reasons: [], emojis: 0, keywords: [], links: [], referencedProfiles: [] };
 	}
 
 	const emojiCount = countLinkEmojis(bio);
 	const keywords = findKeywords(bio);
 	const links = extractLinks(bio);
+	const referencedProfiles = extractReferencedProfiles(bio, username);
 	const bioLower = bio.toLowerCase();
 	const usernameLower = username?.toLowerCase() || "";
 	const hasDiscount = DISCOUNT_PATTERNS.some((p) => p.test(bioLower));
@@ -280,6 +303,38 @@ export function calculateScore(bio: string, username?: string): BioScoreResult {
 
 	let score = 0;
 	const reasons: string[] = [];
+
+	// ULTIMATE SIGNALS: Definitive creator indicators = instant 100% confidence
+	const definitiveSignals = [
+		{ text: "exclusive content", label: "EXCLUSIVE CONTENT" },
+		{ text: "patreon", label: "PATREON" },
+		{ text: "creator link", label: "PATREON" },
+		{ text: "ko-fi", label: "KO-FI" },
+		{ text: "premium content", label: "PREMIUM CONTENT" },
+		{ text: "nsfw", label: "NSFW" },
+		{ text: "exclusive", label: "exclusive" },
+		{ text: "18 +", label: "exclusive" },
+		{ text: "+18", label: "exclusive" },
+		{ text: "fanvue", label: "FANVUE" },
+		{ text: "custom content", label: "CUSTOM CONTENT" },
+		{ text: "loyalfans", label: "LOYALFANS" },
+		{ text: "manyvids", label: "MANYVIDS" },
+	];
+
+	for (const signal of definitiveSignals) {
+		if (bioLower.includes(signal.text)) {
+			score = 100;
+			reasons.push(`${signal.label} - definitive creator signal`);
+			return {
+				score: 100,
+				reasons,
+				emojis: emojiCount,
+				keywords,
+				links,
+				referencedProfiles,
+			};
+		}
+	}
 
 	// Username keyword scoring (max 20 points)
 	if (usernameKeyword) {
@@ -351,12 +406,19 @@ export function calculateScore(bio: string, username?: string): BioScoreResult {
 		reasons.push(`has linktree: ${links[0]}`);
 	}
 
+	// Boost confidence if referencing another Instagram profile
+	if (referencedProfiles.length > 0) {
+		score += 10;
+		reasons.push(`references Instagram profile(s): ${referencedProfiles.map(p => '@' + p).join(', ')}`);
+	}
+
 	return {
 		score: Math.min(score, 100),
 		reasons,
 		emojis: emojiCount,
 		keywords,
 		links,
+		referencedProfiles,
 	};
 }
 

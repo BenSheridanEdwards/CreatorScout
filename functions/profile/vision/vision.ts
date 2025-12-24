@@ -7,12 +7,23 @@ import {
 	CONFIDENCE_THRESHOLD,
 	OPENROUTER_API_KEY,
 	VISION_MODEL,
+	VISION_MODEL_FALLBACK,
 } from "../../shared/config/config.ts";
 
 const client = new OpenAI({
 	baseURL: "https://openrouter.ai/api/v1",
 	apiKey: OPENROUTER_API_KEY,
 });
+
+/**
+ * Check if an error is a rate limit error (429)
+ */
+function isRateLimitError(error: unknown): boolean {
+	return (
+		error instanceof Error &&
+		("status" in error && (error as any).status === 429)
+	);
+}
 
 const LINKTREE_PROMPT = `You are analyzing a screenshot of a link page (linktree, beacons, allmylinks, etc.) for an Instagram user.
 
@@ -88,10 +99,11 @@ export interface VisionAnalysisResult {
 export async function analyzeLinktree(
 	imagePath: string,
 ): Promise<VisionAnalysisResult | null> {
-	try {
-		const imageBuffer = readFileSync(imagePath);
-		const base64 = imageBuffer.toString("base64");
+	const imageBuffer = readFileSync(imagePath);
+	const base64 = imageBuffer.toString("base64");
 
+	// Try with primary model first
+	try {
 		const response = await client.chat.completions.create({
 			model: VISION_MODEL,
 			messages: [
@@ -118,10 +130,53 @@ export async function analyzeLinktree(
 			.replace(/```$/, "");
 
 		return JSON.parse(text.trim()) as VisionAnalysisResult;
-	} catch (e) {
-		// Only log errors when not in test environment to keep test output clean
+	} catch (error) {
+		// If rate limited, try fallback model
+		if (isRateLimitError(error)) {
+			if (process.env.NODE_ENV !== "test" && !process.env.JEST_WORKER_ID) {
+				console.log(
+					`[VISION] Free tier rate limited, falling back to paid model: ${VISION_MODEL_FALLBACK}`,
+				);
+			}
+
+			try {
+				const response = await client.chat.completions.create({
+					model: VISION_MODEL_FALLBACK,
+					messages: [
+						{
+							role: "user",
+							content: [
+								{ type: "text", text: LINKTREE_PROMPT },
+								{
+									type: "image_url",
+									image_url: { url: `data:image/png;base64,${base64}` },
+								},
+							],
+						},
+					],
+					max_tokens: 400,
+					temperature: 0.0,
+				});
+
+				let text = response.choices[0]?.message?.content || "";
+				text = text
+					.trim()
+					.replace(/^```json/, "")
+					.replace(/^```/, "")
+					.replace(/```$/, "");
+
+				return JSON.parse(text.trim()) as VisionAnalysisResult;
+			} catch (fallbackError) {
+				if (process.env.NODE_ENV !== "test" && !process.env.JEST_WORKER_ID) {
+					console.error(`  Fallback vision analysis failed: ${fallbackError}`);
+				}
+				return null;
+			}
+		}
+
+		// For other errors, log and return null
 		if (process.env.NODE_ENV !== "test" && !process.env.JEST_WORKER_ID) {
-			console.error(`  Vision analysis failed: ${e}`);
+			console.error(`  Vision analysis failed: ${error}`);
 		}
 		return null;
 	}
@@ -167,13 +222,46 @@ export async function isConfirmedCreator(
 		return [false, null];
 	}
 
+	// ULTIMATE SIGNALS: Definitive creator indicators = instant 100% confidence
+	const indicators = data.indicators || [];
+	const reason = data.reason || "";
+	const allText = [...indicators, reason].join(" ").toLowerCase();
+	
+	const definitiveSignals = [
+		{ text: "exclusive content", label: "EXCLUSIVE CONTENT" },
+		{ text: "patreon", label: "PATREON" },
+		{ text: "creator link", label: "PATREON" },
+		{ text: "ko-fi", label: "KO-FI" },
+		{ text: "premium content", label: "PREMIUM CONTENT" },
+		{ text: "nsfw", label: "NSFW" },
+		{ text: "exclusive", label: "exclusive" },
+		{ text: "18 +", label: "exclusive" },
+		{ text: "+18", label: "exclusive" },
+		{ text: "fanvue", label: "FANVUE" },
+		{ text: "custom content", label: "CUSTOM CONTENT" },
+		{ text: "loyalfans", label: "LOYALFANS" },
+		{ text: "loyal fans", label: "LOYALFANS" },
+		{ text: "manyvids", label: "MANYVIDS" },
+	];
+
+	for (const signal of definitiveSignals) {
+		if (allText.includes(signal.text)) {
+			data.is_adult_creator = true;
+			data.confidence = 100;
+			if (!indicators.some((i) => i.toLowerCase().includes(signal.text))) {
+				indicators.push(`${signal.label} - definitive creator signal`);
+				data.indicators = indicators;
+			}
+			return [true, data];
+		}
+	}
+
 	let isConfirmed = data.is_adult_creator && data.confidence >= threshold;
 
 	// Heuristic override: Exclusive content + discount language
 	if (!isConfirmed && _hasExclusiveDiscountSignal(data)) {
 		data.is_adult_creator = true;
 		data.confidence = Math.max(data.confidence, threshold);
-		const indicators = data.indicators || [];
 		if (
 			!indicators.some((i) => i.toLowerCase().includes("exclusive+discount"))
 		) {
@@ -212,14 +300,16 @@ export interface BioValidationResult {
 /**
  * Validate whether a bio is visible on a profile screenshot.
  * Used to verify bio extraction is working correctly.
+ * Automatically falls back to paid model if free tier hits rate limits.
  */
 export async function validateBioWithVision(
 	imagePath: string,
 ): Promise<BioValidationResult | null> {
-	try {
-		const imageBuffer = readFileSync(imagePath);
-		const base64 = imageBuffer.toString("base64");
+	const imageBuffer = readFileSync(imagePath);
+	const base64 = imageBuffer.toString("base64");
 
+	// Try with primary model first
+	try {
 		const response = await client.chat.completions.create({
 			model: VISION_MODEL,
 			messages: [
@@ -246,9 +336,53 @@ export async function validateBioWithVision(
 			.replace(/```$/, "");
 
 		return JSON.parse(text.trim()) as BioValidationResult;
-	} catch (e) {
+	} catch (error) {
+		// If rate limited, try fallback model
+		if (isRateLimitError(error)) {
+			if (process.env.NODE_ENV !== "test" && !process.env.JEST_WORKER_ID) {
+				console.log(
+					`[VISION] Free tier rate limited, falling back to paid model: ${VISION_MODEL_FALLBACK}`,
+				);
+			}
+
+			try {
+				const response = await client.chat.completions.create({
+					model: VISION_MODEL_FALLBACK,
+					messages: [
+						{
+							role: "user",
+							content: [
+								{ type: "text", text: BIO_VALIDATION_PROMPT },
+								{
+									type: "image_url",
+									image_url: { url: `data:image/png;base64,${base64}` },
+								},
+							],
+						},
+					],
+					max_tokens: 300,
+					temperature: 0.0,
+				});
+
+				let text = response.choices[0]?.message?.content || "";
+				text = text
+					.trim()
+					.replace(/^```json/, "")
+					.replace(/^```/, "")
+					.replace(/```$/, "");
+
+				return JSON.parse(text.trim()) as BioValidationResult;
+			} catch (fallbackError) {
+				if (process.env.NODE_ENV !== "test" && !process.env.JEST_WORKER_ID) {
+					console.error(`  Fallback bio validation vision failed: ${fallbackError}`);
+				}
+				return null;
+			}
+		}
+
+		// For other errors, log and return null
 		if (process.env.NODE_ENV !== "test" && !process.env.JEST_WORKER_ID) {
-			console.error(`  Bio validation vision failed: ${e}`);
+			console.error(`  Bio validation vision failed: ${error}`);
 		}
 		return null;
 	}
@@ -257,14 +391,16 @@ export async function validateBioWithVision(
 /**
  * Analyze an Instagram profile screenshot (includes bio, highlights, header).
  * Uses PROFILE_PROMPT which is optimized for profile pages.
+ * Automatically falls back to paid model if free tier hits rate limits.
  */
 export async function analyzeProfile(
 	imagePath: string,
 ): Promise<VisionAnalysisResult | null> {
-	try {
-		const imageBuffer = readFileSync(imagePath);
-		const base64 = imageBuffer.toString("base64");
+	const imageBuffer = readFileSync(imagePath);
+	const base64 = imageBuffer.toString("base64");
 
+	// Try with primary model first
+	try {
 		const response = await client.chat.completions.create({
 			model: VISION_MODEL,
 			messages: [
@@ -301,7 +437,58 @@ export async function analyzeProfile(
 			return null;
 		}
 	} catch (error) {
-		// Only log errors when not in test environment to keep test output clean
+		// If rate limited, try fallback model
+		if (isRateLimitError(error)) {
+			if (process.env.NODE_ENV !== "test" && !process.env.JEST_WORKER_ID) {
+				console.log(
+					`[VISION] Free tier rate limited, falling back to paid model: ${VISION_MODEL_FALLBACK}`,
+				);
+			}
+
+			try {
+				const response = await client.chat.completions.create({
+					model: VISION_MODEL_FALLBACK,
+					messages: [
+						{
+							role: "user",
+							content: [
+								{ type: "text", text: PROFILE_PROMPT },
+								{
+									type: "image_url",
+									image_url: { url: `data:image/png;base64,${base64}` },
+								},
+							],
+						},
+					],
+					max_tokens: 400,
+					temperature: 0.0,
+				});
+
+				let text = response.choices[0]?.message?.content || "";
+				text = text
+					.trim()
+					.replace(/^```json/, "")
+					.replace(/^```/, "")
+					.replace(/```$/, "");
+
+				try {
+					const parsed = JSON.parse(text) as VisionAnalysisResult;
+					return parsed;
+				} catch {
+					if (process.env.NODE_ENV !== "test" && !process.env.JEST_WORKER_ID) {
+						console.error("Failed to parse fallback vision response:", text);
+					}
+					return null;
+				}
+			} catch (fallbackError) {
+				if (process.env.NODE_ENV !== "test" && !process.env.JEST_WORKER_ID) {
+					console.error("Fallback vision analysis error:", fallbackError);
+				}
+				return null;
+			}
+		}
+
+		// For other errors, log and return null
 		if (process.env.NODE_ENV !== "test" && !process.env.JEST_WORKER_ID) {
 			console.error("Vision analysis error:", error);
 		}
