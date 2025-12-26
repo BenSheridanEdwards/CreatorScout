@@ -99,11 +99,9 @@ export interface VisionAnalysisResult {
 export async function analyzeLinktree(
 	imagePath: string,
 ): Promise<VisionAnalysisResult | null> {
-	const imageBuffer = readFileSync(imagePath);
-	const base64 = imageBuffer.toString("base64");
-
-	// Try with primary model first
 	try {
+		const imageBuffer = readFileSync(imagePath);
+		const base64 = imageBuffer.toString("base64");
 		const response = await client.chat.completions.create({
 			model: VISION_MODEL,
 			messages: [
@@ -396,11 +394,9 @@ export async function validateBioWithVision(
 export async function analyzeProfile(
 	imagePath: string,
 ): Promise<VisionAnalysisResult | null> {
-	const imageBuffer = readFileSync(imagePath);
-	const base64 = imageBuffer.toString("base64");
-
-	// Try with primary model first
 	try {
+		const imageBuffer = readFileSync(imagePath);
+		const base64 = imageBuffer.toString("base64");
 		const response = await client.chat.completions.create({
 			model: VISION_MODEL,
 			messages: [
@@ -437,6 +433,11 @@ export async function analyzeProfile(
 			return null;
 		}
 	} catch (error) {
+		// If file read failed or other non-API error, return null early
+		if (!(error instanceof Error) || !error.message) {
+			return null;
+		}
+
 		// If rate limited, try fallback model
 		if (isRateLimitError(error)) {
 			if (process.env.NODE_ENV !== "test" && !process.env.JEST_WORKER_ID) {
@@ -446,6 +447,9 @@ export async function analyzeProfile(
 			}
 
 			try {
+				const imageBuffer = readFileSync(imagePath);
+				const base64 = imageBuffer.toString("base64");
+				
 				const response = await client.chat.completions.create({
 					model: VISION_MODEL_FALLBACK,
 					messages: [

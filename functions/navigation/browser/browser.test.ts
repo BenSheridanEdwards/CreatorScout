@@ -17,6 +17,18 @@ const mockGetUserDataDir = jest
 	.mockReturnValue("/tmp/test-data");
 const mockConfig = {
 	LOCAL_BROWSER: true,
+	DECODO_HOST: "gate.decodo.net",
+	DECODO_PORT: 20011,
+	DECODO_USERNAME: undefined,
+	DECODO_PASSWORD: undefined,
+	DECODO_STICKY_SESSION_MIN: 20,
+	DECODO_STICKY_SESSION_MAX: 30,
+	SMARTPROXY_HOST: "gate.smartproxy.com",
+	SMARTPROXY_PORT: 7000,
+	SMARTPROXY_USERNAME: undefined,
+	SMARTPROXY_PASSWORD: undefined,
+	SMARTPROXY_STICKY_SESSION_MIN: 15,
+	SMARTPROXY_STICKY_SESSION_MAX: 30,
 };
 
 jest.unstable_mockModule("puppeteer", () => ({

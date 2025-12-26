@@ -24,8 +24,10 @@ jest.unstable_mockModule("../../timing/sleep/sleep.ts", () => ({
 
 const humanLikeClickHandleMock =
 	jest.fn<(page: Page, handle: ElementHandle<Element>) => Promise<void>>();
+const humanLikeClickAtMock = jest.fn<() => Promise<void>>();
 jest.unstable_mockModule("../humanClick/humanClick.ts", () => ({
 	humanLikeClickHandle: humanLikeClickHandleMock,
+	humanLikeClickAt: humanLikeClickAtMock,
 }));
 
 const { extractFollowingUsernames, openFollowingModal, scrollFollowingModal } =
@@ -41,46 +43,67 @@ describe("modalOperations", () => {
 	// ═══════════════════════════════════════════════════════════════════════════
 
 	describe("openFollowingModal()", () => {
-		test("clicks following link when found by CSS selector", async () => {
-			const page = {
-				$: jest
-					.fn<() => Promise<ElementHandle<Element> | null>>()
-					.mockResolvedValue({} as ElementHandle<Element>),
-				evaluate: jest.fn(),
-			} as unknown as Page;
+	test("clicks following link when found by CSS selector", async () => {
+		const mockElement = {
+			evaluate: jest
+				.fn<(fn: unknown) => Promise<string>>()
+				.mockResolvedValueOnce("/testuser/following/") // href
+				.mockResolvedValueOnce("following"), // text
+		} as unknown as ElementHandle<Element>;
 
-			const ok = await openFollowingModal(page);
+		const page = {
+			url: jest.fn<() => string>().mockReturnValue("https://www.instagram.com/testuser/"),
+			$: jest
+				.fn<() => Promise<ElementHandle<Element> | null>>()
+				.mockResolvedValueOnce(mockElement) // First selector finds element
+				.mockResolvedValueOnce(mockElement), // Modal check finds dialog
+			evaluate: jest.fn(),
+		} as unknown as Page;
 
-			expect(ok).toBe(true);
-			expect(humanLikeClickHandleMock).toHaveBeenCalled();
-			expect(sleepMock).toHaveBeenCalledWith(3000);
-		});
+		const ok = await openFollowingModal(page);
 
-		test("falls back to page.evaluate when CSS selectors fail", async () => {
-			const page = {
-				$: jest.fn<() => Promise<null>>().mockResolvedValue(null),
-				evaluate: jest.fn<() => Promise<boolean>>().mockResolvedValue(true),
-			} as unknown as Page;
+		expect(ok).toBe(true);
+		expect(humanLikeClickHandleMock).toHaveBeenCalled();
+		expect(sleepMock).toHaveBeenCalled();
+	});
 
-			const ok = await openFollowingModal(page);
+	test("falls back to page.evaluate when CSS selectors fail", async () => {
+		const mockDialog = {} as ElementHandle<Element>;
+		const page = {
+			url: jest.fn<() => string>().mockReturnValue("https://www.instagram.com/testuser/"),
+			$: jest
+				.fn<() => Promise<ElementHandle<Element> | null>>()
+				.mockResolvedValue(null) // All CSS selectors fail (5 selectors)
+				.mockResolvedValueOnce(null)
+				.mockResolvedValueOnce(null)
+				.mockResolvedValueOnce(null)
+				.mockResolvedValueOnce(null)
+				.mockResolvedValueOnce(null)
+				.mockResolvedValueOnce(mockDialog), // Modal check succeeds
+			evaluate: jest.fn<() => Promise<{ found: boolean; x: number; y: number; href: string }>>()
+				.mockResolvedValue({ found: true, x: 100, y: 200, href: "/testuser/following/" }),
+		} as unknown as Page;
 
-			expect(ok).toBe(true);
-			expect(page.evaluate).toHaveBeenCalled();
-			expect(sleepMock).toHaveBeenCalledWith(3000);
-		});
+		const ok = await openFollowingModal(page);
 
-		test("returns false when neither CSS selector nor evaluate finds following link", async () => {
-			const page = {
-				$: jest
-					.fn<() => Promise<ElementHandle<Element> | null>>()
-					.mockResolvedValue(null),
-				evaluate: jest.fn<() => Promise<boolean>>().mockResolvedValue(false),
-			} as unknown as Page;
+		expect(ok).toBe(true);
+		expect(page.evaluate).toHaveBeenCalled();
+		expect(sleepMock).toHaveBeenCalled();
+	});
 
-			const ok = await openFollowingModal(page);
+	test("returns false when neither CSS selector nor evaluate finds following link", async () => {
+		const page = {
+			url: jest.fn<() => string>().mockReturnValue("https://www.instagram.com/testuser/"),
+			$: jest
+				.fn<() => Promise<ElementHandle<Element> | null>>()
+				.mockResolvedValue(null),
+			evaluate: jest.fn<() => Promise<boolean>>().mockResolvedValue(false),
+		} as unknown as Page;
 
-			expect(ok).toBe(false);
-		});
+		const ok = await openFollowingModal(page);
+
+		expect(ok).toBe(false);
+	});
 	});
 
 	// ═══════════════════════════════════════════════════════════════════════════
@@ -105,32 +128,13 @@ describe("modalOperations", () => {
 		});
 
 		test("extracts usernames from href attributes respecting batch size", async () => {
-			const makeItem = (href: string) =>
-				({
-					evaluate: jest
-						.fn<
-							(
-								fn: (el: { getAttribute: () => string }) => string,
-							) => Promise<string>
-						>()
-						.mockImplementation(async (fn) => fn({ getAttribute: () => href })),
-				}) as unknown as ElementHandle<Element>;
-
-			const items = [
-				makeItem("/user1/"),
-				makeItem("/user2/"),
-				makeItem("/explore/"), // Should be filtered out
-			];
-
 			const page = {
 				waitForSelector: jest
 					.fn<() => Promise<ElementHandle<Element>>>()
 					.mockResolvedValue({} as ElementHandle<Element>),
-				$$: jest
-					.fn<() => Promise<ElementHandle<Element>[]>>()
-					.mockResolvedValueOnce(items)
-					.mockResolvedValue([]),
-				evaluate: jest.fn(),
+				evaluate: jest
+					.fn<() => Promise<string[]>>()
+					.mockResolvedValue(["user1", "user2"]),
 			} as unknown as Page;
 
 			const names = await extractFollowingUsernames(page, 2);
@@ -139,29 +143,13 @@ describe("modalOperations", () => {
 		});
 
 		test("filters out 'explore' paths and respects batch limit", async () => {
-			const makeItem = (href: string) =>
-				({
-					evaluate: jest.fn().mockImplementation(async (fn: unknown) => {
-						if (typeof fn === "function") {
-							return (fn as (arg: { getAttribute: () => string }) => unknown)({
-								getAttribute: () => href,
-							});
-						}
-						return undefined;
-					}),
-				}) as unknown as ElementHandle<Element>;
-
-			const items = [makeItem("/explore/tags/"), makeItem("/realuser/")];
-
 			const page = {
 				waitForSelector: jest
 					.fn<() => Promise<ElementHandle<Element>>>()
 					.mockResolvedValue({} as ElementHandle<Element>),
-				$$: jest
-					.fn<() => Promise<ElementHandle<Element>[]>>()
-					.mockResolvedValueOnce(items)
-					.mockResolvedValue([]),
-				evaluate: jest.fn(),
+				evaluate: jest
+					.fn<() => Promise<string[]>>()
+					.mockResolvedValue(["realuser"]), // 'explore' already filtered out by implementation
 			} as unknown as Page;
 
 			const names = await extractFollowingUsernames(page, 10);

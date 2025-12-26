@@ -43,31 +43,29 @@ describe("clickAny", () => {
 	// ═══════════════════════════════════════════════════════════════════════════
 
 	describe("Button search behavior", () => {
-		test("searches for button using XPath with text content", async () => {
-			const page = createPageMock();
+		test("searches for button using page.evaluate with text content", async () => {
+			const page = createPageMock({
+				evaluate: jest.fn<() => Promise<{ found: boolean }>>()
+					.mockResolvedValue({ found: false }),
+			});
 
 			await clickAny(page, ["Accept"]);
 
-			expect(page.$).toHaveBeenCalledWith(
-				'xpath//button[contains(normalize-space(), "Accept")]',
-			);
+			expect(page.evaluate).toHaveBeenCalled();
 		});
 
 		test("tries each text label in order until one is found", async () => {
 			const page = createPageMock({
-				$: jest
-					.fn<() => Promise<{ click: () => Promise<void> } | null>>()
-					.mockResolvedValueOnce(null) // First selector fails
-					.mockResolvedValueOnce(null) // Second selector fails
-					.mockResolvedValue({
-						click: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
-					}), // Third succeeds
+				evaluate: jest.fn<() => Promise<{ found: boolean }>>()
+					.mockResolvedValueOnce({ found: false }) // First fails
+					.mockResolvedValueOnce({ found: false }) // Second fails
+					.mockResolvedValueOnce({ found: true, tagName: "BUTTON", text: "Option3" }), // Third succeeds
 			});
 
 			const result = await clickAny(page, ["Option1", "Option2", "Option3"]);
 
 			expect(result).toBe(true);
-			expect(page.$).toHaveBeenCalledTimes(3);
+			expect(page.evaluate).toHaveBeenCalledTimes(3);
 		});
 	});
 
@@ -77,42 +75,43 @@ describe("clickAny", () => {
 
 	describe("When button element is found", () => {
 		test("clicks the element and returns true", async () => {
-			const page = createPageWithElementMock();
+			const page = createPageMock({
+				evaluate: jest.fn<() => Promise<{ found: boolean }>>()
+					.mockResolvedValue({ found: true, tagName: "BUTTON", text: "clickable" }),
+			});
 
 			const result = await clickAny(page, ["clickable"]);
 
 			expect(result).toBe(true);
-			expect(page.$).toHaveBeenCalledWith(
-				'xpath//button[contains(normalize-space(), "clickable")]',
-			);
+			expect(page.evaluate).toHaveBeenCalled();
 		});
 
 		test("clicks with a brief delay for natural timing", async () => {
 			const page = createPageMock({
-				$: jest.fn<() => Promise<unknown | null>>().mockResolvedValue({}),
+				evaluate: jest.fn<() => Promise<{ found: boolean }>>()
+					.mockResolvedValue({ found: true, tagName: "BUTTON", text: "text" }),
 			});
 
 			await clickAny(page, ["text"]);
 
-			expect(humanLikeClickHandleMock).toHaveBeenCalled();
+			expect(sleepMock).toHaveBeenCalledWith(500);
 		});
 
 		test("waits after clicking to allow UI to settle", async () => {
-			const page = createPageWithElementMock();
+			const page = createPageMock({
+				evaluate: jest.fn<() => Promise<{ found: boolean }>>()
+					.mockResolvedValue({ found: true, tagName: "BUTTON", text: "Accept" }),
+			});
 
 			await clickAny(page, ["Accept"]);
 
-			expect(sleepMock).toHaveBeenCalledWith(200);
+			expect(sleepMock).toHaveBeenCalledWith(500);
 		});
 
 		test("stops searching after first successful click", async () => {
-			const clickMock = jest
-				.fn<() => Promise<void>>()
-				.mockResolvedValue(undefined);
 			const page = createPageMock({
-				$: jest
-					.fn<() => Promise<{ click: () => Promise<void> } | null>>()
-					.mockResolvedValue({ click: clickMock }),
+				evaluate: jest.fn<() => Promise<{ found: boolean }>>()
+					.mockResolvedValue({ found: true, tagName: "BUTTON", text: "First" }),
 			});
 
 			await clickAny(page, ["First", "Second", "Third"]);
@@ -128,28 +127,41 @@ describe("clickAny", () => {
 
 	describe("When no button elements are found", () => {
 		test("returns false when single selector finds nothing", async () => {
-			const page = createPageMock();
+			const page = createPageMock({
+				evaluate: jest.fn<() => Promise<{ found: boolean }>>()
+					.mockResolvedValue({ found: false }),
+				$: jest.fn<() => Promise<null>>()
+					.mockResolvedValue(null),
+			});
 
 			const result = await clickAny(page, ["nonexistent"]);
 
 			expect(result).toBe(false);
-			expect(page.$).toHaveBeenCalledWith(
-				'xpath//button[contains(normalize-space(), "nonexistent")]',
-			);
+			expect(page.evaluate).toHaveBeenCalled();
 		});
 
 		test("returns false after exhausting all provided text options", async () => {
-			const page = createPageMock();
+			const page = createPageMock({
+				evaluate: jest.fn<() => Promise<{ found: boolean }>>()
+					.mockResolvedValue({ found: false }),
+				$: jest.fn<() => Promise<null>>()
+					.mockResolvedValue(null),
+			});
 
 			const result = await clickAny(page, ["Option1", "Option2", "Option3"]);
 
 			expect(result).toBe(false);
-			// clickAny tries both button and div[role="button"] for each text, so 3 texts = 6 calls
-			expect(page.$).toHaveBeenCalledTimes(6);
+			// Should try page.evaluate for each text
+			expect(page.evaluate).toHaveBeenCalledTimes(3);
 		});
 
 		test("does not call sleep when no element is clicked", async () => {
-			const page = createPageMock();
+			const page = createPageMock({
+				evaluate: jest.fn<() => Promise<{ found: boolean }>>()
+					.mockResolvedValue({ found: false }),
+				$: jest.fn<() => Promise<null>>()
+					.mockResolvedValue(null),
+			});
 
 			await clickAny(page, ["missing"]);
 

@@ -42,10 +42,30 @@ const isConfirmedCreatorMock = jest
 		{ confidence: 70, reason: "test", indicators: [] },
 	]);
 
+const validateBioWithVisionMock = jest
+	.fn<
+		(
+			bio: string,
+			imagePath: string,
+		) => Promise<{
+			isValid: boolean;
+			confidence: number;
+			extractedBio?: string;
+			reason?: string;
+		} | null>
+	>()
+	.mockResolvedValue({
+		isValid: true,
+		confidence: 80,
+		extractedBio: "test bio",
+		reason: "test",
+	});
+
 // Set up mocks before importing
 jest.unstable_mockModule("../vision/vision.ts", () => ({
 	analyzeProfile: analyzeProfileMock,
 	isConfirmedCreator: isConfirmedCreatorMock,
+	validateBioWithVision: validateBioWithVisionMock,
 }));
 
 // Mock sleep to avoid delays in tests

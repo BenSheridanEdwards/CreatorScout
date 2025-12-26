@@ -187,7 +187,7 @@ describe("getBioFromPage", () => {
 			expect(result).toBeNull();
 		});
 
-		test("skips screenshot in CI environment when extraction fails", async () => {
+		test("takes debug screenshot even in CI environment when extraction fails", async () => {
 			const page = createPageMock({
 				$: jest
 					.fn<() => Promise<ElementHandle<Element> | null>>()
@@ -196,10 +196,11 @@ describe("getBioFromPage", () => {
 
 			await getBioFromPage(page as Page);
 
+			// Screenshots are taken for debugging even in CI
 			if (page.screenshot) {
 				expect(
 					page.screenshot as jest.MockedFunction<Page["screenshot"]>,
-				).not.toHaveBeenCalled();
+				).toHaveBeenCalled();
 			}
 		});
 
