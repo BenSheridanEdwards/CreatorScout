@@ -14,7 +14,7 @@ import { getUserDataDir } from "../../auth/sessionManager/sessionManager.ts";
 import { LOCAL_BROWSER } from "../../shared/config/config.ts";
 import { createLogger } from "../../shared/logger/logger.ts";
 import { connectToAdsPowerProfile } from "./adsPowerConnector.ts";
-import { ProxyManager, createStickyProxy } from "../proxy/proxyManager.ts";
+import { type ProxyManager, createStickyProxy } from "../proxy/proxyManager.ts";
 
 const logger = createLogger();
 
@@ -122,7 +122,7 @@ export async function createBrowser(
 				city: proxyCity,
 			});
 			logger.info("PROXY", "Auto-created sticky proxy session");
-		} catch (error) {
+		} catch {
 			logger.warn(
 				"PROXY",
 				"No proxy credentials found, launching without proxy",
