@@ -805,6 +805,7 @@ export async function processFollowingList(
 	const batchSize = 10;
 	let consecutiveAllVisited = 0;
 	const maxConsecutiveAllVisited = 3;
+	let lastExtractedUsernames: string[] | null = null; // Track last extraction to detect stuck modal
 
 	while (consecutiveAllVisited < maxConsecutiveAllVisited && checkContinue()) {
 		try {
@@ -908,23 +909,39 @@ export async function processFollowingList(
 						);
 					}
 				} else {
-					logger.debug("PROFILE", `@${username} already visited, skipping`);
+					logger.info("PROFILE", `⏭️  @${username} already visited, skipping`);
 				}
 			}
 
 			// If all in batch were already visited, scroll for more
 			if (allVisited) {
 				consecutiveAllVisited++;
-				logger.debug(
+				logger.info(
 					"NAVIGATION",
-					`All profiles in batch already visited (${consecutiveAllVisited}/${maxConsecutiveAllVisited})`,
+					`⚠️  All ${usernames.length} profiles in batch already visited (${consecutiveAllVisited}/${maxConsecutiveAllVisited}) - scrolling for more...`,
 				);
-				await scrollFollowingModal(page, 500);
-				scrollIndex += 500;
-				await updateScrollIndex(seedUsername, scrollIndex);
-				await sleep(2000);
+
+				// Check if we're getting the same usernames (stuck modal)
+				if (
+					lastExtractedUsernames &&
+					JSON.stringify(lastExtractedUsernames.sort()) ===
+						JSON.stringify(usernames.sort())
+				) {
+					consecutiveAllVisited = maxConsecutiveAllVisited; // Force exit
+					logger.warn(
+						"NAVIGATION",
+						`🔄 Detected duplicate extraction - modal appears stuck. Ending extraction for @${seedUsername}`,
+					);
+				} else {
+					lastExtractedUsernames = [...usernames];
+					await scrollFollowingModal(page, 500);
+					scrollIndex += 500;
+					await updateScrollIndex(seedUsername, scrollIndex);
+					await sleep(2000);
+				}
 			} else {
 				consecutiveAllVisited = 0;
+				lastExtractedUsernames = [...usernames];
 				// Processed new profiles, continue with next batch
 			}
 
