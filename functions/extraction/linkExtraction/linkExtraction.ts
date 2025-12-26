@@ -477,6 +477,9 @@ export async function analyzeExternalLink(
 			{ text: "my vip page", label: "VIP PAGE", reason: "vip_page" },
 			{ text: "vip page", label: "VIP PAGE", reason: "vip_page" },
 			{ text: "my vip", label: "VIP PAGE", reason: "vip_page" },
+			{ text: "free trial", label: "FREE TRIAL", reason: "free_trial" },
+			{ text: "free for", label: "FREE PROMO", reason: "free_promo" }, // "Free for 24hrs", "Free for 30 days"
+			{ text: "vip free", label: "VIP FREE", reason: "vip_free" },
 		];
 
 		for (const signal of definitiveSignals) {
@@ -495,6 +498,30 @@ export async function analyzeExternalLink(
 				console.log(`[LINK_ANALYSIS] Page text contains: "${signal.text}"`);
 				return result;
 			}
+		}
+
+		// Check for VIP + promotional patterns (common Patreon pattern: "VIP Free for 24hrs")
+		// This catches cases where "vip" appears with time-limited offers or pricing
+		if (
+			pageContent.fullText.includes("vip") &&
+			(pageContent.fullText.includes("free") ||
+				pageContent.fullText.includes("24hrs") ||
+				pageContent.fullText.includes("24 hours") ||
+				pageContent.fullText.includes("discount") ||
+				pageContent.fullText.includes("% off") ||
+				pageContent.fullText.includes("limited time") ||
+				pageContent.hasPricingIndicator)
+		) {
+			result.isCreator = true;
+			result.confidence = 95; // Very high confidence for VIP + promotional language
+			result.reason = "vip_promotional";
+			result.indicators.push(
+				"VIP + promotional offer (free/discount/limited time) - strong creator signal",
+			);
+			console.log(
+				`[LINK_ANALYSIS] 💎 Found VIP with promotional language - strong creator signal`,
+			);
+			return result;
 		}
 
 		// Look for social media platform indicators in image alts and icons

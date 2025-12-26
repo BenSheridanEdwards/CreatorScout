@@ -107,8 +107,12 @@ const KEYWORDS = [
 	"bio link",
 	// Highlight hints
 	"check my highlight",
+	"check story highlight",
+	"check story highlights",
 	"check highlight",
 	"see highlight",
+	"story highlight",
+	"story highlights",
 	"highlight",
 	"highlights",
 	"my link",
@@ -304,12 +308,15 @@ export function calculateScore(bio: string, username?: string): BioScoreResult {
 		usernameLower.includes(kw),
 	);
 
-	// Check for "check my highlight" pattern with link emoji
+	// Check for "check my highlight" pattern with link emoji or arrows pointing down
 	const hasHighlightHint =
 		(bioLower.includes("check my highlight") ||
+			bioLower.includes("check story highlight") ||
 			bioLower.includes("check highlight") ||
-			bioLower.includes("see highlight")) &&
-		(bio.includes("🔗") || bio.includes("link"));
+			bioLower.includes("see highlight") ||
+			bioLower.includes("in my highlight") ||
+			bioLower.includes("story highlight")) &&
+		(bio.includes("🔗") || bio.includes("link") || bio.includes("⬇️") || bio.includes("👇"));
 
 	let score = 0;
 	const reasons: string[] = [];
@@ -336,9 +343,12 @@ export function calculateScore(bio: string, username?: string): BioScoreResult {
 		// Highlights = links hidden in Instagram story highlights (90%+ confidence signal)
 		{ text: "in my highlights", label: "LINKS IN HIGHLIGHTS" },
 		{ text: "check my highlights", label: "LINKS IN HIGHLIGHTS" },
+		{ text: "check story highlights", label: "LINKS IN HIGHLIGHTS" },
+		{ text: "check story highlight", label: "LINKS IN HIGHLIGHTS" },
 		{ text: "look at my highlights", label: "LINKS IN HIGHLIGHTS" },
 		{ text: "check highlights", label: "LINKS IN HIGHLIGHTS" },
 		{ text: "in highlights", label: "LINKS IN HIGHLIGHTS" },
+		{ text: "story highlights", label: "LINKS IN HIGHLIGHTS" },
 		{ text: "what you're looking for is in", label: "LINKS IN HIGHLIGHTS" },
 	];
 

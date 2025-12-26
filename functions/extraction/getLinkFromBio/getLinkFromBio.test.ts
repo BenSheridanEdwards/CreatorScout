@@ -167,7 +167,7 @@ describe("getLinkFromBio", () => {
 			const result = await clickBioLink(page);
 
 			expect(result.success).toBe(false);
-			expect(result.finalUrl).toBeNull();
+			expect(result.finalUrl).toBe("https://about.meta.com/"); // Now returns the URL
 			expect(result.error).toContain("Blacklisted domain");
 			expect(result.error).toContain("meta.com");
 		});
@@ -189,7 +189,7 @@ describe("getLinkFromBio", () => {
 			const result = await clickBioLink(page);
 
 			expect(result.success).toBe(false);
-			expect(result.finalUrl).toBeNull();
+			expect(result.finalUrl).toBe("https://www.facebook.com/profile"); // Now returns the URL
 			expect(result.error).toContain("Blacklisted domain");
 		});
 
@@ -213,19 +213,44 @@ describe("getLinkFromBio", () => {
 			expect(result.error).toContain("Blacklisted domain");
 		});
 
-		test("returns error when no bio link element found", async () => {
-			const page = createPageMock({
-				url: jest.fn<() => string>().mockReturnValue("https://www.instagram.com/test"),
-				$: jest
-					.fn<() => Promise<ElementHandle<Element> | null>>()
-					.mockResolvedValue(null),
-			});
-
-			const result = await clickBioLink(page);
-
-			expect(result.success).toBe(false);
-			expect(result.finalUrl).toBeNull();
-			expect(result.error).toBe("No bio link found on page");
+	test("returns error when no bio link element found", async () => {
+		const page = createPageMock({
+			url: jest.fn<() => string>().mockReturnValue("https://www.instagram.com/test"),
+			$: jest
+				.fn<() => Promise<ElementHandle<Element> | null>>()
+				.mockResolvedValue(null),
 		});
+
+		const result = await clickBioLink(page);
+
+		expect(result.success).toBe(false);
+		expect(result.finalUrl).toBeNull();
+		expect(result.error).toBe("No bio link found on page");
 	});
+
+	test("decodes Instagram redirect before checking blacklist (blocks facebook.com)", async () => {
+		const mockElement = {
+			evaluate: jest
+				.fn<() => Promise<string>>()
+				.mockResolvedValue(
+					"https://l.instagram.com/?u=https%3A%2F%2Fwww.facebook.com%2Fprofile",
+				),
+		} as unknown as ElementHandle<Element>;
+
+		const page = createPageMock({
+			url: jest.fn<() => string>().mockReturnValue("https://www.instagram.com/test"),
+			$: jest
+				.fn<() => Promise<ElementHandle<Element> | null>>()
+				.mockResolvedValue(mockElement),
+		});
+
+		const result = await clickBioLink(page);
+
+		// Should be blacklisted - facebook.com in decoded URL
+		expect(result.success).toBe(false);
+		expect(result.finalUrl).toBe("https://www.facebook.com/profile");
+		expect(result.error).toContain("Blacklisted domain");
+		expect(result.error).toContain("facebook.com");
+	});
+});
 });

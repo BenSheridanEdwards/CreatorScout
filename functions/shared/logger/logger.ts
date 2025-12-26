@@ -64,10 +64,10 @@ export interface Logger {
 }
 
 class LoggerImpl implements Logger {
-	private enabled: boolean;
-
-	constructor(debug: boolean = false) {
-		this.enabled = debug;
+	// Debug flag kept for backward compatibility but no longer used
+	// Instagram can't see our server logs, so there's no reason to hide anything
+	constructor(_debug: boolean = false) {
+		// No-op: all logs always show
 	}
 
 	private slugifyForPath(input: string, maxLen: number = 80): string {
@@ -93,8 +93,8 @@ class LoggerImpl implements Logger {
 		message: string,
 		...args: unknown[]
 	): void {
-		if (!this.enabled) return;
-
+		// All logs always show - Instagram can't see our server logs anyway
+		// The enabled flag is kept for backward compatibility but ignored
 		const formatted = this.formatMessage(level, prefix, message, ...args);
 
 		switch (level) {

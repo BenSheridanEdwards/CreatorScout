@@ -21,8 +21,6 @@ import {
 	buildUniqueLinks,
 	decodeInstagramRedirect,
 	hasDirectCreatorLink,
-	shouldUseVisionAnalysis,
-	VISION_SKIP_THRESHOLD,
 } from "../../extraction/linkExtraction/linkExtraction.ts";
 import { executeWithCircuitBreaker } from "../../shared/circuitBreaker/circuitBreaker.ts";
 import {
@@ -36,7 +34,7 @@ import { recordActivity } from "../../shared/dashboard/dashboard.ts";
 import { snapshot } from "../../shared/snapshot/snapshot.ts";
 import { sleep } from "../../timing/sleep/sleep.ts";
 import { findKeywords, isLikelyCreator } from "../bioMatcher/bioMatcher.ts";
-import { analyzeProfile, isConfirmedCreator } from "../vision/vision.ts";
+import { isConfirmedCreator } from "../vision/vision.ts";
 import { queueAdd } from "../../shared/database/database.ts";
 
 export interface BasicAnalysisResult {
@@ -232,18 +230,20 @@ export async function analyzeProfileComprehensive(
 			linkHighlights.forEach((h) => {
 				result.indicators.push(`Link highlight: "${h.title}"`);
 			});
-			
+
 			// Boost confidence if bio also mentions highlights (but not too much)
-			const bioMentionsHighlights = result.bio && (
-				result.bio.toLowerCase().includes("in my highlight") ||
-				result.bio.toLowerCase().includes("check my highlight") ||
-				result.bio.toLowerCase().includes("what you're looking for is in")
-			);
-			
+			const bioMentionsHighlights =
+				result.bio &&
+				(result.bio.toLowerCase().includes("in my highlight") ||
+					result.bio.toLowerCase().includes("check my highlight") ||
+					result.bio.toLowerCase().includes("what you're looking for is in"));
+
 			if (bioMentionsHighlights && linkHighlights.length > 0) {
 				// Bio directs to highlights + link names = medium-high signal (50%)
 				result.confidence = Math.max(result.confidence, 50);
-				result.indicators.push("Bio directs to highlights with link names");
+				result.indicators.push(
+					"Bio directs to highlights with link names",
+				);
 			} else {
 				// Link highlights alone = low-medium signal (30%)
 				result.confidence = Math.max(result.confidence, 30);
@@ -398,41 +398,9 @@ export async function analyzeProfileComprehensive(
 		}
 	}
 
-	// Only use vision analysis if we're still unsure
-	const shouldUseVision = await shouldUseVisionAnalysis(
-		result.confidence,
-		externalLinks.length > 0,
-		result.highlights.length > 0,
-	);
-
-	if (shouldUseVision && !SKIP_VISION) {
-		try {
-			await page.evaluate(() => window.scrollTo(0, 0));
-			await sleep(1000);
-
-			const profileScreenshot = await snapshot(page, `profile_${username}`);
-			result.screenshots.push(profileScreenshot);
-
-			const visionResult = await executeWithCircuitBreaker(
-				() => analyzeProfile(profileScreenshot),
-				`vision_analysis_${username}`,
-			);
-
-			if (visionResult?.is_adult_creator && visionResult.confidence > 60) {
-				result.isCreator = true;
-				result.confidence = Math.max(
-					result.confidence,
-					visionResult.confidence,
-				);
-				if (visionResult.indicators) {
-					result.indicators.push(...visionResult.indicators);
-				}
-				result.reason = visionResult.reason || "profile_vision";
-			}
-		} catch {
-			// Vision analysis failed, continue
-		}
-	}
+	// Vision analysis is ONLY used for external links (Linktree, link.me, etc.)
+	// NOT for Instagram profiles - that's wasteful and unreliable
+	// External link vision analysis happens in analyzeExternalLink() above
 
 	// Direct Patreon shortcut (fallback for backward compatibility)
 	if (hasDirectCreatorLink(result.links)) {
