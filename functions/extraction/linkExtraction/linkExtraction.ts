@@ -263,6 +263,12 @@ export async function analyzeExternalLink(
 
 		// Extract and analyze page content for keywords and creator indicators
 		const pageContent = await page.evaluate(() => {
+			// Check for Linktree's "Sensitive Content" gate (strong indicator)
+			const hasSensitiveContentGate =
+				document.body.textContent?.includes("Sensitive Content") &&
+				(document.body.textContent?.includes("not appropriate for all audiences") ||
+				 document.body.textContent?.includes("Continue"));
+			
 			// Get text content
 			const elements = document.querySelectorAll("h1, h2, h3, p, span, div, a");
 			const texts = Array.from(elements)
@@ -375,6 +381,7 @@ export async function analyzeExternalLink(
 				hasSubscribeButton: hasSubscribeButton,
 				hasPricingIndicator: hasPricingIndicator,
 				hasMonetizationIndicator: hasMonetizationIndicator,
+				hasSensitiveContentGate: hasSensitiveContentGate,
 				creatorPatterns: creatorTextPatterns.filter((pattern) =>
 					texts.some((text) => text.toLowerCase().includes(pattern)),
 				),
@@ -390,6 +397,18 @@ export async function analyzeExternalLink(
 			console.log(
 				`[LINK_ANALYSIS] 🔍 Found ${keywordMatches.length} keyword matches: ${keywordMatches.slice(0, 5).join(", ")}`,
 			);
+		}
+
+		// Check for Linktree's "Sensitive Content" gate (ULTIMATE signal)
+		if (pageContent.hasSensitiveContentGate) {
+			result.isCreator = true;
+			result.confidence = 100;
+			result.reason = "sensitive_content_gate";
+			result.indicators.push("CONTENT GATE - Linktree premium content warning");
+			console.log(
+				`[LINK_ANALYSIS] 🔒 Found Linktree Sensitive Content gate - DEFINITIVE creator signal`,
+			);
+			return result;
 		}
 
 		// ULTIMATE SIGNALS: Definitive creator indicators = instant 100% confidence

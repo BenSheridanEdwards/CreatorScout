@@ -221,7 +221,7 @@ export async function createPage(
 
 	// Capture page errors
 	page.on("pageerror", (error) => {
-		const errorMessage = error.message;
+		const errorMessage = error?.message || String(error) || "Unknown error";
 
 		const ignoredErrors = ["__name is not defined", "is not defined"];
 

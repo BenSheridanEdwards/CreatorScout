@@ -34,6 +34,8 @@ STRONG INDICATORS (high confidence if present):
 - Discount language: "% OFF", "Sale", "Limited offer", "Free trial"
 - Subscription CTAs: "Subscribe", "Join me", "Unlock", "See more"
 - Adult warnings: "exclusive", "NSFW", "Adults only", "Must be 18"
+- **CRITICAL**: "Sensitive Content" warning (Linktree's premium content gate) - this is VERY HIGH confidence
+- Content gates requiring "Continue" or "I'm exclusive" to access - padlock icons, age verification
 
 MODERATE INDICATORS (consider with other factors):
 - Link/revealing imagery (bikini, lingerie, provocative poses)

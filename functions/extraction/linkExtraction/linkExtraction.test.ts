@@ -16,7 +16,10 @@
  * - shouldUseVisionAnalysis(...): Determines if vision AI should be used
  */
 
+import { jest } from "@jest/globals";
+import type { Page } from "puppeteer";
 import {
+	analyzeExternalLink,
 	buildUniqueLinks,
 	collectAggregatorLinks,
 	hasDirectCreatorLink,
@@ -158,6 +161,113 @@ describe("linkExtraction", () => {
 
 		test("handles protocol-less URLs", () => {
 			expect(toSafeHttps("example.com")).toBe("https://example.com");
+		});
+	});
+
+	// ═══════════════════════════════════════════════════════════════════════════
+	// analyzeExternalLink() - Linktree Creator Signal Detection
+	// ═══════════════════════════════════════════════════════════════════════════
+
+	describe("analyzeExternalLink() - Creator Signal", () => {
+		test("detects Linktree creator signal as definitive creator signal (100% confidence)", async () => {
+			const mockPage = {
+				url: jest.fn<() => string>().mockReturnValue("https://linktr.ee/testuser"),
+				goto: jest
+					.fn<() => Promise<void>>()
+					.mockResolvedValue(undefined),
+				evaluate: jest
+					.fn<() => Promise<{
+						title: string;
+						texts: string[];
+						fullText: string;
+						imageAlts: string[];
+						socialIcons: string[];
+						hasEmailForm: boolean;
+						hasSubscribeButton: boolean;
+						hasPricingIndicator: boolean;
+						hasMonetizationIndicator: boolean;
+						hasSensitiveContentGate: boolean;
+						creatorPatterns: string[];
+					}>>()
+					.mockResolvedValue({
+						title: "m0mmyashleyy | Instagram, TikTok | Linktree",
+						texts: [
+							"Sensitive Content",
+							"This link may contain content that is not appropriate for all audiences",
+							"Continue",
+							"MOMMY HAS PLANS WITH YOU 🍒⛓",
+						],
+						fullText:
+							"content verification this link may contain content that is not appropriate for all audiences continue support my work 🍒⛓",
+						imageAlts: [],
+						socialIcons: [],
+						hasEmailForm: false,
+						hasSubscribeButton: false,
+						hasPricingIndicator: false,
+						hasMonetizationIndicator: false,
+						hasSensitiveContentGate: true,
+						creatorPatterns: [],
+					}),
+			} as unknown as Page;
+
+			const result = await analyzeExternalLink(
+				mockPage,
+				"https://linktr.ee/testuser",
+				"testuser",
+			);
+
+			expect(result.isCreator).toBe(true);
+			expect(result.confidence).toBe(100);
+			expect(result.reason).toBe("sensitive_content_gate");
+			expect(result.indicators).toContain(
+				"CONTENT GATE - Linktree premium content warning",
+			);
+		});
+
+		test("returns lower confidence when no creator signal present", async () => {
+			const mockPage = {
+				url: jest.fn<() => string>().mockReturnValue("https://linktr.ee/testuser"),
+				goto: jest
+					.fn<() => Promise<void>>()
+					.mockResolvedValue(undefined),
+				evaluate: jest
+					.fn<() => Promise<{
+						title: string;
+						texts: string[];
+						fullText: string;
+						imageAlts: string[];
+						socialIcons: string[];
+						hasEmailForm: boolean;
+						hasSubscribeButton: boolean;
+						hasPricingIndicator: boolean;
+						hasMonetizationIndicator: boolean;
+						hasSensitiveContentGate: boolean;
+						creatorPatterns: string[];
+					}>>()
+					.mockResolvedValue({
+						title: "User | Instagram, TikTok | Linktree",
+						texts: ["My YouTube Channel", "My Twitter", "Contact Me"],
+						fullText: "my youtube channel my twitter contact me",
+						imageAlts: [],
+						socialIcons: [],
+						hasEmailForm: false,
+						hasSubscribeButton: false,
+						hasPricingIndicator: false,
+						hasMonetizationIndicator: false,
+						hasSensitiveContentGate: false,
+						creatorPatterns: [],
+					}),
+			} as unknown as Page;
+
+			const result = await analyzeExternalLink(
+				mockPage,
+				"https://linktr.ee/testuser",
+				"testuser",
+			);
+
+			// Without creator signal, should have lower confidence
+			// (Aggregator platform gives 40% base confidence)
+			expect(result.confidence).toBeLessThan(100);
 		});
 	});
 });
