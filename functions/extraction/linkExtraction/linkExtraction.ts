@@ -261,6 +261,25 @@ export async function analyzeExternalLink(
 
 		console.log(`[LINK_ANALYSIS] 🔎 Analyzing page content at: ${finalUrl}`);
 
+		// Scroll the page to load all content (especially for aggregator platforms)
+		try {
+			await page.evaluate(async () => {
+				// Scroll to bottom
+				window.scrollTo(0, document.body.scrollHeight);
+				await new Promise((resolve) => setTimeout(resolve, 500));
+				// Scroll back to top to capture everything
+				window.scrollTo(0, 0);
+				await new Promise((resolve) => setTimeout(resolve, 300));
+			});
+		} catch (scrollError) {
+			console.log(
+				`[LINK_ANALYSIS] Scroll failed (non-critical): ${scrollError}`,
+			);
+		}
+
+		// Wait a bit for any dynamic content to load
+		await new Promise((resolve) => setTimeout(resolve, 800));
+
 		// Extract and analyze page content for keywords and creator indicators
 		const pageContent = await page.evaluate(() => {
 			// Check for Linktree's "Sensitive Content" gate (strong indicator)
@@ -271,12 +290,19 @@ export async function analyzeExternalLink(
 				) ||
 					document.body.textContent?.includes("Continue"));
 
-			// Get text content
-			const elements = document.querySelectorAll("h1, h2, h3, p, span, div, a");
+			// Grab ALL text content from the page (it's not Instagram, so we can be aggressive)
+			// This ensures we capture overlays, dynamic content, and everything visible
+			const fullBodyText =
+				document.body.innerText || document.body.textContent || "";
+
+			// Also get text from specific elements for structured analysis
+			const elements = document.querySelectorAll(
+				"h1, h2, h3, p, span, div, a, button",
+			);
 			const texts = Array.from(elements)
 				.map((el) => (el as HTMLElement).innerText?.trim())
 				.filter((text) => text && text.length > 3 && text.length < 200)
-				.slice(0, 50);
+				.slice(0, 100); // Increased from 50 to 100
 
 			// Get image alt texts and titles (for social media icons)
 			const images = document.querySelectorAll("img");
@@ -316,13 +342,18 @@ export async function analyzeExternalLink(
 			).some((el) => {
 				const text = (el as HTMLElement).innerText?.toLowerCase() || "";
 				return (
+					// Direct pricing patterns
 					(text.includes("$") &&
 						(text.includes("/m") ||
 							text.includes("/month") ||
-							text.includes("month"))) ||
+							text.includes("month") ||
+							text.includes("initial") ||
+							text.includes("tier") ||
+							/\$\s*\d+/.test(text))) || // Match "$50", "$ 50", etc.
 					text.includes("private account") ||
 					text.includes("get access") ||
 					text.includes("limited time") ||
+					text.includes("wishlist") || // Wishlist buttons are common on creator platforms
 					(text.includes("content") &&
 						(text.includes("my") || text.includes("exclusive")))
 				);
@@ -376,7 +407,7 @@ export async function analyzeExternalLink(
 			return {
 				title: document.title,
 				texts: texts,
-				fullText: texts.join(" ").toLowerCase(),
+				fullText: fullBodyText.toLowerCase(), // Use ALL body text instead of just filtered elements
 				imageAlts: imageAlts,
 				socialIcons: socialIcons,
 				hasEmailForm: hasEmailForm,
@@ -384,8 +415,8 @@ export async function analyzeExternalLink(
 				hasPricingIndicator: hasPricingIndicator,
 				hasMonetizationIndicator: hasMonetizationIndicator,
 				hasSensitiveContentGate: hasSensitiveContentGate,
-				creatorPatterns: creatorTextPatterns.filter((pattern) =>
-					texts.some((text) => text.toLowerCase().includes(pattern)),
+				creatorPatterns: creatorTextPatterns.filter(
+					(pattern) => fullBodyText.toLowerCase().includes(pattern), // Check against full body text
 				),
 			};
 		});
