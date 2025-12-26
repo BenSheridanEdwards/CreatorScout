@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import CreatorsTable from "./components/CreatorsTable";
 
 type ScriptName =
 	| "discover"
@@ -716,12 +717,15 @@ function App() {
 						)}
 						{screenshots.length > 20 && (
 							<p className="text-[11px] text-slate-500 mt-3 text-center">
-								Showing 20 of {screenshots.length} screenshots
-							</p>
-						)}
-					</div>
-				</section>
-			</main>
+							Showing 20 of {screenshots.length} screenshots
+						</p>
+					)}
+				</div>
+			</section>
+
+			{/* Confirmed Creators */}
+			<CreatorsTable />
+		</main>
 
 			{selectedScreenshot && (
 				<div

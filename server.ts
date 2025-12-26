@@ -4,16 +4,16 @@ import { readdir, readFile, stat } from "node:fs/promises";
 import http from "node:http";
 import { extname, join } from "node:path";
 import {
-	BROWSERLESS_TOKEN,
 	ADSPOWER_API_KEY,
+	BROWSERLESS_TOKEN,
 	LOCAL_BROWSER,
 } from "./functions/shared/config/config.ts";
+import { getPrismaClient } from "./functions/shared/database/database.ts";
 import {
 	createRun,
-	updateRun,
 	getAllRuns,
 	getRun,
-	type RunMetadata,
+	updateRun,
 } from "./functions/shared/runs/runs.ts";
 
 const PORT = Number(process.env.PORT) || 4000;
@@ -70,7 +70,7 @@ function parseScreenshotFilename(filename: string): Partial<Screenshot> {
 	}
 
 	const [, type, username, timestamp] = match;
-	const date = new Date(parseInt(timestamp));
+	const date = new Date(parseInt(timestamp, 10));
 
 	return {
 		username,
@@ -111,7 +111,7 @@ async function scanScreenshots(): Promise<Screenshot[]> {
 					} as Screenshot);
 				}
 			}
-		} catch (error) {
+		} catch {
 			// Silently skip directories we can't read
 		}
 	}
@@ -313,7 +313,7 @@ async function handleApi(
 		try {
 			const screenshots = await scanScreenshots();
 			sendJson(res, 200, screenshots);
-		} catch (error) {
+		} catch {
 			sendJson(res, 500, { error: "Failed to load screenshots" });
 		}
 		return;
@@ -323,7 +323,7 @@ async function handleApi(
 		try {
 			const runs = await getAllRuns();
 			sendJson(res, 200, runs);
-		} catch (error) {
+		} catch {
 			sendJson(res, 500, { error: "Failed to load runs" });
 		}
 		return;
@@ -343,9 +343,120 @@ async function handleApi(
 				return;
 			}
 			sendJson(res, 200, run);
-		} catch (error) {
+		} catch {
 			sendJson(res, 500, { error: "Failed to load run" });
 		}
+		return;
+	}
+
+	// GET /api/creators - Fetch confirmed creators with pagination/filtering
+	if (url.pathname === "/api/creators" && req.method === "GET") {
+		const page = parseInt(url.searchParams.get("page") || "1", 10);
+		const limit = parseInt(url.searchParams.get("limit") || "50", 10);
+		const dmFilter = url.searchParams.get("dmFilter") || "all";
+
+		try {
+			const prisma = getPrismaClient();
+
+			// Build where clause
+			const where: { isCreator: boolean; dmSent?: boolean } = {
+				isCreator: true,
+			};
+			if (dmFilter === "pending") {
+				where.dmSent = false;
+			} else if (dmFilter === "sent") {
+				where.dmSent = true;
+			}
+
+			// Get total count for current filter
+			const total = await prisma.profile.count({ where });
+
+			// Get pending DM count (always useful to show)
+			const pendingCount = await prisma.profile.count({
+				where: { isCreator: true, dmSent: false },
+			});
+
+			// Get paginated creators
+			const creators = await prisma.profile.findMany({
+				where,
+				select: {
+					username: true,
+					bioText: true,
+					confidence: true,
+					manualOverride: true,
+					dmSent: true,
+					dmSentAt: true,
+					visitedAt: true,
+				},
+				orderBy: { visitedAt: "desc" },
+				skip: (page - 1) * limit,
+				take: limit,
+			});
+
+			const totalPages = Math.ceil(total / limit);
+
+			sendJson(res, 200, {
+				creators,
+				total,
+				pendingCount,
+				page,
+				totalPages,
+			});
+		} catch (error) {
+			// eslint-disable-next-line no-console
+			console.error("Failed to load creators:", error);
+			sendJson(res, 500, { error: "Failed to load creators" });
+		}
+		return;
+	}
+
+	// PATCH /api/creators/:username/dm - Update DM sent status
+	if (
+		url.pathname.startsWith("/api/creators/") &&
+		url.pathname.endsWith("/dm") &&
+		req.method === "PATCH"
+	) {
+		const pathParts = url.pathname.split("/");
+		const username = pathParts[3];
+
+		if (!username) {
+			sendJson(res, 400, { error: "Username required" });
+			return;
+		}
+
+		let body = "";
+		req.on("data", (chunk) => {
+			body += chunk;
+		});
+		req.on("end", async () => {
+			try {
+				const parsed = JSON.parse(body || "{}") as { dmSent?: boolean };
+				if (typeof parsed.dmSent !== "boolean") {
+					sendJson(res, 400, { error: "dmSent boolean required" });
+					return;
+				}
+
+				const prisma = getPrismaClient();
+				const updated = await prisma.profile.update({
+					where: { username },
+					data: {
+						dmSent: parsed.dmSent,
+						dmSentAt: parsed.dmSent ? new Date() : null,
+					},
+					select: {
+						username: true,
+						dmSent: true,
+						dmSentAt: true,
+					},
+				});
+
+				sendJson(res, 200, updated);
+			} catch (error) {
+				// eslint-disable-next-line no-console
+				console.error("Failed to update DM status:", error);
+				sendJson(res, 500, { error: "Failed to update DM status" });
+			}
+		});
 		return;
 	}
 
