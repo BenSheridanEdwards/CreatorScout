@@ -278,7 +278,69 @@ export async function analyzeExternalLink(
 		}
 
 		// Wait a bit for any dynamic content to load
-		await new Promise((resolve) => setTimeout(resolve, 800));
+		await new Promise((resolve) => setTimeout(resolve, 1500)); // Increased from 800ms to 1500ms
+
+		// Helper function to normalize Unicode to ASCII (converts fancy Unicode chars to plain text)
+		const normalizeUnicode = (text: string): string => {
+			let result = "";
+
+			// Process each code point (handles surrogate pairs correctly)
+			for (const char of text) {
+				const codePoint = char.codePointAt(0);
+				if (!codePoint) {
+					result += char;
+					continue;
+				}
+
+				let replacement = char;
+
+				// Mathematical Alphanumeric Symbols (U+1D400 - U+1D7FF)
+				// Mathematical Bold (U+1D400 - U+1D433): A-Z, a-z
+				if (codePoint >= 0x1d400 && codePoint <= 0x1d419) {
+					// Bold uppercase A-Z
+					replacement = String.fromCharCode(0x41 + (codePoint - 0x1d400));
+				} else if (codePoint >= 0x1d41a && codePoint <= 0x1d433) {
+					// Bold lowercase a-z
+					replacement = String.fromCharCode(0x61 + (codePoint - 0x1d41a));
+				}
+				// Mathematical Italic (U+1D434 - U+1D467)
+				else if (codePoint >= 0x1d434 && codePoint <= 0x1d44d) {
+					replacement = String.fromCharCode(0x41 + (codePoint - 0x1d434));
+				} else if (codePoint >= 0x1d44e && codePoint <= 0x1d467) {
+					replacement = String.fromCharCode(0x61 + (codePoint - 0x1d44e));
+				}
+				// Mathematical Sans-Serif (U+1D5A0 - U+1D5D3)
+				else if (codePoint >= 0x1d5a0 && codePoint <= 0x1d5b9) {
+					// Sans-serif uppercase A-Z
+					replacement = String.fromCharCode(0x41 + (codePoint - 0x1d5a0));
+				} else if (codePoint >= 0x1d5ba && codePoint <= 0x1d5d3) {
+					// Sans-serif lowercase a-z
+					replacement = String.fromCharCode(0x61 + (codePoint - 0x1d5ba));
+				}
+				// Mathematical Sans-Serif Bold (U+1D5D4 - U+1D607)
+				else if (codePoint >= 0x1d5d4 && codePoint <= 0x1d5ed) {
+					replacement = String.fromCharCode(0x41 + (codePoint - 0x1d5d4));
+				} else if (codePoint >= 0x1d5ee && codePoint <= 0x1d607) {
+					replacement = String.fromCharCode(0x61 + (codePoint - 0x1d5ee));
+				}
+				// Mathematical Bold Digits (U+1D7CE - U+1D7D7)
+				else if (codePoint >= 0x1d7ce && codePoint <= 0x1d7d7) {
+					replacement = String.fromCharCode(0x30 + (codePoint - 0x1d7ce));
+				}
+				// Mathematical Sans-Serif Digits (U+1D7E2 - U+1D7EB)
+				else if (codePoint >= 0x1d7e2 && codePoint <= 0x1d7eb) {
+					replacement = String.fromCharCode(0x30 + (codePoint - 0x1d7e2));
+				}
+				// Fullwidth and halfwidth forms
+				else if (char === "﹩" || char === "＄") {
+					replacement = "$";
+				}
+
+				result += replacement;
+			}
+
+			return result.toLowerCase();
+		};
 
 		// Extract and analyze page content for keywords and creator indicators
 		const pageContent = await page.evaluate(() => {
@@ -421,9 +483,69 @@ export async function analyzeExternalLink(
 			};
 		});
 
-		// Look for creator keywords in text
+		// Normalize Unicode fancy characters to ASCII for better pattern matching
+		const normalizedText = normalizeUnicode(pageContent.fullText);
+
+		// Re-check creator patterns with normalized text (in case Unicode chars prevented matching)
+		const creatorTextPatterns = [
+			// Definitive creator platform signals
+			"patreon",
+			"creator link",
+			"ko-fi",
+			"fanvue",
+			"loyalfans",
+			"loyal fans",
+			"manyvids",
+			"justforfans",
+			// Definitive content signals
+			"exclusive content",
+			"premium content",
+			"custom content",
+			"premium content",
+			"nsfw",
+			"exclusive",
+			"+18",
+			// Context-specific signals (must include context)
+			"private account",
+			"get access",
+			"my content",
+			"chat with me",
+			"subscribe to",
+			"subscribe for",
+			"vip access",
+			"vip content",
+		];
+
+		const normalizedCreatorPatterns = creatorTextPatterns.filter((pattern) =>
+			normalizedText.includes(pattern),
+		);
+
+		// Merge with original patterns (deduplicate)
+		const allCreatorPatterns = Array.from(
+			new Set([...pageContent.creatorPatterns, ...normalizedCreatorPatterns]),
+		);
+
+		// Debug: Log extracted text preview
+		console.log(
+			`[LINK_ANALYSIS] 📝 Extracted ${pageContent.fullText.length} chars of text`,
+		);
+		if (pageContent.fullText.length > 0) {
+			const preview = pageContent.fullText.substring(0, 300);
+			console.log(`[LINK_ANALYSIS] 📄 Text preview (raw): ${preview}...`);
+			const normalizedPreview = normalizedText.substring(0, 300);
+			console.log(
+				`[LINK_ANALYSIS] 📄 Text preview (normalized): ${normalizedPreview}...`,
+			);
+		}
+		if (normalizedCreatorPatterns.length > 0) {
+			console.log(
+				`[LINK_ANALYSIS] 🎯 Found ${normalizedCreatorPatterns.length} creator patterns in normalized text: ${normalizedCreatorPatterns.slice(0, 5).join(", ")}`,
+			);
+		}
+
+		// Look for creator keywords in text (use normalized text for better Unicode matching)
 		const keywordMatches = CREATOR_KEYWORDS.filter((keyword) =>
-			pageContent.fullText.includes(keyword.toLowerCase()),
+			normalizedText.includes(keyword.toLowerCase()),
 		);
 
 		if (keywordMatches.length > 0) {
@@ -484,9 +606,9 @@ export async function analyzeExternalLink(
 
 		for (const signal of definitiveSignals) {
 			if (
-				pageContent.fullText.includes(signal.text) ||
+				normalizedText.includes(signal.text) ||
 				keywordMatches.includes(signal.text) ||
-				pageContent.creatorPatterns.includes(signal.text)
+				allCreatorPatterns.includes(signal.text)
 			) {
 				result.isCreator = true;
 				result.confidence = 100;
@@ -503,13 +625,13 @@ export async function analyzeExternalLink(
 		// Check for VIP + promotional patterns (common Patreon pattern: "VIP Free for 24hrs")
 		// This catches cases where "vip" appears with time-limited offers or pricing
 		if (
-			pageContent.fullText.includes("vip") &&
-			(pageContent.fullText.includes("free") ||
-				pageContent.fullText.includes("24hrs") ||
-				pageContent.fullText.includes("24 hours") ||
-				pageContent.fullText.includes("discount") ||
-				pageContent.fullText.includes("% off") ||
-				pageContent.fullText.includes("limited time") ||
+			normalizedText.includes("vip") &&
+			(normalizedText.includes("free") ||
+				normalizedText.includes("24hrs") ||
+				normalizedText.includes("24 hours") ||
+				normalizedText.includes("discount") ||
+				normalizedText.includes("% off") ||
+				normalizedText.includes("limited time") ||
 				pageContent.hasPricingIndicator)
 		) {
 			result.isCreator = true;
@@ -553,7 +675,7 @@ export async function analyzeExternalLink(
 		// Generic content creators (fitness, gaming, etc.) also use these platforms
 		const hasDefinitiveCreatorIndicators =
 			pageContent.hasMonetizationIndicator ||
-			pageContent.creatorPatterns.some((pattern) =>
+			allCreatorPatterns.some((pattern) =>
 				[
 					"exclusive content",
 					"premium content",
@@ -587,10 +709,8 @@ export async function analyzeExternalLink(
 		if (pageContent.hasPricingIndicator) foundIndicators.push("pricing");
 		if (pageContent.hasMonetizationIndicator)
 			foundIndicators.push("premium content");
-		if (pageContent.creatorPatterns.length > 0)
-			foundIndicators.push(
-				`patterns: ${pageContent.creatorPatterns.join(", ")}`,
-			);
+		if (allCreatorPatterns.length > 0)
+			foundIndicators.push(`patterns: ${allCreatorPatterns.join(", ")}`);
 
 		if (foundIndicators.length > 0) {
 			console.log(
@@ -614,18 +734,18 @@ export async function analyzeExternalLink(
 				result.confidence = 85;
 				result.reason = "adult_content_indicator";
 				result.indicators.push("Has premium content indicator");
-			} else if (pageContent.creatorPatterns.length > 0) {
+			} else if (allCreatorPatterns.length > 0) {
 				result.confidence = 80;
 				result.reason = "creator_patterns";
 				result.indicators.push(
-					`Creator-specific text: ${pageContent.creatorPatterns.slice(0, 3).join(", ")}`,
+					`Creator-specific text: ${allCreatorPatterns.slice(0, 3).join(", ")}`,
 				);
 			}
 
 			// Add additional indicators
-			if (pageContent.creatorPatterns.length > 0) {
+			if (allCreatorPatterns.length > 0) {
 				result.indicators.push(
-					`Patterns found: ${pageContent.creatorPatterns.join(", ")}`,
+					`Patterns found: ${allCreatorPatterns.join(", ")}`,
 				);
 			}
 

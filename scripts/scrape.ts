@@ -147,6 +147,13 @@ export async function processProfile(
 	const contentCategories: string[] = [];
 	let profileProcessedSuccessfully = false;
 
+	// Variables for summary logging (moved outside try for finally block access)
+	let quickScore = 0;
+	let confidence = 0;
+	let confirmedCreator = false;
+	let analysisReason: string | null = null;
+	let analysisIndicators: string[] = [];
+
 	// Parse discovery source to extract depth and source profile (moved outside try for finally block access)
 	const discoveryDepth = source.split("_").length - 1; // Count underscores as depth
 	const sourceProfile = source.includes("_of_")
@@ -275,7 +282,7 @@ export async function processProfile(
 	logger.debug("ANALYSIS", `Is creator: ${analysis.isCreator}`);
 
 	// Quick bio scoring for smart filtering
-	const quickScore = calculateScore(analysis.bio, username).score;
+	quickScore = calculateScore(analysis.bio, username).score;
 	logger.debug("ANALYSIS", `Quick bio score: ${quickScore}`);
 
 	// Use the higher of quickScore or analysis.confidence (which includes link analysis)
@@ -334,8 +341,10 @@ export async function processProfile(
 	try {
 		// Comprehensive analysis already includes advanced link detection
 		// Check if creator based on comprehensive analysis results
-		const confirmedCreator = analysis.isCreator;
-		const confidence = analysis.confidence;
+		confirmedCreator = analysis.isCreator;
+		confidence = analysis.confidence;
+		analysisReason = analysis.reason;
+		analysisIndicators = analysis.indicators || [];
 
 		// Log potential creator indicators (even if confidence is low)
 		if (confirmedCreator) {
@@ -597,73 +606,10 @@ export async function processProfile(
 				`Not confirmed (confidence: ${confidence}% < ${CONFIDENCE_THRESHOLD}%)`,
 			);
 			cycleManager.recordProfileProcessed(username, false);
-
-			// Log summary for profiles that don't meet threshold
-			logger.info("SUMMARY", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-			logger.info("SUMMARY", `📊 Profile Analysis Complete: @${username}`);
-			logger.info("SUMMARY", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-			logger.info("SUMMARY", `📊 Bio Score: ${quickScore}%`);
-			logger.info("SUMMARY", `🎯 Confidence: ${confidence}%`);
-			logger.info(
-				"SUMMARY",
-				`${confirmedCreator ? "⚠️" : "❌"} Is Creator: ${confirmedCreator ? "DETECTED" : "NO"}`,
-			);
-			if (analysis.reason) {
-				logger.info("SUMMARY", `💡 Reason: ${analysis.reason}`);
-			}
-			logger.info(
-				"SUMMARY",
-				`❌ Action: BELOW THRESHOLD (need ${CONFIDENCE_THRESHOLD}%)`,
-			);
-			logger.info("SUMMARY", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 		}
 
 		// Mark profile as processed successfully
 		profileProcessedSuccessfully = true;
-
-		// Log summary report before moving to next profile
-		logger.info("SUMMARY", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-		logger.info("SUMMARY", `✅ Profile Analysis Complete: @${username}`);
-		logger.info("SUMMARY", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-		logger.info("SUMMARY", `📊 Bio Score: ${quickScore}%`);
-		logger.info("SUMMARY", `🎯 Confidence: ${confidence}%`);
-		logger.info(
-			"SUMMARY",
-			`${confirmedCreator ? "✅" : "❌"} Is Creator: ${confirmedCreator ? "YES" : "NO"}`,
-		);
-		if (analysis.reason) {
-			logger.info("SUMMARY", `💡 Reason: ${analysis.reason}`);
-		}
-		if (analysis.indicators && analysis.indicators.length > 0) {
-			logger.info("SUMMARY", `🔍 Key Indicators:`);
-			for (const indicator of analysis.indicators.slice(0, 3)) {
-				logger.info("SUMMARY", `   • ${indicator}`);
-			}
-		}
-		if (confirmedCreator && confidence >= CONFIDENCE_THRESHOLD) {
-			logger.info(
-				"SUMMARY",
-				`🎯 Action: AUTO-APPROVED (confidence ≥ ${CONFIDENCE_THRESHOLD}%)`,
-			);
-		} else if (confirmedCreator) {
-			logger.info(
-				"SUMMARY",
-				`⚠️  Action: DETECTED but below threshold (${CONFIDENCE_THRESHOLD}%)`,
-			);
-		} else {
-			logger.info("SUMMARY", `❌ Action: NOT A CREATOR`);
-		}
-		logger.info("SUMMARY", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-
-		// Human-like delay before next profile
-		const [profileDelayMin, profileDelayMax] = getDelay("between_profiles");
-		const profileWait =
-			profileDelayMin + Math.random() * (profileDelayMax - profileDelayMin);
-		logger.debug(
-			"DELAY",
-			`Waiting ${Math.floor(profileWait)}s before next profile...`,
-		);
-		await sleep(profileWait * 1000);
 	} catch (err) {
 		const errorMessage = err instanceof Error ? err.message : String(err);
 		const error = err instanceof Error ? err : new Error(String(err));
@@ -686,6 +632,45 @@ export async function processProfile(
 
 		throw err; // Re-throw to let caller handle
 	} finally {
+		// Log summary report (always show, even if there was an error)
+		logger.info("SUMMARY", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+		logger.info("SUMMARY", `📊 Profile Analysis Complete: @${username}`);
+		logger.info("SUMMARY", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+		logger.info("SUMMARY", `📊 Bio Score: ${quickScore}%`);
+		logger.info("SUMMARY", `🎯 Confidence: ${confidence}%`);
+		logger.info(
+			"SUMMARY",
+			`${confirmedCreator ? "✅" : "❌"} Is Creator: ${confirmedCreator ? "YES" : "NO"}`,
+		);
+		if (analysisReason) {
+			logger.info("SUMMARY", `💡 Reason: ${analysisReason}`);
+		}
+		if (analysisIndicators.length > 0) {
+			logger.info("SUMMARY", `🔍 Key Indicators:`);
+			for (const indicator of analysisIndicators.slice(0, 3)) {
+				logger.info("SUMMARY", `   • ${indicator}`);
+			}
+		}
+		if (confirmedCreator && confidence >= CONFIDENCE_THRESHOLD) {
+			logger.info(
+				"SUMMARY",
+				`🎯 Action: AUTO-APPROVED (confidence ≥ ${CONFIDENCE_THRESHOLD}%)`,
+			);
+		} else if (confirmedCreator) {
+			logger.info(
+				"SUMMARY",
+				`⚠️  Action: DETECTED but below threshold (${CONFIDENCE_THRESHOLD}%)`,
+			);
+		} else {
+			logger.info("SUMMARY", `❌ Action: NOT A CREATOR`);
+		}
+		if (profileProcessedSuccessfully) {
+			logger.info("SUMMARY", `✅ Processing: SUCCESSFUL`);
+		} else {
+			logger.info("SUMMARY", `⚠️  Processing: COMPLETED WITH ERRORS`);
+		}
+		logger.info("SUMMARY", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+
 		// Record profile visit metrics with complete data
 		if (metricsTracker) {
 			const finalProcessingTime = timer.end();

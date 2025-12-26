@@ -316,7 +316,10 @@ export function calculateScore(bio: string, username?: string): BioScoreResult {
 			bioLower.includes("see highlight") ||
 			bioLower.includes("in my highlight") ||
 			bioLower.includes("story highlight")) &&
-		(bio.includes("🔗") || bio.includes("link") || bio.includes("⬇️") || bio.includes("👇"));
+		(bio.includes("🔗") ||
+			bio.includes("link") ||
+			bio.includes("⬇️") ||
+			bio.includes("👇"));
 
 	let score = 0;
 	const reasons: string[] = [];
