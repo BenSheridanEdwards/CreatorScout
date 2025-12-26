@@ -117,11 +117,11 @@ describe("bioMatcher", () => {
 			expect(result.reasons).toEqual([]);
 		});
 
-	test("awards high score (50+) for direct Patreon mention", () => {
-		const result = calculateScore("Check out my Patreon!");
-		expect(result.score).toBeGreaterThanOrEqual(50);
-		expect(result.reasons.some((r) => r.includes("PATREON"))).toBe(true);
-	});
+		test("awards high score (50+) for direct Patreon mention", () => {
+			const result = calculateScore("Check out my Patreon!");
+			expect(result.score).toBeGreaterThanOrEqual(50);
+			expect(result.reasons.some((r) => r.includes("PATREON"))).toBe(true);
+		});
 
 		test("awards points for link emojis (5+ emojis = 25 points)", () => {
 			const result = calculateScore("🔥💋🍑💦🥵");
@@ -131,17 +131,19 @@ describe("bioMatcher", () => {
 			);
 		});
 
-	test("awards bonus points for exclusive content + discount combo", () => {
-		const result = calculateScore("Exclusive content 50% OFF");
-		expect(result.score).toBeGreaterThanOrEqual(25);
-		expect(result.reasons.some((r) => r.includes("EXCLUSIVE CONTENT"))).toBe(true);
-	});
+		test("awards bonus points for exclusive content + discount combo", () => {
+			const result = calculateScore("Exclusive content 50% OFF");
+			expect(result.score).toBeGreaterThanOrEqual(25);
+			expect(result.reasons.some((r) => r.includes("EXCLUSIVE CONTENT"))).toBe(
+				true,
+			);
+		});
 
-	test("awards points for creator link in bio", () => {
-		const result = calculateScore("patreon.com/creator");
-		expect(result.score).toBeGreaterThanOrEqual(25);
-		expect(result.reasons.some((r) => r.includes("PATREON"))).toBe(true);
-	});
+		test("awards points for creator link in bio", () => {
+			const result = calculateScore("patreon.com/creator");
+			expect(result.score).toBeGreaterThanOrEqual(25);
+			expect(result.reasons.some((r) => r.includes("PATREON"))).toBe(true);
+		});
 
 		test("caps maximum score at 100", () => {
 			const result = calculateScore(

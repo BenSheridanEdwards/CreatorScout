@@ -28,38 +28,8 @@ describe("getProfileStats", () => {
 	// ═══════════════════════════════════════════════════════════════════════════
 
 	describe("Successful stats extraction", () => {
-	test("returns parsed counts with calculated ratio", async () => {
-		const evaluateMock = jest
-			.fn<
-				() => Promise<{
-					followersText: string | null;
-					followingText: string | null;
-					postsText: string | null;
-					hasZeroFollowing: boolean;
-				}>
-			>()
-			.mockResolvedValue({
-				followersText: "1200",
-				followingText: "300",
-				postsText: "42",
-				hasZeroFollowing: false,
-			});
-		const page = createPageMock({ evaluate: evaluateMock });
-
-		const stats = await getProfileStats(page);
-
-		expect(evaluateMock).toHaveBeenCalledTimes(1);
-		expect(stats).toEqual({
-			followers: 1200,
-			following: 300,
-			posts: 42,
-			ratio: 4, // 1200 / 300 = 4
-		});
-	});
-
-	test("calculates correct ratio for high follower counts", async () => {
-		const page = createPageMock({
-			evaluate: jest
+		test("returns parsed counts with calculated ratio", async () => {
+			const evaluateMock = jest
 				.fn<
 					() => Promise<{
 						followersText: string | null;
@@ -69,17 +39,47 @@ describe("getProfileStats", () => {
 					}>
 				>()
 				.mockResolvedValue({
-					followersText: "100000",
-					followingText: "500",
-					postsText: "200",
+					followersText: "1200",
+					followingText: "300",
+					postsText: "42",
 					hasZeroFollowing: false,
-				}),
+				});
+			const page = createPageMock({ evaluate: evaluateMock });
+
+			const stats = await getProfileStats(page);
+
+			expect(evaluateMock).toHaveBeenCalledTimes(1);
+			expect(stats).toEqual({
+				followers: 1200,
+				following: 300,
+				posts: 42,
+				ratio: 4, // 1200 / 300 = 4
+			});
 		});
 
-		const stats = await getProfileStats(page);
+		test("calculates correct ratio for high follower counts", async () => {
+			const page = createPageMock({
+				evaluate: jest
+					.fn<
+						() => Promise<{
+							followersText: string | null;
+							followingText: string | null;
+							postsText: string | null;
+							hasZeroFollowing: boolean;
+						}>
+					>()
+					.mockResolvedValue({
+						followersText: "100000",
+						followingText: "500",
+						postsText: "200",
+						hasZeroFollowing: false,
+					}),
+			});
 
-		expect(stats.ratio).toBe(200); // 100000 / 500 = 200
-	});
+			const stats = await getProfileStats(page);
+
+			expect(stats.ratio).toBe(200); // 100000 / 500 = 200
+		});
 	});
 
 	// ═══════════════════════════════════════════════════════════════════════════
@@ -87,77 +87,77 @@ describe("getProfileStats", () => {
 	// ═══════════════════════════════════════════════════════════════════════════
 
 	describe("Ratio calculation edge cases", () => {
-	test("returns null ratio when following count is zero (avoid division by zero)", async () => {
-		const page = createPageMock({
-			evaluate: jest
-				.fn<
-					() => Promise<{
-						followersText: string | null;
-						followingText: string | null;
-						postsText: string | null;
-						hasZeroFollowing: boolean;
-					}>
-				>()
-				.mockResolvedValue({
-					followersText: "100",
-					followingText: null,
-					postsText: "10",
-					hasZeroFollowing: true,
-				}),
+		test("returns null ratio when following count is zero (avoid division by zero)", async () => {
+			const page = createPageMock({
+				evaluate: jest
+					.fn<
+						() => Promise<{
+							followersText: string | null;
+							followingText: string | null;
+							postsText: string | null;
+							hasZeroFollowing: boolean;
+						}>
+					>()
+					.mockResolvedValue({
+						followersText: "100",
+						followingText: null,
+						postsText: "10",
+						hasZeroFollowing: true,
+					}),
+			});
+
+			const stats = await getProfileStats(page);
+
+			expect(stats).toEqual({
+				followers: 100,
+				following: 0,
+				posts: 10,
+				ratio: null,
+			});
 		});
 
-		const stats = await getProfileStats(page);
+		test("returns null ratio when followers count is null", async () => {
+			const page = createPageMock({
+				evaluate: jest
+					.fn<
+						() => Promise<{
+							followersText: string | null;
+							followingText: string | null;
+							postsText: string | null;
+							hasZeroFollowing: boolean;
+						}>
+					>()
+					.mockResolvedValue({
+						followersText: null,
+						followingText: "500",
+						postsText: "20",
+						hasZeroFollowing: false,
+					}),
+			});
 
-		expect(stats).toEqual({
-			followers: 100,
-			following: 0,
-			posts: 10,
-			ratio: null,
-		});
-	});
+			const stats = await getProfileStats(page);
 
-	test("returns null ratio when followers count is null", async () => {
-		const page = createPageMock({
-			evaluate: jest
-				.fn<
-					() => Promise<{
-						followersText: string | null;
-						followingText: string | null;
-						postsText: string | null;
-						hasZeroFollowing: boolean;
-					}>
-				>()
-				.mockResolvedValue({
-					followersText: null,
-					followingText: "500",
-					postsText: "20",
-					hasZeroFollowing: false,
-				}),
+			expect(stats.ratio).toBeNull();
 		});
 
-		const stats = await getProfileStats(page);
-
-		expect(stats.ratio).toBeNull();
-	});
-
-	test("returns null ratio when following count is null", async () => {
-		const page = createPageMock({
-			evaluate: jest
-				.fn<
-					() => Promise<{
-						followersText: string | null;
-						followingText: string | null;
-						postsText: string | null;
-						hasZeroFollowing: boolean;
-					}>
-				>()
-				.mockResolvedValue({
-					followersText: "500",
-					followingText: null,
-					postsText: "20",
-					hasZeroFollowing: false,
-				}),
-		});
+		test("returns null ratio when following count is null", async () => {
+			const page = createPageMock({
+				evaluate: jest
+					.fn<
+						() => Promise<{
+							followersText: string | null;
+							followingText: string | null;
+							postsText: string | null;
+							hasZeroFollowing: boolean;
+						}>
+					>()
+					.mockResolvedValue({
+						followersText: "500",
+						followingText: null,
+						postsText: "20",
+						hasZeroFollowing: false,
+					}),
+			});
 
 			const stats = await getProfileStats(page);
 

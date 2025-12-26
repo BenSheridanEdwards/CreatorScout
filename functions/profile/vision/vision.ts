@@ -20,8 +20,7 @@ const client = new OpenAI({
  */
 function isRateLimitError(error: unknown): boolean {
 	return (
-		error instanceof Error &&
-		("status" in error && (error as any).status === 429)
+		error instanceof Error && "status" in error && (error as any).status === 429
 	);
 }
 
@@ -224,7 +223,7 @@ export async function isConfirmedCreator(
 	const indicators = data.indicators || [];
 	const reason = data.reason || "";
 	const allText = [...indicators, reason].join(" ").toLowerCase();
-	
+
 	const definitiveSignals = [
 		{ text: "exclusive content", label: "EXCLUSIVE CONTENT" },
 		{ text: "patreon", label: "PATREON" },
@@ -372,7 +371,9 @@ export async function validateBioWithVision(
 				return JSON.parse(text.trim()) as BioValidationResult;
 			} catch (fallbackError) {
 				if (process.env.NODE_ENV !== "test" && !process.env.JEST_WORKER_ID) {
-					console.error(`  Fallback bio validation vision failed: ${fallbackError}`);
+					console.error(
+						`  Fallback bio validation vision failed: ${fallbackError}`,
+					);
 				}
 				return null;
 			}
@@ -449,7 +450,7 @@ export async function analyzeProfile(
 			try {
 				const imageBuffer = readFileSync(imagePath);
 				const base64 = imageBuffer.toString("base64");
-				
+
 				const response = await client.chat.completions.create({
 					model: VISION_MODEL_FALLBACK,
 					messages: [
