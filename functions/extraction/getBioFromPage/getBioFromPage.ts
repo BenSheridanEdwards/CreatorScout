@@ -53,6 +53,27 @@ export async function validateBioExtraction(
 	return { valid: true, correctedBio: null };
 }
 
+/**
+ * Clean up extracted bio by removing Instagram UI text that may have been captured
+ */
+function cleanBioText(bio: string): string {
+	let cleaned = bio;
+
+	// Remove "Followed X, Y, and Z" pattern (Instagram mutual follows UI)
+	cleaned = cleaned.replace(
+		/\s*Followed\s+[\w._]+(?:,\s*[\w._]+)*(?:,?\s*and\s+[\w._]+)?\.?\.?\.?\s*/gi,
+		" ",
+	);
+
+	// Remove standalone "Followed by X" text
+	cleaned = cleaned.replace(/\s*Followed by\s+[\w._]+\s*/gi, " ");
+
+	// Clean up multiple spaces
+	cleaned = cleaned.replace(/\s+/g, " ").trim();
+
+	return cleaned;
+}
+
 export async function getBioFromPage(page: Page): Promise<string | null> {
 	const selectors = [
 		// More robust selectors that don't rely on changing CSS classes
@@ -91,12 +112,14 @@ export async function getBioFromPage(page: Page): Promise<string | null> {
 					// Check if this looks like bio content
 					const isBioLike =
 						!trimmed.includes("Follow") &&
+						!trimmed.includes("Followed") && // "Followed user1, user2, and user3"
 						!trimmed.includes("Message") &&
 						!trimmed.includes("Options") &&
 						!trimmed.match(/^\d/) &&
 						!trimmed.includes("posts") &&
 						!trimmed.includes("followers") &&
 						!trimmed.includes("following") &&
+						!trimmed.match(/Followed .+ and /) && // Instagram mutual follows UI
 						trimmed !== "Links" &&
 						trimmed !== "lanahyummy"; // Exclude username
 
@@ -130,17 +153,18 @@ export async function getBioFromPage(page: Page): Promise<string | null> {
 								parentText.length > trimmed.length &&
 								parentText.length < 200
 							) {
+								const cleanedParent = cleanBioText(parentText);
 								logger.info(
 									"ANALYSIS",
-									`Enhanced bio from parent: "${parentText}"`,
+									`Enhanced bio from parent: "${cleanedParent}"`,
 								);
-								return parentText;
+								return cleanedParent;
 							}
 						} catch (e) {
 							// Continue with original text
 						}
 
-						return trimmed;
+						return cleanBioText(trimmed);
 					} else {
 						logger.debug(
 							"ANALYSIS",
@@ -183,6 +207,7 @@ export async function getBioFromPage(page: Page): Promise<string | null> {
 					// Skip UI elements and stats
 					if (
 						word === "Follow" ||
+						word === "Followed" || // Instagram mutual follows UI text
 						word === "Message" ||
 						word === "Options" ||
 						word === "Links" ||
@@ -230,7 +255,7 @@ export async function getBioFromPage(page: Page): Promise<string | null> {
 				);
 
 				if (validBioParts.length > 0) {
-					const combinedBio = validBioParts.join(" ").trim();
+					const combinedBio = cleanBioText(validBioParts.join(" ").trim());
 					if (combinedBio.length > 5) {
 						logger.info(
 							"ANALYSIS",
@@ -239,7 +264,7 @@ export async function getBioFromPage(page: Page): Promise<string | null> {
 						return combinedBio;
 					}
 				}
-				return txt.trim() || null;
+				return cleanBioText(txt.trim()) || null;
 			}
 		}
 	} catch (_e) {
