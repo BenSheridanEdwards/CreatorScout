@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import CreatorsTable from "./components/CreatorsTable";
+import CreatorsTable from "./components/CreatorsTable/CreatorsTable";
 
 type ScriptName =
 	| "discover"
