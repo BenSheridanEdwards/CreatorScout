@@ -4,6 +4,7 @@ import {
 	humanLikeClickAt,
 	humanLikeClickHandle,
 } from "../../navigation/humanClick/humanClick.ts";
+import { BLACKLISTED_DOMAINS } from "../linkExtraction/linkExtraction.ts";
 
 /**
  * Get the bio link URL from the profile page (without clicking).
@@ -165,6 +166,25 @@ export async function clickBioLink(page: Page): Promise<{
 	const originalUrl = page.url();
 	const linkHref = await linkElement.evaluate((el) => el.getAttribute("href"));
 	console.log(`[BIO_LINK] Found link href: ${linkHref}`);
+
+	// Check if the link is blacklisted BEFORE clicking
+	if (linkHref) {
+		const linkHrefLower = linkHref.toLowerCase();
+		const isBlacklisted = BLACKLISTED_DOMAINS.some((domain) =>
+			linkHrefLower.includes(domain),
+		);
+
+		if (isBlacklisted) {
+			console.log(
+				`[BIO_LINK] ⛔ Skipping blacklisted domain: ${linkHref}`,
+			);
+			return {
+				success: false,
+				finalUrl: null,
+				error: `Blacklisted domain detected: ${linkHref}`,
+			};
+		}
+	}
 
 	try {
 		// Click with ghost-cursor (human-like)

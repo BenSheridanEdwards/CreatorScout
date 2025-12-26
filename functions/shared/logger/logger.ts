@@ -38,7 +38,8 @@ export type LogPrefix =
 	| "WARMUP"
 	| "LIMITS"
 	| "TEST"
-	| "RAMPUP";
+	| "RAMPUP"
+	| "SUMMARY";
 
 export interface Logger {
 	debug(prefix: LogPrefix, message: string, ...args: unknown[]): void;

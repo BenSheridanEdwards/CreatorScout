@@ -9,7 +9,7 @@ const AGGREGATOR_REGEX =
 const CREATOR_HOST_REGEX = /patreon\.com/i;
 
 // Domains that should NEVER be considered creator links
-const BLACKLISTED_DOMAINS = [
+export const BLACKLISTED_DOMAINS = [
 	"meta.com",
 	"facebook.com",
 	"instagram.com",
@@ -266,9 +266,11 @@ export async function analyzeExternalLink(
 			// Check for Linktree's "Sensitive Content" gate (strong indicator)
 			const hasSensitiveContentGate =
 				document.body.textContent?.includes("Sensitive Content") &&
-				(document.body.textContent?.includes("not appropriate for all audiences") ||
-				 document.body.textContent?.includes("Continue"));
-			
+				(document.body.textContent?.includes(
+					"not appropriate for all audiences",
+				) ||
+					document.body.textContent?.includes("Continue"));
+
 			// Get text content
 			const elements = document.querySelectorAll("h1, h2, h3, p, span, div, a");
 			const texts = Array.from(elements)
@@ -404,7 +406,9 @@ export async function analyzeExternalLink(
 			result.isCreator = true;
 			result.confidence = 100;
 			result.reason = "sensitive_content_gate";
-			result.indicators.push("CONTENT GATE - Linktree premium content warning");
+			result.indicators.push(
+				"CONTENT GATE - Linktree premium content warning",
+			);
 			console.log(
 				`[LINK_ANALYSIS] 🔒 Found Linktree Sensitive Content gate - DEFINITIVE creator signal`,
 			);
@@ -571,17 +575,29 @@ export async function analyzeExternalLink(
 		}
 
 		// If we ONLY have generic indicators (subscribe button, email form, pricing)
-		// WITHOUT any adult/creator-specific signals, give LOW confidence
-		// Many fitness coaches, artists, etc. have these without being creators
+		// WITHOUT any adult/creator-specific signals, still give moderate confidence
+		// Pricing on aggregator platforms is a strong signal for monetized content
 		if (hasGenericCreatorIndicators && isAggregator) {
-			result.confidence = Math.max(result.confidence, 30); // Very low, just slightly above aggregator-only
-			result.reason = "generic_aggregator_link";
-			result.indicators.push(
-				"Has aggregator link with generic subscription features (no premium content signals)",
-			);
-			console.log(
-				`[LINK_ANALYSIS] ⚠️  Generic aggregator detected (fitness coach, artist, etc.) - keeping low confidence`,
-			);
+			// Pricing is a stronger signal than just email/subscribe
+			if (pageContent.hasPricingIndicator) {
+				result.confidence = Math.max(result.confidence, 60); // Pricing = moderate confidence
+				result.reason = "aggregator_with_pricing";
+				result.indicators.push(
+					"Aggregator link with pricing/monetization (likely creator)",
+				);
+				console.log(
+					`[LINK_ANALYSIS] 💰 Aggregator with pricing detected - moderate confidence`,
+				);
+			} else {
+				result.confidence = Math.max(result.confidence, 30); // Email/subscribe only = low confidence
+				result.reason = "generic_aggregator_link";
+				result.indicators.push(
+					"Has aggregator link with generic subscription features (no premium content signals)",
+				);
+				console.log(
+					`[LINK_ANALYSIS] ⚠️  Generic aggregator detected (fitness coach, artist, etc.) - keeping low confidence`,
+				);
+			}
 			return result;
 		}
 

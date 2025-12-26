@@ -298,6 +298,16 @@ export async function processProfile(
 			analysis.confidence,
 		);
 		cycleManager.recordProfileProcessed(username, false);
+
+		// Log quick reject summary
+		logger.info("SUMMARY", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+		logger.info("SUMMARY", `⚡ Quick Reject: @${username}`);
+		logger.info("SUMMARY", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+		logger.info("SUMMARY", `📊 Bio Score: ${quickScore}%`);
+		logger.info("SUMMARY", `🎯 Confidence: ${analysis.confidence}%`);
+		logger.info("SUMMARY", `❌ Is Creator: NO`);
+		logger.info("SUMMARY", `💡 Reason: Very low scores from all signals`);
+		logger.info("SUMMARY", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 		return;
 	}
 
@@ -587,10 +597,63 @@ export async function processProfile(
 				`Not confirmed (confidence: ${confidence}% < ${CONFIDENCE_THRESHOLD}%)`,
 			);
 			cycleManager.recordProfileProcessed(username, false);
+
+			// Log summary for profiles that don't meet threshold
+			logger.info("SUMMARY", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+			logger.info("SUMMARY", `📊 Profile Analysis Complete: @${username}`);
+			logger.info("SUMMARY", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+			logger.info("SUMMARY", `📊 Bio Score: ${quickScore}%`);
+			logger.info("SUMMARY", `🎯 Confidence: ${confidence}%`);
+			logger.info(
+				"SUMMARY",
+				`${confirmedCreator ? "⚠️" : "❌"} Is Creator: ${confirmedCreator ? "DETECTED" : "NO"}`,
+			);
+			if (analysis.reason) {
+				logger.info("SUMMARY", `💡 Reason: ${analysis.reason}`);
+			}
+			logger.info(
+				"SUMMARY",
+				`❌ Action: BELOW THRESHOLD (need ${CONFIDENCE_THRESHOLD}%)`,
+			);
+			logger.info("SUMMARY", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 		}
 
 		// Mark profile as processed successfully
 		profileProcessedSuccessfully = true;
+
+		// Log summary report before moving to next profile
+		logger.info("SUMMARY", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+		logger.info("SUMMARY", `✅ Profile Analysis Complete: @${username}`);
+		logger.info("SUMMARY", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+		logger.info("SUMMARY", `📊 Bio Score: ${quickScore}%`);
+		logger.info("SUMMARY", `🎯 Confidence: ${confidence}%`);
+		logger.info(
+			"SUMMARY",
+			`${confirmedCreator ? "✅" : "❌"} Is Creator: ${confirmedCreator ? "YES" : "NO"}`,
+		);
+		if (analysis.reason) {
+			logger.info("SUMMARY", `💡 Reason: ${analysis.reason}`);
+		}
+		if (analysis.indicators && analysis.indicators.length > 0) {
+			logger.info("SUMMARY", `🔍 Key Indicators:`);
+			for (const indicator of analysis.indicators.slice(0, 3)) {
+				logger.info("SUMMARY", `   • ${indicator}`);
+			}
+		}
+		if (confirmedCreator && confidence >= CONFIDENCE_THRESHOLD) {
+			logger.info(
+				"SUMMARY",
+				`🎯 Action: AUTO-APPROVED (confidence ≥ ${CONFIDENCE_THRESHOLD}%)`,
+			);
+		} else if (confirmedCreator) {
+			logger.info(
+				"SUMMARY",
+				`⚠️  Action: DETECTED but below threshold (${CONFIDENCE_THRESHOLD}%)`,
+			);
+		} else {
+			logger.info("SUMMARY", `❌ Action: NOT A CREATOR`);
+		}
+		logger.info("SUMMARY", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
 		// Human-like delay before next profile
 		const [profileDelayMin, profileDelayMax] = getDelay("between_profiles");
