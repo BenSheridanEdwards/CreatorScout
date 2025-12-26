@@ -289,7 +289,14 @@ export async function processProfile(
 			"ANALYSIS",
 			`Quick reject: Low combined score (bio: ${quickScore}, analysis: ${analysis.confidence} < 20)`,
 		);
-		await markVisited(username, undefined, analysis.bio, effectiveConfidence);
+		await markVisited(
+			username,
+			undefined,
+			analysis.bio,
+			quickScore,
+			undefined,
+			analysis.confidence,
+		);
 		cycleManager.recordProfileProcessed(username, false);
 		return;
 	}
@@ -305,7 +312,14 @@ export async function processProfile(
 	}
 
 	// Mark as visited with bio and confidence score
-	await markVisited(username, undefined, analysis.bio, analysis.confidence);
+	await markVisited(
+		username,
+		undefined,
+		analysis.bio,
+		quickScore,
+		undefined,
+		analysis.confidence,
+	);
 
 	try {
 		// Comprehensive analysis already includes advanced link detection

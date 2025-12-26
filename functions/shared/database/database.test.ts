@@ -169,6 +169,7 @@ describe("database", () => {
 				"Test bio",
 				50,
 				"https://example.com",
+				75,
 			);
 			expect(await wasVisited(username)).toBe(true);
 			expect(mockProfile.upsert).toHaveBeenCalled();

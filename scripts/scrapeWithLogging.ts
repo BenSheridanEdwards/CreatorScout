@@ -195,7 +195,14 @@ export async function processProfile(
 		logger.info("ANALYSIS", `Bio score: ${analysis.bioScore}`);
 
 		// Mark as visited with bio and score
-		await markVisited(username, undefined, analysis.bio, analysis.bioScore);
+		await markVisited(
+			username,
+			undefined,
+			analysis.bio,
+			analysis.bioScore,
+			undefined,
+			analysis.confidence,
+		);
 
 		// Parse discovery source to extract depth and source profile
 		const discoveryDepth = source.split("_").length - 1; // Count underscores as depth

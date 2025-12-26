@@ -475,7 +475,15 @@ describe("Scout E2E Test Suite", () => {
 
 				const isCreator = target === "seed_user_1";
 				const bioScore = isCreator ? 75 : 20;
-				await markVisited(target, undefined, undefined, bioScore);
+				const confidence = isCreator ? 85 : 20;
+				await markVisited(
+					target,
+					undefined,
+					undefined,
+					bioScore,
+					undefined,
+					confidence,
+				);
 
 				if (isCreator) {
 					await markAsCreator(target, 85);

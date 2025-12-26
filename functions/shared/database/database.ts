@@ -152,6 +152,7 @@ export async function markVisited(
 	bio?: string | null,
 	bioScore: number = 0,
 	linkUrl?: string | null,
+	confidence?: number,
 ): Promise<void> {
 	const prisma = getPrisma();
 	const normalizedUsername = username.toLowerCase().trim();
@@ -164,6 +165,7 @@ export async function markVisited(
 			displayName: displayName || null,
 			bioText: bio || null,
 			bioScore,
+			confidence: confidence !== undefined ? confidence : bioScore,
 			linkUrl: linkUrl || null,
 			visitedAt: now,
 			lastSeen: now,
@@ -172,6 +174,7 @@ export async function markVisited(
 			displayName: displayName || undefined,
 			bioText: bio || undefined,
 			bioScore,
+			confidence: confidence !== undefined ? confidence : undefined,
 			linkUrl: linkUrl || undefined,
 			lastSeen: now,
 		},
