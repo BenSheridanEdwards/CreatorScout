@@ -30,6 +30,7 @@ model Profile {
   dmSent      Boolean   @default(false) @map("dm_sent")
   dmSentAt    DateTime? @map("dm_sent_at") @db.Timestamptz(6)
   followed    Boolean   @default(false)
+  followers   Int?      @map("followers")
   proofPath   String?   @map("proof_path")
   visitedAt   DateTime  @default(now()) @map("visited_at") @db.Timestamptz(6)
   lastSeen    DateTime  @default(now()) @map("last_seen") @db.Timestamptz(6)

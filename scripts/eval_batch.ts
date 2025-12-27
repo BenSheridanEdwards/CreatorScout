@@ -92,6 +92,7 @@ async function evaluateProfile(
 			analysis.bioScore,
 			analysis.links?.[0] || undefined,
 			analysis.confidence,
+			analysis.stats?.followers ?? undefined,
 		);
 
 		if (analysis.isCreator) {

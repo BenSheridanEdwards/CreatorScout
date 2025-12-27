@@ -57,8 +57,9 @@ async function evaluateProfile(username: string) {
 			undefined,
 			analysis.bio || undefined,
 			analysis.bioScore,
+			analysis.links?.[0] || undefined,
 			analysis.confidence,
-			analysis.linkUrl || undefined,
+			analysis.stats?.followers ?? undefined,
 		);
 
 		// Mark as creator if confidence is high enough

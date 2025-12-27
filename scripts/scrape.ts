@@ -261,7 +261,7 @@ export async function processProfile(
 
 	if (!analysis.bio) {
 		logger.warn("ANALYSIS", `No bio found for @${username}`);
-		await markVisited(username, undefined, undefined, 0);
+		await markVisited(username, undefined, undefined, 0, undefined, undefined, analysis.stats?.followers ?? undefined);
 		recordError("No bio found", `comprehensive_analysis_${username}`, username);
 		await logger.errorWithScreenshot(
 			"ERROR",
@@ -303,6 +303,7 @@ export async function processProfile(
 			quickScore,
 			undefined,
 			analysis.confidence,
+			analysis.stats?.followers ?? undefined,
 		);
 		cycleManager.recordProfileProcessed(username, false);
 
