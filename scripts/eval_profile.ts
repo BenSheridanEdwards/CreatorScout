@@ -60,6 +60,14 @@ async function evaluateProfile(username: string) {
 			analysis.links?.[0] || undefined,
 			analysis.confidence,
 			analysis.stats?.followers ?? undefined,
+			analysis.stats
+				? {
+						followers: analysis.stats.followers ?? null,
+						following: analysis.stats.following ?? null,
+						posts: null, // Not available in ComprehensiveAnalysisResult
+						ratio: analysis.stats.ratio ?? null,
+					}
+				: null,
 		);
 
 		// Mark as creator if confidence is high enough

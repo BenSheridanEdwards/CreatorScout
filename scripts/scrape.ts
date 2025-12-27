@@ -261,7 +261,23 @@ export async function processProfile(
 
 	if (!analysis.bio) {
 		logger.warn("ANALYSIS", `No bio found for @${username}`);
-		await markVisited(username, undefined, undefined, 0, undefined, undefined, analysis.stats?.followers ?? undefined);
+		await markVisited(
+			username,
+			undefined,
+			undefined,
+			0,
+			undefined,
+			undefined,
+			analysis.stats?.followers ?? undefined,
+			analysis.stats
+				? {
+						followers: analysis.stats.followers ?? null,
+						following: analysis.stats.following ?? null,
+						posts: null, // Not available in ComprehensiveAnalysisResult
+						ratio: analysis.stats.ratio ?? null,
+					}
+				: null,
+		);
 		recordError("No bio found", `comprehensive_analysis_${username}`, username);
 		await logger.errorWithScreenshot(
 			"ERROR",
@@ -304,6 +320,14 @@ export async function processProfile(
 			undefined,
 			analysis.confidence,
 			analysis.stats?.followers ?? undefined,
+			analysis.stats
+				? {
+						followers: analysis.stats.followers ?? null,
+						following: analysis.stats.following ?? null,
+						posts: null, // Not available in ComprehensiveAnalysisResult
+						ratio: analysis.stats.ratio ?? null,
+					}
+				: null,
 		);
 		cycleManager.recordProfileProcessed(username, false);
 
@@ -337,6 +361,15 @@ export async function processProfile(
 		quickScore,
 		undefined,
 		analysis.confidence,
+		analysis.stats?.followers ?? undefined,
+		analysis.stats
+			? {
+					followers: analysis.stats.followers ?? null,
+					following: analysis.stats.following ?? null,
+					posts: null, // Not available in ComprehensiveAnalysisResult
+					ratio: analysis.stats.ratio ?? null,
+				}
+			: null,
 	);
 
 	try {

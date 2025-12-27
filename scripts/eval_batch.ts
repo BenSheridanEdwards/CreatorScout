@@ -93,6 +93,14 @@ async function evaluateProfile(
 			analysis.links?.[0] || undefined,
 			analysis.confidence,
 			analysis.stats?.followers ?? undefined,
+			analysis.stats
+				? {
+						followers: analysis.stats.followers ?? null,
+						following: analysis.stats.following ?? null,
+						posts: null, // Not available in ComprehensiveAnalysisResult
+						ratio: analysis.stats.ratio ?? null,
+					}
+				: null,
 		);
 
 		if (analysis.isCreator) {

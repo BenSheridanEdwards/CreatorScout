@@ -163,10 +163,39 @@ export async function markVisited(
 	linkUrl?: string | null,
 	confidence?: number,
 	followers?: number | null,
+	profileStats?: {
+		followers?: number | null;
+		following?: number | null;
+		posts?: number | null;
+		ratio?: number | null;
+	} | null,
 ): Promise<void> {
 	const prisma = getPrisma();
 	const normalizedUsername = username.toLowerCase().trim();
 	const now = new Date();
+
+	// Extract followers from profileStats if not provided directly (backward compatibility)
+	const finalFollowers =
+		followers !== undefined
+			? followers
+			: profileStats?.followers !== undefined
+				? profileStats.followers
+				: null;
+
+	// Build engagementMetrics JSON object if profileStats provided
+	const engagementMetrics =
+		profileStats &&
+		(profileStats.followers !== null ||
+			profileStats.following !== null ||
+			profileStats.posts !== null ||
+			profileStats.ratio !== null)
+			? {
+					followers: profileStats.followers ?? null,
+					following: profileStats.following ?? null,
+					posts: profileStats.posts ?? null,
+					ratio: profileStats.ratio ?? null,
+				}
+			: undefined;
 
 	await prisma.profile.upsert({
 		where: { username: normalizedUsername },
@@ -177,7 +206,11 @@ export async function markVisited(
 			bioScore,
 			confidence: confidence !== undefined ? confidence : bioScore,
 			linkUrl: linkUrl || null,
-			followers: followers !== undefined && followers !== null ? followers : null,
+			followers:
+				finalFollowers !== undefined && finalFollowers !== null
+					? finalFollowers
+					: null,
+			engagementMetrics: engagementMetrics ?? Prisma.JsonNull,
 			visitedAt: now,
 			lastSeen: now,
 		},
@@ -187,7 +220,9 @@ export async function markVisited(
 			bioScore,
 			confidence: confidence !== undefined ? confidence : undefined,
 			linkUrl: linkUrl || undefined,
-			followers: followers !== undefined ? followers : undefined,
+			followers: finalFollowers !== undefined ? finalFollowers : undefined,
+			engagementMetrics:
+				engagementMetrics !== undefined ? engagementMetrics : undefined,
 			lastSeen: now,
 		},
 	});
