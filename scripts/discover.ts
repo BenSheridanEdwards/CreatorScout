@@ -19,12 +19,6 @@ dotenv.config();
 import { initializeInstagramSession } from "../functions/auth/sessionInitializer/sessionInitializer.ts";
 import { getProfile } from "../functions/shared/profiles/profileLoader.ts";
 import { stopAdsPowerProfile } from "../functions/navigation/browser/adsPowerConnector.ts";
-import {
-	setCurrentRunId,
-	updateRun,
-	addCreatorToRun,
-	addErrorToRun,
-} from "../functions/shared/runs/runs.ts";
 
 // Parse arguments
 const args = process.argv.slice(2);
@@ -68,11 +62,8 @@ const { createLoggerWithCycleTracking } = await import(
 );
 const { getDelay } = await import("../functions/timing/humanize/humanize.ts");
 const { sleep } = await import("../functions/timing/sleep/sleep.ts");
-const {
-	MAX_DMS_PER_DAY,
-	PRIORITIZE_QUEUE_OVER_SEEDS,
-	SESSION_DURATION_MAX,
-} = await import("../functions/shared/config/config.ts");
+const { MAX_DMS_PER_DAY, PRIORITIZE_QUEUE_OVER_SEEDS, SESSION_DURATION_MAX } =
+	await import("../functions/shared/config/config.ts");
 
 async function main() {
 	console.log("🚀 Starting Instagram Creator Discovery...");
@@ -92,7 +83,9 @@ async function main() {
 		console.log("🔍 DISCOVERY MODE - No DMs (use --send-dms to enable)");
 	}
 	if (PRIORITIZE_QUEUE_OVER_SEEDS) {
-		console.log("📋 QUEUE PRIORITY MODE - Queue items will be processed before seeds");
+		console.log(
+			"📋 QUEUE PRIORITY MODE - Queue items will be processed before seeds",
+		);
 	}
 	console.log(
 		`⏱️  Session duration limit: ${SESSION_DURATION_MAX} minutes (safety feature to prevent account flagging)`,
@@ -192,17 +185,17 @@ async function main() {
 		const stats = await getStats();
 		dmsSent = stats.dms_sent;
 
+		// Track consecutive errors to detect Instagram blocking
+		let consecutiveErrors = 0;
+		const MAX_CONSECUTIVE_ERRORS = 3; // Disconnect after 3 consecutive blocking errors
+
 		// Session duration limit to prevent running all night
 		const sessionStartTime = Date.now();
 		const maxSessionDurationMs = SESSION_DURATION_MAX * 60 * 1000; // Convert minutes to ms
 
-		while (
-			(!sendDMs || dmsSent < MAX_DMS_PER_DAY) &&
-			shouldContinue()
-		) {
+		while ((!sendDMs || dmsSent < MAX_DMS_PER_DAY) && shouldContinue()) {
 			// Check session duration limit
-			const sessionElapsed = Date.now() - sessionStartTime;
-			if (sessionElapsed >= maxSessionDurationMs) {
+			if (Date.now() - sessionStartTime >= maxSessionDurationMs) {
 				logger.info(
 					"LIMIT",
 					`✅ Reached maximum session duration (${SESSION_DURATION_MAX} minutes) - stopping to prevent account flagging`,
@@ -216,10 +209,7 @@ async function main() {
 			if (!target && PRIORITIZE_QUEUE_OVER_SEEDS) {
 				target = await queueNext(false);
 				if (target) {
-					logger.info(
-						"QUEUE",
-						"No more queue items, falling back to seeds...",
-					);
+					logger.info("QUEUE", "No more queue items, falling back to seeds...");
 				}
 			}
 
@@ -248,15 +238,48 @@ async function main() {
 					sendDMs, // sendDM based on flag
 					shouldContinue,
 				);
+				// Reset error counter on success
+				consecutiveErrors = 0;
 			} catch (err) {
+				const errorMessage = err instanceof Error ? err.message : String(err);
 				await logger.errorWithScreenshot(
 					"ERROR",
-					`Failed to process seed @${target}: ${
-						err instanceof Error ? err.message : String(err)
-					}`,
+					`Failed to process seed @${target}: ${errorMessage}`,
 					page,
 					`seed_process_${target}`,
 				);
+
+				// Check if this looks like Instagram blocking
+				const isBlockingError =
+					errorMessage.includes("Could not find profile") ||
+					errorMessage.includes("search results") ||
+					errorMessage.includes("rate limit") ||
+					errorMessage.includes("blocked") ||
+					errorMessage.includes("challenge") ||
+					errorMessage.includes("suspended");
+
+				if (isBlockingError) {
+					consecutiveErrors++;
+					logger.warn(
+						"ERROR",
+						`⚠️ Instagram blocking detected (${consecutiveErrors}/${MAX_CONSECUTIVE_ERRORS} consecutive errors)`,
+					);
+
+					if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
+						logger.error(
+							"ERROR",
+							`🚫 Instagram is blocking us - ${consecutiveErrors} consecutive blocking errors. Disconnecting immediately...`,
+						);
+						console.log(
+							"\n🔌 Auto-disconnecting due to Instagram blocking (3 consecutive errors)...",
+						);
+						browser.disconnect().catch(() => {});
+						process.exit(0);
+					}
+				} else {
+					// Reset counter for non-blocking errors
+					consecutiveErrors = 0;
+				}
 			}
 
 			// Print stats
@@ -285,7 +308,7 @@ async function main() {
 			const [seedDelayMin, seedDelayMax] = getDelay("between_seeds");
 			const seedWait =
 				seedDelayMin + Math.random() * (seedDelayMax - seedDelayMin);
-			
+
 			// Check if we'd exceed session duration after this wait
 			const sessionElapsed = Date.now() - sessionStartTime;
 			const remainingTime = maxSessionDurationMs - sessionElapsed;
@@ -297,7 +320,7 @@ async function main() {
 				);
 				break;
 			}
-			
+
 			logger.info(
 				"DELAY",
 				`Waiting ${Math.floor(seedWait)}s before next seed... (${Math.floor((maxSessionDurationMs - sessionElapsed) / 60000)} min remaining)`,
