@@ -21,7 +21,13 @@ export async function getCurrentUsername(page: Page): Promise<string | null> {
 				if (href && href.match(/^\/[^\/]+\/$/)) {
 					// Profile links are typically /username/
 					const match = href.match(/^\/([^\/]+)\/$/);
-					if (match && match[1] && match[1] !== "explore" && match[1] !== "direct" && match[1] !== "accounts") {
+					if (
+						match &&
+						match[1] &&
+						match[1] !== "explore" &&
+						match[1] !== "direct" &&
+						match[1] !== "accounts"
+					) {
 						return match[1];
 					}
 				}
@@ -40,13 +46,19 @@ export async function getCurrentUsername(page: Page): Promise<string | null> {
 			const username = urlMatch[1];
 			// If we're on a profile page and there's no "following" or other indicators,
 			// it might be our own profile
-			if (!currentUrl.includes("/following") && !currentUrl.includes("/followers") && !currentUrl.includes("/tagged")) {
+			if (
+				!currentUrl.includes("/following") &&
+				!currentUrl.includes("/followers") &&
+				!currentUrl.includes("/tagged")
+			) {
 				// Check if there's a profile link that matches
 				const hasMatchingProfileLink = await page.evaluate((uname) => {
-					const links = Array.from(document.querySelectorAll(`a[href="/${uname}/"]`));
+					const links = Array.from(
+						document.querySelectorAll(`a[href="/${uname}/"]`),
+					);
 					return links.length > 0;
 				}, username);
-				
+
 				if (hasMatchingProfileLink) {
 					return username.toLowerCase();
 				}
@@ -55,7 +67,9 @@ export async function getCurrentUsername(page: Page): Promise<string | null> {
 
 		// Method 3: Try to get from profile picture link
 		const profilePicLink = await page.evaluate(() => {
-			const profilePic = document.querySelector('img[alt*="profile picture"], img[alt*="Profile picture"]');
+			const profilePic = document.querySelector(
+				'img[alt*="profile picture"], img[alt*="Profile picture"]',
+			);
 			if (profilePic) {
 				const parent = profilePic.closest("a");
 				if (parent) {
@@ -81,4 +95,3 @@ export async function getCurrentUsername(page: Page): Promise<string | null> {
 		return null;
 	}
 }
-

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 interface Creator {
 	username: string;
@@ -30,10 +30,47 @@ export default function CreatorsTable() {
 	const [totalPages, setTotalPages] = useState(1);
 	const [total, setTotal] = useState(0);
 	const [pendingCount, setPendingCount] = useState(0);
-	const [dmFilter, setDmFilter] = useState<"all" | "pending" | "sent">("all");
+	const [dmFilter, setDmFilter] = useState<"all" | "pending" | "sent">(
+		"pending",
+	);
 	const [maxFollowers, setMaxFollowers] = useState<number | null>(null);
 
-	async function loadCreators(pageNum = 1, filter = dmFilter, maxFollowersFilter = maxFollowers) {
+	// Load creators with pending filter on mount
+	useEffect(() => {
+		async function loadInitialCreators() {
+			setLoading(true);
+			setError(null);
+			try {
+				const params = new URLSearchParams({
+					page: "1",
+					limit: "50",
+					dmFilter: "pending",
+				});
+				const res = await fetch(`/api/creators?${params.toString()}`);
+				if (!res.ok) {
+					setError(`Failed to load creators (status ${res.status}).`);
+					return;
+				}
+				const data = (await res.json()) as CreatorsResponse;
+				setCreators(data.creators);
+				setPage(data.page);
+				setTotalPages(data.totalPages);
+				setTotal(data.total);
+				setPendingCount(data.pendingCount);
+			} catch {
+				setError("Could not reach /api/creators. Is the API server running?");
+			} finally {
+				setLoading(false);
+			}
+		}
+		void loadInitialCreators();
+	}, []);
+
+	async function loadCreators(
+		pageNum = 1,
+		filter = dmFilter,
+		maxFollowersFilter = maxFollowers,
+	) {
 		setLoading(true);
 		setError(null);
 		try {
@@ -98,32 +135,35 @@ export default function CreatorsTable() {
 			if (!res.ok) return;
 
 			setCreators((prev) =>
-				prev.map((c) =>
-					c.username === username
-						? { ...c, dmSentBy }
-						: c,
-				),
+				prev.map((c) => (c.username === username ? { ...c, dmSentBy } : c)),
 			);
 		} catch (err) {
 			console.error("Failed to update dmSentBy:", err);
 		}
 	}
 
-	async function toggleHidden(username: string, currentStatus: boolean | null | undefined) {
+	async function toggleHidden(
+		username: string,
+		currentStatus: boolean | null | undefined,
+	) {
 		try {
 			// Treat null/undefined as false (not hidden)
 			const isCurrentlyHidden = currentStatus === true;
 			const newHiddenStatus = !isCurrentlyHidden;
-			
-			console.log(`Toggling hidden for ${username}: ${isCurrentlyHidden} -> ${newHiddenStatus}`);
-			
+
+			console.log(
+				`Toggling hidden for ${username}: ${isCurrentlyHidden} -> ${newHiddenStatus}`,
+			);
+
 			const res = await fetch(`/api/creators/${username}/hide`, {
 				method: "PATCH",
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify({ hidden: newHiddenStatus }),
 			});
 			if (!res.ok) {
-				console.error(`Failed to hide creator: ${res.status} ${res.statusText}`);
+				console.error(
+					`Failed to hide creator: ${res.status} ${res.statusText}`,
+				);
 				const errorText = await res.text();
 				console.error("Error response:", errorText);
 				return;
@@ -272,7 +312,8 @@ export default function CreatorsTable() {
 										</span>
 									</td>
 									<td className="py-2 pr-3 text-center text-slate-300">
-										{creator.followers !== null && creator.followers !== undefined
+										{creator.followers !== null &&
+										creator.followers !== undefined
 											? creator.followers.toLocaleString()
 											: "-"}
 									</td>
@@ -328,7 +369,12 @@ export default function CreatorsTable() {
 											onClick={(e) => {
 												e.preventDefault();
 												e.stopPropagation();
-												console.log("Hide button clicked for:", creator.username, "current hidden:", creator.hidden);
+												console.log(
+													"Hide button clicked for:",
+													creator.username,
+													"current hidden:",
+													creator.hidden,
+												);
 												toggleHidden(creator.username, creator.hidden ?? false);
 											}}
 											type="button"
