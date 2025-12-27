@@ -68,9 +68,11 @@ const { createLoggerWithCycleTracking } = await import(
 );
 const { getDelay } = await import("../functions/timing/humanize/humanize.ts");
 const { sleep } = await import("../functions/timing/sleep/sleep.ts");
-const { MAX_DMS_PER_DAY } = await import(
-	"../functions/shared/config/config.ts"
-);
+const {
+	MAX_DMS_PER_DAY,
+	PRIORITIZE_QUEUE_OVER_SEEDS,
+	SESSION_DURATION_MAX,
+} = await import("../functions/shared/config/config.ts");
 
 async function main() {
 	console.log("🚀 Starting Instagram Creator Discovery...");
@@ -89,6 +91,12 @@ async function main() {
 	} else {
 		console.log("🔍 DISCOVERY MODE - No DMs (use --send-dms to enable)");
 	}
+	if (PRIORITIZE_QUEUE_OVER_SEEDS) {
+		console.log("📋 QUEUE PRIORITY MODE - Queue items will be processed before seeds");
+	}
+	console.log(
+		`⏱️  Session duration limit: ${SESSION_DURATION_MAX} minutes (safety feature to prevent account flagging)`,
+	);
 	console.log("");
 
 	// Initialize database
@@ -184,9 +192,36 @@ async function main() {
 		const stats = await getStats();
 		dmsSent = stats.dms_sent;
 
-		while ((!sendDMs || dmsSent < MAX_DMS_PER_DAY) && shouldContinue()) {
-			// Get next profile from queue
-			const target = await queueNext();
+		// Session duration limit to prevent running all night
+		const sessionStartTime = Date.now();
+		const maxSessionDurationMs = SESSION_DURATION_MAX * 60 * 1000; // Convert minutes to ms
+
+		while (
+			(!sendDMs || dmsSent < MAX_DMS_PER_DAY) &&
+			shouldContinue()
+		) {
+			// Check session duration limit
+			const sessionElapsed = Date.now() - sessionStartTime;
+			if (sessionElapsed >= maxSessionDurationMs) {
+				logger.info(
+					"LIMIT",
+					`✅ Reached maximum session duration (${SESSION_DURATION_MAX} minutes) - stopping to prevent account flagging`,
+				);
+				break;
+			}
+			// Get next profile from queue (excluding seeds if PRIORITIZE_QUEUE_OVER_SEEDS is enabled)
+			let target = await queueNext(PRIORITIZE_QUEUE_OVER_SEEDS);
+
+			// If no non-seed items found and we're prioritizing queue, fall back to seeds
+			if (!target && PRIORITIZE_QUEUE_OVER_SEEDS) {
+				target = await queueNext(false);
+				if (target) {
+					logger.info(
+						"QUEUE",
+						"No more queue items, falling back to seeds...",
+					);
+				}
+			}
 
 			if (!target) {
 				const [waitMin, waitMax] = getDelay("queue_empty");
@@ -250,9 +285,22 @@ async function main() {
 			const [seedDelayMin, seedDelayMax] = getDelay("between_seeds");
 			const seedWait =
 				seedDelayMin + Math.random() * (seedDelayMax - seedDelayMin);
+			
+			// Check if we'd exceed session duration after this wait
+			const sessionElapsed = Date.now() - sessionStartTime;
+			const remainingTime = maxSessionDurationMs - sessionElapsed;
+			if (remainingTime < seedWait * 1000 + 60000) {
+				// Less than 1 minute buffer after wait, stop now
+				logger.info(
+					"LIMIT",
+					`Approaching session duration limit - stopping gracefully`,
+				);
+				break;
+			}
+			
 			logger.info(
 				"DELAY",
-				`Waiting ${Math.floor(seedWait)}s before next seed...`,
+				`Waiting ${Math.floor(seedWait)}s before next seed... (${Math.floor((maxSessionDurationMs - sessionElapsed) / 60000)} min remaining)`,
 			);
 			await sleep(seedWait * 1000);
 		}

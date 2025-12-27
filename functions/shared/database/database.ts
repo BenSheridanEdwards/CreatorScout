@@ -108,10 +108,19 @@ export async function queueAdd(
 	});
 }
 
-export async function queueNext(): Promise<string | null> {
+export async function queueNext(
+	excludeSeeds: boolean = false,
+): Promise<string | null> {
 	const prisma = getPrisma();
 
 	const item = await prisma.queueItem.findFirst({
+		where: excludeSeeds
+			? {
+					source: {
+						not: "seed",
+					},
+				}
+			: undefined,
 		orderBy: [{ priority: "desc" }, { addedAt: "asc" }],
 	});
 
