@@ -7,6 +7,7 @@ jest.unstable_mockModule("../../shared/logger/logger.ts", () => ({
 
 jest.unstable_mockModule("../../shared/config/config.ts", () => ({
 	WARMUP_DURATION_MINUTES: 1.5,
+	DEBUG_SCREENSHOTS: false,
 }));
 
 jest.unstable_mockModule("../humanize/humanize.ts", () => ({

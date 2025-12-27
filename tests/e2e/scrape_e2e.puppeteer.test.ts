@@ -17,8 +17,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import dotenv from "dotenv";
 import type { Browser, Page } from "puppeteer";
-import puppeteer from "puppeteer-extra";
-import StealthPlugin from "puppeteer-extra-plugin-stealth";
+import puppeteer from "puppeteer";
 import { login } from "../../functions/auth/login/login.ts";
 import { getBioFromPage } from "../../functions/extraction/getBioFromPage/getBioFromPage.ts";
 import { getLinkFromBio } from "../../functions/extraction/getLinkFromBio/getLinkFromBio.ts";
@@ -65,12 +64,6 @@ if (!IG_USER || !IG_PASS) {
 	);
 }
 
-// Enable stealth mode
-const puppeteerWithUse = puppeteer as unknown as {
-	use: (plugin: unknown) => void;
-};
-puppeteerWithUse.use(StealthPlugin());
-
 // Helper function for test-specific scrolling (wraps scrollFollowingModal)
 async function scrollModal(page: Page, times: number = 2): Promise<void> {
 	for (let i = 0; i < times; i++) {
@@ -99,10 +92,7 @@ describe("Scout E2E Test Suite", () => {
 		);
 		const userDataDir = getUserDataDir();
 
-		const puppeteerWithLaunch = puppeteer as unknown as {
-			launch: (opts: unknown) => Promise<Browser>;
-		};
-		browser = await puppeteerWithLaunch.launch({
+		browser = await puppeteer.launch({
 			headless: true,
 			args: ["--no-sandbox", "--disable-dev-shm-usage"],
 			userDataDir,

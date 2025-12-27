@@ -34,7 +34,7 @@ const parseProfileStatusMock = jest
 	.fn<(text: string) => { isPrivate: boolean; notFound: boolean }>()
 	.mockReturnValue({ isPrivate: false, notFound: false });
 const sleepMock = jest.fn<() => Promise<void>>();
-const configMock = { IG_USER: "u", IG_PASS: "p" };
+const configMock = { IG_USER: "u", IG_PASS: "p", DEBUG_SCREENSHOTS: false };
 
 jest.unstable_mockModule("../../auth/login/login.ts", () => ({
 	login: loginMock,

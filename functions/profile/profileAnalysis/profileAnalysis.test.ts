@@ -126,6 +126,7 @@ jest.unstable_mockModule("../../shared/config/config.ts", () => ({
 	},
 	FAST_MODE: false,
 	LOCAL_BROWSER: true,
+	DEBUG_SCREENSHOTS: false,
 	CONFIDENCE_THRESHOLD: 50,
 	MAX_DMS_PER_DAY: 120,
 }));

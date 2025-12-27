@@ -1,6 +1,6 @@
 import fs from "node:fs/promises";
 import type { Page } from "puppeteer";
-import { LOCAL_BROWSER } from "../config/config.ts";
+import { LOCAL_BROWSER, DEBUG_SCREENSHOTS } from "../config/config.ts";
 import { getCurrentRunId, addScreenshotToRun } from "../runs/runs.ts";
 
 /**
@@ -50,7 +50,30 @@ async function waitForPageReady(
 	}
 }
 
-export async function snapshot(page: Page, label: string): Promise<string> {
+/**
+ * Check if screenshot should be taken based on DEBUG_SCREENSHOTS flag
+ * @param force - If true, bypass debug flag check (for functional screenshots)
+ * @returns true if screenshot should be taken
+ */
+function shouldTakeScreenshot(force: boolean = false): boolean {
+	if (force) {
+		return true; // Functional screenshots always enabled
+	}
+	return DEBUG_SCREENSHOTS; // Debug screenshots gated by flag
+}
+
+export async function snapshot(
+	page: Page,
+	label: string,
+	force: boolean = false,
+): Promise<string> {
+	// Check if screenshots are enabled (unless forced for functional screenshots)
+	if (!shouldTakeScreenshot(force)) {
+		// Return a dummy path to maintain API compatibility
+		// Callers should check if screenshot was actually taken
+		return "";
+	}
+
 	// Organize screenshots into date-based folders under a top-level screenshots directory:
 	// screenshots/YYYY-MM-DD/<label>-<timestamp>.png
 	const now = new Date();
@@ -244,7 +267,14 @@ export async function saveScreenshot(
 	type: string,
 	username: string,
 	action: string,
+	force: boolean = false,
 ): Promise<string> {
+	// Check if screenshots are enabled (unless forced for functional screenshots)
+	if (!shouldTakeScreenshot(force)) {
+		// Return a dummy path to maintain API compatibility
+		return "";
+	}
+
 	// Check if page is still open before doing anything
 	if (!isPageOpen(page)) {
 		throw new Error("Cannot take screenshot: page is closed");

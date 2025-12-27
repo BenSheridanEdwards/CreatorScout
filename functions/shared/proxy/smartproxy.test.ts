@@ -7,6 +7,7 @@ jest.unstable_mockModule("../config/config.ts", () => ({
 	SMARTPROXY_PORT: 7000,
 	SMARTPROXY_STICKY_SESSION_MIN: 15,
 	SMARTPROXY_STICKY_SESSION_MAX: 30,
+	DEBUG_SCREENSHOTS: false,
 }));
 
 jest.unstable_mockModule("../logger/logger.ts", () => ({

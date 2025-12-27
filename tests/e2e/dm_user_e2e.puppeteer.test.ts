@@ -18,8 +18,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import dotenv from "dotenv";
 import type { Browser, Page } from "puppeteer";
-import puppeteer from "puppeteer-extra";
-import StealthPlugin from "puppeteer-extra-plugin-stealth";
+import puppeteer from "puppeteer";
 import { login } from "../../functions/auth/login/login.ts";
 import { sendDMToUser } from "../../functions/profile/profileActions/profileActions.ts";
 import { DM_MESSAGE } from "../../functions/shared/config/config.ts";
@@ -55,16 +54,7 @@ describe("DM user E2E", () => {
 			return;
 		}
 
-		const puppeteerWithUse = puppeteer as unknown as {
-			use: (plugin: unknown) => void;
-		};
-		puppeteerWithUse.use(StealthPlugin());
-
-		const puppeteerWithLaunch = puppeteer as unknown as {
-			launch: (opts: unknown) => Promise<Browser>;
-		};
-
-		browser = await puppeteerWithLaunch.launch({
+		browser = await puppeteer.launch({
 			headless: true,
 			args: ["--no-sandbox", "--disable-dev-shm-usage"],
 		});

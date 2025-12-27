@@ -86,6 +86,10 @@ LOCAL_BROWSER=false
 # Enable verbose debug logging
 DEBUG_LOGS=false
 
+# Enable debug screenshots (error screenshots, final batch screenshots, etc.)
+# Note: Functional screenshots (creator proof, link analysis) are always enabled
+DEBUG_SCREENSHOTS=false
+
 # Fast mode (reduced delays, skip vision - for testing only)
 FAST_MODE=false
 
@@ -141,6 +145,7 @@ DATABASE_URL=postgresql://user:password@host:5432/scout
 # ===========================================
 LOCAL_BROWSER=false
 DEBUG_LOGS=false
+DEBUG_SCREENSHOTS=false
 FAST_MODE=false
 SKIP_VISION=false
 ```

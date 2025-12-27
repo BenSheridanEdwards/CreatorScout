@@ -1,0 +1,9 @@
+# Example usernames file for dm_batch.ts
+# Lines starting with # are ignored
+# One username per line (no @ symbol needed)
+
+# Example users (replace with real usernames):
+# username1
+# username2
+# username3
+

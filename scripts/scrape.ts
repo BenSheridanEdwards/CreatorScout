@@ -447,7 +447,7 @@ export async function processProfile(
 			try {
 				proofPath =
 					analysis.links && analysis.links.length > 0
-						? await snapshot(page, `creator_${username}`)
+						? await snapshot(page, `creator_${username}`, true) // force: true - functional screenshot
 						: null;
 				if (proofPath) {
 					logger.info("SCREENSHOT", `Creator proof saved: ${proofPath}`);

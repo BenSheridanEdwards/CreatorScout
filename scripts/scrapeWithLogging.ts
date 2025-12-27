@@ -316,7 +316,7 @@ export async function processProfile(
 
 			// Mark in database
 			const proofPath = analysis.linkFromBio
-				? await snapshot(page, `creator_${username}`)
+				? await snapshot(page, `creator_${username}`, true) // force: true - functional screenshot
 				: null;
 			if (proofPath) {
 				logger.info("SCREENSHOT", `Creator proof saved: ${proofPath}`);

@@ -17,6 +17,7 @@ const mockGetUserDataDir = jest
 	.mockReturnValue("/tmp/test-data");
 const mockConfig = {
 	LOCAL_BROWSER: true,
+	DEBUG_SCREENSHOTS: false,
 	DECODO_HOST: "gate.decodo.net",
 	DECODO_PORT: 20011,
 	DECODO_USERNAME: undefined,

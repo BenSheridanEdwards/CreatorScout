@@ -77,6 +77,7 @@ jest.unstable_mockModule("../functions/shared/config/config.ts", () => ({
 	FAST_MODE: false,
 	SKIP_VISION: false,
 	LOCAL_BROWSER: false,
+	DEBUG_SCREENSHOTS: false,
 	DELAY_SCALE: 1.0,
 	SLEEP_SCALE: 1.0,
 	DELAY_SCALES: {},

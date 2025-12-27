@@ -314,12 +314,15 @@ export async function analyzeProfileComprehensive(
 					result.indicators.push(...linkAnalysis.indicators);
 					result.reason = linkAnalysis.reason;
 
-					// Take screenshot of the link page for records
+					// Take screenshot of the link page for records (functional - always enabled)
 					const linkScreenshot = await snapshot(
 						page,
 						`link_analysis_${username}`,
+						true, // force: true - functional screenshot for vision analysis
 					);
-					result.screenshots.push(linkScreenshot);
+					if (linkScreenshot) {
+						result.screenshots.push(linkScreenshot);
+					}
 				}
 			} catch (error) {
 				result.errors?.push(`Link analysis failed: ${error}`);
@@ -460,10 +463,11 @@ export async function analyzeLinkWithVision(
 		});
 		await sleep(3000);
 
-		// Take screenshot
+		// Take screenshot (functional - always enabled for vision analysis)
 		const screenshotPath = await snapshot(
 			page,
 			`${screenshotPrefix}_${username}`,
+			true, // force: true - functional screenshot for vision analysis
 		);
 
 		// Vision analysis

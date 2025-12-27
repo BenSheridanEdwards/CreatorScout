@@ -1,5 +1,6 @@
 import type { Page } from "puppeteer";
 import { snapshot } from "../snapshot/snapshot.ts";
+import { DEBUG_SCREENSHOTS } from "../config/config.ts";
 
 export type LogLevel = "DEBUG" | "INFO" | "WARN" | "ERROR";
 export type LogPrefix =
@@ -142,14 +143,21 @@ class LoggerImpl implements Logger {
 		context: string,
 		...args: unknown[]
 	): Promise<void> {
+		// Only take screenshot if DEBUG_SCREENSHOTS is enabled
+		if (!DEBUG_SCREENSHOTS) {
+			// Still log the error, just without screenshot
+			this.error(prefix, message, undefined, ...args);
+			return;
+		}
+
 		try {
 			const reasonSlug = this.slugifyForPath(message);
 			const label =
 				reasonSlug.length > 0
 					? `error_${context}_${reasonSlug}`
 					: `error_${context}`;
-			const screenshotPath = await snapshot(page, label);
-			this.error(prefix, message, screenshotPath, ...args);
+			const screenshotPath = await snapshot(page, label, false);
+			this.error(prefix, message, screenshotPath || undefined, ...args);
 		} catch (screenshotError) {
 			// If screenshot fails, still log the error
 			this.error(

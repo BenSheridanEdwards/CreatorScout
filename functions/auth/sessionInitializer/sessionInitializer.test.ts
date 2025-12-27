@@ -82,6 +82,7 @@ jest.unstable_mockModule(
 jest.unstable_mockModule("../../shared/config/config.ts", () => ({
 	IG_USER: "test_user",
 	IG_PASS: "test_pass",
+	DEBUG_SCREENSHOTS: false,
 }));
 
 // Import after mocks are set up

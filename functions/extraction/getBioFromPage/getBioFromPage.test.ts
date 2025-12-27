@@ -20,7 +20,21 @@ import {
 	createPageMock,
 	createPageWithElementMock,
 } from "../../__test__/testUtils.ts";
-import { getBioFromPage } from "./getBioFromPage.ts";
+
+// Mock config to enable DEBUG_SCREENSHOTS for screenshot tests
+jest.unstable_mockModule("../../shared/config/config.ts", () => ({
+	LOCAL_BROWSER: false,
+	DEBUG_SCREENSHOTS: true,
+}));
+
+// Mock vision module
+jest.unstable_mockModule("../../profile/vision/vision.ts", () => ({
+	validateBioWithVision: jest
+		.fn<() => Promise<null>>()
+		.mockResolvedValue(null),
+}));
+
+const { getBioFromPage } = await import("./getBioFromPage.ts");
 
 const originalEnv = { ...process.env };
 
@@ -188,20 +202,28 @@ describe("getBioFromPage", () => {
 		});
 
 		test("takes debug screenshot even in CI environment when extraction fails", async () => {
+			const screenshotMock = jest
+				.fn<(options?: object) => Promise<Buffer>>()
+				.mockResolvedValue(Buffer.from("fake", "utf8"));
+			const evaluateMock = jest
+				.fn<() => Promise<string>>()
+				.mockResolvedValue("unknown");
 			const page = createPageMock({
 				$: jest
 					.fn<() => Promise<ElementHandle<Element> | null>>()
 					.mockResolvedValue(null),
+				screenshot: screenshotMock,
+				evaluate: evaluateMock,
+				isClosed: jest.fn<() => boolean>().mockReturnValue(false),
+				waitForFunction: jest
+					.fn<() => Promise<unknown>>()
+					.mockResolvedValue(undefined),
 			}) as jest.Mocked<Page>;
 
 			await getBioFromPage(page as Page);
 
-			// Screenshots are taken for debugging even in CI
-			if (page.screenshot) {
-				expect(
-					page.screenshot as jest.MockedFunction<Page["screenshot"]>,
-				).toHaveBeenCalled();
-			}
+			// Screenshots are taken for debugging even in CI when DEBUG_SCREENSHOTS is enabled
+			expect(screenshotMock).toHaveBeenCalled();
 		});
 
 		test("captures debug screenshot in local mode when extraction fails", async () => {
@@ -209,27 +231,26 @@ describe("getBioFromPage", () => {
 			delete process.env.CI;
 
 			const screenshotMock = jest
-				.fn<(options?: object) => Promise<void>>()
-				.mockResolvedValue(undefined);
+				.fn<(options?: object) => Promise<Buffer>>()
+				.mockResolvedValue(Buffer.from("fake", "utf8"));
+			const evaluateMock = jest
+				.fn<() => Promise<string>>()
+				.mockResolvedValue("unknown");
 			const page = createPageMock({
 				$: jest
 					.fn<() => Promise<ElementHandle<Element> | null>>()
 					.mockResolvedValue(null),
 				screenshot: screenshotMock,
+				evaluate: evaluateMock,
+				isClosed: jest.fn<() => boolean>().mockReturnValue(false),
+				waitForFunction: jest
+					.fn<() => Promise<unknown>>()
+					.mockResolvedValue(undefined),
 			}) as jest.Mocked<Page>;
 
 			await getBioFromPage(page as Page);
 
 			expect(screenshotMock).toHaveBeenCalled();
-			const callArg = (screenshotMock.mock.calls[0]?.[0] || {}) as {
-				path?: string;
-			};
-			if (callArg.path) {
-				expect(callArg.path).toContain("bio_extraction_failed");
-				if (fs.existsSync(callArg.path)) {
-					fs.rmSync(callArg.path, { force: true });
-				}
-			}
 		});
 
 		test("returns null when selector query throws", async () => {

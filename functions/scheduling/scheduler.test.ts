@@ -23,6 +23,7 @@ jest.unstable_mockModule("../shared/config/config.ts", () => ({
 	SESSIONS_PER_DAY: 3,
 	SESSION_STAGGER_MINUTES: 5,
 	TOTAL_SESSION_TIME_PER_DAY: 45,
+	DEBUG_SCREENSHOTS: false,
 }));
 
 const { SessionScheduler, getSessionWindow } = await import("./scheduler.ts");

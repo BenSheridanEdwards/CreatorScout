@@ -214,7 +214,14 @@ async function main() {
 					shouldContinue,
 				);
 			} catch (err) {
-				logger.error("ERROR", `Failed to process seed @${target}: ${err}`);
+				await logger.errorWithScreenshot(
+					"ERROR",
+					`Failed to process seed @${target}: ${
+						err instanceof Error ? err.message : String(err)
+					}`,
+					page,
+					`seed_process_${target}`,
+				);
 			}
 
 			// Print stats
