@@ -234,14 +234,28 @@ export async function markAsCreator(
 	proofPath?: string | null,
 ): Promise<void> {
 	const prisma = getPrisma();
+	const u = username.toLowerCase().trim();
+
+	// Get current profile to check followers count
+	const profile = await prisma.profile.findUnique({
+		where: { username: u },
+		select: { followers: true },
+	});
+
+	// Auto-hide creators with 100k+ followers
+	const shouldHide = profile?.followers !== null && profile.followers >= 100000;
 
 	await prisma.profile.update({
-		where: { username: username.toLowerCase().trim() },
+		where: { username: u },
 		data: {
 			isCreator: true,
 			confidence,
 			proofPath: proofPath || undefined,
 			lastSeen: new Date(),
+			...(shouldHide && {
+				hidden: true,
+				hiddenAt: new Date(),
+			}),
 		},
 	});
 }

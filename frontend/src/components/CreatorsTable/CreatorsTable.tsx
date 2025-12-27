@@ -33,9 +33,9 @@ export default function CreatorsTable() {
 	const [dmFilter, setDmFilter] = useState<"all" | "pending" | "sent">(
 		"pending",
 	);
-	const [maxFollowers, setMaxFollowers] = useState<number | null>(null);
+	const [maxFollowers, setMaxFollowers] = useState<number | null>(100000);
 
-	// Load creators with pending filter on mount
+	// Load creators with pending filter and 100k followers limit on mount
 	useEffect(() => {
 		async function loadInitialCreators() {
 			setLoading(true);
@@ -45,6 +45,7 @@ export default function CreatorsTable() {
 					page: "1",
 					limit: "50",
 					dmFilter: "pending",
+					maxFollowers: "100000",
 				});
 				const res = await fetch(`/api/creators?${params.toString()}`);
 				if (!res.ok) {
@@ -194,7 +195,7 @@ export default function CreatorsTable() {
 						• Click checkbox to mark DM as sent
 					</p>
 				</div>
-				<div className="flex items-center gap-2">
+				<div className="flex items-center gap-3">
 					<select
 						value={dmFilter}
 						onChange={(e) => {
@@ -202,30 +203,41 @@ export default function CreatorsTable() {
 							setDmFilter(newFilter);
 							loadCreators(1, newFilter, maxFollowers);
 						}}
-						className="rounded-md border border-slate-700 bg-slate-900 px-2 py-1 text-xs text-slate-200"
+						className="rounded-lg border border-slate-700 bg-slate-900/50 px-3 py-1.5 text-xs font-medium text-slate-200 hover:bg-slate-800/50 focus:outline-none focus:ring-2 focus:ring-sky-500/50 focus:border-sky-500/50 transition-colors"
 					>
 						<option value="all">All</option>
 						<option value="pending">DM Pending</option>
 						<option value="sent">DM Sent</option>
 					</select>
-					<label className="flex items-center gap-1 text-xs text-slate-400">
-						<input
-							type="checkbox"
-							checked={maxFollowers === 100000}
-							onChange={(e) => {
-								const newMaxFollowers = e.target.checked ? 100000 : null;
+					<div className="flex items-center gap-2.5 px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-900/50">
+						<button
+							type="button"
+							onClick={() => {
+								const newMaxFollowers = maxFollowers === 100000 ? null : 100000;
 								setMaxFollowers(newMaxFollowers);
 								loadCreators(1, dmFilter, newMaxFollowers);
 							}}
-							className="w-4 h-4 rounded border-slate-600 bg-slate-800 text-emerald-500 focus:ring-emerald-500/50 cursor-pointer"
-						/>
-						<span>Followers &lt; 100k</span>
-					</label>
+							className={`relative inline-flex h-6 w-11 items-center rounded-full transition-all duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 ${
+								maxFollowers === 100000
+									? "bg-emerald-500 focus:ring-emerald-500/50"
+									: "bg-slate-700 focus:ring-slate-600"
+							}`}
+						>
+							<span
+								className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-all duration-200 ease-in-out ${
+									maxFollowers === 100000 ? "translate-x-6" : "translate-x-1"
+								}`}
+							/>
+						</button>
+						<span className="text-xs font-medium text-slate-300">
+							Followers &lt; 100k
+						</span>
+					</div>
 					<button
 						onClick={() => loadCreators(page, dmFilter, maxFollowers)}
 						disabled={loading}
 						type="button"
-						className="rounded-md border border-slate-700 bg-slate-900 px-2.5 py-1 text-xs font-medium text-slate-200 hover:bg-slate-800 disabled:opacity-60"
+						className="rounded-lg border border-slate-700 bg-slate-900/50 px-3 py-1.5 text-xs font-medium text-slate-200 hover:bg-slate-800/50 hover:border-slate-600 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-sky-500/50 focus:border-sky-500/50 transition-all"
 					>
 						{loading ? "Loading..." : "Load creators"}
 					</button>

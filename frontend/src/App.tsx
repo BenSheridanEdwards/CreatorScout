@@ -214,10 +214,36 @@ function App() {
 					<div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
 						<div className="rounded-xl border border-slate-800 bg-slate-900/60 p-4">
 							<div className="flex items-center justify-between">
-								<div>
-									<p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">
-										Creators Found
-									</p>
+								<div className="flex-1">
+									<div className="flex items-center gap-1.5 mb-1">
+										<p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">
+											Avatar Creators Found
+										</p>
+										<div className="group relative">
+											<svg
+												className="w-3.5 h-3.5 text-slate-500 hover:text-slate-400 cursor-help"
+												fill="none"
+												stroke="currentColor"
+												viewBox="0 0 24 24"
+											>
+												<path
+													strokeLinecap="round"
+													strokeLinejoin="round"
+													strokeWidth={2}
+													d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+												/>
+											</svg>
+											<div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block z-10">
+												<div className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-200 shadow-xl w-64">
+													<p className="font-medium mb-1.5">Filter Parameters:</p>
+													<ul className="space-y-1 text-slate-300">
+														<li>• Followers: &lt; 100k</li>
+														<li>• Excludes hidden creators</li>
+													</ul>
+												</div>
+											</div>
+										</div>
+									</div>
 									{statsLoading ? (
 										<p className="text-2xl font-bold text-slate-300">
 											Loading...
