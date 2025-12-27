@@ -32,6 +32,8 @@ model Profile {
   followed    Boolean   @default(false)
   followers   Int?      @map("followers")
   proofPath   String?   @map("proof_path")
+  hidden      Boolean   @default(false) @map("hidden")
+  hiddenAt    DateTime? @map("hidden_at") @db.Timestamptz(6)
   visitedAt   DateTime  @default(now()) @map("visited_at") @db.Timestamptz(6)
   lastSeen    DateTime  @default(now()) @map("last_seen") @db.Timestamptz(6)
 

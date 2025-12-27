@@ -134,6 +134,14 @@ async function handleApi(
 	res: http.ServerResponse,
 ): Promise<void> {
 	const url = new URL(req.url ?? "/", `http://${req.headers.host}`);
+	
+	// Debug logging for PATCH requests to /api/creators
+	if (req.method === "PATCH" && url.pathname.startsWith("/api/creators/")) {
+		// eslint-disable-next-line no-console
+		console.log(`[API DEBUG] PATCH ${url.pathname}, endsWith /hide: ${url.pathname.endsWith("/hide")}, endsWith /dm: ${url.pathname.endsWith("/dm")}`);
+		// eslint-disable-next-line no-console
+		console.log(`[API DEBUG] Full URL: ${req.url}, pathname: ${url.pathname}`);
+	}
 
 	if (req.method === "GET" && url.pathname === "/api/health") {
 		sendJson(res, 200, { ok: true, ts: Date.now() });
@@ -363,10 +371,12 @@ async function handleApi(
 			const where: { 
 				isCreator: boolean; 
 				dmSent?: boolean; 
+				hidden?: boolean;
 				followers?: { lte: number } | null;
 				OR?: Array<{ followers: { lte: number } } | { followers: null }>;
 			} = {
 				isCreator: true,
+				hidden: false, // Exclude hidden creators by default
 			};
 			if (dmFilter === "pending") {
 				where.dmSent = false;
@@ -384,9 +394,9 @@ async function handleApi(
 			// Get total count for current filter
 			const total = await prisma.profile.count({ where });
 
-			// Get pending DM count (always useful to show)
+			// Get pending DM count (always useful to show, excluding hidden)
 			const pendingCount = await prisma.profile.count({
-				where: { isCreator: true, dmSent: false },
+				where: { isCreator: true, dmSent: false, hidden: false },
 			});
 
 			// Get paginated creators
@@ -401,6 +411,8 @@ async function handleApi(
 					dmSentAt: true,
 					visitedAt: true,
 					followers: true,
+					hidden: true,
+					hiddenAt: true,
 				},
 				orderBy: { visitedAt: "desc" },
 				skip: (page - 1) * limit,
@@ -421,6 +433,62 @@ async function handleApi(
 			console.error("Failed to load creators:", error);
 			sendJson(res, 500, { error: "Failed to load creators" });
 		}
+		return;
+	}
+
+	// PATCH /api/creators/:username/hide - Toggle hidden status (strike off)
+	// Check this BEFORE the /dm route to avoid conflicts
+	if (
+		req.method === "PATCH" &&
+		url.pathname.startsWith("/api/creators/") &&
+		url.pathname.endsWith("/hide")
+	) {
+		const pathParts = url.pathname.split("/");
+		const username = pathParts[3];
+
+		// eslint-disable-next-line no-console
+		console.log(`[API] Hide request for: ${username}, pathname: ${url.pathname}`);
+
+		if (!username) {
+			sendJson(res, 400, { error: "Username required" });
+			return;
+		}
+
+		let body = "";
+		req.on("data", (chunk) => {
+			body += chunk;
+		});
+		req.on("end", async () => {
+			try {
+				const parsed = JSON.parse(body || "{}") as { hidden?: boolean };
+				if (typeof parsed.hidden !== "boolean") {
+					sendJson(res, 400, { error: "hidden boolean required" });
+					return;
+				}
+
+				const prisma = getPrismaClient();
+				const updated = await prisma.profile.update({
+					where: { username },
+					data: {
+						hidden: parsed.hidden,
+						hiddenAt: parsed.hidden ? new Date() : null,
+					},
+					select: {
+						username: true,
+						hidden: true,
+						hiddenAt: true,
+					},
+				});
+
+				// eslint-disable-next-line no-console
+				console.log(`[API] Successfully updated hidden status for ${username}:`, updated);
+				sendJson(res, 200, updated);
+			} catch (error) {
+				// eslint-disable-next-line no-console
+				console.error("Failed to update hidden status:", error);
+				sendJson(res, 500, { error: "Failed to update hidden status" });
+			}
+		});
 		return;
 	}
 

@@ -9,6 +9,8 @@ interface Creator {
 	dmSentAt: string | null;
 	visitedAt: string;
 	followers: number | null;
+	hidden: boolean;
+	hiddenAt: string | null;
 }
 
 interface CreatorsResponse {
@@ -82,6 +84,38 @@ export default function CreatorsTable() {
 			);
 		} catch (err) {
 			console.error("Failed to update DM status:", err);
+		}
+	}
+
+	async function toggleHidden(username: string, currentStatus: boolean | null | undefined) {
+		try {
+			// Treat null/undefined as false (not hidden)
+			const isCurrentlyHidden = currentStatus === true;
+			const newHiddenStatus = !isCurrentlyHidden;
+			
+			console.log(`Toggling hidden for ${username}: ${isCurrentlyHidden} -> ${newHiddenStatus}`);
+			
+			const res = await fetch(`/api/creators/${username}/hide`, {
+				method: "PATCH",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ hidden: newHiddenStatus }),
+			});
+			if (!res.ok) {
+				console.error(`Failed to hide creator: ${res.status} ${res.statusText}`);
+				const errorText = await res.text();
+				console.error("Error response:", errorText);
+				return;
+			}
+
+			const data = await res.json();
+			console.log("Hide toggle successful:", data);
+
+			// Remove from list since hidden creators are filtered out
+			setCreators((prev) => prev.filter((c) => c.username !== username));
+			// Reload to get updated counts
+			loadCreators(page, dmFilter, maxFollowers);
+		} catch (err) {
+			console.error("Failed to update hidden status:", err);
 		}
 	}
 
@@ -167,9 +201,14 @@ export default function CreatorsTable() {
 								<th className="pb-2 pr-3 text-slate-400 font-semibold text-center">
 									DM Sent
 								</th>
-								<th className="pb-2 text-slate-400 font-semibold">DM Date</th>
-								<th className="pb-2 text-slate-400 font-semibold">
+								<th className="pb-2 pr-3 text-slate-400 font-semibold text-center">
+									DM Date
+								</th>
+								<th className="pb-2 pr-3 text-slate-400 font-semibold text-center">
 									Discovered
+								</th>
+								<th className="pb-2 pr-3 text-slate-400 font-semibold text-center">
+									Hide
 								</th>
 							</tr>
 						</thead>
@@ -233,13 +272,28 @@ export default function CreatorsTable() {
 											className="w-4 h-4 rounded border-slate-600 bg-slate-800 text-emerald-500 focus:ring-emerald-500/50 cursor-pointer"
 										/>
 									</td>
-									<td className="py-2 text-slate-400">
+									<td className="py-2 pr-3 text-slate-400 text-center">
 										{creator.dmSentAt
 											? new Date(creator.dmSentAt).toLocaleDateString()
 											: "-"}
 									</td>
-									<td className="py-2 text-slate-400">
+									<td className="py-2 pr-3 text-slate-400 text-center">
 										{new Date(creator.visitedAt).toLocaleDateString()}
+									</td>
+									<td className="py-2 pr-3 text-center">
+										<button
+											onClick={(e) => {
+												e.preventDefault();
+												e.stopPropagation();
+												console.log("Hide button clicked for:", creator.username, "current hidden:", creator.hidden);
+												toggleHidden(creator.username, creator.hidden ?? false);
+											}}
+											type="button"
+											title="Strike off / Hide creator (e.g., male, not a creator to DM)"
+											className="text-red-400 hover:text-red-300 text-lg font-bold transition hover:scale-110"
+										>
+											✕
+										</button>
 									</td>
 								</tr>
 							))}
