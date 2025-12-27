@@ -58,13 +58,17 @@ function App() {
 	const [runsLoading, setRunsLoading] = useState(false);
 	const [runsError, setRunsError] = useState<string | null>(null);
 	const [selectedRun, setSelectedRun] = useState<RunMetadata | null>(null);
+	const [selectedRunForLogs, setSelectedRunForLogs] =
+		useState<RunMetadata | null>(null);
 	const [stats, setStats] = useState<{
 		creatorsFound: number;
 		dmsSent: number;
 	} | null>(null);
 	const [statsLoading, setStatsLoading] = useState(false);
 	const [statsError, setStatsError] = useState<string | null>(null);
-	const [screenshotTab, setScreenshotTab] = useState<"proof" | "analysis" | "errors">("proof");
+	const [screenshotTab, setScreenshotTab] = useState<
+		"proof" | "analysis" | "errors"
+	>("proof");
 
 	const loadStats = useCallback(async () => {
 		setStatsLoading(true);
@@ -91,11 +95,19 @@ function App() {
 		void loadStats();
 	}, [loadStats]);
 
-	async function refreshLogs() {
+	async function refreshLogs(run?: RunMetadata | null) {
 		setLogsLoading(true);
 		setLogsError(null);
 		try {
-			const res = await fetch("/api/logs?limit=200");
+			let url = "/api/logs?limit=500";
+			if (run) {
+				// Filter logs by run's time window
+				url += `&startTime=${encodeURIComponent(run.startTime)}`;
+				if (run.endTime) {
+					url += `&endTime=${encodeURIComponent(run.endTime)}`;
+				}
+			}
+			const res = await fetch(url);
 			if (!res.ok) {
 				setLogsError(`Failed to load logs (status ${res.status}).`);
 				// eslint-disable-next-line no-console
@@ -273,71 +285,8 @@ function App() {
 					</div>
 				</section>
 
-				<section className="flex flex-col rounded-xl border border-slate-800 bg-slate-900/60 overflow-hidden xl:col-span-2">
-					<div className="flex items-center justify-between border-b border-slate-800 px-4 py-2.5">
-						<h2 className="text-sm font-semibold text-slate-200">Logs</h2>
-						<button
-							onClick={refreshLogs}
-							type="button"
-							className="rounded-md border border-slate-700 bg-slate-900 px-2.5 py-1 text-xs font-medium text-slate-200 hover:bg-slate-800 disabled:opacity-60"
-							disabled={logsLoading}
-						>
-							{logsLoading ? "Loading..." : "Refresh logs"}
-						</button>
-					</div>
-					{logsError && (
-						<div className="px-4 py-2 text-[11px] text-amber-400 border-b border-slate-800 bg-slate-950/60">
-							{logsError}
-						</div>
-					)}
-					<div className="flex-1 overflow-y-auto px-4 py-3 text-xs font-mono text-slate-300 bg-slate-950/60">
-						{logEntries.length === 0 ? (
-							<p className="text-slate-500">
-								No log entries yet. Run a script to generate logs, then hit
-								“Refresh logs”.
-							</p>
-						) : (
-							<ul className="space-y-1">
-								{logEntries.map((entry, idx) => {
-									const ts = entry.timestamp ?? "";
-									const level = entry.level ?? "";
-									const prefix = entry.prefix ?? "";
-									const message = entry.message ?? entry.raw ?? "";
-									return (
-										<li
-											// eslint-disable-next-line react/no-array-index-key
-											key={idx}
-											className="whitespace-pre-wrap break-words"
-										>
-											<span className="text-slate-500 mr-1">
-												{ts && `[${ts}]`}
-											</span>
-											{level && (
-												<span
-													className={
-														level === "ERROR"
-															? "text-red-400 mr-1"
-															: level === "WARN"
-																? "text-amber-300 mr-1"
-																: "text-sky-300 mr-1"
-													}
-												>
-													{level}
-												</span>
-											)}
-											{prefix && (
-												<span className="text-emerald-300 mr-1">
-													[{prefix}]
-												</span>
-											)}
-											<span>{message}</span>
-										</li>
-									);
-								})}
-							</ul>
-						)}
-					</div>
-				</section>
+				{/* Confirmed Creators */}
+				<CreatorsTable />
 
 				<section className="flex flex-col rounded-xl border border-slate-800 bg-slate-900/60 overflow-hidden xl:col-span-2">
 					<div className="flex items-center justify-between border-b border-slate-800 px-4 py-2.5">
@@ -346,7 +295,8 @@ function App() {
 								Recent Runs
 							</h2>
 							<p className="text-[11px] text-slate-400 mt-0.5">
-								Script execution history with screenshots and metrics
+								Script execution history with screenshots and metrics. Click a
+								run to view its logs.
 							</p>
 						</div>
 						<button
@@ -373,9 +323,18 @@ function App() {
 								{runs.map((run) => (
 									<button
 										key={run.id}
-										onClick={() => setSelectedRun(run)}
+										onClick={(e) => {
+											e.stopPropagation();
+											setSelectedRun(run);
+											setSelectedRunForLogs(run);
+											void refreshLogs(run);
+										}}
 										type="button"
-										className="w-full text-left rounded-lg border border-slate-800 hover:border-slate-600 transition bg-slate-900/40 p-3"
+										className={`w-full text-left rounded-lg border transition p-3 ${
+											selectedRunForLogs?.id === run.id
+												? "border-sky-500 bg-slate-900/60"
+												: "border-slate-800 hover:border-slate-600 bg-slate-900/40"
+										}`}
 									>
 										<div className="flex items-start justify-between gap-3">
 											<div className="flex-1 min-w-0">
@@ -503,7 +462,12 @@ function App() {
 							}`}
 						>
 							Profile Analysis (
-							{screenshots.filter((s) => s.type === "profile" || s.type === "link").length})
+							{
+								screenshots.filter(
+									(s) => s.type === "profile" || s.type === "link",
+								).length
+							}
+							)
 						</button>
 						<button
 							onClick={() => setScreenshotTab("errors")}
@@ -515,7 +479,12 @@ function App() {
 							}`}
 						>
 							Errors & Debug (
-							{screenshots.filter((s) => s.type === "error" || s.type === "debug").length})
+							{
+								screenshots.filter(
+									(s) => s.type === "error" || s.type === "debug",
+								).length
+							}
+							)
 						</button>
 					</div>
 					<div className="flex-1 overflow-y-auto px-4 py-3 bg-slate-950/60 max-h-[600px]">
@@ -592,9 +561,6 @@ function App() {
 						})()}
 					</div>
 				</section>
-
-				{/* Confirmed Creators */}
-				<CreatorsTable />
 			</main>
 
 			{selectedScreenshot && (

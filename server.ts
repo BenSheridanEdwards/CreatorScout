@@ -348,6 +348,9 @@ async function handleApi(
 	if (req.method === "GET" && url.pathname === "/api/logs") {
 		const limitParam = url.searchParams.get("limit");
 		const limit = limitParam ? Number.parseInt(limitParam, 10) || 200 : 200;
+		const cycleIdParam = url.searchParams.get("cycleId");
+		const startTimeParam = url.searchParams.get("startTime");
+		const endTimeParam = url.searchParams.get("endTime");
 		try {
 			const logsDir = join(process.cwd(), "logs");
 			const file = await getLatestLogFile(logsDir);
@@ -360,14 +363,46 @@ async function handleApi(
 				.split("\n")
 				.map((l) => l.trim())
 				.filter((l) => l.length > 0);
-			const tail = lines.slice(-limit);
-			const entries = tail.map((line) => {
+
+			// Parse all log entries
+			const allEntries = lines.map((line) => {
 				try {
 					return JSON.parse(line);
 				} catch {
 					return { raw: line };
 				}
 			});
+
+			// Filter by cycleId if provided
+			let filteredEntries = allEntries;
+			if (cycleIdParam) {
+				filteredEntries = allEntries.filter((entry) => {
+					// Check if cycleId matches in entry.cycleId or entry.data?.cycleId
+					return (
+						entry.cycleId === cycleIdParam ||
+						entry.data?.cycleId === cycleIdParam
+					);
+				});
+			}
+
+			// Filter by time window if provided (for run-scoped logs)
+			if (startTimeParam || endTimeParam) {
+				const startTime = startTimeParam
+					? new Date(startTimeParam).getTime()
+					: 0;
+				const endTime = endTimeParam
+					? new Date(endTimeParam).getTime()
+					: Date.now();
+
+				filteredEntries = filteredEntries.filter((entry) => {
+					if (!entry.timestamp) return false;
+					const entryTime = new Date(entry.timestamp).getTime();
+					return entryTime >= startTime && entryTime <= endTime;
+				});
+			}
+
+			// Apply limit (take last N entries)
+			const entries = filteredEntries.slice(-limit);
 			sendJson(res, 200, { file, entries });
 		} catch (err) {
 			// eslint-disable-next-line no-console
@@ -493,6 +528,7 @@ async function handleApi(
 					manualOverride: true,
 					dmSent: true,
 					dmSentAt: true,
+					dmSentBy: true,
 					visitedAt: true,
 					followers: true,
 					hidden: true,

@@ -7,6 +7,7 @@ interface Creator {
 	manualOverride: boolean;
 	dmSent: boolean;
 	dmSentAt: string | null;
+	dmSentBy: string | null;
 	visitedAt: string;
 	followers: number | null;
 	hidden: boolean;
@@ -84,6 +85,27 @@ export default function CreatorsTable() {
 			);
 		} catch (err) {
 			console.error("Failed to update DM status:", err);
+		}
+	}
+
+	async function updateDmSentBy(username: string, dmSentBy: string | null) {
+		try {
+			const res = await fetch(`/api/creators/${username}/dm-sent-by`, {
+				method: "PATCH",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ dmSentBy }),
+			});
+			if (!res.ok) return;
+
+			setCreators((prev) =>
+				prev.map((c) =>
+					c.username === username
+						? { ...c, dmSentBy }
+						: c,
+				),
+			);
+		} catch (err) {
+			console.error("Failed to update dmSentBy:", err);
 		}
 	}
 
@@ -205,6 +227,9 @@ export default function CreatorsTable() {
 									DM Date
 								</th>
 								<th className="pb-2 pr-3 text-slate-400 font-semibold text-center">
+									DM Sent By
+								</th>
+								<th className="pb-2 pr-3 text-slate-400 font-semibold text-center">
 									Discovered
 								</th>
 								<th className="pb-2 pr-3 text-slate-400 font-semibold text-center">
@@ -276,6 +301,24 @@ export default function CreatorsTable() {
 										{creator.dmSentAt
 											? new Date(creator.dmSentAt).toLocaleDateString()
 											: "-"}
+									</td>
+									<td className="py-2 pr-3 text-center">
+										<input
+											type="text"
+											value={creator.dmSentBy || ""}
+											onChange={(e) => {
+												const newValue = e.target.value.trim() || null;
+												updateDmSentBy(creator.username, newValue);
+											}}
+											onBlur={(e) => {
+												const newValue = e.target.value.trim() || null;
+												if (newValue !== (creator.dmSentBy || null)) {
+													updateDmSentBy(creator.username, newValue);
+												}
+											}}
+											placeholder="username"
+											className="w-24 px-2 py-1 text-xs rounded border border-slate-700 bg-slate-900 text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500"
+										/>
 									</td>
 									<td className="py-2 pr-3 text-slate-400 text-center">
 										{new Date(creator.visitedAt).toLocaleDateString()}

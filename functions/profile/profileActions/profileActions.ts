@@ -120,7 +120,12 @@ export async function sendDMToUser(
 
 		// Verify and record
 		const { proofPath } = await verifyDmSent(page, username);
-		await markDmSent(username, proofPath);
+		
+		// Get current logged-in username
+		const { getCurrentUsername } = await import("../../shared/username/getCurrentUsername.ts");
+		const currentUsername = await getCurrentUsername(page);
+		
+		await markDmSent(username, proofPath, currentUsername || undefined);
 
 		logger.info("ACTION", `DM sent to @${username}`);
 		recordActivity("dm_sent", username, "success");

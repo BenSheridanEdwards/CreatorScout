@@ -258,6 +258,7 @@ export async function wasDmSent(username: string): Promise<boolean> {
 export async function markDmSent(
 	username: string,
 	proofPath?: string | null,
+	dmSentBy?: string | null,
 ): Promise<void> {
 	const prisma = getPrisma();
 	const u = username.toLowerCase().trim();
@@ -269,6 +270,7 @@ export async function markDmSent(
 			username: u,
 			dmSent: true,
 			dmSentAt: new Date(),
+			dmSentBy: dmSentBy || undefined,
 			proofPath: proofPath || undefined,
 			visitedAt: new Date(),
 			lastSeen: new Date(),
@@ -276,6 +278,7 @@ export async function markDmSent(
 		update: {
 			dmSent: true,
 			dmSentAt: new Date(),
+			dmSentBy: dmSentBy || undefined,
 			proofPath: proofPath || undefined,
 			lastSeen: new Date(),
 		},
