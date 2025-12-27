@@ -8,6 +8,7 @@ interface Creator {
 	dmSent: boolean;
 	dmSentAt: string | null;
 	visitedAt: string;
+	followers: number | null;
 }
 
 interface CreatorsResponse {
@@ -27,14 +28,21 @@ export default function CreatorsTable() {
 	const [total, setTotal] = useState(0);
 	const [pendingCount, setPendingCount] = useState(0);
 	const [dmFilter, setDmFilter] = useState<"all" | "pending" | "sent">("all");
+	const [maxFollowers, setMaxFollowers] = useState<number | null>(null);
 
-	async function loadCreators(pageNum = 1, filter = dmFilter) {
+	async function loadCreators(pageNum = 1, filter = dmFilter, maxFollowersFilter = maxFollowers) {
 		setLoading(true);
 		setError(null);
 		try {
-			const res = await fetch(
-				`/api/creators?page=${pageNum}&limit=50&dmFilter=${filter}`,
-			);
+			const params = new URLSearchParams({
+				page: pageNum.toString(),
+				limit: "50",
+				dmFilter: filter,
+			});
+			if (maxFollowersFilter !== null) {
+				params.append("maxFollowers", maxFollowersFilter.toString());
+			}
+			const res = await fetch(`/api/creators?${params.toString()}`);
 			if (!res.ok) {
 				setError(`Failed to load creators (status ${res.status}).`);
 				return;
@@ -96,7 +104,7 @@ export default function CreatorsTable() {
 						onChange={(e) => {
 							const newFilter = e.target.value as "all" | "pending" | "sent";
 							setDmFilter(newFilter);
-							loadCreators(1, newFilter);
+							loadCreators(1, newFilter, maxFollowers);
 						}}
 						className="rounded-md border border-slate-700 bg-slate-900 px-2 py-1 text-xs text-slate-200"
 					>
@@ -104,8 +112,21 @@ export default function CreatorsTable() {
 						<option value="pending">DM Pending</option>
 						<option value="sent">DM Sent</option>
 					</select>
+					<label className="flex items-center gap-1 text-xs text-slate-400">
+						<input
+							type="checkbox"
+							checked={maxFollowers === 100000}
+							onChange={(e) => {
+								const newMaxFollowers = e.target.checked ? 100000 : null;
+								setMaxFollowers(newMaxFollowers);
+								loadCreators(1, dmFilter, newMaxFollowers);
+							}}
+							className="w-4 h-4 rounded border-slate-600 bg-slate-800 text-emerald-500 focus:ring-emerald-500/50 cursor-pointer"
+						/>
+						<span>Followers &lt; 100k</span>
+					</label>
 					<button
-						onClick={() => loadCreators(page, dmFilter)}
+						onClick={() => loadCreators(page, dmFilter, maxFollowers)}
 						disabled={loading}
 						type="button"
 						className="rounded-md border border-slate-700 bg-slate-900 px-2.5 py-1 text-xs font-medium text-slate-200 hover:bg-slate-800 disabled:opacity-60"
@@ -136,6 +157,9 @@ export default function CreatorsTable() {
 								<th className="pb-2 pr-3 text-slate-400 font-semibold">Bio</th>
 								<th className="pb-2 pr-3 text-slate-400 font-semibold text-center">
 									Conf.
+								</th>
+								<th className="pb-2 pr-3 text-slate-400 font-semibold text-center">
+									Followers
 								</th>
 								<th className="pb-2 pr-3 text-slate-400 font-semibold text-center">
 									Manual
@@ -183,6 +207,11 @@ export default function CreatorsTable() {
 											{creator.confidence}%
 										</span>
 									</td>
+									<td className="py-2 pr-3 text-center text-slate-300">
+										{creator.followers !== null && creator.followers !== undefined
+											? creator.followers.toLocaleString()
+											: "-"}
+									</td>
 									<td className="py-2 pr-3 text-center">
 										{creator.manualOverride ? (
 											<span className="text-purple-400" title="Manual override">
@@ -226,7 +255,7 @@ export default function CreatorsTable() {
 					</div>
 					<div className="flex gap-2">
 						<button
-							onClick={() => loadCreators(page - 1, dmFilter)}
+							onClick={() => loadCreators(page - 1, dmFilter, maxFollowers)}
 							disabled={page === 1 || loading}
 							type="button"
 							className="px-3 py-1 rounded border border-slate-700 text-slate-200 hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed"
@@ -234,7 +263,7 @@ export default function CreatorsTable() {
 							Previous
 						</button>
 						<button
-							onClick={() => loadCreators(page + 1, dmFilter)}
+							onClick={() => loadCreators(page + 1, dmFilter, maxFollowers)}
 							disabled={page >= totalPages || loading}
 							type="button"
 							className="px-3 py-1 rounded border border-slate-700 text-slate-200 hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed"

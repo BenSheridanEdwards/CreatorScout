@@ -28,7 +28,10 @@ const LINKTREE_PROMPT = `You are analyzing a screenshot of a link page (linktree
 
 Determine if this person is an Patreon/premium content creator.
 
+**VISUAL ANALYSIS PRIORITY**: Look for visual branding FIRST - logos, icons, brand colors, and visual elements are more reliable than text.
+
 STRONG INDICATORS (high confidence if present):
+- **CRITICAL - HIGHEST PRIORITY**: Patreon logo/branding visible anywhere on the page - the distinctive "OF" logo with wing element, Patreon brand colors (blue/teal), Patreon icon, or any Patreon visual branding = INSTANT 100% confidence. If you see the Patreon logo (even without text), this is definitive proof.
 - Direct links to: Patreon, Ko-fi, FanVue, Fanfix, Fanhouse, LoyalFans, Pornhub, ManyVids
 - Text like "Exclusive Content", "Premium Content", "VIP Access", "Private Content"
 - Discount language: "% OFF", "Sale", "Limited offer", "Free trial"
@@ -44,7 +47,9 @@ MODERATE INDICATORS (consider with other factors):
 - Words: "Spicy", "Naughty", "Uncensored", "Unfiltered", "Content creator"
 - High follower counts with link aggregator pages
 
-IMPORTANT: "Exclusive Content" + discount (e.g., "80% OFF") + link imagery = VERY HIGH confidence even without explicit creator link.
+IMPORTANT: 
+- If you see the Patreon logo/icon/branding visually (the "OF" logo with wing), mark as creator with 100% confidence immediately
+- "Exclusive Content" + discount (e.g., "80% OFF") + link imagery = VERY HIGH confidence even without explicit creator link
 
 Return EXACTLY this JSON:
 {
@@ -228,6 +233,10 @@ export async function isConfirmedCreator(
 	const allText = [...indicators, reason].join(" ").toLowerCase();
 
 	const definitiveSignals = [
+		{ text: "patreon logo", label: "PATREON LOGO" },
+		{ text: "of logo", label: "PATREON LOGO" },
+		{ text: "patreon branding", label: "PATREON BRANDING" },
+		{ text: "patreon visual", label: "PATREON VISUAL" },
 		{ text: "exclusive content", label: "EXCLUSIVE CONTENT" },
 		{ text: "patreon", label: "PATREON" },
 		{ text: "creator link", label: "PATREON" },

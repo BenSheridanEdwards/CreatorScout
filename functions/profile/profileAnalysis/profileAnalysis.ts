@@ -291,6 +291,17 @@ export async function analyzeProfileComprehensive(
 					`link_analysis_${username}`,
 				);
 
+				// Take screenshot of the link page for records (functional - always enabled)
+				// Do this BEFORE checking isCreator so vision can run even if text analysis missed it
+				const linkScreenshot = await snapshot(
+					page,
+					`link_analysis_${username}`,
+					true, // force: true - functional screenshot for vision analysis
+				);
+				if (linkScreenshot) {
+					result.screenshots.push(linkScreenshot);
+				}
+
 				if (linkAnalysis.isCreator) {
 					// Combine link confidence with bio score
 					// If link confidence is LOW (30-50%) AND bio score is also LOW (<40),
@@ -325,65 +336,71 @@ export async function analyzeProfileComprehensive(
 					result.confidence = Math.max(result.confidence, adjustedConfidence);
 					result.indicators.push(...linkAnalysis.indicators);
 					result.reason = linkAnalysis.reason;
+				} else {
+					// Text analysis didn't detect creator, but still add indicators and reason
+					result.indicators.push(...linkAnalysis.indicators);
+					result.reason = linkAnalysis.reason;
+				}
 
-					// Take screenshot of the link page for records (functional - always enabled)
-					const linkScreenshot = await snapshot(
-						page,
-						`link_analysis_${username}`,
-						true, // force: true - functional screenshot for vision analysis
+				// Vision analysis (only if text confidence is below threshold and SKIP_VISION is false)
+				// Run vision even if text analysis said isCreator=false - vision might catch what text missed
+				if (
+					!SKIP_VISION &&
+					linkScreenshot &&
+					linkAnalysis.confidence < VISION_SKIP_THRESHOLD
+				) {
+					console.log(
+						`[VISION] Text confidence ${linkAnalysis.confidence}% < ${VISION_SKIP_THRESHOLD}%, running vision analysis...`,
 					);
-					if (linkScreenshot) {
-						result.screenshots.push(linkScreenshot);
-					}
-
-					// Vision analysis (only if text confidence is below threshold and SKIP_VISION is false)
-					if (
-						!SKIP_VISION &&
-						linkScreenshot &&
-						linkAnalysis.confidence < VISION_SKIP_THRESHOLD
-					) {
-						console.log(
-							`[VISION] Text confidence ${linkAnalysis.confidence}% < ${VISION_SKIP_THRESHOLD}%, running vision analysis...`,
-						);
-						try {
-							const [isCreatorVision, visionData] =
-								await isConfirmedCreator(linkScreenshot);
-							if (isCreatorVision && visionData) {
-								// Vision found creator - use vision confidence if higher than text
-								const visionConfidence = visionData.confidence || 0;
-								if (visionConfidence > linkAnalysis.confidence) {
-									result.confidence = Math.max(
-										result.confidence,
-										visionConfidence,
-									);
-									result.isCreator = true;
-									result.indicators.push(
-										`Vision confirmed creator (${visionConfidence}% confidence)`,
-									);
-									if (visionData.indicators) {
-										result.indicators.push(...visionData.indicators);
-									}
-									result.reason = `vision_${visionData.reason || "confirmed"}`;
-									console.log(
-										`[VISION] Vision confirmed creator with ${visionConfidence}% confidence`,
-									);
-								} else {
-									result.indicators.push(
-										`Vision analysis: ${visionConfidence}% (text analysis was ${linkAnalysis.confidence}%)`,
-									);
-								}
-							} else {
-								console.log(
-									`[VISION] Vision did not confirm creator (confidence: ${visionData?.confidence || 0}%)`,
+					try {
+						const [isCreatorVision, visionData] =
+							await isConfirmedCreator(linkScreenshot);
+						if (isCreatorVision && visionData) {
+							// Vision found creator - use vision confidence if higher than text
+							const visionConfidence = visionData.confidence || 0;
+							if (visionConfidence > linkAnalysis.confidence) {
+								result.confidence = Math.max(
+									result.confidence,
+									visionConfidence,
 								);
+								result.isCreator = true;
 								result.indicators.push(
-									`Vision analysis did not confirm creator`,
+									`Vision confirmed creator (${visionConfidence}% confidence)`,
+								);
+								if (visionData.indicators) {
+									result.indicators.push(...visionData.indicators);
+								}
+								result.reason = `vision_${visionData.reason || "confirmed"}`;
+								console.log(
+									`[VISION] Vision confirmed creator with ${visionConfidence}% confidence`,
+								);
+							} else {
+								result.indicators.push(
+									`Vision analysis: ${visionConfidence}% (text analysis was ${linkAnalysis.confidence}%)`,
 								);
 							}
-						} catch (visionError) {
-							console.log(`[VISION] Vision analysis error: ${visionError}`);
-							result.errors?.push(`Vision analysis failed: ${visionError}`);
+						} else {
+							console.log(
+								`[VISION] Vision did not confirm creator (confidence: ${visionData?.confidence || 0}%)`,
+							);
+							result.indicators.push(
+								`Vision analysis did not confirm creator`,
+							);
 						}
+					} catch (visionError) {
+						console.log(`[VISION] Vision analysis error: ${visionError}`);
+						result.errors?.push(`Vision analysis failed: ${visionError}`);
+					}
+				} else {
+					// Log why vision didn't run
+					if (SKIP_VISION) {
+						console.log(
+							`[VISION] Skipping vision - SKIP_VISION is enabled`,
+						);
+					} else if (!linkScreenshot) {
+						console.log(
+							`[VISION] Skipping vision - screenshot was not taken (linkScreenshot is null)`,
+						);
 					} else if (linkAnalysis.confidence >= VISION_SKIP_THRESHOLD) {
 						console.log(
 							`[VISION] Skipping vision - text confidence ${linkAnalysis.confidence}% >= ${VISION_SKIP_THRESHOLD}% threshold`,

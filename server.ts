@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { createReadStream } from "node:fs";
+import { createReadStream, existsSync } from "node:fs";
 import { readdir, readFile, stat } from "node:fs/promises";
 import http from "node:http";
 import { extname, join } from "node:path";
@@ -354,18 +354,31 @@ async function handleApi(
 		const page = parseInt(url.searchParams.get("page") || "1", 10);
 		const limit = parseInt(url.searchParams.get("limit") || "50", 10);
 		const dmFilter = url.searchParams.get("dmFilter") || "all";
+		const maxFollowers = url.searchParams.get("maxFollowers");
 
 		try {
 			const prisma = getPrismaClient();
 
 			// Build where clause
-			const where: { isCreator: boolean; dmSent?: boolean } = {
+			const where: { 
+				isCreator: boolean; 
+				dmSent?: boolean; 
+				followers?: { lte: number } | null;
+				OR?: Array<{ followers: { lte: number } } | { followers: null }>;
+			} = {
 				isCreator: true,
 			};
 			if (dmFilter === "pending") {
 				where.dmSent = false;
 			} else if (dmFilter === "sent") {
 				where.dmSent = true;
+			}
+			if (maxFollowers) {
+				// Include creators with null followers OR followers <= maxFollowers
+				where.OR = [
+					{ followers: { lte: parseInt(maxFollowers, 10) } },
+					{ followers: null },
+				];
 			}
 
 			// Get total count for current filter
@@ -387,6 +400,7 @@ async function handleApi(
 					dmSent: true,
 					dmSentAt: true,
 					visitedAt: true,
+					followers: true,
 				},
 				orderBy: { visitedAt: "desc" },
 				skip: (page - 1) * limit,
