@@ -77,9 +77,26 @@ function parseScreenshotFilename(filename: string): Partial<Screenshot> | null {
 		};
 	}
 
-	// Match discovery-related screenshots (profile, link_analysis, dm)
+	// Match DM proof screenshots (only two cases):
+	// 1. dm_username-timestamp.png - proof when a new DM has been sent
+	// 2. dm_skipped_existing_username-timestamp.png - proof when thread already has messages
+	const dmProofMatch = filename.match(
+		/^dm_(skipped_existing_)?([^-]+)-(\d+)\.png$/,
+	);
+	if (dmProofMatch) {
+		const [, , username, timestamp] = dmProofMatch;
+		const date = new Date(parseInt(timestamp, 10));
+
+		return {
+			username,
+			type: "dm",
+			date: date.toISOString(),
+		};
+	}
+
+	// Match discovery-related screenshots (profile, link_analysis)
 	const discoveryMatch = filename.match(
-		/(profile|link_analysis|dm)_([^-]+)-(\d+)\.png$/,
+		/(profile|link_analysis)_([^-]+)-(\d+)\.png$/,
 	);
 	if (discoveryMatch) {
 		const [, type, username, timestamp] = discoveryMatch;
@@ -87,7 +104,7 @@ function parseScreenshotFilename(filename: string): Partial<Screenshot> | null {
 
 		return {
 			username,
-			type: type === "link_analysis" ? "link" : (type as "profile" | "dm"),
+			type: type === "link_analysis" ? "link" : "profile",
 			date: date.toISOString(),
 		};
 	}
