@@ -134,17 +134,49 @@ async function handleApi(
 	res: http.ServerResponse,
 ): Promise<void> {
 	const url = new URL(req.url ?? "/", `http://${req.headers.host}`);
-	
+
 	// Debug logging for PATCH requests to /api/creators
 	if (req.method === "PATCH" && url.pathname.startsWith("/api/creators/")) {
 		// eslint-disable-next-line no-console
-		console.log(`[API DEBUG] PATCH ${url.pathname}, endsWith /hide: ${url.pathname.endsWith("/hide")}, endsWith /dm: ${url.pathname.endsWith("/dm")}`);
+		console.log(
+			`[API DEBUG] PATCH ${url.pathname}, endsWith /hide: ${url.pathname.endsWith("/hide")}, endsWith /dm: ${url.pathname.endsWith("/dm")}`,
+		);
 		// eslint-disable-next-line no-console
 		console.log(`[API DEBUG] Full URL: ${req.url}, pathname: ${url.pathname}`);
 	}
 
 	if (req.method === "GET" && url.pathname === "/api/health") {
 		sendJson(res, 200, { ok: true, ts: Date.now() });
+		return;
+	}
+
+	if (req.method === "GET" && url.pathname === "/api/stats") {
+		try {
+			const prisma = getPrismaClient();
+
+			// Get total visible creators (excluding hidden) - matches CreatorsTable
+			const creatorsFound = await prisma.profile.count({
+				where: { isCreator: true, hidden: false },
+			});
+
+			// Get total DMs sent to creators (only count DMs sent to visible creators)
+			const dmsSent = await prisma.profile.count({
+				where: {
+					dmSent: true,
+					isCreator: true,
+					hidden: false, // Only count DMs to visible creators
+				},
+			});
+
+			sendJson(res, 200, {
+				creatorsFound,
+				dmsSent,
+			});
+		} catch (error) {
+			// eslint-disable-next-line no-console
+			console.error("Failed to load stats:", error);
+			sendJson(res, 500, { error: "Failed to load stats" });
+		}
 		return;
 	}
 
@@ -368,9 +400,9 @@ async function handleApi(
 			const prisma = getPrismaClient();
 
 			// Build where clause
-			const where: { 
-				isCreator: boolean; 
-				dmSent?: boolean; 
+			const where: {
+				isCreator: boolean;
+				dmSent?: boolean;
 				hidden?: boolean;
 				followers?: { lte: number } | null;
 				OR?: Array<{ followers: { lte: number } } | { followers: null }>;
@@ -447,7 +479,9 @@ async function handleApi(
 		const username = pathParts[3];
 
 		// eslint-disable-next-line no-console
-		console.log(`[API] Hide request for: ${username}, pathname: ${url.pathname}`);
+		console.log(
+			`[API] Hide request for: ${username}, pathname: ${url.pathname}`,
+		);
 
 		if (!username) {
 			sendJson(res, 400, { error: "Username required" });
@@ -481,7 +515,10 @@ async function handleApi(
 				});
 
 				// eslint-disable-next-line no-console
-				console.log(`[API] Successfully updated hidden status for ${username}:`, updated);
+				console.log(
+					`[API] Successfully updated hidden status for ${username}:`,
+					updated,
+				);
 				sendJson(res, 200, updated);
 			} catch (error) {
 				// eslint-disable-next-line no-console
