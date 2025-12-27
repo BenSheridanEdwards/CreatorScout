@@ -49,7 +49,7 @@ const recordingState: RecordingState = {
 
 interface Screenshot {
 	username: string;
-	type: "profile" | "link" | "dm" | "unknown";
+	type: "profile" | "link" | "dm" | "error" | "debug" | "unknown";
 	date: string;
 	path: string;
 	filename: string;
@@ -60,26 +60,56 @@ interface Screenshot {
  * Format: profile_username-timestamp.png
  *         link_analysis_username-timestamp.png
  *         dm_username-timestamp.png
+ *         error_*_*-timestamp.png (error screenshots)
  */
-function parseScreenshotFilename(filename: string): Partial<Screenshot> {
-	const match = filename.match(
-		/(profile|link_analysis|dm)_([^-]+)-(\d+)\.png$/,
-	);
-	if (!match) {
-		return { type: "unknown", username: "unknown" };
+function parseScreenshotFilename(filename: string): Partial<Screenshot> | null {
+	// Match debug screenshots: dm_profile_debug_username-timestamp.png
+	// These are debug screenshots taken during DM navigation, categorize as debug
+	const debugMatch = filename.match(/^dm_profile_debug_([^-]+)-(\d+)\.png$/);
+	if (debugMatch) {
+		const [, username, timestamp] = debugMatch;
+		const date = new Date(parseInt(timestamp, 10));
+
+		return {
+			username,
+			type: "debug",
+			date: date.toISOString(),
+		};
 	}
 
-	const [, type, username, timestamp] = match;
-	const date = new Date(parseInt(timestamp, 10));
+	// Match discovery-related screenshots (profile, link_analysis, dm)
+	const discoveryMatch = filename.match(
+		/(profile|link_analysis|dm)_([^-]+)-(\d+)\.png$/,
+	);
+	if (discoveryMatch) {
+		const [, type, username, timestamp] = discoveryMatch;
+		const date = new Date(parseInt(timestamp, 10));
 
-	return {
-		username,
-		type:
-			type === "link_analysis"
-				? "link"
-				: (type as "profile" | "dm" | "unknown"),
-		date: date.toISOString(),
-	};
+		return {
+			username,
+			type: type === "link_analysis" ? "link" : (type as "profile" | "dm"),
+			date: date.toISOString(),
+		};
+	}
+
+	// Match error screenshots: error_*_*-timestamp.png
+	const errorMatch = filename.match(/^error_(.+?)_(.+?)-(\d+)\.png$/);
+	if (errorMatch) {
+		const [, , reason, timestamp] = errorMatch;
+		const date = new Date(parseInt(timestamp, 10));
+		// Extract username from reason if possible
+		const usernameMatch = reason.match(/([a-zA-Z0-9._]+)/);
+		const username = usernameMatch ? usernameMatch[1] : "unknown";
+
+		return {
+			username,
+			type: "error",
+			date: date.toISOString(),
+		};
+	}
+
+	// Return null for other screenshot types (follow, bio_validation, etc.)
+	return null;
 }
 
 /**
@@ -101,6 +131,11 @@ async function scanScreenshots(): Promise<Screenshot[]> {
 					await scan(fullPath, relPath);
 				} else if (entry.name.endsWith(".png")) {
 					const metadata = parseScreenshotFilename(entry.name);
+					// Include discovery-related screenshots (profile, link_analysis, dm) and error screenshots
+					// Filter out other types (follow, bio_validation, etc.)
+					if (!metadata) {
+						continue;
+					}
 					const stats = await stat(fullPath);
 
 					screenshots.push({
