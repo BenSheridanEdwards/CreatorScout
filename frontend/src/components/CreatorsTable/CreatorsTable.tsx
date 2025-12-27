@@ -360,8 +360,14 @@ export default function CreatorsTable() {
 											type="text"
 											value={creator.dmSentBy || ""}
 											onChange={(e) => {
-												const newValue = e.target.value.trim() || null;
-												updateDmSentBy(creator.username, newValue);
+												const newValue = e.target.value;
+												setCreators((prev) =>
+													prev.map((c) =>
+														c.username === creator.username
+															? { ...c, dmSentBy: newValue || null }
+															: c,
+													),
+												);
 											}}
 											onBlur={(e) => {
 												const newValue = e.target.value.trim() || null;
