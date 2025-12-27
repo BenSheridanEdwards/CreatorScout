@@ -1,5 +1,6 @@
 import type { Page } from "puppeteer";
 import { CONFIDENCE_THRESHOLD } from "../../shared/config/config.ts";
+import { sleep } from "../../timing/sleep/sleep.ts";
 
 const INSTAGRAM_HOST = "instagram.com";
 
@@ -189,11 +190,21 @@ export async function analyzeExternalLink(
 		if (isAlreadyOnExternalPage) {
 			console.log(`[LINK_ANALYSIS] Already on external page: ${currentUrl}`);
 			finalUrl = currentUrl;
+			// Wait 5 seconds for page to fully load even if we're already on it
+			console.log(
+				`[LINK_ANALYSIS] Waiting 5 seconds for page to fully load...`,
+			);
+			await sleep(5000);
 		} else {
 			// Navigate to the external link
 			console.log(`[LINK_ANALYSIS] Navigating to: ${linkUrl}`);
 			await page.goto(linkUrl, { waitUntil: "networkidle2", timeout: 15000 });
 			finalUrl = page.url();
+			// Wait 5 seconds for page to fully load before doing any checks
+			console.log(
+				`[LINK_ANALYSIS] Waiting 5 seconds for page to fully load...`,
+			);
+			await sleep(5000);
 		}
 
 		// Check if the URL is blacklisted (non-creator domains)
@@ -344,13 +355,26 @@ export async function analyzeExternalLink(
 
 		// Extract and analyze page content for keywords and creator indicators
 		const pageContent = await page.evaluate(() => {
-			// Check for Linktree's "Sensitive Content" gate (strong indicator)
+			// Check for content warning gates (Linktree "Sensitive Content", link.me "Mature Content", etc.)
+			const bodyText = document.body.textContent?.toLowerCase() || "";
 			const hasSensitiveContentGate =
-				document.body.textContent?.includes("Sensitive Content") &&
-				(document.body.textContent?.includes(
-					"not appropriate for all audiences",
-				) ||
-					document.body.textContent?.includes("Continue"));
+				// Linktree pattern: "Sensitive Content" + "not appropriate for all audiences" or "Continue"
+				(bodyText.includes("sensitive content") &&
+					(bodyText.includes("not appropriate for all audiences") ||
+						bodyText.includes("continue"))) ||
+				// link.me and other platforms: "Mature Content" + "disclaimer" or "exclusive" or "Continue"
+				(bodyText.includes("mature content") &&
+					(bodyText.includes("disclaimer") ||
+						bodyText.includes("exclusive") ||
+						bodyText.includes("continue") ||
+						bodyText.includes("graphic") ||
+						bodyText.includes("premium content"))) ||
+				// Generic patterns: "This link may contain" + premium content indicators
+				(bodyText.includes("this link may contain") &&
+					(bodyText.includes("graphic") ||
+						bodyText.includes("adult") ||
+						bodyText.includes("mature") ||
+						bodyText.includes("exclusive")));
 
 			// Grab ALL text content from the page (it's not Instagram, so we can be aggressive)
 			// This ensures we capture overlays, dynamic content, and everything visible
@@ -431,7 +455,18 @@ export async function analyzeExternalLink(
 					(text.includes("hot") && text.includes("content")) ||
 					text.includes("chat with me") ||
 					text.includes("don't tell") ||
-					text.includes("dont tell")
+					text.includes("dont tell") ||
+					text.includes("you belong to") ||
+					text.includes("belong to me") ||
+					text.includes("belong to mommy") ||
+					(text.includes("mommy") &&
+						(text.includes("% off") ||
+							text.includes("discount") ||
+							text.includes("treatment"))) ||
+					(text.includes("treatment") &&
+						(text.includes("% off") ||
+							text.includes("discount") ||
+							text.includes("$")))
 				);
 			});
 
@@ -464,6 +499,11 @@ export async function analyzeExternalLink(
 				"subscribe for",
 				"vip access",
 				"vip content",
+				// Creator/dominant language patterns
+				"you belong to",
+				"belong to me",
+				"mommy treatment",
+				"daddy treatment",
 			];
 
 			return {
@@ -514,6 +554,11 @@ export async function analyzeExternalLink(
 			"subscribe for",
 			"vip access",
 			"vip content",
+			// Creator/dominant language patterns
+			"you belong to",
+			"belong to me",
+			"mommy treatment",
+			"daddy treatment",
 		];
 
 		const normalizedCreatorPatterns = creatorTextPatterns.filter((pattern) =>
@@ -554,16 +599,17 @@ export async function analyzeExternalLink(
 			);
 		}
 
-		// Check for Linktree's "Sensitive Content" gate (ULTIMATE signal)
+		// Check for content warning gates (ULTIMATE signal)
+		// This includes Linktree's "Sensitive Content", link.me's "Mature Content Disclaimer", etc.
 		if (pageContent.hasSensitiveContentGate) {
 			result.isCreator = true;
 			result.confidence = 100;
-			result.reason = "sensitive_content_gate";
+			result.reason = "content_warning_gate";
 			result.indicators.push(
-				"CONTENT GATE - Linktree premium content warning",
+				"CONTENT WARNING GATE - Adult/content disclaimer detected",
 			);
 			console.log(
-				`[LINK_ANALYSIS] 🔒 Found Linktree Sensitive Content gate - DEFINITIVE creator signal`,
+				`[LINK_ANALYSIS] 🔒 Found content warning gate (Sensitive/Mature Content) - DEFINITIVE creator signal`,
 			);
 			return result;
 		}
@@ -596,12 +642,37 @@ export async function analyzeExternalLink(
 			{ text: "loyalfans", label: "LOYALFANS", reason: "loyalfans" },
 			{ text: "loyal fans", label: "LOYALFANS", reason: "loyalfans" },
 			{ text: "manyvids", label: "MANYVIDS", reason: "manyvids" },
+			{
+				text: "mature content",
+				label: "MATURE CONTENT",
+				reason: "mature_content_warning",
+			},
+			{
+				text: "content disclaimer",
+				label: "MATURE CONTENT DISCLAIMER",
+				reason: "mature_content_warning",
+			},
 			{ text: "my vip page", label: "VIP PAGE", reason: "vip_page" },
 			{ text: "vip page", label: "VIP PAGE", reason: "vip_page" },
 			{ text: "my vip", label: "VIP PAGE", reason: "vip_page" },
 			{ text: "free trial", label: "FREE TRIAL", reason: "free_trial" },
 			{ text: "free for", label: "FREE PROMO", reason: "free_promo" }, // "Free for 24hrs", "Free for 30 days"
 			{ text: "vip free", label: "VIP FREE", reason: "vip_free" },
+			{
+				text: "mommy treatment",
+				label: "MOMMY TREATMENT",
+				reason: "link_promotional",
+			},
+			{
+				text: "daddy treatment",
+				label: "DADDY TREATMENT",
+				reason: "link_promotional",
+			},
+			{
+				text: "you belong to",
+				label: "CREATOR LANGUAGE",
+				reason: "link_promotional",
+			},
 		];
 
 		for (const signal of definitiveSignals) {
@@ -642,6 +713,32 @@ export async function analyzeExternalLink(
 			);
 			console.log(
 				`[LINK_ANALYSIS] 💎 Found VIP with promotional language - strong creator signal`,
+			);
+			return result;
+		}
+
+		// Check for creator language + promotional patterns (e.g., "mommy treatment (70% off)")
+		// This catches link/dominant language combined with pricing/discounts
+		if (
+			(normalizedText.includes("mommy") ||
+				normalizedText.includes("daddy") ||
+				normalizedText.includes("mistress") ||
+				normalizedText.includes("goddess")) &&
+			(normalizedText.includes("% off") ||
+				normalizedText.includes("discount") ||
+				normalizedText.includes("treatment") ||
+				normalizedText.includes("you belong to") ||
+				normalizedText.includes("belong to me") ||
+				pageContent.hasPricingIndicator)
+		) {
+			result.isCreator = true;
+			result.confidence = 95; // Very high confidence for creator language + pricing
+			result.reason = "link_promotional";
+			result.indicators.push(
+				"Creator language + promotional offer (pricing/discount) - strong creator signal",
+			);
+			console.log(
+				`[LINK_ANALYSIS] 💎 Found creator language with promotional offer - strong creator signal`,
 			);
 			return result;
 		}
@@ -691,6 +788,10 @@ export async function analyzeExternalLink(
 					"+18",
 					"private account",
 					"chat with me",
+					"you belong to",
+					"belong to me",
+					"mommy treatment",
+					"daddy treatment",
 				].includes(pattern),
 			) ||
 			platformMatches.length > 0; // Platform icons are still strong signals

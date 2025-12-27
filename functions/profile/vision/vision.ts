@@ -34,8 +34,9 @@ STRONG INDICATORS (high confidence if present):
 - Discount language: "% OFF", "Sale", "Limited offer", "Free trial"
 - Subscription CTAs: "Subscribe", "Join me", "Unlock", "See more"
 - Adult warnings: "exclusive", "NSFW", "Adults only", "Must be 18"
-- **CRITICAL**: "Sensitive Content" warning (Linktree's premium content gate) - this is VERY HIGH confidence
-- Content gates requiring "Continue" or "I'm exclusive" to access - padlock icons, age verification
+- **CRITICAL**: Content warning gates - "Sensitive Content" (Linktree), "Mature Content Disclaimer" (link.me), etc. - this is VERY HIGH confidence
+- Content gates requiring "Continue", "I'm exclusive", or age verification to access - padlock icons, age verification boxes
+- Creator/dominant language with pricing: "mommy treatment", "daddy treatment", "you belong to me", "belong to mommy" combined with discounts/pricing
 
 MODERATE INDICATORS (consider with other factors):
 - Link/revealing imagery (bikini, lingerie, provocative poses)
@@ -241,6 +242,11 @@ export async function isConfirmedCreator(
 		{ text: "loyalfans", label: "LOYALFANS" },
 		{ text: "loyal fans", label: "LOYALFANS" },
 		{ text: "manyvids", label: "MANYVIDS" },
+		{ text: "mature content", label: "MATURE CONTENT" },
+		{ text: "content disclaimer", label: "MATURE CONTENT DISCLAIMER" },
+		{ text: "mommy treatment", label: "MOMMY TREATMENT" },
+		{ text: "daddy treatment", label: "DADDY TREATMENT" },
+		{ text: "you belong to", label: "CREATOR LANGUAGE" },
 	];
 
 	for (const signal of definitiveSignals) {
