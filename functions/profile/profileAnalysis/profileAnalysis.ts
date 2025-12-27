@@ -91,16 +91,20 @@ export async function analyzeProfileBasic(
 
 	// Queue referenced Instagram profiles for follow-up analysis
 	if (scoreData.referencedProfiles && scoreData.referencedProfiles.length > 0) {
-		logger.log(
+		logger.info(
+			"ANALYSIS",
 			`📎 Bio references other profiles: ${scoreData.referencedProfiles.map((p) => "@" + p).join(", ")}`,
 		);
 
 		for (const refProfile of scoreData.referencedProfiles) {
 			try {
 				await queueAdd(refProfile, 15, "referenced_profile");
-				logger.log(`  ➕ Added @${refProfile} to queue for analysis`);
+				logger.info(
+					"ANALYSIS",
+					`  ➕ Added @${refProfile} to queue for analysis`,
+				);
 			} catch (error) {
-				logger.log(`  ⚠️ Failed to queue @${refProfile}: ${error}`);
+				logger.info("ANALYSIS", `  ⚠️ Failed to queue @${refProfile}: ${error}`);
 			}
 		}
 	}
@@ -168,16 +172,23 @@ export async function analyzeProfileComprehensive(
 
 		// Queue referenced Instagram profiles for follow-up analysis
 		if (bioScore.referencedProfiles && bioScore.referencedProfiles.length > 0) {
-			logger.log(
+			logger.info(
+				"ANALYSIS",
 				`📎 Bio references other profiles: ${bioScore.referencedProfiles.map((p) => "@" + p).join(", ")}`,
 			);
 
 			for (const refProfile of bioScore.referencedProfiles) {
 				try {
 					await queueAdd(refProfile, 15, "referenced_profile");
-					logger.log(`  ➕ Added @${refProfile} to queue for analysis`);
+					logger.info(
+						"ANALYSIS",
+						`  ➕ Added @${refProfile} to queue for analysis`,
+					);
 				} catch (error) {
-					logger.log(`  ⚠️ Failed to queue @${refProfile}: ${error}`);
+					logger.info(
+						"ANALYSIS",
+						`  ⚠️ Failed to queue @${refProfile}: ${error}`,
+					);
 				}
 			}
 		}
