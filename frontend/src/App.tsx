@@ -1,28 +1,5 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import CreatorsTable from "./components/CreatorsTable/CreatorsTable";
-
-type ScriptName =
-	| "discover"
-	| "analyze"
-	| "follow"
-	| "dm"
-	| "inbox"
-	| "process"
-	| "health"
-	| "dashboard";
-
-interface ScriptStatus {
-	name: ScriptName;
-	running: boolean;
-	lastRun?: string;
-	lastError?: string;
-}
-
-interface ConnectionInfo {
-	provider: "local" | "browserless" | "unknown" | "offline";
-	localBrowser: boolean;
-	browserlessConfigured: boolean;
-}
 
 interface Screenshot {
 	username: string;
@@ -68,155 +45,50 @@ interface RunMetadata {
 	creatorsFoundList?: CreatorFound[];
 }
 
-const scripts: ScriptName[] = [
-	"discover",
-	"analyze",
-	"follow",
-	"dm",
-	"inbox",
-	"process",
-	"health",
-	"dashboard",
-];
-
 function App() {
-	const [statuses, setStatuses] = useState<Record<ScriptName, ScriptStatus>>(
-		() =>
-			Object.fromEntries(
-				scripts.map((name) => [
-					name,
-					{ name, running: false } satisfies ScriptStatus,
-				]),
-			) as Record<ScriptName, ScriptStatus>,
-	);
-	const [liveUrl, setLiveUrl] = useState<string | null>(null);
-	const [isRecording, setIsRecording] = useState(false);
-	const [connectionInfo, setConnectionInfo] = useState<ConnectionInfo | null>(
-		null,
-	);
-	const [liveUrlError, setLiveUrlError] = useState<string | null>(null);
 	const [logEntries, setLogEntries] = useState<any[]>([]);
 	const [logsError, setLogsError] = useState<string | null>(null);
 	const [logsLoading, setLogsLoading] = useState(false);
 	const [screenshots, setScreenshots] = useState<Screenshot[]>([]);
 	const [screenshotsLoading, setScreenshotsLoading] = useState(false);
 	const [screenshotsError, setScreenshotsError] = useState<string | null>(null);
-	const [selectedScreenshot, setSelectedScreenshot] = useState<Screenshot | null>(null);
+	const [selectedScreenshot, setSelectedScreenshot] =
+		useState<Screenshot | null>(null);
 	const [runs, setRuns] = useState<RunMetadata[]>([]);
 	const [runsLoading, setRunsLoading] = useState(false);
 	const [runsError, setRunsError] = useState<string | null>(null);
 	const [selectedRun, setSelectedRun] = useState<RunMetadata | null>(null);
-	const [stats, setStats] = useState<{ creatorsFound: number; dmsSent: number } | null>(null);
+	const [stats, setStats] = useState<{
+		creatorsFound: number;
+		dmsSent: number;
+	} | null>(null);
 	const [statsLoading, setStatsLoading] = useState(false);
 	const [statsError, setStatsError] = useState<string | null>(null);
 
-	useEffect(() => {
-		void (async () => {
-			try {
-				const res = await fetch("/api/env/connection");
-				if (!res.ok) {
-					setConnectionInfo({
-						provider: "offline",
-						localBrowser: false,
-						browserlessConfigured: false,
-					});
-					return;
-				}
-				const data = (await res.json()) as ConnectionInfo;
-				setConnectionInfo(data);
-			} catch {
-				setConnectionInfo({
-					provider: "offline",
-					localBrowser: false,
-					browserlessConfigured: false,
-				});
+	const loadStats = useCallback(async () => {
+		setStatsLoading(true);
+		setStatsError(null);
+		try {
+			const res = await fetch("/api/stats");
+			if (!res.ok) {
+				setStatsError(`Failed to load stats (status ${res.status}).`);
+				return;
 			}
-		})();
-		void loadStats();
+			const data = (await res.json()) as {
+				creatorsFound: number;
+				dmsSent: number;
+			};
+			setStats(data);
+		} catch {
+			setStatsError("Could not reach /api/stats. Is the API server running?");
+		} finally {
+			setStatsLoading(false);
+		}
 	}, []);
 
-	async function runScript(name: ScriptName) {
-		setStatuses((prev) => ({
-			...prev,
-			[name]: { ...prev[name], running: true, lastError: undefined },
-		}));
-
-		try {
-			const res = await fetch(`/api/scripts/${name}/start`, {
-				method: "POST",
-			});
-			if (!res.ok) {
-				const text = await res.text();
-				throw new Error(text || `Failed with ${res.status}`);
-			}
-			const { startedAt } = (await res.json()) as { startedAt: string };
-			setStatuses((prev) => ({
-				...prev,
-				[name]: { ...prev[name], running: false, lastRun: startedAt },
-			}));
-		} catch (err) {
-			setStatuses((prev) => ({
-				...prev,
-				[name]: {
-					...prev[name],
-					running: false,
-					lastError: err instanceof Error ? err.message : String(err),
-				},
-			}));
-		}
-	}
-
-	async function refreshLiveUrl() {
-		try {
-			const res = await fetch("/api/session/live-url");
-			if (res.status === 204) {
-				setLiveUrl(null);
-				setLiveUrlError(
-					"No active Browserless live session. Start a script while connected to Browserless.",
-				);
-				// Also surface in devtools for easier debugging
-				// eslint-disable-next-line no-console
-				console.error(
-					"[Scout Studio] /api/session/live-url returned 204 (no live URL). " +
-						"Likely causes: script not using Browserless Sessions, plan without Live Debugger, or session not started yet.",
-				);
-				return;
-			}
-			if (!res.ok) {
-				setLiveUrlError(
-					`Failed to load live viewer (status ${res.status}). Check server logs.`,
-				);
-				// eslint-disable-next-line no-console
-				console.error(
-					`[Scout Studio] /api/session/live-url failed with status ${res.status}.`,
-				);
-				return;
-			}
-			const data = (await res.json()) as { liveURL?: string };
-			if (data.liveURL) {
-				setLiveUrl(data.liveURL);
-				setLiveUrlError(null);
-			} else {
-				setLiveUrl(null);
-				setLiveUrlError(
-					"No Browserless live URL available yet. Make sure a script is running with Browserless enabled.",
-				);
-				// eslint-disable-next-line no-console
-				console.error(
-					"[Scout Studio] /api/session/live-url responded without a liveURL field.",
-				);
-			}
-		} catch {
-			setLiveUrlError(
-				"Could not reach /api/session/live-url. Is the API server running on port 4000?",
-			);
-			// eslint-disable-next-line no-console
-			console.error(
-				"[Scout Studio] Network error while calling /api/session/live-url. " +
-					"Verify that `npm run dev:server` is running on port 4000.",
-			);
-		}
-	}
+	useEffect(() => {
+		void loadStats();
+	}, [loadStats]);
 
 	async function refreshLogs() {
 		setLogsLoading(true);
@@ -247,36 +119,27 @@ function App() {
 		}
 	}
 
-	async function toggleRecording() {
-		try {
-			const res = await fetch("/api/session/recording", {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ enable: !isRecording }),
-			});
-			if (!res.ok) return;
-			const data = (await res.json()) as { recording: boolean };
-			setIsRecording(data.recording);
-		} catch {
-			// ignore for now
-		}
-	}
-
 	async function loadScreenshots() {
 		setScreenshotsLoading(true);
 		setScreenshotsError(null);
 		try {
 			const res = await fetch("/api/screenshots");
 			if (!res.ok) {
-				setScreenshotsError(`Failed to load screenshots (status ${res.status}).`);
+				setScreenshotsError(
+					`Failed to load screenshots (status ${res.status}).`,
+				);
 				return;
 			}
 			const data = (await res.json()) as Screenshot[];
 			// Sort by date, newest first
-			data.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+			data.sort(
+				(a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
+			);
 			setScreenshots(data);
 		} catch {
-			setScreenshotsError("Could not reach /api/screenshots. Is the API server running?");
+			setScreenshotsError(
+				"Could not reach /api/screenshots. Is the API server running?",
+			);
 		} finally {
 			setScreenshotsLoading(false);
 		}
@@ -300,24 +163,6 @@ function App() {
 		}
 	}
 
-	async function loadStats() {
-		setStatsLoading(true);
-		setStatsError(null);
-		try {
-			const res = await fetch("/api/stats");
-			if (!res.ok) {
-				setStatsError(`Failed to load stats (status ${res.status}).`);
-				return;
-			}
-			const data = (await res.json()) as { creatorsFound: number; dmsSent: number };
-			setStats(data);
-		} catch {
-			setStatsError("Could not reach /api/stats. Is the API server running?");
-		} finally {
-			setStatsLoading(false);
-		}
-	}
-
 	function formatDuration(seconds?: number): string {
 		if (!seconds) return "N/A";
 		if (seconds < 60) return `${seconds}s`;
@@ -328,74 +173,16 @@ function App() {
 
 	return (
 		<div className="min-h-screen flex flex-col">
-			<header className="border-b border-slate-800 px-6 py-4 flex items-center justify-between">
+			<header className="border-b border-slate-800 px-6 py-4">
 				<div>
 					<h1 className="text-xl font-semibold tracking-tight">Scout Studio</h1>
 					<p className="text-sm text-slate-400">
-						Control panel for Browserless sessions & scripts
+						Dashboard for creator discovery and outreach
 					</p>
-					{connectionInfo && (
-						<div className="mt-1 flex items-center gap-2 text-xs">
-							<span
-								className={`inline-flex items-center rounded-full px-2 py-0.5 font-medium ${
-									connectionInfo.provider === "browserless"
-										? "bg-emerald-500/10 text-emerald-300 border border-emerald-500/40"
-										: connectionInfo.provider === "local"
-											? "bg-sky-500/10 text-sky-300 border border-sky-500/40"
-											: connectionInfo.provider === "offline"
-												? "bg-rose-500/10 text-rose-300 border border-rose-500/40"
-												: "bg-amber-500/10 text-amber-300 border border-amber-500/40"
-								}`}
-							>
-								<span
-									className={`mr-1 h-1.5 w-1.5 rounded-full ${
-										connectionInfo.provider === "browserless"
-											? "bg-emerald-400"
-											: connectionInfo.provider === "local"
-												? "bg-sky-400"
-												: connectionInfo.provider === "offline"
-													? "bg-rose-400"
-													: "bg-amber-400"
-									}`}
-								/>
-								{connectionInfo.provider === "browserless" &&
-									"Connected to Browserless"}
-								{connectionInfo.provider === "local" &&
-									"Using local Chrome (LOCAL_BROWSER=true)"}
-								{connectionInfo.provider === "offline" &&
-									"API offline (server not reachable)"}
-								{connectionInfo.provider === "unknown" &&
-									"No Browserless token detected"}
-							</span>
-							{connectionInfo.provider !== "offline" &&
-								!connectionInfo.browserlessConfigured && (
-									<span className="text-[11px] text-slate-500">
-										Set BROWSERLESS_TOKEN and LOCAL_BROWSER=false to enable
-										Browserless.
-									</span>
-								)}
-						</div>
-					)}
 				</div>
-				<button
-					onClick={toggleRecording}
-					type="button"
-					className={`inline-flex items-center rounded-md px-3 py-1.5 text-sm font-medium transition ${
-						isRecording
-							? "bg-red-500/90 hover:bg-red-500 text-white"
-							: "bg-emerald-500/90 hover:bg-emerald-500 text-slate-900"
-					}`}
-				>
-					<span
-						className={`mr-2 h-2 w-2 rounded-full ${
-							isRecording ? "bg-red-200 animate-pulse" : "bg-emerald-900"
-						}`}
-					/>
-					{isRecording ? "Stop Recording" : "Start Recording"}
-				</button>
 			</header>
 
-			<main className="flex-1 grid grid-cols-1 xl:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)] gap-6 p-6">
+			<main className="flex-1 grid grid-cols-1 gap-6 p-6">
 				{/* Stats Cards */}
 				<section className="xl:col-span-2">
 					<div className="flex items-center justify-between mb-4">
@@ -419,7 +206,9 @@ function App() {
 										Creators Found
 									</p>
 									{statsLoading ? (
-										<p className="text-2xl font-bold text-slate-300">Loading...</p>
+										<p className="text-2xl font-bold text-slate-300">
+											Loading...
+										</p>
 									) : statsError ? (
 										<p className="text-sm text-amber-400">{statsError}</p>
 									) : (
@@ -452,7 +241,9 @@ function App() {
 										DMs Sent
 									</p>
 									{statsLoading ? (
-										<p className="text-2xl font-bold text-slate-300">Loading...</p>
+										<p className="text-2xl font-bold text-slate-300">
+											Loading...
+										</p>
 									) : statsError ? (
 										<p className="text-sm text-amber-400">{statsError}</p>
 									) : (
@@ -478,116 +269,6 @@ function App() {
 								</div>
 							</div>
 						</div>
-					</div>
-				</section>
-
-				<section className="space-y-4">
-					<h2 className="text-sm font-semibold text-slate-300 uppercase tracking-wide">
-						Scripts
-					</h2>
-					<div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3">
-						{scripts.map((name) => {
-							const status = statuses[name];
-							const label = name.toUpperCase();
-							return (
-								<button
-									key={name}
-									onClick={() => runScript(name)}
-									type="button"
-									disabled={status.running}
-									className="group flex flex-col items-start rounded-xl border border-slate-800 bg-slate-900/60 px-4 py-3 text-left shadow-sm transition hover:border-slate-700 hover:bg-slate-900/90 disabled:opacity-60 disabled:cursor-not-allowed"
-								>
-									<span className="text-xs font-semibold tracking-wide text-slate-400">
-										SCRIPT
-									</span>
-									<span className="mt-0.5 text-sm font-medium text-slate-50">
-										{label}
-									</span>
-									<span className="mt-1 text-xs text-slate-400">
-										{status.running
-											? "Running..."
-											: status.lastRun
-												? `Last run: ${new Date(
-														status.lastRun,
-													).toLocaleTimeString()}`
-												: "Not run yet"}
-									</span>
-									{status.lastError && (
-										<span className="mt-1 text-[11px] text-red-400">
-											{status.lastError}
-										</span>
-									)}
-								</button>
-							);
-						})}
-					</div>
-				</section>
-
-				<section className="flex flex-col rounded-xl border border-slate-800 bg-slate-900/60 overflow-hidden">
-					<div className="flex items-center justify-between border-b border-slate-800 px-4 py-2.5">
-						<h2 className="text-sm font-semibold text-slate-200">
-							Live Session
-						</h2>
-						<button
-							onClick={refreshLiveUrl}
-							type="button"
-							className="rounded-md border border-slate-700 bg-slate-900 px-2.5 py-1 text-xs font-medium text-slate-200 hover:bg-slate-800"
-						>
-							Load viewer
-						</button>
-					</div>
-					<div className="px-4 py-2 text-[11px] text-slate-400 border-b border-slate-800 space-y-1 bg-slate-950/60">
-						<p className="font-medium text-slate-300">
-							Live viewer requirements (Browserless):
-						</p>
-						<ul className="list-disc pl-4 space-y-0.5">
-							<li>
-								<code className="text-[11px]">BROWSERLESS_TOKEN</code> is set in
-								your environment
-							</li>
-							<li>
-								<code className="text-[11px]">LOCAL_BROWSER=false</code> (or not
-								set) so scripts use Browserless instead of local Chrome
-							</li>
-							<li>
-								A script (e.g. <span className="font-mono text-[11px]">dm</span>{" "}
-								or <span className="font-mono text-[11px]">inbox</span>) is
-								currently running
-							</li>
-						</ul>
-						{connectionInfo && (
-							<p className="mt-1 text-[11px] text-slate-500">
-								Current status: provider{" "}
-								<code className="text-[11px]">{connectionInfo.provider}</code>,{" "}
-								Browserless configured{" "}
-								<code className="text-[11px]">
-									{connectionInfo.browserlessConfigured ? "true" : "false"}
-								</code>
-								, local browser{" "}
-								<code className="text-[11px]">
-									{connectionInfo.localBrowser ? "true" : "false"}
-								</code>
-								.
-							</p>
-						)}
-						{liveUrlError && (
-							<p className="mt-1 text-[11px] text-amber-400">{liveUrlError}</p>
-						)}
-					</div>
-					<div className="flex-1 flex items-center justify-center bg-black/90">
-						{liveUrl ? (
-							<iframe
-								src={liveUrl}
-								title="Browserless Live Session"
-								className="h-[500px] w-full border-0"
-								allow="clipboard-read; clipboard-write; fullscreen"
-							/>
-						) : (
-							<p className="text-xs text-slate-500">
-								No live viewer yet. Run a script (Browserless) and hit “Load
-								viewer”.
-							</p>
-						)}
 					</div>
 				</section>
 
@@ -660,7 +341,9 @@ function App() {
 				<section className="flex flex-col rounded-xl border border-slate-800 bg-slate-900/60 overflow-hidden xl:col-span-2">
 					<div className="flex items-center justify-between border-b border-slate-800 px-4 py-2.5">
 						<div>
-							<h2 className="text-sm font-semibold text-slate-200">Recent Runs</h2>
+							<h2 className="text-sm font-semibold text-slate-200">
+								Recent Runs
+							</h2>
 							<p className="text-[11px] text-slate-400 mt-0.5">
 								Script execution history with screenshots and metrics
 							</p>
@@ -699,13 +382,15 @@ function App() {
 													<span className="text-sm font-semibold text-slate-200 uppercase">
 														{run.scriptName}
 													</span>
-													<span className={`text-[10px] px-2 py-0.5 rounded font-medium ${
-														run.status === 'completed'
-															? 'bg-emerald-500/20 text-emerald-300'
-															: run.status === 'running'
-															? 'bg-sky-500/20 text-sky-300 animate-pulse'
-															: 'bg-red-500/20 text-red-300'
-													}`}>
+													<span
+														className={`text-[10px] px-2 py-0.5 rounded font-medium ${
+															run.status === "completed"
+																? "bg-emerald-500/20 text-emerald-300"
+																: run.status === "running"
+																	? "bg-sky-500/20 text-sky-300 animate-pulse"
+																	: "bg-red-500/20 text-red-300"
+														}`}
+													>
 														{run.status}
 													</span>
 													{run.screenshots.length > 0 && (
@@ -717,21 +402,33 @@ function App() {
 												<div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-[11px]">
 													<div>
 														<span className="text-slate-500">Profiles:</span>{" "}
-														<span className="text-slate-300 font-medium">{run.profilesProcessed}</span>
+														<span className="text-slate-300 font-medium">
+															{run.profilesProcessed}
+														</span>
 													</div>
 													<div>
 														<span className="text-slate-500">Creators:</span>{" "}
-														<span className="text-emerald-400 font-medium">{run.creatorsFound}</span>
+														<span className="text-emerald-400 font-medium">
+															{run.creatorsFound}
+														</span>
 													</div>
 													<div>
 														<span className="text-slate-500">Errors:</span>{" "}
-														<span className={run.errors > 0 ? "text-red-400 font-medium" : "text-slate-400"}>
+														<span
+															className={
+																run.errors > 0
+																	? "text-red-400 font-medium"
+																	: "text-slate-400"
+															}
+														>
 															{run.errors}
 														</span>
 													</div>
 													<div>
 														<span className="text-slate-500">Duration:</span>{" "}
-														<span className="text-slate-300">{formatDuration(run.stats?.duration)}</span>
+														<span className="text-slate-300">
+															{formatDuration(run.stats?.duration)}
+														</span>
 													</div>
 												</div>
 												<div className="text-[10px] text-slate-500 mt-1">
@@ -761,7 +458,9 @@ function App() {
 				<section className="flex flex-col rounded-xl border border-slate-800 bg-slate-900/60 overflow-hidden xl:col-span-2">
 					<div className="flex items-center justify-between border-b border-slate-800 px-4 py-2.5">
 						<div>
-							<h2 className="text-sm font-semibold text-slate-200">Screenshots</h2>
+							<h2 className="text-sm font-semibold text-slate-200">
+								Screenshots
+							</h2>
 							<p className="text-[11px] text-slate-400 mt-0.5">
 								Profile & link analysis screenshots from discovery runs
 							</p>
@@ -783,7 +482,8 @@ function App() {
 					<div className="flex-1 overflow-y-auto px-4 py-3 bg-slate-950/60 max-h-[600px]">
 						{screenshots.length === 0 ? (
 							<p className="text-xs text-slate-500">
-								No screenshots yet. Run discovery or analysis scripts, then hit "Load screenshots".
+								No screenshots yet. Run discovery or analysis scripts, then hit
+								"Load screenshots".
 							</p>
 						) : (
 							<div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
@@ -804,13 +504,15 @@ function App() {
 												@{screenshot.username}
 											</div>
 											<div className="flex items-center gap-1 mt-1">
-												<span className={`text-[10px] px-1.5 py-0.5 rounded ${
-													screenshot.type === 'profile' 
-														? 'bg-emerald-500/20 text-emerald-300'
-														: screenshot.type === 'link'
-														? 'bg-purple-500/20 text-purple-300'
-														: 'bg-slate-700 text-slate-400'
-												}`}>
+												<span
+													className={`text-[10px] px-1.5 py-0.5 rounded ${
+														screenshot.type === "profile"
+															? "bg-emerald-500/20 text-emerald-300"
+															: screenshot.type === "link"
+																? "bg-purple-500/20 text-purple-300"
+																: "bg-slate-700 text-slate-400"
+													}`}
+												>
 													{screenshot.type}
 												</span>
 												<span className="text-[10px] text-slate-500">
@@ -824,15 +526,15 @@ function App() {
 						)}
 						{screenshots.length > 20 && (
 							<p className="text-[11px] text-slate-500 mt-3 text-center">
-							Showing 20 of {screenshots.length} screenshots
-						</p>
-					)}
-				</div>
-			</section>
+								Showing 20 of {screenshots.length} screenshots
+							</p>
+						)}
+					</div>
+				</section>
 
-			{/* Confirmed Creators */}
-			<CreatorsTable />
-		</main>
+				{/* Confirmed Creators */}
+				<CreatorsTable />
+			</main>
 
 			{selectedScreenshot && (
 				<div
@@ -849,13 +551,15 @@ function App() {
 									@{selectedScreenshot.username}
 								</h3>
 								<div className="flex items-center gap-2 mt-1">
-									<span className={`text-xs px-2 py-0.5 rounded ${
-										selectedScreenshot.type === 'profile' 
-											? 'bg-emerald-500/20 text-emerald-300'
-											: selectedScreenshot.type === 'link'
-											? 'bg-purple-500/20 text-purple-300'
-											: 'bg-slate-700 text-slate-400'
-									}`}>
+									<span
+										className={`text-xs px-2 py-0.5 rounded ${
+											selectedScreenshot.type === "profile"
+												? "bg-emerald-500/20 text-emerald-300"
+												: selectedScreenshot.type === "link"
+													? "bg-purple-500/20 text-purple-300"
+													: "bg-slate-700 text-slate-400"
+										}`}
+									>
 										{selectedScreenshot.type}
 									</span>
 									<span className="text-xs text-slate-400">
@@ -897,13 +601,15 @@ function App() {
 									{selectedRun.scriptName}
 								</h3>
 								<div className="flex items-center gap-2 mt-1">
-									<span className={`text-xs px-2 py-0.5 rounded font-medium ${
-										selectedRun.status === 'completed'
-											? 'bg-emerald-500/20 text-emerald-300'
-											: selectedRun.status === 'running'
-											? 'bg-sky-500/20 text-sky-300'
-											: 'bg-red-500/20 text-red-300'
-									}`}>
+									<span
+										className={`text-xs px-2 py-0.5 rounded font-medium ${
+											selectedRun.status === "completed"
+												? "bg-emerald-500/20 text-emerald-300"
+												: selectedRun.status === "running"
+													? "bg-sky-500/20 text-sky-300"
+													: "bg-red-500/20 text-red-300"
+										}`}
+									>
 										{selectedRun.status}
 									</span>
 									<span className="text-xs text-slate-400">
@@ -922,64 +628,83 @@ function App() {
 						<div className="p-4">
 							<div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
 								<div className="bg-slate-800/50 rounded-lg p-3">
-									<div className="text-xs text-slate-400 mb-1">Profiles Processed</div>
-									<div className="text-2xl font-bold text-slate-200">{selectedRun.profilesProcessed}</div>
+									<div className="text-xs text-slate-400 mb-1">
+										Profiles Processed
+									</div>
+									<div className="text-2xl font-bold text-slate-200">
+										{selectedRun.profilesProcessed}
+									</div>
 								</div>
 								<div className="bg-emerald-500/10 rounded-lg p-3">
-									<div className="text-xs text-emerald-400 mb-1">Creators Found</div>
-									<div className="text-2xl font-bold text-emerald-300">{selectedRun.creatorsFound}</div>
+									<div className="text-xs text-emerald-400 mb-1">
+										Creators Found
+									</div>
+									<div className="text-2xl font-bold text-emerald-300">
+										{selectedRun.creatorsFound}
+									</div>
 								</div>
 								<div className="bg-red-500/10 rounded-lg p-3">
 									<div className="text-xs text-red-400 mb-1">Errors</div>
-									<div className="text-2xl font-bold text-red-300">{selectedRun.errors}</div>
+									<div className="text-2xl font-bold text-red-300">
+										{selectedRun.errors}
+									</div>
 								</div>
 								<div className="bg-slate-800/50 rounded-lg p-3">
 									<div className="text-xs text-slate-400 mb-1">Duration</div>
-									<div className="text-2xl font-bold text-slate-200">{formatDuration(selectedRun.stats?.duration)}</div>
-								</div>
-							</div>
-							
-							{selectedRun.creatorsFoundList && selectedRun.creatorsFoundList.length > 0 && (
-								<div className="bg-emerald-500/5 border border-emerald-500/20 rounded-lg p-4 mb-4">
-									<h4 className="text-sm font-semibold text-emerald-400 mb-3 flex items-center gap-2">
-										<span>✨</span>
-										Creators Found ({selectedRun.creatorsFoundList.length})
-									</h4>
-									<div className="space-y-2 max-h-60 overflow-y-auto">
-										{selectedRun.creatorsFoundList.map((creator, idx) => (
-											<div
-												key={idx}
-												className="bg-slate-900/50 rounded p-2 border border-emerald-500/10 hover:border-emerald-500/30 transition"
-											>
-												<div className="flex items-center justify-between">
-													<a
-														href={`https://instagram.com/${creator.username}`}
-														target="_blank"
-														rel="noopener noreferrer"
-														className="text-sm font-semibold text-emerald-300 hover:text-emerald-200"
-													>
-														@{creator.username}
-													</a>
-													<span className="text-xs px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300">
-														{creator.confidence}%
-													</span>
-												</div>
-												<div className="text-xs text-slate-400 mt-1">
-													{creator.reason} • {new Date(creator.timestamp).toLocaleTimeString()}
-												</div>
-												{creator.screenshotPath && (
-													<button
-														onClick={() => window.open(`http://localhost:4000${creator.screenshotPath}`, '_blank')}
-														className="text-xs text-purple-400 hover:text-purple-300 mt-1"
-													>
-														📸 View screenshot
-													</button>
-												)}
-											</div>
-										))}
+									<div className="text-2xl font-bold text-slate-200">
+										{formatDuration(selectedRun.stats?.duration)}
 									</div>
 								</div>
-							)}
+							</div>
+
+							{selectedRun.creatorsFoundList &&
+								selectedRun.creatorsFoundList.length > 0 && (
+									<div className="bg-emerald-500/5 border border-emerald-500/20 rounded-lg p-4 mb-4">
+										<h4 className="text-sm font-semibold text-emerald-400 mb-3 flex items-center gap-2">
+											<span>✨</span>
+											Creators Found ({selectedRun.creatorsFoundList.length})
+										</h4>
+										<div className="space-y-2 max-h-60 overflow-y-auto">
+											{selectedRun.creatorsFoundList.map((creator, idx) => (
+												<div
+													key={idx}
+													className="bg-slate-900/50 rounded p-2 border border-emerald-500/10 hover:border-emerald-500/30 transition"
+												>
+													<div className="flex items-center justify-between">
+														<a
+															href={`https://instagram.com/${creator.username}`}
+															target="_blank"
+															rel="noopener noreferrer"
+															className="text-sm font-semibold text-emerald-300 hover:text-emerald-200"
+														>
+															@{creator.username}
+														</a>
+														<span className="text-xs px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300">
+															{creator.confidence}%
+														</span>
+													</div>
+													<div className="text-xs text-slate-400 mt-1">
+														{creator.reason} •{" "}
+														{new Date(creator.timestamp).toLocaleTimeString()}
+													</div>
+													{creator.screenshotPath && (
+														<button
+															onClick={() =>
+																window.open(
+																	`http://localhost:4000${creator.screenshotPath}`,
+																	"_blank",
+																)
+															}
+															className="text-xs text-purple-400 hover:text-purple-300 mt-1"
+														>
+															📸 View screenshot
+														</button>
+													)}
+												</div>
+											))}
+										</div>
+									</div>
+								)}
 
 							{selectedRun.errorLogs && selectedRun.errorLogs.length > 0 && (
 								<div className="bg-red-500/5 border border-red-500/20 rounded-lg p-4 mb-4">
@@ -1034,7 +759,12 @@ function App() {
 												src={`http://localhost:4000${screenshot}`}
 												alt={`Screenshot ${idx + 1}`}
 												className="w-full h-24 object-cover rounded border border-slate-700 hover:border-slate-500 transition cursor-pointer"
-												onClick={() => window.open(`http://localhost:4000${screenshot}`, '_blank')}
+												onClick={() =>
+													window.open(
+														`http://localhost:4000${screenshot}`,
+														"_blank",
+													)
+												}
 											/>
 										))}
 									</div>
