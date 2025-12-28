@@ -50,10 +50,10 @@ const mockRun: RunMetadata = {
 };
 
 describe("RunDetailsModal", () => {
-	let mockOnClose: ReturnType<typeof vi.fn>;
+	let mockOnClose: ReturnType<typeof vi.fn<() => void>>;
 
 	beforeEach(() => {
-		mockOnClose = vi.fn();
+		mockOnClose = vi.fn<() => void>();
 		// Mock window.open
 		window.open = vi.fn();
 	});

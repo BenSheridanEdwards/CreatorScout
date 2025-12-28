@@ -13,17 +13,17 @@ const mockScreenshot: Screenshot = {
 };
 
 describe("ScreenshotModal", () => {
-	let mockOnClose: ReturnType<typeof vi.fn>;
+	let mockOnClose: ReturnType<typeof vi.fn<() => void>>;
 
 	beforeEach(() => {
-		mockOnClose = vi.fn();
+		mockOnClose = vi.fn<() => void>();
 	});
 
 	it("renders the modal with screenshot information", () => {
 		render(
 			<ScreenshotModal
 				screenshot={mockScreenshot}
-				onClose={mockOnClose as () => void}
+				onClose={mockOnClose}
 			/>,
 		);
 
@@ -36,7 +36,7 @@ describe("ScreenshotModal", () => {
 		render(
 			<ScreenshotModal
 				screenshot={mockScreenshot}
-				onClose={mockOnClose as () => void}
+				onClose={mockOnClose}
 			/>,
 		);
 
@@ -51,7 +51,7 @@ describe("ScreenshotModal", () => {
 		render(
 			<ScreenshotModal
 				screenshot={mockScreenshot}
-				onClose={mockOnClose as () => void}
+				onClose={mockOnClose}
 			/>,
 		);
 
@@ -69,7 +69,7 @@ describe("ScreenshotModal", () => {
 		render(
 			<ScreenshotModal
 				screenshot={linkScreenshot}
-				onClose={mockOnClose as () => void}
+				onClose={mockOnClose}
 			/>,
 		);
 
@@ -81,7 +81,7 @@ describe("ScreenshotModal", () => {
 		render(
 			<ScreenshotModal
 				screenshot={mockScreenshot}
-				onClose={mockOnClose as () => void}
+				onClose={mockOnClose}
 			/>,
 		);
 
@@ -95,7 +95,7 @@ describe("ScreenshotModal", () => {
 		render(
 			<ScreenshotModal
 				screenshot={mockScreenshot}
-				onClose={mockOnClose as () => void}
+				onClose={mockOnClose}
 			/>,
 		);
 
@@ -111,7 +111,7 @@ describe("ScreenshotModal", () => {
 		const { container } = render(
 			<ScreenshotModal
 				screenshot={mockScreenshot}
-				onClose={mockOnClose as () => void}
+				onClose={mockOnClose}
 			/>,
 		);
 
@@ -132,7 +132,7 @@ describe("ScreenshotModal", () => {
 		render(
 			<ScreenshotModal
 				screenshot={mockScreenshot}
-				onClose={mockOnClose as () => void}
+				onClose={mockOnClose}
 			/>,
 		);
 
@@ -154,7 +154,7 @@ describe("ScreenshotModal", () => {
 		const { rerender } = render(
 			<ScreenshotModal
 				screenshot={mockScreenshot}
-				onClose={mockOnClose as () => void}
+				onClose={mockOnClose}
 			/>,
 		);
 
@@ -163,7 +163,7 @@ describe("ScreenshotModal", () => {
 		rerender(
 			<ScreenshotModal
 				screenshot={dmScreenshot}
-				onClose={mockOnClose as () => void}
+				onClose={mockOnClose}
 			/>,
 		);
 
