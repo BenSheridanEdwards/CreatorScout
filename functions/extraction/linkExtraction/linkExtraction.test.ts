@@ -168,7 +168,7 @@ describe("linkExtraction", () => {
 	// analyzeExternalLink() - Linktree Creator Signal Detection
 	// ═══════════════════════════════════════════════════════════════════════════
 
-	describe("analyzeExternalLink() - Creator Signal", () => {
+	describe("analyzeExternalLink() - Content Warning Gates", () => {
 		test("detects Linktree creator signal as definitive creator signal (100% confidence)", async () => {
 			const mockPage = {
 				url: jest.fn<() => string>().mockReturnValue("https://linktr.ee/testuser"),
@@ -187,6 +187,7 @@ describe("linkExtraction", () => {
 						hasPricingIndicator: boolean;
 						hasMonetizationIndicator: boolean;
 						hasSensitiveContentGate: boolean;
+						hasMatureContentGate: boolean;
 						creatorPatterns: string[];
 					}>>()
 					.mockResolvedValue({
@@ -206,6 +207,7 @@ describe("linkExtraction", () => {
 						hasPricingIndicator: false,
 						hasMonetizationIndicator: false,
 						hasSensitiveContentGate: true,
+						hasMatureContentGate: false,
 						creatorPatterns: [],
 					}),
 			} as unknown as Page;
@@ -224,7 +226,64 @@ describe("linkExtraction", () => {
 			);
 		});
 
-		test("returns lower confidence when no creator signal present", async () => {
+		test("detects link.me creator signal as definitive creator signal (100% confidence)", async () => {
+			const mockPage = {
+				url: jest.fn<() => string>().mockReturnValue("https://link.me/testuser"),
+				goto: jest
+					.fn<() => Promise<void>>()
+					.mockResolvedValue(undefined),
+				evaluate: jest
+					.fn<() => Promise<{
+						title: string;
+						texts: string[];
+						fullText: string;
+						imageAlts: string[];
+						socialIcons: string[];
+						hasEmailForm: boolean;
+						hasSubscribeButton: boolean;
+						hasPricingIndicator: boolean;
+						hasMonetizationIndicator: boolean;
+						hasSensitiveContentGate: boolean;
+						hasMatureContentGate: boolean;
+						creatorPatterns: string[];
+					}>>()
+					.mockResolvedValue({
+						title: "User Profile | link.me",
+						texts: [
+							"Mature Content",
+							"Mature Content Disclaimer",
+							"This content is requires verification exclusive",
+							"Continue",
+						],
+						fullText:
+							"mature content content disclaimer this content is requires verification exclusive continue",
+						imageAlts: [],
+						socialIcons: [],
+						hasEmailForm: false,
+						hasSubscribeButton: false,
+						hasPricingIndicator: false,
+						hasMonetizationIndicator: false,
+						hasSensitiveContentGate: false,
+						hasMatureContentGate: true,
+						creatorPatterns: [],
+					}),
+			} as unknown as Page;
+
+			const result = await analyzeExternalLink(
+				mockPage,
+				"https://link.me/testuser",
+				"testuser",
+			);
+
+			expect(result.isCreator).toBe(true);
+			expect(result.confidence).toBe(100);
+			expect(result.reason).toBe("mature_content_gate");
+			expect(result.indicators).toContain(
+				"CONTENT GATE - link.me premium content disclaimer",
+			);
+		});
+
+		test("returns lower confidence when no content warning gates present", async () => {
 			const mockPage = {
 				url: jest.fn<() => string>().mockReturnValue("https://linktr.ee/testuser"),
 				goto: jest
@@ -242,6 +301,7 @@ describe("linkExtraction", () => {
 						hasPricingIndicator: boolean;
 						hasMonetizationIndicator: boolean;
 						hasSensitiveContentGate: boolean;
+						hasMatureContentGate: boolean;
 						creatorPatterns: string[];
 					}>>()
 					.mockResolvedValue({
@@ -255,6 +315,7 @@ describe("linkExtraction", () => {
 						hasPricingIndicator: false,
 						hasMonetizationIndicator: false,
 						hasSensitiveContentGate: false,
+						hasMatureContentGate: false,
 						creatorPatterns: [],
 					}),
 			} as unknown as Page;
@@ -265,7 +326,7 @@ describe("linkExtraction", () => {
 				"testuser",
 			);
 
-			// Without creator signal, should have lower confidence
+			// Without content warning gates, should have lower confidence
 			// (Aggregator platform gives 40% base confidence)
 			expect(result.confidence).toBeLessThan(100);
 		});

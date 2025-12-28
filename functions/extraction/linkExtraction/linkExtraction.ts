@@ -357,24 +357,27 @@ export async function analyzeExternalLink(
 		const pageContent = await page.evaluate(() => {
 			// Check for content warning gates (Linktree "Sensitive Content", link.me "Mature Content", etc.)
 			const bodyText = document.body.textContent?.toLowerCase() || "";
+			
+			// Linktree pattern: "Sensitive Content" + "not appropriate for all audiences" or "Continue"
 			const hasSensitiveContentGate =
-				// Linktree pattern: "Sensitive Content" + "not appropriate for all audiences" or "Continue"
 				(bodyText.includes("sensitive content") &&
 					(bodyText.includes("not appropriate for all audiences") ||
 						bodyText.includes("continue"))) ||
-				// link.me and other platforms: "Mature Content" + "disclaimer" or "exclusive" or "Continue"
-				(bodyText.includes("mature content") &&
-					(bodyText.includes("disclaimer") ||
-						bodyText.includes("exclusive") ||
-						bodyText.includes("continue") ||
-						bodyText.includes("graphic") ||
-						bodyText.includes("premium content"))) ||
-				// Generic patterns: "This link may contain" + premium content indicators
+				// Generic patterns: "This link may contain" + premium content indicators (Linktree style)
 				(bodyText.includes("this link may contain") &&
 					(bodyText.includes("graphic") ||
 						bodyText.includes("adult") ||
 						bodyText.includes("mature") ||
 						bodyText.includes("exclusive")));
+			
+			// link.me and other platforms: "Mature Content" + "disclaimer" or "exclusive" or "Continue"
+			const hasMatureContentGate =
+				bodyText.includes("mature content") &&
+				(bodyText.includes("disclaimer") ||
+					bodyText.includes("exclusive") ||
+					bodyText.includes("continue") ||
+					bodyText.includes("graphic") ||
+					bodyText.includes("premium content"));
 
 			// Grab ALL text content from the page (it's not Instagram, so we can be aggressive)
 			// This ensures we capture overlays, dynamic content, and everything visible
@@ -517,6 +520,7 @@ export async function analyzeExternalLink(
 				hasPricingIndicator: hasPricingIndicator,
 				hasMonetizationIndicator: hasMonetizationIndicator,
 				hasSensitiveContentGate: hasSensitiveContentGate,
+				hasMatureContentGate: hasMatureContentGate,
 				creatorPatterns: creatorTextPatterns.filter(
 					(pattern) => fullBodyText.toLowerCase().includes(pattern), // Check against full body text
 				),
@@ -600,16 +604,30 @@ export async function analyzeExternalLink(
 		}
 
 		// Check for content warning gates (ULTIMATE signal)
-		// This includes Linktree's "Sensitive Content", link.me's "Mature Content Disclaimer", etc.
+		// Check Linktree's "Sensitive Content" gate first
 		if (pageContent.hasSensitiveContentGate) {
 			result.isCreator = true;
 			result.confidence = 100;
-			result.reason = "content_warning_gate";
+			result.reason = "sensitive_content_gate";
 			result.indicators.push(
-				"CONTENT WARNING GATE - Adult/content disclaimer detected",
+				"CONTENT GATE - Linktree premium content warning",
 			);
 			console.log(
-				`[LINK_ANALYSIS] 🔒 Found content warning gate (Sensitive/Mature Content) - DEFINITIVE creator signal`,
+				`[LINK_ANALYSIS] 🔒 Found creator signal (Linktree) - DEFINITIVE creator signal`,
+			);
+			return result;
+		}
+		
+		// Check link.me's "Mature Content" gate
+		if (pageContent.hasMatureContentGate) {
+			result.isCreator = true;
+			result.confidence = 100;
+			result.reason = "mature_content_gate";
+			result.indicators.push(
+				"CONTENT GATE - link.me premium content disclaimer",
+			);
+			console.log(
+				`[LINK_ANALYSIS] 🔒 Found creator signal (link.me) - DEFINITIVE creator signal`,
 			);
 			return result;
 		}
