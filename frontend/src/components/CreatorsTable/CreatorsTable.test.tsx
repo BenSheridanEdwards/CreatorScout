@@ -11,7 +11,11 @@ const mockCreators = [
 		manualOverride: false,
 		dmSent: false,
 		dmSentAt: null,
+		dmSentBy: null,
 		visitedAt: "2025-12-24T10:00:00.000Z",
+		followers: 50000,
+		hidden: false,
+		hiddenAt: null,
 	},
 	{
 		username: "testcreator2",
@@ -20,7 +24,11 @@ const mockCreators = [
 		manualOverride: true,
 		dmSent: true,
 		dmSentAt: "2025-12-25T12:00:00.000Z",
+		dmSentBy: "profile1",
 		visitedAt: "2025-12-23T08:00:00.000Z",
+		followers: 150000,
+		hidden: false,
+		hiddenAt: null,
 	},
 	{
 		username: "testcreator3",
@@ -29,7 +37,11 @@ const mockCreators = [
 		manualOverride: false,
 		dmSent: false,
 		dmSentAt: null,
+		dmSentBy: null,
 		visitedAt: "2025-12-22T14:00:00.000Z",
+		followers: null,
+		hidden: false,
+		hiddenAt: null,
 	},
 ];
 
@@ -319,5 +331,222 @@ describe("CreatorsTable", () => {
 			"2025-12-25T12:00:00.000Z",
 		).toLocaleDateString();
 		expect(screen.getByText(formattedDate)).toBeInTheDocument();
+	});
+
+	it("displays DM sent by field with edit functionality", async () => {
+		const user = userEvent.setup();
+
+		render(<CreatorsTable />);
+
+		await waitFor(() => {
+			expect(screen.getByText("@testcreator2")).toBeInTheDocument();
+		});
+
+		// testcreator2 has dmSentBy set, should show value with edit button
+		expect(screen.getByText("profile1")).toBeInTheDocument();
+		const editButtons = screen.getAllByTitle("Edit DM sent by");
+		expect(editButtons.length).toBeGreaterThan(0);
+	});
+
+	it("shows input field when dmSentBy is empty", async () => {
+		render(<CreatorsTable />);
+
+		await waitFor(() => {
+			expect(screen.getByText("@testcreator1")).toBeInTheDocument();
+		});
+
+		// testcreator1 has no dmSentBy, should show input field
+		const inputs = screen.getAllByPlaceholderText("username");
+		expect(inputs.length).toBeGreaterThan(0);
+	});
+
+	it("allows editing dmSentBy field", async () => {
+		const user = userEvent.setup();
+
+		mockFetch
+			.mockResolvedValueOnce({
+				ok: true,
+				json: () => Promise.resolve(mockResponse),
+			})
+			.mockResolvedValueOnce({
+				ok: true,
+				json: () => Promise.resolve({ username: "testcreator2", dmSentBy: "newprofile" }),
+			});
+
+		render(<CreatorsTable />);
+
+		await waitFor(() => {
+			expect(screen.getByText("@testcreator2")).toBeInTheDocument();
+		});
+
+		// Click edit button
+		const editButton = screen.getAllByTitle("Edit DM sent by")[0];
+		await user.click(editButton);
+
+		// Find the input and type new value
+		const inputs = screen.getAllByPlaceholderText("username");
+		const input = inputs.find((inp) => (inp as HTMLInputElement).value === "profile1");
+		expect(input).toBeInTheDocument();
+
+		if (input) {
+			await user.clear(input);
+			await user.type(input, "newprofile");
+			await user.keyboard("{Enter}");
+
+			await waitFor(() => {
+				expect(mockFetch).toHaveBeenCalledWith(
+					"/api/creators/testcreator2/dm-sent-by",
+					expect.objectContaining({
+						method: "PATCH",
+						headers: { "Content-Type": "application/json" },
+					}),
+				);
+			});
+		}
+	});
+
+	it("saves dmSentBy on blur", async () => {
+		const user = userEvent.setup();
+
+		mockFetch
+			.mockResolvedValueOnce({
+				ok: true,
+				json: () => Promise.resolve(mockResponse),
+			})
+			.mockResolvedValueOnce({
+				ok: true,
+				json: () => Promise.resolve({ username: "testcreator1", dmSentBy: "profile2" }),
+			});
+
+		render(<CreatorsTable />);
+
+		await waitFor(() => {
+			expect(screen.getByText("@testcreator1")).toBeInTheDocument();
+		});
+
+		// Find the input for testcreator1 (which has no dmSentBy)
+		const inputs = screen.getAllByPlaceholderText("username");
+		const input = inputs[0];
+		
+		await user.type(input, "profile2");
+		await user.tab(); // Blur the input
+
+		await waitFor(() => {
+			expect(mockFetch).toHaveBeenCalledWith(
+				"/api/creators/testcreator1/dm-sent-by",
+				expect.objectContaining({
+					method: "PATCH",
+				}),
+			);
+		});
+	});
+
+	it("toggles hide status", async () => {
+		const user = userEvent.setup();
+
+		// Mock the hide API response
+		const hideResponse = {
+			username: "testcreator1",
+			hidden: true,
+			hiddenAt: new Date().toISOString(),
+		};
+
+		// Mock the reload after hiding (with testcreator1 removed)
+		const reloadResponse = {
+			creators: [mockCreators[1], mockCreators[2]], // testcreator1 removed
+			total: 2,
+			pendingCount: 1,
+			page: 1,
+			totalPages: 1,
+		};
+
+		mockFetch
+			.mockResolvedValueOnce({
+				ok: true,
+				json: () => Promise.resolve(mockResponse),
+			})
+			.mockResolvedValueOnce({
+				ok: true,
+				json: () => Promise.resolve(hideResponse),
+			})
+			.mockResolvedValueOnce({
+				ok: true,
+				json: () => Promise.resolve(reloadResponse),
+			});
+
+		render(<CreatorsTable />);
+
+		await waitFor(() => {
+			expect(screen.getByText("@testcreator1")).toBeInTheDocument();
+		});
+
+		// Find the hide button (✕)
+		const hideButtons = screen.getAllByTitle(
+			"Strike off / Hide creator (e.g., male, not a creator to DM)",
+		);
+		expect(hideButtons.length).toBeGreaterThan(0);
+
+		await user.click(hideButtons[0]);
+
+		await waitFor(() => {
+			expect(mockFetch).toHaveBeenCalledWith(
+				"/api/creators/testcreator1/hide",
+				expect.objectContaining({
+					method: "PATCH",
+					headers: { "Content-Type": "application/json" },
+				}),
+			);
+		});
+	});
+
+	it("displays followers count", async () => {
+		render(<CreatorsTable />);
+
+		await waitFor(() => {
+			expect(screen.getByText("@testcreator1")).toBeInTheDocument();
+		});
+
+		// testcreator1 has 50000 followers
+		expect(screen.getByText("50,000")).toBeInTheDocument();
+		// testcreator2 has 150000 followers
+		expect(screen.getByText("150,000")).toBeInTheDocument();
+		// testcreator3 has null followers, should show "-"
+		// There will be multiple "-" elements (for dmSentAt, followers, etc.)
+		const dashElements = screen.getAllByText("-");
+		expect(dashElements.length).toBeGreaterThanOrEqual(1);
+	});
+
+	it("toggles followers filter", async () => {
+		const user = userEvent.setup();
+
+		mockFetch
+			.mockResolvedValueOnce({
+				ok: true,
+				json: () => Promise.resolve(mockResponse),
+			})
+			.mockResolvedValueOnce({
+				ok: true,
+				json: () => Promise.resolve(mockResponse),
+			});
+
+		render(<CreatorsTable />);
+
+		await waitFor(() => {
+			expect(screen.getByText("@testcreator1")).toBeInTheDocument();
+		});
+
+		// Find the toggle button for followers filter
+		const toggleButton = screen.getByText("Followers < 100k").closest("div")?.querySelector("button");
+		expect(toggleButton).toBeInTheDocument();
+
+		if (toggleButton) {
+			await user.click(toggleButton);
+
+			await waitFor(() => {
+				expect(mockFetch).toHaveBeenCalledWith(
+					expect.stringContaining("/api/creators"),
+				);
+			});
+		}
 	});
 });

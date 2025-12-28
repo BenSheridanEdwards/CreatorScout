@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 
 interface Creator {
 	username: string;
@@ -34,6 +34,9 @@ export default function CreatorsTable() {
 		"pending",
 	);
 	const [maxFollowers, setMaxFollowers] = useState<number | null>(100000);
+	const [editingDmSentBy, setEditingDmSentBy] = useState<string | null>(null);
+	const [editingDmSentByValue, setEditingDmSentByValue] = useState<string>("");
+	const dmSentByInputRefs = useRef<Map<string, HTMLInputElement>>(new Map());
 
 	// Load creators with pending filter and 100k followers limit on mount
 	useEffect(() => {
@@ -53,7 +56,7 @@ export default function CreatorsTable() {
 					return;
 				}
 				const data = (await res.json()) as CreatorsResponse;
-				setCreators(data.creators);
+				setCreators(data.creators || []);
 				setPage(data.page);
 				setTotalPages(data.totalPages);
 				setTotal(data.total);
@@ -89,7 +92,7 @@ export default function CreatorsTable() {
 				return;
 			}
 			const data = (await res.json()) as CreatorsResponse;
-			setCreators(data.creators);
+			setCreators(data.creators || []);
 			setPage(data.page);
 			setTotalPages(data.totalPages);
 			setTotal(data.total);
@@ -133,13 +136,62 @@ export default function CreatorsTable() {
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify({ dmSentBy }),
 			});
-			if (!res.ok) return;
+			if (!res.ok) {
+				console.error(
+					`Failed to update dmSentBy: ${res.status} ${res.statusText}`,
+				);
+				return;
+			}
 
 			setCreators((prev) =>
 				prev.map((c) => (c.username === username ? { ...c, dmSentBy } : c)),
 			);
 		} catch (err) {
 			console.error("Failed to update dmSentBy:", err);
+		}
+	}
+
+	function startEditingDmSentBy(username: string, currentValue: string | null) {
+		setEditingDmSentBy(username);
+		setEditingDmSentByValue(currentValue || "");
+		// Focus the input after state update
+		setTimeout(() => {
+			dmSentByInputRefs.current.get(username)?.focus();
+		}, 0);
+	}
+
+	function setDmSentByInputRef(username: string, el: HTMLInputElement | null) {
+		if (el) {
+			dmSentByInputRefs.current.set(username, el);
+		} else {
+			dmSentByInputRefs.current.delete(username);
+		}
+	}
+
+	function cancelEditingDmSentBy() {
+		setEditingDmSentBy(null);
+		setEditingDmSentByValue("");
+	}
+
+	async function saveDmSentBy(username: string) {
+		const newValue = editingDmSentByValue.trim() || null;
+		const currentValue =
+			creators.find((c) => c.username === username)?.dmSentBy || null;
+
+		// Update local state immediately for responsive UI
+		setCreators((prev) =>
+			prev.map((c) =>
+				c.username === username ? { ...c, dmSentBy: newValue } : c,
+			),
+		);
+
+		// Clear editing state
+		setEditingDmSentBy(null);
+		setEditingDmSentByValue("");
+
+		// Then update the backend
+		if (newValue !== currentValue) {
+			await updateDmSentBy(username, newValue);
 		}
 	}
 
@@ -251,7 +303,7 @@ export default function CreatorsTable() {
 			)}
 
 			<div className="flex-1 overflow-auto px-4 py-3 bg-slate-950/60 max-h-[600px]">
-				{creators.length === 0 ? (
+				{!creators || creators.length === 0 ? (
 					<p className="text-xs text-slate-500">
 						No creators yet. Run discovery scripts, then hit "Load creators".
 					</p>
@@ -356,28 +408,72 @@ export default function CreatorsTable() {
 											: "-"}
 									</td>
 									<td className="py-2 pr-3 text-center">
-										<input
-											type="text"
-											value={creator.dmSentBy || ""}
-											onChange={(e) => {
-												const newValue = e.target.value;
-												setCreators((prev) =>
-													prev.map((c) =>
-														c.username === creator.username
-															? { ...c, dmSentBy: newValue || null }
-															: c,
-													),
-												);
-											}}
-											onBlur={(e) => {
-												const newValue = e.target.value.trim() || null;
-												if (newValue !== (creator.dmSentBy || null)) {
-													updateDmSentBy(creator.username, newValue);
-												}
-											}}
-											placeholder="username"
-											className="w-24 px-2 py-1 text-xs rounded border border-slate-700 bg-slate-900 text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500"
-										/>
+										{editingDmSentBy === creator.username ||
+										!creator.dmSentBy ? (
+											<div className="flex items-center gap-1.5 justify-center">
+												<input
+													ref={(el) =>
+														setDmSentByInputRef(creator.username, el)
+													}
+													type="text"
+													value={
+														editingDmSentBy === creator.username
+															? editingDmSentByValue
+															: ""
+													}
+													onChange={(e) => {
+														const value = e.target.value;
+														if (editingDmSentBy !== creator.username) {
+															// Start editing if not already editing
+															startEditingDmSentBy(creator.username, null);
+														}
+														setEditingDmSentByValue(value);
+													}}
+													onKeyDown={(e) => {
+														if (e.key === "Enter") {
+															e.preventDefault();
+															saveDmSentBy(creator.username);
+														} else if (e.key === "Escape") {
+															cancelEditingDmSentBy();
+														}
+													}}
+													onBlur={() => {
+														if (editingDmSentBy === creator.username) {
+															saveDmSentBy(creator.username);
+														}
+													}}
+													onFocus={() => {
+														if (editingDmSentBy !== creator.username) {
+															startEditingDmSentBy(
+																creator.username,
+																creator.dmSentBy,
+															);
+														}
+													}}
+													placeholder="username"
+													className="w-24 px-2 py-1 text-xs rounded border border-slate-700 bg-slate-900 text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500"
+												/>
+											</div>
+										) : (
+											<div className="flex items-center gap-1.5 justify-center">
+												<span className="text-slate-300 text-xs">
+													{creator.dmSentBy}
+												</span>
+												<button
+													type="button"
+													onClick={() =>
+														startEditingDmSentBy(
+															creator.username,
+															creator.dmSentBy,
+														)
+													}
+													className="text-slate-400 hover:text-slate-200 text-[10px] px-1.5 py-0.5 rounded hover:bg-slate-800/50 transition-colors"
+													title="Edit DM sent by"
+												>
+													✎
+												</button>
+											</div>
+										)}
 									</td>
 									<td className="py-2 pr-3 text-slate-400 text-center">
 										{new Date(creator.visitedAt).toLocaleDateString()}
