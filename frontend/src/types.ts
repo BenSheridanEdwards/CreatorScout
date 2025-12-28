@@ -21,18 +21,37 @@ export interface CreatorFound {
 	screenshotPath?: string;
 }
 
+export interface RunIssue {
+	type:
+		| "rate_limit"
+		| "high_error_rate"
+		| "early_termination"
+		| "low_discovery"
+		| "oom"
+		| "stack_trace"
+		| "error_429";
+	message: string;
+	severity: "warning" | "critical";
+	detectedAt: string; // ISO timestamp
+	logLine?: number; // Line number in logs where issue was found
+}
+
 export interface RunMetadata {
 	id: string;
 	scriptName: string;
 	startTime: string;
 	endTime?: string;
-	status: "running" | "completed" | "error";
+	status: "scheduled" | "running" | "completed" | "error";
 	profilesProcessed: number;
 	creatorsFound: number;
 	errors: number;
 	screenshots: string[];
 	finalScreenshot?: string;
 	errorMessage?: string;
+	scheduledTime?: string; // ISO timestamp for scheduled runs
+	issues?: RunIssue[]; // Detected problems
+	profileId?: string; // Profile ID for cron runs
+	sessionType?: "morning" | "afternoon" | "evening"; // Session type for cron runs
 	stats?: {
 		duration?: number;
 		avgProcessingTime?: number;
@@ -40,6 +59,28 @@ export interface RunMetadata {
 	};
 	errorLogs?: ErrorLog[];
 	creatorsFoundList?: CreatorFound[];
+}
+
+export interface ScheduledRun {
+	id: string;
+	profileId: string;
+	scriptName: string;
+	scheduledTime: string;
+	recurring?: "daily" | "weekday";
+	sessionType?: "morning" | "afternoon" | "evening";
+	accountName?: string; // Display name for account filtering
+}
+
+export interface TimelineCard {
+	id: string;
+	type: "scheduled" | "running" | "completed" | "error";
+	profileId: string;
+	accountName: string;
+	timestamp: string; // ISO timestamp for positioning on timeline
+	thumbnail?: string; // Latest screenshot path
+	hasIssues?: boolean; // Amber dot indicator
+	countdown?: number; // Seconds until scheduled run
+	elapsed?: number; // Seconds elapsed for running runs
 }
 
 export interface Stats {

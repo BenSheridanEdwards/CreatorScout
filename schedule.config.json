@@ -1,0 +1,26 @@
+{
+  "timezone": "Europe/London",
+  "oneOff": [
+    {
+      "id": "discover_session_1",
+      "profileId": "burner1",
+      "scriptName": "discover",
+      "scheduledTime": "2025-12-28T12:00:00Z",
+      "accountName": "burner1"
+    },
+    {
+      "id": "discover_session_2",
+      "profileId": "burner1",
+      "scriptName": "discover",
+      "scheduledTime": "2025-12-28T12:30:00Z",
+      "accountName": "burner1"
+    },
+    {
+      "id": "discover_session_3",
+      "profileId": "burner1",
+      "scriptName": "discover",
+      "scheduledTime": "2025-12-28T13:00:00Z",
+      "accountName": "burner1"
+    }
+  ]
+}

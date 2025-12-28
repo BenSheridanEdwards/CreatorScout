@@ -2,7 +2,7 @@
  * Run Tracking System
  * Tracks each script execution with screenshots, logs, and metrics
  */
-import { writeFile, readFile, mkdir } from "fs/promises";
+import { writeFile, readFile, mkdir, readdir } from "fs/promises";
 import { existsSync } from "fs";
 import { join } from "path";
 
@@ -11,6 +11,21 @@ export interface ErrorLog {
 	username?: string;
 	message: string;
 	stack?: string;
+}
+
+export interface RunIssue {
+	type:
+		| "rate_limit"
+		| "high_error_rate"
+		| "early_termination"
+		| "low_discovery"
+		| "oom"
+		| "stack_trace"
+		| "error_429";
+	message: string;
+	severity: "warning" | "critical";
+	detectedAt: string;
+	logLine?: number;
 }
 
 export interface CreatorFound {
@@ -26,13 +41,17 @@ export interface RunMetadata {
 	scriptName: string;
 	startTime: string;
 	endTime?: string;
-	status: "running" | "completed" | "error";
+	status: "scheduled" | "running" | "completed" | "error";
 	profilesProcessed: number;
 	creatorsFound: number;
 	errors: number;
 	screenshots: string[];
 	finalScreenshot?: string;
 	errorMessage?: string;
+	scheduledTime?: string;
+	issues?: RunIssue[];
+	profileId?: string;
+	sessionType?: "morning" | "afternoon" | "evening";
 	stats?: {
 		duration?: number;
 		avgProcessingTime?: number;
@@ -127,6 +146,12 @@ export async function updateRun(
 					100
 				: 0,
 		};
+
+		// Detect issues when run completes
+		const issues = await detectIssues(updatedRun);
+		if (issues.length > 0) {
+			updatedRun.issues = issues;
+		}
 	}
 
 	await writeFile(runFile, JSON.stringify(updatedRun, null, 2));
@@ -195,6 +220,129 @@ export async function getAllRuns(): Promise<RunMetadata[]> {
 		(a, b) =>
 			new Date(b.startTime).getTime() - new Date(a.startTime).getTime(),
 	);
+}
+
+/**
+ * Detect issues in completed run by grepping log file
+ */
+export async function detectIssues(run: RunMetadata): Promise<RunIssue[]> {
+	const issues: RunIssue[] = [];
+
+	if (run.status !== "completed" && run.status !== "error") {
+		return issues;
+	}
+
+	// Try to read the log file for this run
+	const logsDir = join(process.cwd(), "logs");
+	try {
+		const logFiles = await readdir(logsDir);
+		// Find the most recent log file
+		const logFile = logFiles
+			.filter((f) => f.startsWith("scout-") && f.endsWith(".log"))
+			.sort()
+			.reverse()[0];
+
+		if (logFile) {
+			const logPath = join(logsDir, logFile);
+			const logContent = await readFile(logPath, "utf-8");
+			const logLines = logContent.split("\n");
+
+			// Grep for error patterns
+			logLines.forEach((line, index) => {
+				const lineNum = index + 1;
+				const lowerLine = line.toLowerCase();
+
+				// 429 Rate limits
+				if (
+					lowerLine.includes("429") ||
+					lowerLine.includes("rate limit") ||
+					lowerLine.includes("rate_limit")
+				) {
+					issues.push({
+						type: "error_429",
+						message: `Rate limit detected: ${line.substring(0, 100)}`,
+						severity: "critical",
+						detectedAt: new Date().toISOString(),
+						logLine: lineNum,
+					});
+				}
+
+				// Stack traces
+				if (
+					lowerLine.includes("error:") ||
+					(lowerLine.includes("at ") && lowerLine.includes(":"))
+				) {
+					issues.push({
+						type: "stack_trace",
+						message: `Stack trace found: ${line.substring(0, 100)}`,
+						severity: "warning",
+						detectedAt: new Date().toISOString(),
+						logLine: lineNum,
+					});
+				}
+
+				// OOM errors
+				if (
+					lowerLine.includes("out of memory") ||
+					lowerLine.includes("oom") ||
+					lowerLine.includes("heap limit")
+				) {
+					issues.push({
+						type: "oom",
+						message: `Out of memory error: ${line.substring(0, 100)}`,
+						severity: "critical",
+						detectedAt: new Date().toISOString(),
+						logLine: lineNum,
+					});
+				}
+
+				// Early termination
+				if (
+					lowerLine.includes("sigint") ||
+					lowerLine.includes("terminated") ||
+					lowerLine.includes("killed")
+				) {
+					issues.push({
+						type: "early_termination",
+						message: `Early termination detected: ${line.substring(0, 100)}`,
+						severity: "warning",
+						detectedAt: new Date().toISOString(),
+						logLine: lineNum,
+					});
+				}
+			});
+		}
+	} catch (error) {
+		// If we can't read logs, continue without log-based detection
+		console.error("Failed to read logs for issue detection:", error);
+	}
+
+	// Calculate metrics-based issues
+	if (run.profilesProcessed > 0) {
+		// High error rate
+		const errorRate = run.errors / run.profilesProcessed;
+		if (errorRate > 0.1) {
+			issues.push({
+				type: "high_error_rate",
+				message: `High error rate: ${(errorRate * 100).toFixed(1)}% (${run.errors}/${run.profilesProcessed})`,
+				severity: "warning",
+				detectedAt: new Date().toISOString(),
+			});
+		}
+
+		// Low discovery rate
+		const discoveryRate = run.creatorsFound / run.profilesProcessed;
+		if (discoveryRate < 0.05) {
+			issues.push({
+				type: "low_discovery",
+				message: `Low discovery rate: ${(discoveryRate * 100).toFixed(1)}% (${run.creatorsFound}/${run.profilesProcessed})`,
+				severity: "warning",
+				detectedAt: new Date().toISOString(),
+			});
+		}
+	}
+
+	return issues;
 }
 
 /**

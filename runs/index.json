@@ -1,89 +1,83 @@
 [
   {
-    "id": "test_script_1766612329281",
-    "scriptName": "test_script",
-    "startTime": "2025-12-24T21:38:49.281Z",
+    "id": "discover_success_001",
+    "scriptName": "discover",
+    "startTime": "2025-12-28T11:46:33.913Z",
     "status": "completed",
     "profilesProcessed": 25,
-    "creatorsFound": 5,
-    "errors": 1,
-    "screenshots": [],
-    "endTime": "2025-12-24T21:38:51.289Z",
-    "stats": {
-      "duration": 2,
-      "successRate": 96
-    }
-  },
-  {
-    "id": "test_enhanced_1766612494345",
-    "scriptName": "test_enhanced",
-    "startTime": "2025-12-24T21:41:34.345Z",
-    "status": "completed",
-    "profilesProcessed": 15,
-    "creatorsFound": 3,
+    "creatorsFound": 8,
     "errors": 2,
     "screenshots": [
-      "/screenshots/2025-12-24/profile_test1.png",
-      "/screenshots/2025-12-24/profile_test2.png",
-      "/screenshots/2025-12-24/profile_test3.png"
+      "/screenshots/2025-12-28/discover_success.png",
+      "/screenshots/2025-12-28/discover_step1.png"
     ],
+    "profileId": "burner1",
+    "endTime": "2025-12-28T11:46:33.914Z",
+    "stats": {
+      "duration": 0,
+      "successRate": 92
+    },
     "creatorsFoundList": [
       {
-        "username": "test_creator_1",
+        "username": "creator1",
         "confidence": 95,
         "reason": "direct_patreon_link",
-        "timestamp": "2025-12-24T21:41:34.849Z",
-        "screenshotPath": "/screenshots/2025-12-24/profile_test_creator_1.png"
+        "timestamp": "2025-12-28T10:46:33.914Z"
       },
       {
-        "username": "test_creator_2",
-        "confidence": 85,
+        "username": "creator2",
+        "confidence": 88,
         "reason": "exclusive_content_in_bio",
-        "timestamp": "2025-12-24T21:41:35.856Z",
-        "screenshotPath": "/screenshots/2025-12-24/profile_test_creator_2.png"
-      },
-      {
-        "username": "test_creator_3",
-        "confidence": 100,
-        "reason": "patreon_link_found",
-        "timestamp": "2025-12-24T21:41:36.864Z"
+        "timestamp": "2025-12-28T10:47:23.914Z"
       }
     ],
-    "errorLogs": [
-      {
-        "timestamp": "2025-12-24T21:41:35.353Z",
-        "username": "broken_profile",
-        "message": "Target closed: Session was terminated while processing",
-        "stack": "Error: Target closed\n    at navigateToProfile (/functions/navigation/profileNavigation.ts:45:10)\n    at analyzeProfileComprehensive (/functions/profile/profileAnalysis.ts:120:5)"
-      },
-      {
-        "timestamp": "2025-12-24T21:41:36.360Z",
-        "username": "rate_limited_profile",
-        "message": "429 Rate limit exceeded: free-models-per-day",
-        "stack": "APIError: 429 Rate limit exceeded\n    at analyzeProfile (/functions/profile/vision/vision.ts:449:22)\n    at analyzeProfileComprehensive (/functions/profile/profileAnalysis.ts:354:25)"
-      }
-    ],
-    "finalScreenshot": "/screenshots/2025-12-24/profile_test3.png",
-    "endTime": "2025-12-24T21:41:36.870Z",
-    "stats": {
-      "duration": 3,
-      "successRate": 86.66666666666667
-    }
+    "finalScreenshot": "/screenshots/2025-12-28/discover_success.png"
   },
   {
-    "id": "test_graceful_shutdown_1766612668570",
-    "scriptName": "test_graceful_shutdown",
-    "startTime": "2025-12-24T21:44:28.570Z",
-    "status": "error",
-    "profilesProcessed": 0,
-    "creatorsFound": 0,
-    "errors": 0,
-    "screenshots": [],
-    "errorMessage": "Script terminated by SIGINT",
-    "endTime": "2025-12-24T21:44:31.064Z",
+    "id": "discover_issues_002",
+    "scriptName": "discover",
+    "startTime": "2025-12-28T11:46:33.917Z",
+    "status": "completed",
+    "profilesProcessed": 15,
+    "creatorsFound": 2,
+    "errors": 5,
+    "screenshots": [
+      "/screenshots/2025-12-28/discover_issues.png"
+    ],
+    "profileId": "burner1",
+    "endTime": "2025-12-28T11:46:33.917Z",
     "stats": {
-      "duration": 2,
-      "successRate": 0
-    }
+      "duration": 0,
+      "successRate": 66.66666666666666
+    },
+    "errorLogs": [
+      {
+        "timestamp": "2025-12-28T11:16:33.917Z",
+        "username": "rate_limited_user",
+        "message": "429 Rate limit exceeded: free-models-per-day"
+      }
+    ],
+    "issues": [
+      {
+        "type": "high_error_rate",
+        "message": "High error rate: 33.3% (5/15)",
+        "severity": "warning",
+        "detectedAt": "2025-12-28T11:46:33.917Z"
+      }
+    ],
+    "finalScreenshot": "/screenshots/2025-12-28/discover_issues.png"
+  },
+  {
+    "id": "discover_running_003",
+    "scriptName": "discover",
+    "startTime": "2025-12-28T11:46:33.918Z",
+    "status": "running",
+    "profilesProcessed": 12,
+    "creatorsFound": 4,
+    "errors": 1,
+    "screenshots": [
+      "/screenshots/2025-12-28/discover_running.png"
+    ],
+    "profileId": "burner1"
   }
 ]

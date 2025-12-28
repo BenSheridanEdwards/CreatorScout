@@ -1,7 +1,8 @@
 import { useState } from "react";
 import CreatorsTable from "./components/CreatorsTable/CreatorsTable";
 import StatsCards from "./components/StatsCards/StatsCards";
-import RecentRuns from "./components/RecentRuns/RecentRuns";
+import TimelineCarousel from "./components/TimelineCarousel/TimelineCarousel";
+import AccountFilter from "./components/AccountFilter/AccountFilter";
 import Screenshots from "./components/Screenshots/Screenshots";
 import ScreenshotModal from "./components/ScreenshotModal/ScreenshotModal";
 import RunDetailsModal from "./components/RunDetailsModal/RunDetailsModal";
@@ -11,6 +12,7 @@ function App() {
 	const [selectedScreenshot, setSelectedScreenshot] =
 		useState<Screenshot | null>(null);
 	const [selectedRun, setSelectedRun] = useState<RunMetadata | null>(null);
+	const [selectedAccount, setSelectedAccount] = useState<string>("all");
 
 	async function refreshLogs(run?: RunMetadata | null) {
 		try {
@@ -50,11 +52,14 @@ function App() {
 	return (
 		<div className="min-h-screen flex flex-col">
 			<header className="border-b border-slate-800 px-6 py-4">
-				<div>
-					<h1 className="text-xl font-semibold tracking-tight">Scout Studio</h1>
-					<p className="text-sm text-slate-400">
-						Dashboard for creator discovery and outreach
-					</p>
+				<div className="flex items-center justify-between">
+					<div>
+						<h1 className="text-xl font-semibold tracking-tight">Scout Studio</h1>
+						<p className="text-sm text-slate-400">
+							Dashboard for creator discovery and outreach
+						</p>
+					</div>
+					<AccountFilter onAccountChange={setSelectedAccount} />
 				</div>
 			</header>
 
@@ -63,7 +68,10 @@ function App() {
 
 				<CreatorsTable />
 
-				<RecentRuns onRunSelect={handleRunSelect} />
+				<TimelineCarousel
+					onRunSelect={handleRunSelect}
+					selectedAccount={selectedAccount}
+				/>
 
 				<Screenshots onScreenshotSelect={setSelectedScreenshot} />
 			</main>

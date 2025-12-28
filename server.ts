@@ -1,8 +1,9 @@
 import { spawn } from "node:child_process";
-import { createReadStream, existsSync } from "node:fs";
+import { createReadStream, existsSync, writeFile } from "node:fs";
 import { readdir, readFile, stat } from "node:fs/promises";
 import http from "node:http";
 import { extname, join } from "node:path";
+import { WebSocketServer } from "ws";
 import {
 	ADSPOWER_API_KEY,
 	BROWSERLESS_TOKEN,
@@ -617,6 +618,55 @@ async function handleApi(
 		return;
 	}
 
+	// PATCH /api/creators/:username/dm-sent-by - Update DM sent by username
+	if (
+		url.pathname.startsWith("/api/creators/") &&
+		url.pathname.endsWith("/dm-sent-by") &&
+		req.method === "PATCH"
+	) {
+		const pathParts = url.pathname.split("/");
+		const username = pathParts[3];
+
+		if (!username) {
+			sendJson(res, 400, { error: "Username required" });
+			return;
+		}
+
+		let body = "";
+		req.on("data", (chunk) => {
+			body += chunk;
+		});
+		req.on("end", async () => {
+			try {
+				const parsed = JSON.parse(body || "{}") as { dmSentBy?: string | null };
+				// Allow null, undefined, or string values
+				if (parsed.dmSentBy !== null && parsed.dmSentBy !== undefined && typeof parsed.dmSentBy !== "string") {
+					sendJson(res, 400, { error: "dmSentBy must be a string or null" });
+					return;
+				}
+
+				const prisma = getPrismaClient();
+				const updated = await prisma.profile.update({
+					where: { username },
+					data: {
+						dmSentBy: parsed.dmSentBy || null,
+					},
+					select: {
+						username: true,
+						dmSentBy: true,
+					},
+				});
+
+				sendJson(res, 200, updated);
+			} catch (error) {
+				// eslint-disable-next-line no-console
+				console.error("Failed to update dmSentBy:", error);
+				sendJson(res, 500, { error: "Failed to update dmSentBy" });
+			}
+		});
+		return;
+	}
+
 	// PATCH /api/creators/:username/dm - Update DM sent status
 	if (
 		url.pathname.startsWith("/api/creators/") &&
@@ -664,6 +714,142 @@ async function handleApi(
 				sendJson(res, 500, { error: "Failed to update DM status" });
 			}
 		});
+		return;
+	}
+
+	// GET /api/schedule/cron - Parse crontab and return scheduled runs
+	if (url.pathname === "/api/schedule/cron" && req.method === "GET") {
+		try {
+			const { parseCrontab } = await import(
+				"./functions/shared/runs/crontabParser.ts"
+			);
+			const scheduledRuns = await parseCrontab();
+			sendJson(res, 200, scheduledRuns);
+		} catch (error) {
+			console.error("Failed to parse crontab:", error);
+			sendJson(res, 500, { error: "Failed to parse crontab" });
+		}
+		return;
+	}
+
+	// GET /api/schedule - Return combined scheduled runs (cron + config)
+	if (url.pathname === "/api/schedule" && req.method === "GET") {
+		try {
+			const { parseCrontab } = await import(
+				"./functions/shared/runs/crontabParser.ts"
+			);
+			const cronRuns = await parseCrontab();
+
+			// Try to load from config.json as fallback
+			let configRuns: any[] = [];
+			try {
+				const configPath = join(process.cwd(), "schedule.config.json");
+				if (existsSync(configPath)) {
+					const configData = await readFile(configPath, "utf-8");
+					const config = JSON.parse(configData);
+					configRuns = config.oneOff || [];
+				}
+			} catch {
+				// Config file doesn't exist or is invalid, use cron only
+			}
+
+			// Combine cron and config runs
+			const allScheduled = [...cronRuns, ...configRuns];
+			sendJson(res, 200, allScheduled);
+		} catch (error) {
+			console.error("Failed to load schedule:", error);
+			sendJson(res, 500, { error: "Failed to load schedule" });
+		}
+		return;
+	}
+
+	// POST /api/schedule - Add a one-off scheduled run
+	if (url.pathname === "/api/schedule" && req.method === "POST") {
+		let body = "";
+		req.on("data", (chunk) => {
+			body += chunk;
+		});
+		req.on("end", async () => {
+			try {
+				const parsed = JSON.parse(body || "{}") as {
+					profileId?: string;
+					scriptName?: string;
+					scheduledTime?: string;
+				};
+
+				if (!parsed.profileId || !parsed.scriptName || !parsed.scheduledTime) {
+					sendJson(res, 400, {
+						error: "profileId, scriptName, and scheduledTime required",
+					});
+					return;
+				}
+
+				// Read config file
+				const configPath = join(process.cwd(), "schedule.config.json");
+				let config: any = { oneOff: [] };
+				if (existsSync(configPath)) {
+					const configData = await readFile(configPath, "utf-8");
+					config = JSON.parse(configData);
+				}
+
+				// Add new scheduled run
+				config.oneOff = config.oneOff || [];
+				config.oneOff.push({
+					id: `oneoff_${Date.now()}`,
+					profileId: parsed.profileId,
+					scriptName: parsed.scriptName,
+					scheduledTime: parsed.scheduledTime,
+				});
+
+				// Save config
+				const { writeFile: writeFileAsync } = await import("node:fs/promises");
+				await writeFileAsync(configPath, JSON.stringify(config, null, 2));
+				sendJson(res, 200, { success: true });
+			} catch (error) {
+				console.error("Failed to add scheduled run:", error);
+				sendJson(res, 500, { error: "Failed to add scheduled run" });
+			}
+		});
+		return;
+	}
+
+	// GET /api/runs/:id/thumbnail - Get latest screenshot thumbnail for a run
+	if (
+		url.pathname.startsWith("/api/runs/") &&
+		url.pathname.endsWith("/thumbnail") &&
+		req.method === "GET"
+	) {
+		const runId = url.pathname.split("/")[3];
+		if (!runId) {
+			sendJson(res, 400, { error: "Run ID required" });
+			return;
+		}
+
+		try {
+			const run = await getRun(runId);
+			if (!run) {
+				res.writeHead(204);
+				res.end();
+				return;
+			}
+
+			// Return latest screenshot or final screenshot
+			const thumbnailPath =
+				run.finalScreenshot ||
+				run.screenshots[run.screenshots.length - 1] ||
+				null;
+
+			if (!thumbnailPath) {
+				res.writeHead(204);
+				res.end();
+				return;
+			}
+
+			sendJson(res, 200, { thumbnail: thumbnailPath });
+		} catch {
+			res.writeHead(204);
+			res.end();
+		}
 		return;
 	}
 
@@ -745,7 +931,86 @@ const server = http.createServer((req, res) => {
 	res.end("Not found");
 });
 
+// WebSocket server for real-time updates
+const wss = new WebSocketServer({ noServer: true });
+
+// Track active connections per run
+const activeConnections = new Map<string, Set<any>>();
+
+wss.on("connection", (ws, req) => {
+	const url = new URL(req.url || "/", `http://${req.headers.host}`);
+	const runId = url.searchParams.get("runId");
+
+	if (!runId) {
+		ws.close(1008, "runId required");
+		return;
+	}
+
+	// Add to active connections
+	if (!activeConnections.has(runId)) {
+		activeConnections.set(runId, new Set());
+	}
+	activeConnections.get(runId)!.add(ws);
+
+	ws.on("close", () => {
+		const connections = activeConnections.get(runId);
+		if (connections) {
+			connections.delete(ws);
+			if (connections.size === 0) {
+				activeConnections.delete(runId);
+			}
+		}
+	});
+
+	ws.on("message", (data) => {
+		try {
+			const message = JSON.parse(data.toString());
+			if (message.action === "subscribe" && message.runId) {
+				// Already subscribed via URL param
+			}
+		} catch {
+			// Ignore invalid messages
+		}
+	});
+});
+
+// Broadcast updates to WebSocket clients
+export function broadcastRunUpdate(
+	runId: string,
+	type: "log" | "snapshot" | "metrics" | "status",
+	data: any,
+) {
+	const connections = activeConnections.get(runId);
+	if (connections) {
+		const message = JSON.stringify({
+			type,
+			runId,
+			data,
+			timestamp: new Date().toISOString(),
+		});
+		connections.forEach((ws) => {
+			if (ws.readyState === 1) {
+				// WebSocket.OPEN
+				ws.send(message);
+			}
+		});
+	}
+}
+
+server.on("upgrade", (request, socket, head) => {
+	const url = new URL(request.url || "/", `http://${request.headers.host}`);
+	if (url.pathname === "/ws/runs") {
+		wss.handleUpgrade(request, socket, head, (ws) => {
+			wss.emit("connection", ws, request);
+		});
+	} else {
+		socket.destroy();
+	}
+});
+
 server.listen(PORT, () => {
 	// eslint-disable-next-line no-console
 	console.log(`API server listening on http://localhost:${PORT}`);
+	// eslint-disable-next-line no-console
+	console.log(`WebSocket server ready at ws://localhost:${PORT}/ws/runs`);
 });

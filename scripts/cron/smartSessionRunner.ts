@@ -39,6 +39,7 @@ import {
 } from "../../functions/shared/database/database.ts";
 import { processFollowingList } from "../scrape.ts";
 import { getGlobalMetricsTracker } from "../../functions/shared/metrics/metricsTracker.ts";
+import { createRun } from "../../functions/shared/runs/runs.ts";
 
 const logger = createLogger();
 
@@ -92,6 +93,17 @@ async function runSmartSession(args: SessionArgs): Promise<void> {
 	}
 
 	logger.info("SESSION", `Profile: @${profile.username} (${profile.type})`);
+
+	// Create run entry for this session
+	const runId = await createRun("discover");
+	await import("../../functions/shared/runs/runs.ts").then(({ updateRun }) =>
+		updateRun(runId, {
+			profileId,
+			sessionType,
+			scheduledTime: new Date().toISOString(), // Use current time as scheduled time
+		}),
+	);
+	logger.info("SESSION", `Created run entry: ${runId}`);
 
 	// Calculate session plans for today
 	const dailyGoal = profile.limits.dmsPerDay;

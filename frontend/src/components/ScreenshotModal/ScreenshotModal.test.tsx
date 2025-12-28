@@ -21,10 +21,7 @@ describe("ScreenshotModal", () => {
 
 	it("renders the modal with screenshot information", () => {
 		render(
-			<ScreenshotModal
-				screenshot={mockScreenshot}
-				onClose={mockOnClose}
-			/>,
+			<ScreenshotModal screenshot={mockScreenshot} onClose={mockOnClose} />,
 		);
 
 		expect(screen.getByText("@testcreator")).toBeInTheDocument();
@@ -34,10 +31,7 @@ describe("ScreenshotModal", () => {
 
 	it("displays screenshot image with correct src", () => {
 		render(
-			<ScreenshotModal
-				screenshot={mockScreenshot}
-				onClose={mockOnClose}
-			/>,
+			<ScreenshotModal screenshot={mockScreenshot} onClose={mockOnClose} />,
 		);
 
 		const img = screen.getByAltText("testcreator");
@@ -49,10 +43,7 @@ describe("ScreenshotModal", () => {
 
 	it("displays correct type badge for profile", () => {
 		render(
-			<ScreenshotModal
-				screenshot={mockScreenshot}
-				onClose={mockOnClose}
-			/>,
+			<ScreenshotModal screenshot={mockScreenshot} onClose={mockOnClose} />,
 		);
 
 		const badge = screen.getByText("profile");
@@ -67,10 +58,7 @@ describe("ScreenshotModal", () => {
 		};
 
 		render(
-			<ScreenshotModal
-				screenshot={linkScreenshot}
-				onClose={mockOnClose}
-			/>,
+			<ScreenshotModal screenshot={linkScreenshot} onClose={mockOnClose} />,
 		);
 
 		const badge = screen.getByText("link");
@@ -79,10 +67,7 @@ describe("ScreenshotModal", () => {
 
 	it("displays formatted date", () => {
 		render(
-			<ScreenshotModal
-				screenshot={mockScreenshot}
-				onClose={mockOnClose}
-			/>,
+			<ScreenshotModal screenshot={mockScreenshot} onClose={mockOnClose} />,
 		);
 
 		const formattedDate = new Date("2025-12-24T10:00:00.000Z").toLocaleString();
@@ -93,10 +78,7 @@ describe("ScreenshotModal", () => {
 		const user = userEvent.setup();
 
 		render(
-			<ScreenshotModal
-				screenshot={mockScreenshot}
-				onClose={mockOnClose}
-			/>,
+			<ScreenshotModal screenshot={mockScreenshot} onClose={mockOnClose} />,
 		);
 
 		const closeButton = screen.getByRole("button", { name: /×/ });
@@ -109,10 +91,7 @@ describe("ScreenshotModal", () => {
 		const user = userEvent.setup();
 
 		const { container } = render(
-			<ScreenshotModal
-				screenshot={mockScreenshot}
-				onClose={mockOnClose}
-			/>,
+			<ScreenshotModal screenshot={mockScreenshot} onClose={mockOnClose} />,
 		);
 
 		// User clicks on the dark backdrop area outside the modal content
@@ -130,10 +109,7 @@ describe("ScreenshotModal", () => {
 		const user = userEvent.setup();
 
 		render(
-			<ScreenshotModal
-				screenshot={mockScreenshot}
-				onClose={mockOnClose}
-			/>,
+			<ScreenshotModal screenshot={mockScreenshot} onClose={mockOnClose} />,
 		);
 
 		// Click on visible content inside the modal - user clicks on the screenshot image
@@ -152,19 +128,13 @@ describe("ScreenshotModal", () => {
 		};
 
 		const { rerender } = render(
-			<ScreenshotModal
-				screenshot={mockScreenshot}
-				onClose={mockOnClose}
-			/>,
+			<ScreenshotModal screenshot={mockScreenshot} onClose={mockOnClose} />,
 		);
 
 		expect(screen.getByText("@testcreator")).toBeInTheDocument();
 
 		rerender(
-			<ScreenshotModal
-				screenshot={dmScreenshot}
-				onClose={mockOnClose}
-			/>,
+			<ScreenshotModal screenshot={dmScreenshot} onClose={mockOnClose} />,
 		);
 
 		expect(screen.getByText("@dmcreator")).toBeInTheDocument();
