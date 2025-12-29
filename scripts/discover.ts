@@ -68,7 +68,7 @@ const { MAX_DMS_PER_DAY, PRIORITIZE_QUEUE_OVER_SEEDS, SESSION_DURATION_MAX } =
 async function main() {
 	console.log("🚀 Starting Instagram Creator Discovery...");
 	console.log("📋 This will:");
-	console.log("   • Load seed profiles from seeds.txt");
+	console.log("   • Load seed profiles from data/seeds.txt");
 	console.log("   • Analyze bios for influencer indicators");
 	console.log("   • 🔗 CLICK links in bios and analyze with AI vision");
 	console.log("   • 👥 Follow confirmed creators");
@@ -111,7 +111,7 @@ async function main() {
 		// First try loading seeds
 		const seedsLoaded = await loadSeeds();
 		if (seedsLoaded > 0) {
-			console.log(`📋 Loaded ${seedsLoaded} seeds from seeds.txt`);
+			console.log(`📋 Loaded ${seedsLoaded} seeds from data/seeds.txt`);
 		}
 
 		// Then check for confirmed creators whose following hasn't been scraped
@@ -135,7 +135,7 @@ async function main() {
 		const newQueueSize = await queueCount();
 		if (newQueueSize === 0) {
 			console.log("📭 No work to do - queue is still empty");
-			console.log("💡 Add usernames to seeds.txt to start discovery");
+			console.log("💡 Add usernames to data/seeds.txt to start discovery");
 			return;
 		}
 		console.log(`📋 Queue now has ${newQueueSize} items`);
@@ -143,7 +143,7 @@ async function main() {
 		// Also load seeds to add any new ones
 		const seedsLoaded = await loadSeeds();
 		if (seedsLoaded > 0) {
-			console.log(`📋 Loaded ${seedsLoaded} seeds from seeds.txt`);
+			console.log(`📋 Loaded ${seedsLoaded} seeds from data/seeds.txt`);
 		}
 	}
 

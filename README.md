@@ -19,7 +19,7 @@ npm install
 - **[OpenRouter](https://openrouter.ai)** - Vision AI ($10-30/month)
 - **Postgres Database** - Railway/Supabase/Neon (free tier available)
 
-**Detailed setup guide:** See [DEPLOYMENT.md](DEPLOYMENT.md)
+**Detailed setup guide:** See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)
 
 ### 3. Configure Environment
 
@@ -75,9 +75,9 @@ npm run discover
 - ✅ Cheaper than Railway
 
 **Quick start guides:**
-- 🚀 **[QUICKSTART_VPS.md](QUICKSTART_VPS.md)** - 15 minute setup (recommended)
-- 📖 **[VPS_SETUP.md](VPS_SETUP.md)** - Detailed walkthrough with troubleshooting
-- 🔧 **[DEPLOYMENT.md](DEPLOYMENT.md)** - All deployment options (VPS, Railway, Local)
+- 🚀 **[docs/QUICKSTART_VPS.md](docs/QUICKSTART_VPS.md)** - 15 minute setup (recommended)
+- 📖 **[docs/VPS_SETUP.md](docs/VPS_SETUP.md)** - Detailed walkthrough with troubleshooting
+- 🔧 **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)** - All deployment options (VPS, Railway, Local)
 
 **Why not Railway?** They prohibit scraping/automation in ToS. VPS gives you freedom.
 
@@ -389,7 +389,7 @@ Your Script → AdsPower (fingerprint) → SmartProxy (residential IP) → Insta
    - Creates sticky sessions (15-30 min)
    - Auto-rotates when session expires
 
-**Detailed setup guide:** See [ADSPOWER_SETUP.md](ADSPOWER_SETUP.md) for step-by-step instructions.
+**Detailed setup guide:** See [docs/ADSPOWER_SETUP.md](docs/ADSPOWER_SETUP.md) for step-by-step instructions.
 
 **Cost:**
 - **AdsPower**: $9/month base (custom pricing for many profiles)

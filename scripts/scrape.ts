@@ -89,7 +89,7 @@ const {
  * Load seeds from file into queue
  */
 export async function loadSeeds(
-	filePath: string = "seeds.txt",
+	filePath: string = "data/seeds.txt",
 ): Promise<number> {
 	try {
 		logger.debug("SEED", `Loading seeds from ${filePath}`);
@@ -1218,7 +1218,7 @@ export async function scrape(debug: boolean = false): Promise<void> {
 		// Load seeds
 		const seedsLoaded = await loadSeeds();
 		if (seedsLoaded === 0) {
-			logger.warn("QUEUE", "❌ No seeds.txt found or no seeds loaded!");
+			logger.warn("QUEUE", "❌ No data/seeds.txt found or no seeds loaded!");
 			endCycle("FAILED", "No seeds loaded");
 			await browser.close();
 			return;
@@ -1317,7 +1317,7 @@ export async function scrapeWithoutDM(debug: boolean = false): Promise<void> {
 		// Load seeds
 		const seedsLoaded = await loadSeeds();
 		if (seedsLoaded === 0) {
-			logger.warn("QUEUE", "❌ No seeds.txt found or no seeds loaded!");
+			logger.warn("QUEUE", "❌ No data/seeds.txt found or no seeds loaded!");
 			endCycle("FAILED", "No seeds loaded");
 			await browser.close();
 			return;
