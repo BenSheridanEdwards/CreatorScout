@@ -163,14 +163,15 @@ async function likeRandomPost(page: Page): Promise<boolean> {
 
 /**
  * Watch a reel briefly (if engagement is enabled)
+ * Returns the number of reels watched (1 or 2)
  */
-async function watchReel(page: Page): Promise<boolean> {
+async function watchReel(page: Page): Promise<number> {
 	try {
 		// Find a reel in the feed
 		const reelLinks = await page.$$('a[href*="/reel/"]');
 
 		if (reelLinks.length === 0) {
-			return false;
+			return 0;
 		}
 
 		// Randomly select one
@@ -197,10 +198,54 @@ async function watchReel(page: Page): Promise<boolean> {
 		await page.keyboard.press("Escape");
 		await shortDelay(0.5, 1);
 
-		return true;
+		let reelsWatched = 1;
+
+		// 50% chance to watch a second reel by scrolling up
+		if (Math.random() < 0.5) {
+			// Scroll up to find another reel
+			await page.evaluate(() => {
+				window.scrollBy({
+					top: -400 - Math.random() * 300, // Scroll up 400-700px
+					behavior: "smooth",
+				});
+			});
+			await shortDelay(1, 2);
+
+			// Try to find another reel
+			const newReelLinks = await page.$$('a[href*="/reel/"]');
+			if (newReelLinks.length > 0) {
+				// Select a different reel (prefer one we haven't watched)
+				const secondReelIndex = Math.floor(
+					Math.random() * Math.min(2, newReelLinks.length),
+				);
+				const secondReelLink = newReelLinks[secondReelIndex];
+
+				// Scroll to make it visible
+				await secondReelLink.evaluate((el: Element) => {
+					el.scrollIntoView({ block: "center", behavior: "smooth" });
+				});
+
+				await shortDelay(0.5, 1);
+
+				// Click to open second reel
+				await secondReelLink.click();
+				await shortDelay(1, 2);
+
+				// Watch for 3-8 seconds
+				await mediumDelay(3, 8);
+
+				// Close second reel
+				await page.keyboard.press("Escape");
+				await shortDelay(0.5, 1);
+
+				reelsWatched = 2;
+			}
+		}
+
+		return reelsWatched;
 	} catch {
 		// Could not watch reel - continue
-		return false;
+		return 0;
 	}
 }
 
@@ -318,8 +363,8 @@ async function runNaturalScroll(args: ScrollArgs): Promise<void> {
 
 			// Engagement actions (if enabled)
 			if (!noEngagement && !dryRun) {
-				// Like a post (15% chance)
-				if (Math.random() < 0.15 && scrollCount > 2) {
+				// Like a post (18% chance - slightly increased)
+				if (Math.random() < 0.18 && scrollCount > 2) {
 					const liked = await likeRandomPost(page);
 					if (liked) {
 						likesCount++;
@@ -327,11 +372,11 @@ async function runNaturalScroll(args: ScrollArgs): Promise<void> {
 					}
 				}
 
-				// Watch a reel (5% chance - less frequent)
-				if (Math.random() < 0.05 && scrollCount > 5) {
-					const watched = await watchReel(page);
-					if (watched) {
-						reelsWatched++;
+				// Watch a reel (8% chance - slightly increased)
+				if (Math.random() < 0.08 && scrollCount > 5) {
+					const watchedCount = await watchReel(page);
+					if (watchedCount > 0) {
+						reelsWatched += watchedCount;
 					}
 				}
 			}
