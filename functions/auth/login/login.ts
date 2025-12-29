@@ -406,10 +406,17 @@ export async function login(
 		// Try multiple login form selectors (Instagram changes them frequently)
 		const loginSelectors = [
 			'input[name="username"]',
+			'input[name="email"]', // Instagram sometimes uses name="email" for username field
 			'input[aria-label*="Phone number, username, or email"]',
+			'input[aria-label*="Mobile number, username or email"]',
+			'input[aria-label*="Mobile number, username, or email"]',
 			'input[aria-label*="Username"]',
 			'input[placeholder*="Phone number, username, or email"]',
+			'input[placeholder*="Mobile number, username or email"]',
+			'input[placeholder*="Mobile number, username, or email"]',
 			'input[placeholder*="Username"]',
+			'label:has-text("Mobile number, username or email") + input',
+			'label:has-text("Mobile number, username, or email") + input',
 			'#loginForm input[type="text"]',
 			'form input[type="text"]',
 		];
@@ -423,6 +430,47 @@ export async function login(
 				formFound = true;
 				break;
 			} catch {}
+		}
+
+		// Also try case-insensitive placeholder/aria-label/label matching in JavaScript
+		if (!formFound) {
+			const foundViaJS = await page.evaluate(() => {
+				const inputs = Array.from(document.querySelectorAll('input[type="text"], input:not([type])'));
+				for (const input of inputs) {
+					const placeholder = (input.getAttribute('placeholder') || '').toLowerCase();
+					const ariaLabel = (input.getAttribute('aria-label') || '').toLowerCase();
+					const name = (input.getAttribute('name') || '').toLowerCase();
+					
+					// Check associated label element
+					const id = input.getAttribute('id');
+					let labelText = '';
+					if (id) {
+						const label = document.querySelector(`label[for="${id}"]`);
+						if (label) {
+							labelText = (label.textContent || '').toLowerCase();
+						}
+					}
+					
+					if (
+						name === 'username' ||
+						name === 'email' || // Instagram uses name="email" for username field
+						placeholder.includes('mobile number') && (placeholder.includes('username') || placeholder.includes('email')) ||
+						placeholder.includes('phone number') && (placeholder.includes('username') || placeholder.includes('email')) ||
+						ariaLabel.includes('mobile number') && (ariaLabel.includes('username') || ariaLabel.includes('email')) ||
+						ariaLabel.includes('phone number') && (ariaLabel.includes('username') || ariaLabel.includes('email')) ||
+						labelText.includes('mobile number') && (labelText.includes('username') || labelText.includes('email')) ||
+						labelText.includes('phone number') && (labelText.includes('username') || labelText.includes('email'))
+					) {
+						return true;
+					}
+				}
+				return false;
+			});
+			
+			if (foundViaJS) {
+				logger.info("ACTION", "Login form found via JavaScript placeholder/aria-label/label matching");
+				formFound = true;
+			}
 		}
 
 		if (!formFound) {
@@ -587,9 +635,14 @@ export async function login(
 	// Find and fill username field
 	const usernameSelectors = [
 		'input[name="username"]',
+		'input[name="email"]', // Instagram sometimes uses name="email" for username field
 		'input[aria-label*="Phone number, username, or email"]',
+		'input[aria-label*="Mobile number, username or email"]',
+		'input[aria-label*="Mobile number, username, or email"]',
 		'input[aria-label*="Username"]',
 		'input[placeholder*="Phone number, username, or email"]',
+		'input[placeholder*="Mobile number, username or email"]',
+		'input[placeholder*="Mobile number, username, or email"]',
 		'input[placeholder*="Username"]',
 		'#loginForm input[type="text"]',
 		'form input[type="text"]:first-of-type',
@@ -611,7 +664,32 @@ export async function login(
 		} catch {}
 	}
 
+	// Fallback: Find by associated label text (Instagram uses label elements)
 	if (!usernameField) {
+		usernameField = await page.evaluateHandle(() => {
+			const labels = Array.from(document.querySelectorAll('label'));
+			for (const label of labels) {
+				const labelText = (label.textContent || '').toLowerCase();
+				if (
+					(labelText.includes('mobile number') || labelText.includes('phone number')) &&
+					(labelText.includes('username') || labelText.includes('email'))
+				) {
+					const forAttr = label.getAttribute('for');
+					if (forAttr) {
+						const input = document.querySelector(`input#${forAttr}`);
+						if (input) return input;
+					}
+				}
+			}
+			return null;
+		}).catch(() => null);
+		
+		if (usernameField && usernameField.asElement()) {
+			logger.info("ACTION", "Username field found via associated label");
+		}
+	}
+
+	if (!usernameField || !usernameField.asElement()) {
 		throw new Error("Could not find username input field");
 	}
 
@@ -651,6 +729,7 @@ export async function login(
 	// Find and fill password field
 	const passwordSelectors = [
 		'input[name="password"]',
+		'input[name="pass"]', // Instagram sometimes uses name="pass" for password field
 		'input[type="password"]',
 		'input[aria-label*="Password"]',
 		'input[placeholder*="Password"]',
@@ -672,7 +751,31 @@ export async function login(
 		} catch {}
 	}
 
+	// Fallback: Find by associated label text (Instagram uses label elements)
 	if (!passwordField) {
+		passwordField = await page.evaluateHandle(() => {
+			const labels = Array.from(document.querySelectorAll('label'));
+			for (const label of labels) {
+				const labelText = (label.textContent || '').toLowerCase();
+				if (labelText.includes('password')) {
+					const forAttr = label.getAttribute('for');
+					if (forAttr) {
+						const input = document.querySelector(`input#${forAttr}`);
+						if (input && input.getAttribute('type') === 'password') {
+							return input;
+						}
+					}
+				}
+			}
+			return null;
+		}).catch(() => null);
+		
+		if (passwordField && passwordField.asElement()) {
+			logger.info("ACTION", "Password field found via associated label");
+		}
+	}
+
+	if (!passwordField || !passwordField.asElement()) {
 		throw new Error("Could not find password input field");
 	}
 
