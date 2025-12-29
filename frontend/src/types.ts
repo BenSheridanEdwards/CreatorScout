@@ -63,12 +63,15 @@ export interface RunMetadata {
 
 export interface ScheduledRun {
 	id: string;
+	name?: string; // Human-readable name/description for the scheduled task
 	profileId: string;
 	scriptName: string;
 	scheduledTime: string;
 	recurring?: "daily" | "weekday";
 	sessionType?: "morning" | "afternoon" | "evening";
 	accountName?: string; // Display name for account filtering
+	cronPattern?: string; // Cron pattern for display (if from crontab)
+	source?: "cron" | "config"; // Distinguish schedule sources
 }
 
 export interface TimelineCard {
@@ -81,6 +84,8 @@ export interface TimelineCard {
 	hasIssues?: boolean; // Amber dot indicator
 	countdown?: number; // Seconds until scheduled run
 	elapsed?: number; // Seconds elapsed for running runs
+	name?: string; // Task name/description
+	scriptName?: string; // Script that will be executed
 }
 
 export interface Stats {

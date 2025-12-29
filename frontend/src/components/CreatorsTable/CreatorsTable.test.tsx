@@ -370,7 +370,8 @@ describe("CreatorsTable", () => {
 			})
 			.mockResolvedValueOnce({
 				ok: true,
-				json: () => Promise.resolve({ username: "testcreator2", dmSentBy: "newprofile" }),
+				json: () =>
+					Promise.resolve({ username: "testcreator2", dmSentBy: "newprofile" }),
 			});
 
 		render(<CreatorsTable />);
@@ -385,7 +386,9 @@ describe("CreatorsTable", () => {
 
 		// Find the input and type new value
 		const inputs = screen.getAllByPlaceholderText("username");
-		const input = inputs.find((inp) => (inp as HTMLInputElement).value === "profile1");
+		const input = inputs.find(
+			(inp) => (inp as HTMLInputElement).value === "profile1",
+		);
 		expect(input).toBeInTheDocument();
 
 		if (input) {
@@ -415,7 +418,8 @@ describe("CreatorsTable", () => {
 			})
 			.mockResolvedValueOnce({
 				ok: true,
-				json: () => Promise.resolve({ username: "testcreator1", dmSentBy: "profile2" }),
+				json: () =>
+					Promise.resolve({ username: "testcreator1", dmSentBy: "profile2" }),
 			});
 
 		render(<CreatorsTable />);
@@ -427,7 +431,7 @@ describe("CreatorsTable", () => {
 		// Find the input for testcreator1 (which has no dmSentBy)
 		const inputs = screen.getAllByPlaceholderText("username");
 		const input = inputs[0];
-		
+
 		await user.type(input, "profile2");
 		await user.tab(); // Blur the input
 
@@ -536,7 +540,10 @@ describe("CreatorsTable", () => {
 		});
 
 		// Find the toggle button for followers filter
-		const toggleButton = screen.getByText("Followers < 100k").closest("div")?.querySelector("button");
+		const toggleButton = screen
+			.getByText("Followers < 100k")
+			.closest("div")
+			?.querySelector("button");
 		expect(toggleButton).toBeInTheDocument();
 
 		if (toggleButton) {

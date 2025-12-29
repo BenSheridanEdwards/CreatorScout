@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { RunMetadata } from "../../types";
+import { getImageUrl } from "../../utils/imageUrl";
 
 interface RecentRunsProps {
 	onRunSelect: (run: RunMetadata) => void;
@@ -150,7 +151,7 @@ export default function RecentRuns({ onRunSelect }: RecentRunsProps) {
 									</div>
 									{run.finalScreenshot && (
 										<img
-											src={`http://localhost:4000${run.finalScreenshot}`}
+											src={getImageUrl(run.finalScreenshot)}
 											alt="Final screenshot"
 											className="w-16 h-16 object-cover rounded border border-slate-700"
 										/>

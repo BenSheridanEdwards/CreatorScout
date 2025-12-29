@@ -27,9 +27,13 @@ export default function AccountFilter({ onAccountChange }: AccountFilterProps) {
 						...new Set(scheduled.map((s) => s.profileId)),
 					];
 					setAccounts(uniqueAccounts);
+				} else if (res.status !== 404) {
+					console.warn("Failed to load accounts:", res.status);
 				}
+				// 404 is OK - means no schedule endpoint
 			} catch (error) {
-				console.error("Failed to load accounts:", error);
+				console.warn("Schedule endpoint not available for account loading:", error);
+				// Continue with default "all" option
 			}
 		}
 

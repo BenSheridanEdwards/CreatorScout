@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { Screenshot as ScreenshotType } from "../../types";
+import { getImageUrl } from "../../utils/imageUrl";
 
 interface ScreenshotsProps {
 	onScreenshotSelect: (screenshot: ScreenshotType) => void;
@@ -86,9 +87,8 @@ export default function Screenshots({ onScreenshotSelect }: ScreenshotsProps) {
 				>
 					Profile Analysis (
 					{
-						screenshots.filter(
-							(s) => s.type === "profile" || s.type === "link",
-						).length
+						screenshots.filter((s) => s.type === "profile" || s.type === "link")
+							.length
 					}
 					)
 				</button>
@@ -103,9 +103,8 @@ export default function Screenshots({ onScreenshotSelect }: ScreenshotsProps) {
 				>
 					Errors & Debug (
 					{
-						screenshots.filter(
-							(s) => s.type === "error" || s.type === "debug",
-						).length
+						screenshots.filter((s) => s.type === "error" || s.type === "debug")
+							.length
 					}
 					)
 				</button>
@@ -140,7 +139,7 @@ export default function Screenshots({ onScreenshotSelect }: ScreenshotsProps) {
 										className="group relative rounded-lg overflow-hidden border border-slate-800 hover:border-slate-600 transition bg-slate-900/40"
 									>
 										<img
-											src={`http://localhost:4000${screenshot.path}`}
+											src={getImageUrl(screenshot.path)}
 											alt={screenshot.username}
 											className="w-full h-32 object-cover"
 										/>
@@ -186,4 +185,3 @@ export default function Screenshots({ onScreenshotSelect }: ScreenshotsProps) {
 		</section>
 	);
 }
-

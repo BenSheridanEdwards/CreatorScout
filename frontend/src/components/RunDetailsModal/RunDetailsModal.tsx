@@ -8,6 +8,7 @@ import {
 	DialogTitle,
 } from "../ui/dialog";
 import type { RunMetadata } from "../../types";
+import { getImageUrl } from "../../utils/imageUrl";
 
 interface RunDetailsModalProps {
 	run: RunMetadata;
@@ -243,7 +244,7 @@ export default function RunDetailsModal({
 														type="button"
 														onClick={() =>
 															window.open(
-																`http://localhost:4000${creator.screenshotPath}`,
+																getImageUrl(creator.screenshotPath!),
 																"_blank",
 															)
 														}
@@ -314,13 +315,13 @@ export default function RunDetailsModal({
 												className="relative group cursor-pointer rounded-lg overflow-hidden border-2 border-slate-700 hover:border-slate-500 transition w-full p-0 bg-transparent"
 												onClick={() =>
 													window.open(
-														`http://localhost:4000${screenshot}`,
+														getImageUrl(screenshot),
 														"_blank",
 													)
 												}
 											>
 												<img
-													src={`http://localhost:4000${screenshot}`}
+													src={getImageUrl(screenshot)}
 													alt={`Screenshot ${idx + 1}`}
 													className="w-full h-32 object-cover"
 												/>

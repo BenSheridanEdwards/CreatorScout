@@ -1,4 +1,5 @@
 import type { Screenshot } from "../../types";
+import { getImageUrl } from "../../utils/imageUrl";
 
 interface ScreenshotModalProps {
 	screenshot: Screenshot;
@@ -50,7 +51,7 @@ export default function ScreenshotModal({
 				</div>
 				<div className="p-4">
 					<img
-						src={`http://localhost:4000${screenshot.path}`}
+						src={getImageUrl(screenshot.path)}
 						alt={screenshot.username}
 						className="w-full rounded-lg"
 					/>
@@ -59,4 +60,3 @@ export default function ScreenshotModal({
 		</div>
 	);
 }
-

@@ -640,7 +640,11 @@ async function handleApi(
 			try {
 				const parsed = JSON.parse(body || "{}") as { dmSentBy?: string | null };
 				// Allow null, undefined, or string values
-				if (parsed.dmSentBy !== null && parsed.dmSentBy !== undefined && typeof parsed.dmSentBy !== "string") {
+				if (
+					parsed.dmSentBy !== null &&
+					parsed.dmSentBy !== undefined &&
+					typeof parsed.dmSentBy !== "string"
+				) {
 					sendJson(res, 400, { error: "dmSentBy must be a string or null" });
 					return;
 				}
@@ -732,6 +736,26 @@ async function handleApi(
 		return;
 	}
 
+	// GET /api/schedule/config - Get schedule config (timezone, etc.)
+	if (url.pathname === "/api/schedule/config" && req.method === "GET") {
+		try {
+			const configPath = join(process.cwd(), "schedule.config.json");
+			if (existsSync(configPath)) {
+				const configData = await readFile(configPath, "utf-8");
+				const config = JSON.parse(configData);
+				sendJson(res, 200, {
+					timezone: config.timezone || "UTC",
+				});
+			} else {
+				sendJson(res, 200, { timezone: "UTC" });
+			}
+		} catch (error) {
+			console.error("Failed to load schedule config:", error);
+			sendJson(res, 200, { timezone: "UTC" }); // Default to UTC on error
+		}
+		return;
+	}
+
 	// GET /api/schedule - Return combined scheduled runs (cron + config)
 	if (url.pathname === "/api/schedule" && req.method === "GET") {
 		try {
@@ -772,9 +796,11 @@ async function handleApi(
 		req.on("end", async () => {
 			try {
 				const parsed = JSON.parse(body || "{}") as {
+					name?: string;
 					profileId?: string;
 					scriptName?: string;
 					scheduledTime?: string;
+					accountName?: string;
 				};
 
 				if (!parsed.profileId || !parsed.scriptName || !parsed.scheduledTime) {
@@ -784,9 +810,20 @@ async function handleApi(
 					return;
 				}
 
+				// Validate scheduledTime is in the future
+				const scheduledDate = new Date(parsed.scheduledTime);
+				if (isNaN(scheduledDate.getTime())) {
+					sendJson(res, 400, { error: "Invalid scheduledTime format" });
+					return;
+				}
+				if (scheduledDate.getTime() <= Date.now()) {
+					sendJson(res, 400, { error: "scheduledTime must be in the future" });
+					return;
+				}
+
 				// Read config file
 				const configPath = join(process.cwd(), "schedule.config.json");
-				let config: any = { oneOff: [] };
+				let config: any = { oneOff: [], timezone: "UTC" };
 				if (existsSync(configPath)) {
 					const configData = await readFile(configPath, "utf-8");
 					config = JSON.parse(configData);
@@ -794,20 +831,203 @@ async function handleApi(
 
 				// Add new scheduled run
 				config.oneOff = config.oneOff || [];
-				config.oneOff.push({
+				const newSchedule = {
 					id: `oneoff_${Date.now()}`,
+					...(parsed.name && { name: parsed.name }),
 					profileId: parsed.profileId,
 					scriptName: parsed.scriptName,
 					scheduledTime: parsed.scheduledTime,
-				});
+					accountName: parsed.accountName || parsed.profileId,
+				};
+				config.oneOff.push(newSchedule);
 
 				// Save config
 				const { writeFile: writeFileAsync } = await import("node:fs/promises");
 				await writeFileAsync(configPath, JSON.stringify(config, null, 2));
-				sendJson(res, 200, { success: true });
+				sendJson(res, 200, { success: true, schedule: newSchedule });
 			} catch (error) {
 				console.error("Failed to add scheduled run:", error);
 				sendJson(res, 500, { error: "Failed to add scheduled run" });
+			}
+		});
+		return;
+	}
+
+	// GET /api/schedule/:id - Get a specific scheduled run
+	if (
+		url.pathname.startsWith("/api/schedule/") &&
+		req.method === "GET" &&
+		url.pathname !== "/api/schedule" &&
+		url.pathname !== "/api/schedule/cron"
+	) {
+		try {
+			const scheduleId = url.pathname.split("/").pop();
+			if (!scheduleId) {
+				sendJson(res, 400, { error: "Schedule ID required" });
+				return;
+			}
+
+			// Try to find in config file
+			const configPath = join(process.cwd(), "schedule.config.json");
+			if (existsSync(configPath)) {
+				const configData = await readFile(configPath, "utf-8");
+				const config = JSON.parse(configData);
+				const schedule = config.oneOff?.find((s: any) => s.id === scheduleId);
+				if (schedule) {
+					sendJson(res, 200, schedule);
+					return;
+				}
+			}
+
+			// Not found in config, try cron (but cron schedules don't have IDs we can look up)
+			sendJson(res, 404, { error: "Schedule not found" });
+		} catch (error) {
+			console.error("Failed to get schedule:", error);
+			sendJson(res, 500, { error: "Failed to get schedule" });
+		}
+		return;
+	}
+
+	// DELETE /api/schedule/:id - Delete a one-off scheduled run
+	if (
+		url.pathname.startsWith("/api/schedule/") &&
+		req.method === "DELETE" &&
+		url.pathname !== "/api/schedule" &&
+		url.pathname !== "/api/schedule/cron"
+	) {
+		try {
+			const scheduleId = url.pathname.split("/").pop();
+			if (!scheduleId) {
+				sendJson(res, 400, { error: "Schedule ID required" });
+				return;
+			}
+
+			// Check if it's a cron schedule (can't delete those via API)
+			if (scheduleId.startsWith("scheduled_")) {
+				sendJson(res, 400, {
+					error: "Cannot delete cron schedules via API. Edit crontab instead.",
+				});
+				return;
+			}
+
+			// Read config file
+			const configPath = join(process.cwd(), "schedule.config.json");
+			if (!existsSync(configPath)) {
+				sendJson(res, 404, { error: "Schedule config not found" });
+				return;
+			}
+
+			const configData = await readFile(configPath, "utf-8");
+			const config = JSON.parse(configData);
+
+			// Find and remove the schedule
+			const initialLength = config.oneOff?.length || 0;
+			config.oneOff = (config.oneOff || []).filter(
+				(s: any) => s.id !== scheduleId,
+			);
+
+			if (config.oneOff.length === initialLength) {
+				sendJson(res, 404, { error: "Schedule not found" });
+				return;
+			}
+
+			// Save config
+			const { writeFile: writeFileAsync } = await import("node:fs/promises");
+			await writeFileAsync(configPath, JSON.stringify(config, null, 2));
+			sendJson(res, 200, { success: true });
+		} catch (error) {
+			console.error("Failed to delete schedule:", error);
+			sendJson(res, 500, { error: "Failed to delete schedule" });
+		}
+		return;
+	}
+
+	// PATCH /api/schedule/:id - Update a one-off scheduled run
+	if (
+		url.pathname.startsWith("/api/schedule/") &&
+		req.method === "PATCH" &&
+		url.pathname !== "/api/schedule" &&
+		url.pathname !== "/api/schedule/cron"
+	) {
+		let body = "";
+		req.on("data", (chunk) => {
+			body += chunk;
+		});
+		req.on("end", async () => {
+			try {
+				const scheduleId = url.pathname.split("/").pop();
+				if (!scheduleId) {
+					sendJson(res, 400, { error: "Schedule ID required" });
+					return;
+				}
+
+				// Check if it's a cron schedule (can't update those via API)
+				if (scheduleId.startsWith("scheduled_")) {
+					sendJson(res, 400, {
+						error:
+							"Cannot update cron schedules via API. Edit crontab instead.",
+					});
+					return;
+				}
+
+				const parsed = JSON.parse(body || "{}") as {
+					name?: string;
+					profileId?: string;
+					scriptName?: string;
+					scheduledTime?: string;
+					accountName?: string;
+				};
+
+				// Validate scheduledTime if provided
+				if (parsed.scheduledTime) {
+					const scheduledDate = new Date(parsed.scheduledTime);
+					if (isNaN(scheduledDate.getTime())) {
+						sendJson(res, 400, { error: "Invalid scheduledTime format" });
+						return;
+					}
+					if (scheduledDate.getTime() <= Date.now()) {
+						sendJson(res, 400, {
+							error: "scheduledTime must be in the future",
+						});
+						return;
+					}
+				}
+
+				// Read config file
+				const configPath = join(process.cwd(), "schedule.config.json");
+				if (!existsSync(configPath)) {
+					sendJson(res, 404, { error: "Schedule config not found" });
+					return;
+				}
+
+				const configData = await readFile(configPath, "utf-8");
+				const config = JSON.parse(configData);
+
+				// Find the schedule
+				const scheduleIndex = config.oneOff?.findIndex(
+					(s: any) => s.id === scheduleId,
+				);
+				if (scheduleIndex === -1 || scheduleIndex === undefined) {
+					sendJson(res, 404, { error: "Schedule not found" });
+					return;
+				}
+
+				// Update the schedule
+				const schedule = config.oneOff[scheduleIndex];
+				if (parsed.name !== undefined) schedule.name = parsed.name;
+				if (parsed.profileId) schedule.profileId = parsed.profileId;
+				if (parsed.scriptName) schedule.scriptName = parsed.scriptName;
+				if (parsed.scheduledTime) schedule.scheduledTime = parsed.scheduledTime;
+				if (parsed.accountName !== undefined)
+					schedule.accountName = parsed.accountName;
+
+				// Save config
+				const { writeFile: writeFileAsync } = await import("node:fs/promises");
+				await writeFileAsync(configPath, JSON.stringify(config, null, 2));
+				sendJson(res, 200, { success: true, schedule });
+			} catch (error) {
+				console.error("Failed to update schedule:", error);
+				sendJson(res, 500, { error: "Failed to update schedule" });
 			}
 		});
 		return;
