@@ -46,6 +46,7 @@
 		"cron:session": "tsx scripts/cron/sessionRunner.ts",
 		"cron:smart": "tsx scripts/cron/smartSessionRunner.ts",
 		"cron:reset": "tsx scripts/cron/resetDailyCounters.ts",
+		"scroll": "tsx scripts/natural_scroll.ts",
 		"test:dm": "tsx scripts/test_dm_variation.ts",
 		"test:proxy": "tsx scripts/test_proxy.ts",
 		"test:single-profile": "tsx scripts/test_profile.ts",

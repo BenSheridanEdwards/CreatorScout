@@ -79,5 +79,29 @@
       "/screenshots/2025-12-28/discover_running.png"
     ],
     "profileId": "burner1"
+  },
+  {
+    "id": "scroll_1767047567072",
+    "scriptName": "scroll",
+    "startTime": "2025-12-29T22:32:47.072Z",
+    "status": "running",
+    "profilesProcessed": 0,
+    "creatorsFound": 0,
+    "errors": 0,
+    "screenshots": [],
+    "profileId": "test-account",
+    "scheduledTime": "2025-12-29T22:32:47.080Z"
+  },
+  {
+    "id": "scroll_1767047953403",
+    "scriptName": "scroll",
+    "startTime": "2025-12-29T22:39:13.403Z",
+    "status": "running",
+    "profilesProcessed": 0,
+    "creatorsFound": 0,
+    "errors": 0,
+    "screenshots": [],
+    "profileId": "test-account",
+    "scheduledTime": "2025-12-29T22:39:13.407Z"
   }
 ]

@@ -97,7 +97,7 @@ async function manualOverride() {
 		process.exit(1);
 	}
 
-	// Check if profile exists
+	// Check if profile exists (optional - we'll create if it doesn't)
 	const profile = await prisma.profile.findUnique({
 		where: { username },
 		select: {
@@ -110,44 +110,47 @@ async function manualOverride() {
 		},
 	});
 
-	if (!profile) {
-		console.error(
-			chalk.red(`❌ Error: Profile @${username} not found in database`),
-		);
-		console.log(
-			chalk.yellow(
-				"💡 The profile must be visited/analyzed before you can override it",
-			),
-		);
-		process.exit(1);
-	}
-
 	console.log(chalk.blue(`📝 Manual Override for @${username}`));
 	console.log(chalk.gray("━".repeat(60)));
 	console.log();
 
-	console.log(chalk.white("Current Status:"));
-	console.log(
-		chalk.gray(
-			`  Automated: ${profile.isCreator ? "✅" : "❌"} ${profile.confidence}%`,
-		),
-	);
-	if (profile.manualOverride) {
+	if (profile) {
+		console.log(chalk.white("Current Status:"));
 		console.log(
 			chalk.gray(
-				`  Manual: ${profile.manuallyMarkedCreator ? "✅" : "❌"} ${profile.manuallyMarkedCreator ? "CREATOR" : "NOT CREATOR"}`,
+				`  Automated: ${profile.isCreator ? "✅" : "❌"} ${profile.confidence}%`,
 			),
 		);
+		if (profile.manualOverride) {
+			console.log(
+				chalk.gray(
+					`  Manual: ${profile.manuallyMarkedCreator ? "✅" : "❌"} ${profile.manuallyMarkedCreator ? "CREATOR" : "NOT CREATOR"}`,
+				),
+			);
+		}
+		if (profile.bioText) {
+			console.log(chalk.gray(`  Bio: ${profile.bioText.substring(0, 100)}...`));
+		}
+		console.log();
+	} else {
+		console.log(
+			chalk.yellow("⚠️  Profile not found in database - will create new entry"),
+		);
+		console.log();
 	}
-	if (profile.bioText) {
-		console.log(chalk.gray(`  Bio: ${profile.bioText.substring(0, 100)}...`));
-	}
-	console.log();
 
 	if (command === "mark-creator") {
-		await prisma.profile.update({
+		await prisma.profile.upsert({
 			where: { username },
-			data: {
+			create: {
+				username,
+				manualOverride: true,
+				manuallyMarkedCreator: true,
+				manualOverrideReason: reason || "Manually confirmed as creator",
+				manualOverrideAt: new Date(),
+				isCreator: true,
+			},
+			update: {
 				manualOverride: true,
 				manuallyMarkedCreator: true,
 				manualOverrideReason: reason || "Manually confirmed as creator",
