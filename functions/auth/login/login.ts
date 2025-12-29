@@ -987,7 +987,95 @@ export async function login(
 			return;
 		}
 
-		// Check for error conditions
+		// Check for verification code prompt (Instagram security challenge)
+		const verificationPrompt = await page.evaluate(() => {
+			const bodyText = document.body?.innerText || "";
+			const hasCodeInput =
+				!!document.querySelector('input[placeholder*="code"]') ||
+				!!document.querySelector('input[type="text"][maxlength="6"]') ||
+				!!document.querySelector('input[aria-label*="code"]') ||
+				!!document.querySelector('input[name*="code"]');
+			const hasVerificationText =
+				bodyText.includes("Enter the code") ||
+				bodyText.includes("confirmation code") ||
+				bodyText.includes("verification code") ||
+				bodyText.includes("sent a code") ||
+				bodyText.includes("code we sent") ||
+				(bodyText.includes("verify") &&
+					(bodyText.includes("phone") || bodyText.includes("mobile")));
+			return hasCodeInput || hasVerificationText;
+		});
+
+		if (verificationPrompt) {
+			logger.warn(
+				"ACTION",
+				"🔐 Instagram is requesting a verification code. Please enter the code manually in the browser.",
+			);
+			logger.info(
+				"ACTION",
+				"⏳ Waiting up to 5 minutes for you to enter the verification code...",
+			);
+
+			// Wait for verification code to be entered and processed
+			// Poll every 2 seconds to check if we've successfully logged in
+			const maxWaitTime = 5 * 60 * 1000; // 5 minutes
+			const startTime = Date.now();
+			const pollInterval = 2000; // Check every 2 seconds
+
+			while (Date.now() - startTime < maxWaitTime) {
+				await delay(pollInterval);
+
+				// Check if we're now logged in
+				const loggedIn = await isLoggedIn(page);
+				if (loggedIn) {
+					logger.info(
+						"ACTION",
+						"✅ Verification code accepted - login successful!",
+					);
+					await saveCookies(page);
+					return;
+				}
+
+				// Check if we're still on verification page or if we've moved on
+				const stillOnVerification = await page.evaluate(() => {
+					const bodyText = document.body?.innerText || "";
+					const hasCodeInput =
+						!!document.querySelector('input[placeholder*="code"]') ||
+						!!document.querySelector('input[type="text"][maxlength="6"]') ||
+						!!document.querySelector('input[aria-label*="code"]');
+					return (
+						hasCodeInput ||
+						bodyText.includes("Enter the code") ||
+						bodyText.includes("confirmation code") ||
+						bodyText.includes("verification code")
+					);
+				});
+
+				if (!stillOnVerification) {
+					// We've moved away from verification page, check login status again
+					const loggedInAfterMove = await isLoggedIn(page);
+					if (loggedInAfterMove) {
+						logger.info(
+							"ACTION",
+							"✅ Verification completed - login successful!",
+						);
+						await saveCookies(page);
+						return;
+					}
+				}
+			}
+
+			// Timeout waiting for verification
+			logger.error(
+				"ACTION",
+				"⏱️  Timeout waiting for verification code entry (5 minutes)",
+			);
+			throw new Error(
+				"Verification code entry timeout - please try again and enter the code within 5 minutes",
+			);
+		}
+
+		// Check for other error conditions (non-verification errors)
 		const errorText = await page.evaluate(() => {
 			const bodyText = document.body?.innerText || "";
 			return (
@@ -995,8 +1083,6 @@ export async function login(
 				bodyText.includes("incorrect") ||
 				bodyText.includes("Sorry") ||
 				bodyText.includes("suspended") ||
-				bodyText.includes("challenge") ||
-				bodyText.includes("verify") ||
 				bodyText.includes("suspicious") ||
 				bodyText.includes("unusual activity")
 			);
@@ -1101,6 +1187,86 @@ export async function login(
 			);
 		}
 
+		// Check if we're on a verification code page - if so, wait for manual entry
+		try {
+			const verificationPrompt = await page.evaluate(() => {
+				const bodyText = document.body?.innerText || "";
+				const hasCodeInput =
+					!!document.querySelector('input[placeholder*="code"]') ||
+					!!document.querySelector('input[type="text"][maxlength="6"]') ||
+					!!document.querySelector('input[aria-label*="code"]');
+				const hasVerificationText =
+					bodyText.includes("Enter the code") ||
+					bodyText.includes("confirmation code") ||
+					bodyText.includes("verification code") ||
+					bodyText.includes("sent a code");
+				return hasCodeInput || hasVerificationText;
+			});
+
+			if (verificationPrompt) {
+				logger.warn(
+					"ACTION",
+					"🔐 Instagram is requesting a verification code. Please enter the code manually in the browser.",
+				);
+				logger.info(
+					"ACTION",
+					"⏳ Waiting up to 5 minutes for you to enter the verification code...",
+				);
+
+				// Wait for verification code to be entered
+				const maxWaitTime = 5 * 60 * 1000; // 5 minutes
+				const startTime = Date.now();
+				const pollInterval = 2000; // Check every 2 seconds
+
+				while (Date.now() - startTime < maxWaitTime) {
+					await delay(pollInterval);
+
+					const loggedIn = await isLoggedIn(page);
+					if (loggedIn) {
+						logger.info(
+							"ACTION",
+							"✅ Verification code accepted - login successful!",
+						);
+						await saveCookies(page);
+						return;
+					}
+
+					// Check if still on verification page
+					const stillOnVerification = await page.evaluate(() => {
+						const bodyText = document.body?.innerText || "";
+						const hasCodeInput =
+							!!document.querySelector('input[placeholder*="code"]') ||
+							!!document.querySelector('input[type="text"][maxlength="6"]');
+						return (
+							hasCodeInput ||
+							bodyText.includes("Enter the code") ||
+							bodyText.includes("confirmation code")
+						);
+					});
+
+					if (!stillOnVerification) {
+						const loggedInAfterMove = await isLoggedIn(page);
+						if (loggedInAfterMove) {
+							logger.info(
+								"ACTION",
+								"✅ Verification completed - login successful!",
+							);
+							await saveCookies(page);
+							return;
+						}
+					}
+				}
+
+				throw new Error(
+					"Verification code entry timeout - please try again and enter the code within 5 minutes",
+				);
+			}
+		} catch (e) {
+			if (e instanceof Error && e.message.includes("Verification code")) {
+				throw e;
+			}
+		}
+
 		// If we can detect a login failure message, surface that instead of a generic timeout.
 		try {
 			const bodyText = await page.evaluate(
@@ -1110,7 +1276,6 @@ export async function login(
 				bodyText.includes("incorrect") ||
 				bodyText.includes("Sorry") ||
 				bodyText.includes("challenge") ||
-				bodyText.includes("verify") ||
 				bodyText.includes("suspicious") ||
 				bodyText.includes("unusual activity")
 			) {

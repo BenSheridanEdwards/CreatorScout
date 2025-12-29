@@ -306,6 +306,10 @@ async function runNaturalScroll(args: ScrollArgs): Promise<void> {
 			adsPowerProfileId: profile.adsPowerProfileId,
 			profileId: profile.id,
 			debug: true,
+			credentials: {
+				username: profile.username,
+				password: profile.password,
+			},
 		});
 
 		browser = session.browser;
