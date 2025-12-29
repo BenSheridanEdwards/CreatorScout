@@ -124,6 +124,48 @@ async function scrollBackUp(page: Page): Promise<void> {
 }
 
 /**
+ * Check if a post is a sponsored post/ad
+ */
+async function isSponsoredPost(button: any): Promise<boolean> {
+	try {
+		const isSponsored = await button.evaluate((el: Element) => {
+			let postContainer = el.closest('article') || el.closest('[role="article"]');
+			if (!postContainer) {
+				let parent = el.parentElement;
+				for (let i = 0; i < 5 && parent; i++) {
+					if (parent.tagName === 'ARTICLE' || parent.getAttribute('role') === 'article') {
+						postContainer = parent;
+						break;
+					}
+					parent = parent.parentElement;
+				}
+			}
+
+			if (!postContainer) return false;
+
+			const containerText = (postContainer.textContent || '').toLowerCase();
+			const hasSponsored = containerText.includes('sponsored') || 
+				containerText.includes(' paid partnership') ||
+				containerText.includes('ad') && containerText.includes('instagram');
+
+			const sponsoredLabels = postContainer.querySelectorAll('span, div, a');
+			for (const label of Array.from(sponsoredLabels)) {
+				const text = (label.textContent || '').toLowerCase().trim();
+				if (text === 'sponsored' || text === 'paid partnership') {
+					return true;
+				}
+			}
+
+			return hasSponsored;
+		});
+
+		return isSponsored;
+	} catch {
+		return false;
+	}
+}
+
+/**
  * Like a visible post (if engagement is enabled)
  */
 async function likeRandomPost(page: Page): Promise<boolean> {
@@ -137,11 +179,24 @@ async function likeRandomPost(page: Page): Promise<boolean> {
 			return false;
 		}
 
+		// Filter out sponsored posts
+		const nonSponsoredButtons = [];
+		for (const button of likeButtons) {
+			const sponsored = await isSponsoredPost(button);
+			if (!sponsored) {
+				nonSponsoredButtons.push(button);
+			}
+		}
+
+		if (nonSponsoredButtons.length === 0) {
+			return false; // No non-sponsored posts to like
+		}
+
 		// Randomly select one
 		const randomIndex = Math.floor(
-			Math.random() * Math.min(3, likeButtons.length),
+			Math.random() * Math.min(3, nonSponsoredButtons.length),
 		);
-		const button = likeButtons[randomIndex];
+		const button = nonSponsoredButtons[randomIndex];
 
 		// Scroll to make it visible
 		await button.evaluate((el: Element) => {

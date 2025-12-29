@@ -48,6 +48,60 @@ function parseArgs(): LikeTestArgs {
 }
 
 /**
+ * Check if a post is a sponsored post/ad
+ */
+async function isSponsoredPost(
+	button: import("puppeteer").ElementHandle<Element>,
+): Promise<boolean> {
+	try {
+		// Check if the post contains "Sponsored" or "Ad" text
+		const isSponsored = await button.evaluate((el: Element) => {
+			// Find the post container (usually a parent article or div)
+			let postContainer =
+				el.closest("article") || el.closest('[role="article"]');
+			if (!postContainer) {
+				// Try to find parent that contains the post
+				let parent = el.parentElement;
+				for (let i = 0; i < 5 && parent; i++) {
+					if (
+						parent.tagName === "ARTICLE" ||
+						parent.getAttribute("role") === "article"
+					) {
+						postContainer = parent;
+						break;
+					}
+					parent = parent.parentElement;
+				}
+			}
+
+			if (!postContainer) return false;
+
+			// Check for sponsored indicators
+			const containerText = (postContainer.textContent || "").toLowerCase();
+			const hasSponsored =
+				containerText.includes("sponsored") ||
+				containerText.includes(" paid partnership") ||
+				(containerText.includes("ad") && containerText.includes("instagram"));
+
+			// Also check for "Sponsored" label in the post
+			const sponsoredLabels = postContainer.querySelectorAll("span, div, a");
+			for (const label of Array.from(sponsoredLabels)) {
+				const text = (label.textContent || "").toLowerCase().trim();
+				if (text === "sponsored" || text === "paid partnership") {
+					return true;
+				}
+			}
+
+			return hasSponsored;
+		});
+
+		return isSponsored;
+	} catch {
+		return false; // If we can't determine, assume not sponsored
+	}
+}
+
+/**
  * Like a visible post on the feed
  */
 async function likeRandomPost(page: Page): Promise<boolean> {
@@ -58,7 +112,7 @@ async function likeRandomPost(page: Page): Promise<boolean> {
 
 		// Try multiple selectors for like buttons
 		// Instagram uses different structures: svg elements, button elements, etc.
-		let likeButtons = await page.$$(
+		let likeButtons: import("puppeteer").ElementHandle<Element>[] = await page.$$(
 			'svg[aria-label="Like"][fill="none"], svg[aria-label="Like"]:not([fill])',
 		);
 
@@ -85,24 +139,24 @@ async function likeRandomPost(page: Page): Promise<boolean> {
 					document.querySelectorAll('button, [role="button"], svg'),
 				);
 				for (const btn of allButtons) {
-					const ariaLabel = btn.getAttribute('aria-label') || '';
+					const ariaLabel = btn.getAttribute("aria-label") || "";
 					const parentAriaLabel =
-						btn.parentElement?.getAttribute('aria-label') || '';
+						btn.parentElement?.getAttribute("aria-label") || "";
 					if (
-						ariaLabel.toLowerCase().includes('like') &&
-						!ariaLabel.toLowerCase().includes('unlike') &&
-						!ariaLabel.toLowerCase().includes('liked')
+						ariaLabel.toLowerCase().includes("like") &&
+						!ariaLabel.toLowerCase().includes("unlike") &&
+						!ariaLabel.toLowerCase().includes("liked")
 					) {
-						btn.setAttribute('data-scout-like-button', 'true');
+						btn.setAttribute("data-scout-like-button", "true");
 						count++;
 					} else if (
-						parentAriaLabel.toLowerCase().includes('like') &&
-						!parentAriaLabel.toLowerCase().includes('unlike') &&
-						!parentAriaLabel.toLowerCase().includes('liked')
+						parentAriaLabel.toLowerCase().includes("like") &&
+						!parentAriaLabel.toLowerCase().includes("unlike") &&
+						!parentAriaLabel.toLowerCase().includes("liked")
 					) {
 						const parent = btn.parentElement;
 						if (parent) {
-							parent.setAttribute('data-scout-like-button', 'true');
+							parent.setAttribute("data-scout-like-button", "true");
 							count++;
 						}
 					}
@@ -137,11 +191,30 @@ async function likeRandomPost(page: Page): Promise<boolean> {
 
 		logger.info("ENGAGEMENT", `Found ${likeButtons.length} unliked posts`);
 
+		// Filter out sponsored posts
+		const nonSponsoredButtons = [];
+		for (const button of likeButtons) {
+			const sponsored = await isSponsoredPost(button);
+			if (!sponsored) {
+				nonSponsoredButtons.push(button);
+			}
+		}
+
+		if (nonSponsoredButtons.length === 0) {
+			logger.warn("ENGAGEMENT", "No non-sponsored posts found to like");
+			return false;
+		}
+
+		logger.info(
+			"ENGAGEMENT",
+			`Found ${nonSponsoredButtons.length} non-sponsored posts (filtered ${likeButtons.length - nonSponsoredButtons.length} sponsored)`,
+		);
+
 		// Randomly select one (prefer first 3 visible posts)
 		const randomIndex = Math.floor(
-			Math.random() * Math.min(3, likeButtons.length),
+			Math.random() * Math.min(3, nonSponsoredButtons.length),
 		);
-		const button = likeButtons[randomIndex];
+		const button = nonSponsoredButtons[randomIndex];
 
 		// Scroll to make it visible
 		await button.evaluate((el: Element) => {
@@ -261,9 +334,7 @@ async function testLikePost(args: LikeTestArgs): Promise<void> {
 			}
 		}
 
-		// Keep browser open for 5 minutes to allow manual verification if needed
-		logger.info("TEST", "Keeping browser open for 5 minutes...");
-		await new Promise((resolve) => setTimeout(resolve, 5 * 60 * 1000));
+		// Test complete - browser will close automatically
 	} catch (error) {
 		logger.error("TEST", `Test failed: ${error}`);
 		throw error;

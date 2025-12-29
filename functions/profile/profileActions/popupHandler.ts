@@ -72,12 +72,22 @@ async function clickButtonLikeByText(
  */
 export async function handleInstagramPopups(page: Page): Promise<void> {
 	// Handle "The messaging tab has a new look" popup
-	const messagingTabDismissed =
-		(await clickButtonLikeByText(page, ["ok", "got it", "dismiss"])) ||
-		(await clickAny(page, ["OK", "Got it", "Got It", "Dismiss"]));
-	if (messagingTabDismissed) {
-		getLogger().info("ACTION", "Dismissed messaging tab popup");
-		await sleep(1000 + Math.random() * 1000);
+	// Check for the specific popup text first
+	const hasMessagingTabPopup = await page.evaluate(() => {
+		const bodyText = document.body?.innerText || "";
+		return bodyText.includes("The messaging tab has a new look") ||
+			bodyText.includes("messaging tab has a new look") ||
+			bodyText.includes("You can now go to your inbox by tapping this icon");
+	});
+
+	if (hasMessagingTabPopup) {
+		const messagingTabDismissed =
+			(await clickButtonLikeByText(page, ["ok", "got it", "dismiss"])) ||
+			(await clickAny(page, ["OK", "Got it", "Got It", "Dismiss"]));
+		if (messagingTabDismissed) {
+			getLogger().info("ACTION", "Dismissed messaging tab popup");
+			await sleep(1000 + Math.random() * 1000);
+		}
 	}
 
 	// Handle "Turn on Notifications" popup
