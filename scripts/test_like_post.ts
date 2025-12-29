@@ -112,9 +112,10 @@ async function likeRandomPost(page: Page): Promise<boolean> {
 
 		// Try multiple selectors for like buttons
 		// Instagram uses different structures: svg elements, button elements, etc.
-		let likeButtons: import("puppeteer").ElementHandle<Element>[] = await page.$$(
-			'svg[aria-label="Like"][fill="none"], svg[aria-label="Like"]:not([fill])',
-		);
+		let likeButtons: import("puppeteer").ElementHandle<Element>[] =
+			await page.$$(
+				'svg[aria-label="Like"][fill="none"], svg[aria-label="Like"]:not([fill])',
+			);
 
 		// If no SVG buttons found, try button elements
 		if (likeButtons.length === 0) {
@@ -226,7 +227,7 @@ async function likeRandomPost(page: Page): Promise<boolean> {
 		// Click like - try clicking the button or its parent
 		logger.info("ENGAGEMENT", "Clicking like button...");
 		try {
-			await button.click();
+			await (button as import("puppeteer").ElementHandle<HTMLElement>).click();
 		} catch {
 			// If direct click fails, try clicking parent element
 			await button.evaluate((el: Element) => {
@@ -234,7 +235,7 @@ async function likeRandomPost(page: Page): Promise<boolean> {
 				if (parent) {
 					(parent as HTMLElement).click();
 				} else {
-					el.click();
+					(el as HTMLElement).click();
 				}
 			});
 		}
