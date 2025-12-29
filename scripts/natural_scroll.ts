@@ -26,6 +26,7 @@ import {
 import { createLogger } from "../functions/shared/logger/logger.ts";
 import { getProfile } from "../functions/shared/profiles/profileLoader.ts";
 import { createRun } from "../functions/shared/runs/runs.ts";
+import { humanLikeClickHandle } from "../functions/navigation/humanClick/humanClick.ts";
 
 const logger = createLogger();
 
@@ -129,11 +130,15 @@ async function scrollBackUp(page: Page): Promise<void> {
 async function isSponsoredPost(button: any): Promise<boolean> {
 	try {
 		const isSponsored = await button.evaluate((el: Element) => {
-			let postContainer = el.closest('article') || el.closest('[role="article"]');
+			let postContainer =
+				el.closest("article") || el.closest('[role="article"]');
 			if (!postContainer) {
 				let parent = el.parentElement;
 				for (let i = 0; i < 5 && parent; i++) {
-					if (parent.tagName === 'ARTICLE' || parent.getAttribute('role') === 'article') {
+					if (
+						parent.tagName === "ARTICLE" ||
+						parent.getAttribute("role") === "article"
+					) {
 						postContainer = parent;
 						break;
 					}
@@ -143,15 +148,16 @@ async function isSponsoredPost(button: any): Promise<boolean> {
 
 			if (!postContainer) return false;
 
-			const containerText = (postContainer.textContent || '').toLowerCase();
-			const hasSponsored = containerText.includes('sponsored') || 
-				containerText.includes(' paid partnership') ||
-				containerText.includes('ad') && containerText.includes('instagram');
+			const containerText = (postContainer.textContent || "").toLowerCase();
+			const hasSponsored =
+				containerText.includes("sponsored") ||
+				containerText.includes(" paid partnership") ||
+				(containerText.includes("ad") && containerText.includes("instagram"));
 
-			const sponsoredLabels = postContainer.querySelectorAll('span, div, a');
+			const sponsoredLabels = postContainer.querySelectorAll("span, div, a");
 			for (const label of Array.from(sponsoredLabels)) {
-				const text = (label.textContent || '').toLowerCase().trim();
-				if (text === 'sponsored' || text === 'paid partnership') {
+				const text = (label.textContent || "").toLowerCase().trim();
+				if (text === "sponsored" || text === "paid partnership") {
 					return true;
 				}
 			}
@@ -205,8 +211,15 @@ async function likeRandomPost(page: Page): Promise<boolean> {
 
 		await shortDelay(0.5, 1);
 
-		// Click like
-		await button.click();
+		// Click like using ghost cursor for human-like movement
+		try {
+			await humanLikeClickHandle(page, button, {
+				elementType: "button",
+			});
+		} catch {
+			// Fallback to direct click if ghost cursor fails
+			await button.click();
+		}
 		await microDelay(0.3, 0.8);
 
 		return true;
@@ -282,8 +295,15 @@ async function watchReel(page: Page): Promise<number> {
 
 				await shortDelay(0.5, 1);
 
-				// Click to open second reel
-				await secondReelLink.click();
+				// Click to open second reel using ghost cursor for human-like movement
+				try {
+					await humanLikeClickHandle(page, secondReelLink, {
+						elementType: "link",
+					});
+				} catch {
+					// Fallback to direct click if ghost cursor fails
+					await secondReelLink.click();
+				}
 				await shortDelay(1, 2);
 
 				// Watch for 3-8 seconds

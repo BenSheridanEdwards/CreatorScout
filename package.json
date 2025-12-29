@@ -12,7 +12,7 @@
 		"test:e2e:scrape": "NODE_OPTIONS=--experimental-vm-modules jest tests/e2e/scrape_e2e.puppeteer.test.ts --testTimeout=120000 --testPathIgnorePatterns='[]'",
 		"test:e2e:check-profile": "NODE_OPTIONS=--experimental-vm-modules jest tests/e2e/check_profile_e2e.puppeteer.test.ts --testTimeout=120000 --testPathIgnorePatterns='[]'",
 		"login:screenshot": "tsx scripts/login_screenshot.ts",
-		"discover": "tsx scripts/discover.ts --profile test-account",
+		"discover": "tsx scripts/discover.ts --profile test",
 		"discover:dm": "tsx scripts/discover.ts --profile test-account --send-dms",
 		"discover:debug": "tsx scripts/discover.ts --profile test-account --debug",
 		"discover:dm:debug": "tsx scripts/discover.ts --profile test-account --send-dms --debug",

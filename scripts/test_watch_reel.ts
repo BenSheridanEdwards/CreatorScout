@@ -17,6 +17,7 @@ import {
 } from "../functions/timing/humanize/humanize.ts";
 import { createLogger } from "../functions/shared/logger/logger.ts";
 import { getProfile } from "../functions/shared/profiles/profileLoader.ts";
+import { humanLikeClickHandle } from "../functions/navigation/humanClick/humanClick.ts";
 
 const logger = createLogger();
 
@@ -83,9 +84,16 @@ async function watchReel(
 
 		await shortDelay(0.5, 1);
 
-		// Click to open reel
+		// Click to open reel using ghost cursor for human-like movement
 		logger.info("ENGAGEMENT", "Opening first reel...");
-		await reelLink.click();
+		try {
+			await humanLikeClickHandle(page, reelLink, {
+				elementType: "link",
+			});
+		} catch {
+			// Fallback to direct click if ghost cursor fails
+			await reelLink.click();
+		}
 		await shortDelay(1, 2);
 
 		// Watch for 3-8 seconds (natural viewing time)
@@ -132,9 +140,16 @@ async function watchReel(
 
 				await shortDelay(0.5, 1);
 
-				// Click to open second reel
+				// Click to open second reel using ghost cursor for human-like movement
 				logger.info("ENGAGEMENT", "Opening second reel...");
-				await secondReelLink.click();
+				try {
+					await humanLikeClickHandle(page, secondReelLink, {
+						elementType: "link",
+					});
+				} catch {
+					// Fallback to direct click if ghost cursor fails
+					await secondReelLink.click();
+				}
 				await shortDelay(1, 2);
 
 				// Watch for 3-8 seconds

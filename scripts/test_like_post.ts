@@ -18,6 +18,7 @@ import {
 import { createLogger } from "../functions/shared/logger/logger.ts";
 import { getProfile } from "../functions/shared/profiles/profileLoader.ts";
 import { handleInstagramPopups } from "../functions/profile/profileActions/popupHandler.ts";
+import { humanLikeClickHandle } from "../functions/navigation/humanClick/humanClick.ts";
 
 const logger = createLogger();
 
@@ -224,20 +225,33 @@ async function likeRandomPost(page: Page): Promise<boolean> {
 
 		await shortDelay(0.5, 1);
 
-		// Click like - try clicking the button or its parent
-		logger.info("ENGAGEMENT", "Clicking like button...");
+		// Click like using ghost cursor for human-like movement
+		logger.info("ENGAGEMENT", "Clicking like button with ghost cursor...");
 		try {
-			await (button as import("puppeteer").ElementHandle<HTMLElement>).click();
-		} catch {
-			// If direct click fails, try clicking parent element
-			await button.evaluate((el: Element) => {
-				const parent = el.closest('button, [role="button"]');
-				if (parent) {
-					(parent as HTMLElement).click();
-				} else {
-					(el as HTMLElement).click();
-				}
+			await humanLikeClickHandle(page, button, {
+				elementType: "button",
 			});
+		} catch (error) {
+			logger.warn(
+				"ENGAGEMENT",
+				`Ghost cursor click failed, trying fallback: ${error}`,
+			);
+			// Fallback to direct click if ghost cursor fails
+			try {
+				await (
+					button as import("puppeteer").ElementHandle<HTMLElement>
+				).click();
+			} catch {
+				// Last resort: click via evaluate
+				await button.evaluate((el: Element) => {
+					const parent = el.closest('button, [role="button"]');
+					if (parent) {
+						(parent as HTMLElement).click();
+					} else {
+						(el as HTMLElement).click();
+					}
+				});
+			}
 		}
 		await microDelay(0.3, 0.8);
 
