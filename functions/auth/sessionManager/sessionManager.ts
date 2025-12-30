@@ -71,8 +71,12 @@ export async function loadCookies(page: Page): Promise<boolean> {
  */
 export async function isLoggedIn(page: Page): Promise<boolean> {
 	try {
+		// First check: Are we on a login page? If not on login page and on instagram.com, likely logged in
+		const currentUrl = page.url();
+		const isOnLoginPage = currentUrl.includes("/accounts/login");
+		
 		// Use page.evaluate for more reliable detection
-		const loggedIn = await page.evaluate(() => {
+		const result = await page.evaluate(() => {
 			// Check for multiple logged-in indicators
 			const inboxLink = !!document.querySelector('a[href="/direct/inbox/"]');
 			const profileLink = !!document.querySelector('[aria-label*="profile"]');
@@ -80,6 +84,7 @@ export async function isLoggedIn(page: Page): Promise<boolean> {
 			const homeIcon = !!document.querySelector('svg[aria-label="Home"]');
 			const feed = !!document.querySelector('[role="main"]');
 			const navigation = !!document.querySelector("nav");
+			const homeLink = !!document.querySelector('a[href="/"]');
 
 			// Check for login form (if present, we're NOT logged in)
 			const loginForm = !!document.querySelector('input[name="username"]');
@@ -87,20 +92,66 @@ export async function isLoggedIn(page: Page): Promise<boolean> {
 				(btn) => btn.textContent?.toLowerCase().includes("log in"),
 			);
 
+			// Check if we have any logged-in indicators
+			const hasLoggedInIndicators = 
+				inboxLink ||
+				profileLink ||
+				createButton ||
+				homeIcon ||
+				feed ||
+				navigation ||
+				homeLink;
+
 			// We're logged in if we have any logged-in indicators AND no login form
-			return (
-				(inboxLink ||
-					profileLink ||
-					createButton ||
-					homeIcon ||
-					feed ||
-					navigation) &&
-				!loginForm &&
-				!loginButton
-			);
+			const hasLoginForm = loginForm || loginButton;
+			
+			return {
+				hasLoggedInIndicators,
+				hasLoginForm,
+				indicators: {
+					inboxLink,
+					profileLink,
+					createButton,
+					homeIcon,
+					feed,
+					navigation,
+					homeLink,
+				},
+			};
 		});
+
+		// If we're on instagram.com and NOT on login page, and no login form, assume logged in
+		if (
+			currentUrl.includes("instagram.com") &&
+			!isOnLoginPage &&
+			!result.hasLoginForm
+		) {
+			// Even if we don't see logged-in indicators yet, if we're on homepage without login form,
+			// we're likely logged in (page might still be loading)
+			if (result.hasLoggedInIndicators) {
+				logger.debug("AUTH", "Logged in: Found logged-in indicators");
+				return true;
+			} else {
+				// On homepage, no login form, but no indicators yet - might be loading
+				// Be lenient: if we're on homepage and not login page, assume logged in
+				logger.debug("AUTH", "On homepage without login form - assuming logged in (page may still be loading)");
+				return true;
+			}
+		}
+
+		// Traditional check: logged-in indicators AND no login form
+		const loggedIn = result.hasLoggedInIndicators && !result.hasLoginForm;
+		
+		if (loggedIn) {
+			logger.debug("AUTH", `Logged in: Found indicators: ${Object.entries(result.indicators).filter(([_, v]) => v).map(([k]) => k).join(", ")}`);
+		} else {
+			logger.debug("AUTH", `Not logged in: hasIndicators=${result.hasLoggedInIndicators}, hasLoginForm=${result.hasLoginForm}, url=${currentUrl}`);
+		}
+		
 		return loggedIn;
-	} catch {
+	} catch (error) {
+		const errorMsg = error instanceof Error ? error.message : String(error);
+		logger.warn("AUTH", `Error checking login status: ${errorMsg}`);
 		return false;
 	}
 }

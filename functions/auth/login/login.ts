@@ -7,7 +7,9 @@ import {
 	verifyHomePageLoaded,
 } from "../../shared/pageVerification/pageVerification.ts";
 import { snapshot } from "../../shared/snapshot/snapshot.ts";
-import { humanClickElement } from "../../timing/humanize/humanize.ts";
+import { humanClickElement, humanTypeText, microDelay } from "../../timing/humanize/humanize.ts";
+import { humanLikeClickHandle } from "../../navigation/humanClick/humanClick.ts";
+import { sleep } from "../../timing/sleep/sleep.ts";
 import {
 	isLoggedIn,
 	loadCookies,
@@ -709,34 +711,48 @@ export async function login(
 		throw new Error("Could not find username input field");
 	}
 
-	// Focus the field (click can fail if the node is covered/animated)
+	// Use human-like click on the username field (ghost-cursor)
+	logger.info("ACTION", "Clicking username field with human-like movement...");
 	try {
-		await usernameField.click();
-	} catch {
+		await humanLikeClickHandle(page, usernameField, {
+			elementType: "input",
+			hoverDelay: 150 + Math.random() * 100,
+		});
+	} catch (clickErr) {
+		logger.warn("ACTION", `Ghost-cursor click failed, trying fallback: ${clickErr}`);
+		// Fallback to direct click if ghost-cursor fails
 		try {
-			// Scroll into view and focus as a fallback
-			await page.evaluate((el) => {
-				(el as HTMLElement | null)?.scrollIntoView?.({
-					block: "center",
-					inline: "center",
-				});
-			}, usernameField);
+			await usernameField.click();
 		} catch {
-			// ignore
-		}
-
-		// Try focusing by selector if we have one
-		if (usernameSelectorUsed) {
-			try {
+			// Try focusing by selector if we have one
+			if (usernameSelectorUsed) {
 				await page.focus(usernameSelectorUsed);
-			} catch {
-				// ignore
 			}
 		}
 	}
+	
+	// Small pause after clicking, like a human would
+	await sleep(200 + Math.random() * 300);
 
-	// Type username with more realistic delays (type on the element handle itself)
-	await usernameField.type(creds.username, { delay: 100 + Math.random() * 50 });
+	// Type username with human-like patterns (variable delays, occasional pauses)
+	logger.info("ACTION", "Typing username with human-like pattern...");
+	for (const char of creds.username) {
+		// Variable typing speed: faster for common letters, slower for symbols/numbers
+		let charDelay = 70 + Math.random() * 60; // Base 70-130ms
+		
+		// Slower for special characters and numbers
+		if (/[^a-zA-Z]/.test(char)) {
+			charDelay += 30 + Math.random() * 40;
+		}
+		
+		// Occasional longer pause (thinking/hesitation)
+		if (Math.random() < 0.08) {
+			charDelay += 150 + Math.random() * 200;
+		}
+		
+		await page.keyboard.type(char);
+		await sleep(charDelay);
+	}
 	logger.info("ACTION", "Username entered");
 
 	// Add pause between fields (like a human would)
@@ -795,12 +811,48 @@ export async function login(
 		throw new Error("Could not find password input field");
 	}
 
-	// Type password with realistic delays
-	await passwordField.type(creds.password, { delay: 120 + Math.random() * 80 });
+	// Use human-like click on the password field (ghost-cursor)
+	logger.info("ACTION", "Clicking password field with human-like movement...");
+	try {
+		await humanLikeClickHandle(page, passwordField, {
+			elementType: "input",
+			hoverDelay: 100 + Math.random() * 150,
+		});
+	} catch (clickErr) {
+		logger.warn("ACTION", `Ghost-cursor click failed on password, trying fallback: ${clickErr}`);
+		try {
+			await passwordField.click();
+		} catch {
+			// ignore
+		}
+	}
+	
+	// Small pause after clicking
+	await sleep(150 + Math.random() * 250);
+
+	// Type password with human-like patterns (slightly faster than username - muscle memory)
+	logger.info("ACTION", "Typing password with human-like pattern...");
+	for (const char of creds.password) {
+		// Passwords are typed faster (muscle memory)
+		let charDelay = 50 + Math.random() * 50; // Base 50-100ms
+		
+		// Slower for special characters (shift key)
+		if (/[A-Z!@#$%^&*()_+\-=\[\]{}|;':",.<>?]/.test(char)) {
+			charDelay += 20 + Math.random() * 30;
+		}
+		
+		// Very occasional pause (rare for memorized passwords)
+		if (Math.random() < 0.03) {
+			charDelay += 100 + Math.random() * 150;
+		}
+		
+		await page.keyboard.type(char);
+		await sleep(charDelay);
+	}
 	logger.info("ACTION", "Password entered");
 
-	// Add another pause before clicking submit (human hesitation)
-	await delay(800 + Math.random() * 1200);
+	// Add human-like pause before clicking submit (reviewing what they typed, hesitation)
+	await sleep(600 + Math.random() * 800);
 
 	if (options?.skipSubmit) {
 		logger.info(
@@ -832,7 +884,7 @@ export async function login(
 		return;
 	}
 
-	logger.info("ACTION", "Submitting login form");
+	logger.info("ACTION", "Submitting login form with human-like click...");
 
 	// Try multiple submit button selectors
 	const submitSelectors = [
@@ -850,12 +902,22 @@ export async function login(
 		try {
 			const submitButton = await page.$(selector);
 			if (submitButton) {
-				await submitButton.click();
-				logger.info(
-					"ACTION",
-					`Submit button clicked with selector: ${selector}`,
-				);
-				submitClicked = true;
+				// Use human-like click with ghost-cursor for the submit button
+				logger.info("ACTION", `Found submit button with selector: ${selector}, clicking...`);
+				try {
+					await humanLikeClickHandle(page, submitButton, {
+						elementType: "button",
+						hoverDelay: 80 + Math.random() * 100, // Quick confident click
+					});
+					submitClicked = true;
+					logger.info("ACTION", "Submit button clicked with ghost-cursor");
+				} catch (clickErr) {
+					// Fallback to direct click
+					logger.warn("ACTION", `Ghost-cursor failed on submit: ${clickErr}, using direct click`);
+					await submitButton.click();
+					submitClicked = true;
+					logger.info("ACTION", "Submit button clicked with fallback direct click");
+				}
 				break;
 			}
 		} catch {}
@@ -866,7 +928,8 @@ export async function login(
 			"ACTION",
 			"Submit button not found with standard selectors, trying keyboard enter",
 		);
-		// Try pressing Enter on the password field
+		// Add a small human-like delay before pressing Enter
+		await sleep(200 + Math.random() * 300);
 		await page.keyboard.press("Enter");
 	}
 
@@ -980,28 +1043,79 @@ export async function login(
 					timeout: 15000,
 				});
 				await delay(3000);
+
+				// Check if we're already logged in after navigation
+				const alreadyLoggedInAfterNav = await isLoggedIn(page);
+				if (alreadyLoggedInAfterNav) {
+					logger.info(
+						"ACTION",
+						"Already logged in after navigating from onetap page",
+					);
+					// Skip the waitForFunction below - we're already logged in
+					return;
+				}
 			}
 		}
 
-		// Wait for either inbox link or error indicators
-		await page.waitForFunction(
-			() => {
-				// Check for successful login indicators
-				const inboxLink = document.querySelector('a[href="/direct/inbox/"]');
-				const profileLink = document.querySelector('a[href*="/accounts/"]');
-				const feedContent = document.querySelector('[role="main"]');
+		// Only wait for login indicators if we're not already logged in
+		// Check current status first
+		const currentLoginStatus = await isLoggedIn(page);
+		if (currentLoginStatus) {
+			logger.info("ACTION", "Already logged in, skipping waitForFunction");
+		} else {
+			// Wait for either inbox link or error indicators with polling (more reliable)
+			logger.info("ACTION", "Waiting for login indicators to appear...");
+			const maxWaitTime = 90000; // 90 seconds - give Instagram more time
+			const startTime = Date.now();
+			let loggedIn = false;
 
-				// Check for login failure indicators
-				const errorMsg =
-					document.body?.innerText?.includes("incorrect") ||
-					document.body?.innerText?.includes("challenge") ||
-					document.body?.innerText?.includes("verify") ||
-					document.body?.innerText?.includes("suspicious");
+			while (Date.now() - startTime < maxWaitTime) {
+				// Check login status
+				const currentUrlCheck = page.url();
+				loggedIn = await isLoggedIn(page);
+				
+				if (loggedIn) {
+					logger.info("ACTION", `Login detected via polling at ${currentUrlCheck}`);
+					break;
+				}
+				
+				// Log progress every 10 seconds
+				const elapsed = Math.floor((Date.now() - startTime) / 1000);
+				if (elapsed % 10 === 0 && elapsed > 0) {
+					logger.info("ACTION", `Still waiting for login... (${elapsed}s elapsed, URL: ${currentUrlCheck})`);
+				}
 
-				return inboxLink || profileLink || feedContent || errorMsg;
-			},
-			{ timeout: 30000 },
-		);
+				// Check for error indicators
+				const hasError = await page.evaluate(() => {
+					const bodyText = document.body?.innerText || "";
+					return (
+						bodyText.includes("incorrect") ||
+						bodyText.includes("challenge") ||
+						bodyText.includes("verify") ||
+						bodyText.includes("suspicious")
+					);
+				});
+
+				if (hasError) {
+					logger.warn("ACTION", "Error indicators detected on page");
+					break;
+				}
+
+				// Wait a bit before checking again
+				await delay(2000);
+			}
+
+			if (!loggedIn) {
+				// Final check before giving up
+				loggedIn = await isLoggedIn(page);
+				if (!loggedIn) {
+					logger.warn(
+						"ACTION",
+						"Login indicators not found after waiting, but continuing anyway...",
+					);
+				}
+			}
+		}
 
 		// Double-check login status
 		await delay(3000);
@@ -1032,6 +1146,10 @@ export async function login(
 					.map(([k]) => k)
 					.join(", ")}`,
 			);
+
+			// Save cookies immediately to maintain session
+			await saveCookies(page);
+			logger.info("ACTION", "Cookies saved to maintain session");
 
 			// Handle "Save your login info?" modal that often appears after login
 			// We click "Save info" as it's less suspicious than dismissing
@@ -1409,8 +1527,46 @@ export async function login(
 			}
 		}
 
+		// Don't throw error - check if we're on homepage (might be logged in)
+		logger.warn(
+			"ACTION",
+			`Login wait completed. Current URL: ${currentUrl}. Checking final status...`,
+		);
+		
+		// If we're on the homepage, wait a bit more for page to fully load
+		if (currentUrl.includes("instagram.com") && !currentUrl.includes("/accounts/login")) {
+			logger.info("ACTION", "On Instagram homepage - waiting for page to fully load...");
+			await delay(5000); // Give page more time to load
+			
+			// Check if login form is present (if not, we might be logged in)
+			const hasLoginForm = await page.evaluate(() => {
+				return !!document.querySelector('input[name="username"]') ||
+					Array.from(document.querySelectorAll("button")).some(
+						(btn) => btn.textContent?.toLowerCase().includes("log in")
+					);
+			});
+			
+			if (!hasLoginForm) {
+				logger.info("ACTION", "No login form detected on homepage - assuming logged in");
+				// Save cookies to maintain session
+				await saveCookies(page);
+				logger.info("ACTION", "Cookies saved to maintain session");
+				return; // Success - we're logged in
+			}
+		}
+		
+		// Final check if we're actually logged in
+		const finalCheck = await isLoggedIn(page);
+		if (finalCheck) {
+			logger.info("ACTION", "Login successful on final check");
+			await saveCookies(page);
+			logger.info("ACTION", "Cookies saved to maintain session");
+			return;
+		}
+
+		// If still not logged in, throw error but don't close browser
 		throw new Error(
-			`Login timeout after 30 seconds. Instagram may be blocking automated access or requiring manual verification. Current URL: ${currentUrl}`,
+			`Login timeout after 90 seconds. Instagram may be blocking automated access or requiring manual verification. Current URL: ${currentUrl}. Browser kept open for inspection.`,
 		);
 	}
 }

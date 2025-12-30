@@ -161,7 +161,11 @@ export async function initializeInstagramSession(
 
 	try {
 		// 4. Navigate to Instagram with networkidle0 (proven to work with browserless)
-		logger.info("SESSION", "📱 Navigating to Instagram...");
+		// Add a small random delay before navigation (humans don't instantly navigate)
+		const preNavDelay = 500 + Math.random() * 1000;
+		logger.info("SESSION", `📱 Navigating to Instagram (after ${Math.round(preNavDelay)}ms delay)...`);
+		await new Promise(r => setTimeout(r, preNavDelay));
+		
 		await page.goto("https://www.instagram.com/", {
 			waitUntil: "networkidle0",
 			timeout: 30000,
@@ -191,7 +195,63 @@ export async function initializeInstagramSession(
 
 		// 7. Check if already logged in (via cookies)
 		logger.info("SESSION", "🔍 Checking login status...");
+		const currentUrl = page.url();
+		logger.info("SESSION", `Current URL: ${currentUrl}`);
+		
+		// Log what indicators we can find
+		const pageState = await page.evaluate(() => {
+			// Comprehensive login form detection - Instagram uses various input names/attributes
+			const loginFormIndicators = [
+				'input[name="username"]',
+				'input[name="email"]',
+				'input[aria-label*="Phone number"]',
+				'input[aria-label*="username"]',
+				'input[aria-label*="email"]',
+				'input[placeholder*="Phone number"]',
+				'input[placeholder*="username"]',
+				'input[placeholder*="email"]',
+				'input[type="password"]', // Password field is a strong indicator
+			];
+			const hasLoginForm = loginFormIndicators.some(selector => !!document.querySelector(selector));
+			
+			// Also check for login-specific text
+			const pageText = document.body?.innerText?.toLowerCase() || '';
+			const hasLoginText = pageText.includes('log in') && pageText.includes('password') && !pageText.includes('reels');
+			
+			// Strong logged-in indicators (these don't appear on login page)
+			const loggedInIndicators = [
+				'a[href="/direct/inbox/"]',     // DM inbox link
+				'a[href*="/explore/"]',         // Explore link in nav
+				'svg[aria-label="Home"]',       // Home icon in nav
+				'svg[aria-label="New post"]',   // New post icon
+				'a[href*="/accounts/edit/"]',   // Profile settings
+			];
+			const hasStrongLoggedInIndicator = loggedInIndicators.some(selector => !!document.querySelector(selector));
+			
+			return {
+				hasLoginForm: hasLoginForm || hasLoginText,
+				hasInbox: hasStrongLoggedInIndicator,
+				hasNav: !!document.querySelector("nav"),
+				hasMain: !!document.querySelector('[role="main"]'),
+				bodyTextLength: pageText.length,
+			};
+		});
+		logger.info("SESSION", `Page state: loginForm=${pageState.hasLoginForm}, loggedInIndicator=${pageState.hasInbox}, nav=${pageState.hasNav}, main=${pageState.hasMain}, bodyText=${pageState.bodyTextLength}`);
+		
+		// SIMPLE RULE: If there's a login form, we need to log in. Period.
+		// Don't overthink it - if the form is there, fill it in.
+		if (pageState.hasLoginForm) {
+			logger.info("SESSION", "🔐 Login form detected - will authenticate");
+			// Continue to login flow below
+		} else if (adsPowerProfileId) {
+			// No login form = we're logged in, trust AdsPower session
+			logger.info("SESSION", "✅ No login form found - trusting session");
+			logger.info("SESSION", "🎉 Instagram session initialized successfully");
+			return { browser, page, logger };
+		}
+		
 		const alreadyLoggedIn = await isLoggedIn(page);
+		logger.info("SESSION", `isLoggedIn() returned: ${alreadyLoggedIn}`);
 
 		if (alreadyLoggedIn) {
 			logger.info("SESSION", "✅ Already logged in (using saved session)");
@@ -211,8 +271,18 @@ export async function initializeInstagramSession(
 
 			const creds: Credentials = { username, password };
 
+			// When using AdsPower, skip loading our local cookies - AdsPower manages its own
+			const finalLoginOptions = {
+				...loginOptions,
+				skipCookies: adsPowerProfileId ? true : loginOptions?.skipCookies,
+			};
+			
+			if (adsPowerProfileId && !finalLoginOptions.skipCookies) {
+				logger.info("SESSION", "Using AdsPower profile - skipping local cookie loading");
+			}
+
 			logger.info("SESSION", `Logging in as @${creds.username}...`);
-			await login(page, creds, loginOptions);
+			await login(page, creds, finalLoginOptions);
 			logger.info("SESSION", "✅ Login successful");
 		}
 
@@ -224,12 +294,25 @@ export async function initializeInstagramSession(
 		logger.info("SESSION", "🎉 Instagram session initialized successfully");
 		return { browser, page, logger };
 	} catch (error) {
-		// Clean up on error
+		// Don't close browser on login timeout - keep it open for inspection
+		const errorMessage = error instanceof Error ? error.message : String(error);
+		const isLoginTimeout = errorMessage.includes("Login timeout");
+		
 		logger.error("SESSION", `❌ Session initialization failed: ${error}`);
-		try {
-			await browser.close();
-		} catch (closeError) {
-			logger.error("SESSION", `Failed to close browser: ${closeError}`);
+		
+		if (isLoginTimeout) {
+			logger.warn(
+				"SESSION",
+				"⚠️  Browser kept open due to login timeout - please inspect manually",
+			);
+			// Keep browser open - don't close it
+		} else {
+			// Only close browser for non-timeout errors
+			try {
+				await browser.close();
+			} catch (closeError) {
+				logger.error("SESSION", `Failed to close browser: ${closeError}`);
+			}
 		}
 		throw error;
 	}

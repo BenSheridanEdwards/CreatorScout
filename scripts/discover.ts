@@ -375,6 +375,21 @@ async function main() {
 }
 
 main().catch((err) => {
-	console.error("💥 Discovery failed:", err);
+	const errorMessage = err instanceof Error ? err.message : String(err);
+	console.error("💥 Discovery failed:", errorMessage);
+
+	// If it's a login timeout, don't exit - keep the process running so browser stays open
+	if (errorMessage.includes("Login timeout")) {
+		console.log(
+			"\n⚠️  Login timeout detected - keeping browser open for inspection",
+		);
+		console.log(
+			"💡 Check the browser window and complete login manually if needed",
+		);
+		console.log("💡 Press Ctrl+C when done to exit\n");
+		// Don't exit - keep process running so browser stays connected
+		return;
+	}
+
 	process.exit(1);
 });
