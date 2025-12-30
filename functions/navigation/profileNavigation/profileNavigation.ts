@@ -231,6 +231,19 @@ async function navigateToProfileViaSearch(
 	}
 
 	await sleep(2000 + Math.random() * 2000);
+
+	// Check if we've been logged out during navigation
+	const checkUrl = page.url();
+	const isLoginPage = checkUrl.includes("/accounts/login/");
+	if (isLoginPage) {
+		const { clearCookies } = await import(
+			"../../auth/sessionManager/sessionManager.ts"
+		);
+		clearCookies();
+		throw new Error(
+			"Session expired - redirected to login page during navigation",
+		);
+	}
 }
 
 /**
@@ -247,6 +260,18 @@ export async function navigateToProfile(
 	// Use ONLY search-based navigation - no fallback to direct URL
 	// This is more human-like and avoids frame detachment issues
 	await navigateToProfileViaSearch(page, username, { timeout });
+
+	// Double-check we're still logged in after navigation
+	const finalUrl = page.url();
+	if (finalUrl.includes("/accounts/login/")) {
+		const { clearCookies } = await import(
+			"../../auth/sessionManager/sessionManager.ts"
+		);
+		clearCookies();
+		throw new Error(
+			"Session expired - redirected to login page after navigation",
+		);
+	}
 
 	// Verify profile page is loaded
 	try {

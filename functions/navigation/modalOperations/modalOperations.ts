@@ -154,6 +154,33 @@ export async function openFollowingModal(page: Page): Promise<boolean> {
 }
 
 /**
+ * Check if the following modal is in an empty state (no people followed).
+ * Returns true if the modal shows the empty state message.
+ */
+export async function isFollowingModalEmpty(page: Page): Promise<boolean> {
+	try {
+		const isEmpty = await page.evaluate(() => {
+			const dialog = document.querySelector('div[role="dialog"]');
+			if (!dialog) return false;
+
+			const text = dialog.textContent || "";
+			const hasEmptyMessage =
+				text.includes("People you follow") &&
+				text.includes("Once you follow people, you'll see them here");
+
+			return hasEmptyMessage;
+		});
+
+		if (isEmpty) {
+			console.log("[MODAL] Following modal is empty - no people followed");
+		}
+		return isEmpty;
+	} catch {
+		return false;
+	}
+}
+
+/**
  * Extract usernames from the following modal.
  * Returns array of usernames (without @ symbol).
  */

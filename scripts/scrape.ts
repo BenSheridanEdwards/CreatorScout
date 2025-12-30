@@ -807,6 +807,27 @@ export async function processFollowingList(
 	}
 	logger.debug("NAVIGATION", `Following modal opened successfully`);
 
+	// Check if the modal is empty (no people followed)
+	const { isFollowingModalEmpty } = await import(
+		"../../functions/navigation/modalOperations/modalOperations.ts"
+	);
+	const isEmpty = await isFollowingModalEmpty(page);
+	if (isEmpty) {
+		logger.warn(
+			"PROFILE",
+			`@${seedUsername} has an empty following list (no people followed), skipping seed`,
+		);
+		cycleManager.recordWarning(
+			"PROFILE_NOT_FOUND",
+			"Following list is empty",
+			seedUsername,
+		);
+		// Close the modal before returning
+		await page.keyboard.press("Escape");
+		await sleep(1000);
+		return;
+	}
+
 	// Get current scroll index
 	let scrollIndex = await getScrollIndex(seedUsername);
 	logger.debug("NAVIGATION", `Starting from scroll index: ${scrollIndex}`);

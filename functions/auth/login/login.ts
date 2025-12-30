@@ -340,12 +340,28 @@ export async function login(
 	logger.info("ACTION", `Already logged in check: ${alreadyLoggedIn}`);
 	await debugSnapshot(page, `login_after_status_check_${Date.now()}`);
 
-	if (alreadyLoggedIn) {
+	// Double-check we're not on login page (Instagram may have logged us out)
+	const currentUrl = page.url();
+	const isOnLoginPage = currentUrl.includes("/accounts/login/");
+
+	if (alreadyLoggedIn && !isOnLoginPage) {
 		logger.info("ACTION", "Already logged in (using saved session)");
 		// Refresh cookies to extend expiration
 		await saveCookies(page);
 		logger.info("ACTION", "Cookies refreshed for existing session");
 		return;
+	}
+
+	// If we're on login page, clear stale cookies
+	if (isOnLoginPage) {
+		logger.warn(
+			"ACTION",
+			"Detected login page - clearing stale cookies and re-authenticating",
+		);
+		const { clearCookies } = await import(
+			"../sessionManager/sessionManager.ts"
+		);
+		clearCookies();
 	}
 
 	// If cookies were loaded but we're still not logged in, they may be expired
