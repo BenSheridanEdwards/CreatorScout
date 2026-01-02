@@ -74,7 +74,7 @@ export async function isLoggedIn(page: Page): Promise<boolean> {
 		// First check: Are we on a login page? If not on login page and on instagram.com, likely logged in
 		const currentUrl = page.url();
 		const isOnLoginPage = currentUrl.includes("/accounts/login");
-		
+
 		// Use page.evaluate for more reliable detection
 		const result = await page.evaluate(() => {
 			// Check for multiple logged-in indicators
@@ -93,7 +93,7 @@ export async function isLoggedIn(page: Page): Promise<boolean> {
 			);
 
 			// Check if we have any logged-in indicators
-			const hasLoggedInIndicators = 
+			const hasLoggedInIndicators =
 				inboxLink ||
 				profileLink ||
 				createButton ||
@@ -104,7 +104,7 @@ export async function isLoggedIn(page: Page): Promise<boolean> {
 
 			// We're logged in if we have any logged-in indicators AND no login form
 			const hasLoginForm = loginForm || loginButton;
-			
+
 			return {
 				hasLoggedInIndicators,
 				hasLoginForm,
@@ -134,20 +134,32 @@ export async function isLoggedIn(page: Page): Promise<boolean> {
 			} else {
 				// On homepage, no login form, but no indicators yet - might be loading
 				// Be lenient: if we're on homepage and not login page, assume logged in
-				logger.debug("AUTH", "On homepage without login form - assuming logged in (page may still be loading)");
+				logger.debug(
+					"AUTH",
+					"On homepage without login form - assuming logged in (page may still be loading)",
+				);
 				return true;
 			}
 		}
 
 		// Traditional check: logged-in indicators AND no login form
 		const loggedIn = result.hasLoggedInIndicators && !result.hasLoginForm;
-		
+
 		if (loggedIn) {
-			logger.debug("AUTH", `Logged in: Found indicators: ${Object.entries(result.indicators).filter(([_, v]) => v).map(([k]) => k).join(", ")}`);
+			logger.debug(
+				"AUTH",
+				`Logged in: Found indicators: ${Object.entries(result.indicators)
+					.filter(([_, v]) => v)
+					.map(([k]) => k)
+					.join(", ")}`,
+			);
 		} else {
-			logger.debug("AUTH", `Not logged in: hasIndicators=${result.hasLoggedInIndicators}, hasLoginForm=${result.hasLoginForm}, url=${currentUrl}`);
+			logger.debug(
+				"AUTH",
+				`Not logged in: hasIndicators=${result.hasLoggedInIndicators}, hasLoginForm=${result.hasLoginForm}, url=${currentUrl}`,
+			);
 		}
-		
+
 		return loggedIn;
 	} catch (error) {
 		const errorMsg = error instanceof Error ? error.message : String(error);
