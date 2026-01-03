@@ -29,9 +29,7 @@ jest.unstable_mockModule("../../shared/config/config.ts", () => ({
 
 // Mock vision module
 jest.unstable_mockModule("../../profile/vision/vision.ts", () => ({
-	validateBioWithVision: jest
-		.fn<() => Promise<null>>()
-		.mockResolvedValue(null),
+	validateBioWithVision: jest.fn<() => Promise<null>>().mockResolvedValue(null),
 }));
 
 const { getBioFromPage } = await import("./getBioFromPage.ts");

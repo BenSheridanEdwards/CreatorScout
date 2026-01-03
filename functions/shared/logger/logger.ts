@@ -1,6 +1,6 @@
 import type { Page } from "puppeteer";
-import { snapshot } from "../snapshot/snapshot.ts";
 import { DEBUG_SCREENSHOTS } from "../config/config.ts";
+import { snapshot } from "../snapshot/snapshot.ts";
 
 export type LogLevel = "DEBUG" | "INFO" | "WARN" | "ERROR";
 export type LogPrefix =

@@ -2,8 +2,9 @@
  * Run Tracking System
  * Tracks each script execution with screenshots, logs, and metrics
  */
-import { writeFile, readFile, mkdir, readdir } from "fs/promises";
+
 import { existsSync } from "fs";
+import { mkdir, readdir, readFile, writeFile } from "fs/promises";
 import { join } from "path";
 
 export interface ErrorLog {
@@ -217,8 +218,7 @@ export async function getAllRuns(): Promise<RunMetadata[]> {
 
 	// Sort by start time, newest first
 	return runs.sort(
-		(a, b) =>
-			new Date(b.startTime).getTime() - new Date(a.startTime).getTime(),
+		(a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime(),
 	);
 }
 
@@ -439,4 +439,3 @@ export async function addCreatorToRun(
 	await writeFile(runFile, JSON.stringify(run, null, 2));
 	await updateRunsIndex(run);
 }
-

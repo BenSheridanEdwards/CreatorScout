@@ -1,14 +1,15 @@
 /**
  * Setup test runs - delete old test runs and create new complete runs
  */
-import { unlink, writeFile, readFile } from "fs/promises";
+
 import { existsSync } from "fs";
+import { readFile, unlink, writeFile } from "fs/promises";
 import { join } from "path";
 import {
-	createRun,
-	updateRun,
 	addScreenshotToRun,
+	createRun,
 	getAllRuns,
+	updateRun,
 } from "../functions/shared/runs/runs.ts";
 
 const RUNS_DIR = join(process.cwd(), "runs");
@@ -33,9 +34,7 @@ async function deleteOldTestRuns() {
 	// Update index
 	const indexData = await readFile(RUNS_INDEX_FILE, "utf-8");
 	const runs = JSON.parse(indexData);
-	const filteredRuns = runs.filter(
-		(r: any) => !oldRunIds.includes(r.id),
-	);
+	const filteredRuns = runs.filter((r: any) => !oldRunIds.includes(r.id));
 	await writeFile(RUNS_INDEX_FILE, JSON.stringify(filteredRuns, null, 2));
 	console.log("Updated index.json");
 }
@@ -144,4 +143,3 @@ async function main() {
 }
 
 main();
-

@@ -18,18 +18,18 @@
 import type { Browser, Page } from "puppeteer";
 import { initializeInstagramSession } from "../functions/auth/sessionInitializer/sessionInitializer.ts";
 import {
-	microDelay,
-	shortDelay,
-	mediumDelay,
-	mouseWiggle,
-} from "../functions/timing/humanize/humanize.ts";
+	humanClick,
+	humanScroll,
+} from "../functions/navigation/humanInteraction/humanInteraction.ts";
 import { createLogger } from "../functions/shared/logger/logger.ts";
 import { getProfile } from "../functions/shared/profiles/profileLoader.ts";
 import { createRun } from "../functions/shared/runs/runs.ts";
 import {
-	humanClick,
-	humanScroll,
-} from "../functions/navigation/humanInteraction/humanInteraction.ts";
+	mediumDelay,
+	microDelay,
+	mouseWiggle,
+	shortDelay,
+} from "../functions/timing/humanize/humanize.ts";
 
 const logger = createLogger();
 

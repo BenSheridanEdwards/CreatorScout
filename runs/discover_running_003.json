@@ -1,13 +1,11 @@
 {
-  "id": "discover_running_003",
-  "scriptName": "discover",
-  "startTime": "2025-12-28T11:46:33.918Z",
-  "status": "running",
-  "profilesProcessed": 12,
-  "creatorsFound": 4,
-  "errors": 1,
-  "screenshots": [
-    "/screenshots/2025-12-28/discover_running.png"
-  ],
-  "profileId": "burner1"
+	"id": "discover_running_003",
+	"scriptName": "discover",
+	"startTime": "2025-12-28T11:46:33.918Z",
+	"status": "running",
+	"profilesProcessed": 12,
+	"creatorsFound": 4,
+	"errors": 1,
+	"screenshots": ["/screenshots/2025-12-28/discover_running.png"],
+	"profileId": "burner1"
 }

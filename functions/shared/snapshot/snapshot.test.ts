@@ -8,7 +8,9 @@ jest.unstable_mockModule("../config/config.ts", () => ({
 }));
 
 const mockMkdir = jest.fn<() => Promise<void>>().mockResolvedValue(undefined);
-const mockWriteFile = jest.fn<() => Promise<void>>().mockResolvedValue(undefined);
+const mockWriteFile = jest
+	.fn<() => Promise<void>>()
+	.mockResolvedValue(undefined);
 
 jest.mock("node:fs/promises", () => ({
 	mkdir: mockMkdir,
@@ -18,7 +20,9 @@ jest.mock("node:fs/promises", () => ({
 // Mock runs module
 jest.unstable_mockModule("../runs/runs.ts", () => ({
 	getCurrentRunId: jest.fn<() => string | null>().mockReturnValue(null),
-	addScreenshotToRun: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
+	addScreenshotToRun: jest
+		.fn<() => Promise<void>>()
+		.mockResolvedValue(undefined),
 }));
 
 const { snapshot } = await import("./snapshot.ts");
@@ -31,9 +35,7 @@ const page = {
 	waitForFunction: jest
 		.fn<() => Promise<unknown>>()
 		.mockResolvedValue(undefined),
-	evaluate: jest
-		.fn<() => Promise<boolean>>()
-		.mockResolvedValue(false),
+	evaluate: jest.fn<() => Promise<boolean>>().mockResolvedValue(false),
 } as unknown as Page;
 
 describe("snapshot", () => {

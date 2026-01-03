@@ -9,8 +9,8 @@
 
 import {
 	connectToAdsPowerProfile,
-	stopAdsPowerProfile,
 	listAdsPowerProfiles,
+	stopAdsPowerProfile,
 } from "../functions/navigation/browser/adsPowerConnector.ts";
 
 async function main(): Promise<void> {
@@ -28,9 +28,13 @@ async function main(): Promise<void> {
 		console.log(`Using profile: ${profiles[0].name} (${profileId})\n`);
 	}
 
-	console.log("═══════════════════════════════════════════════════════════════");
+	console.log(
+		"═══════════════════════════════════════════════════════════════",
+	);
 	console.log("          ADSPOWER CONNECTION TEST");
-	console.log("═══════════════════════════════════════════════════════════════\n");
+	console.log(
+		"═══════════════════════════════════════════════════════════════\n",
+	);
 
 	console.log(`🔗 Connecting to AdsPower profile: ${profileId}...\n`);
 
@@ -69,9 +73,13 @@ async function main(): Promise<void> {
 			console.log(`📸 Screenshot saved: ${screenshotPath}`);
 		}
 
-		console.log("\n═══════════════════════════════════════════════════════════════");
+		console.log(
+			"\n═══════════════════════════════════════════════════════════════",
+		);
 		console.log("                    TEST PASSED ✅");
-		console.log("═══════════════════════════════════════════════════════════════\n");
+		console.log(
+			"═══════════════════════════════════════════════════════════════\n",
+		);
 	} catch (error) {
 		console.error("❌ Connection failed:", error);
 		process.exit(1);
@@ -93,4 +101,3 @@ main().catch((error) => {
 	console.error("Fatal error:", error);
 	process.exit(1);
 });
-

@@ -392,5 +392,3 @@ export function testDMGeneration(count: number = 10): void {
 		`Possible combinations: ${stats.possibleCombinations}`,
 	);
 }
-
-

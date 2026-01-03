@@ -10,32 +10,32 @@
 import "dotenv/config";
 import type { Page } from "puppeteer";
 import {
-	connectToAdsPowerProfile,
-	stopAdsPowerProfile,
-} from "../functions/navigation/browser/adsPowerConnector.ts";
-import {
 	getBioFromPage,
 	validateBioExtraction,
 } from "../functions/extraction/getBioFromPage/getBioFromPage.ts";
+import {
+	clickBioLink,
+	getLinkFromBio,
+} from "../functions/extraction/getLinkFromBio/getLinkFromBio.ts";
 import { getProfileStats } from "../functions/extraction/getProfileStats/getProfileStats.ts";
 import { getStoryHighlights } from "../functions/extraction/getStoryHighlights/getStoryHighlights.ts";
 import {
-	getLinkFromBio,
-	clickBioLink,
-} from "../functions/extraction/getLinkFromBio/getLinkFromBio.ts";
+	connectToAdsPowerProfile,
+	stopAdsPowerProfile,
+} from "../functions/navigation/browser/adsPowerConnector.ts";
 import { calculateScore } from "../functions/profile/bioMatcher/bioMatcher.ts";
 import { analyzeProfileComprehensive } from "../functions/profile/profileAnalysis/profileAnalysis.ts";
 import {
-	analyzeProfile,
 	analyzeLinktree,
+	analyzeProfile,
 } from "../functions/profile/vision/vision.ts";
-import { snapshot } from "../functions/shared/snapshot/snapshot.ts";
-import { sleep } from "../functions/timing/sleep/sleep.ts";
-import { shortDelay } from "../functions/timing/humanize/humanize.ts";
 import {
-	initDb,
 	getPrismaClient,
+	initDb,
 } from "../functions/shared/database/database.ts";
+import { snapshot } from "../functions/shared/snapshot/snapshot.ts";
+import { shortDelay } from "../functions/timing/humanize/humanize.ts";
+import { sleep } from "../functions/timing/sleep/sleep.ts";
 
 interface ProfileTestResult {
 	username: string;

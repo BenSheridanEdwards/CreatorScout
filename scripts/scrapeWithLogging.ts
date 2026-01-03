@@ -48,9 +48,9 @@ import { snapshot } from "../functions/shared/snapshot/snapshot.ts";
 import {
 	getDelay,
 	mouseWiggle,
+	shortDelay,
 } from "../functions/timing/humanize/humanize.ts";
 import { sleep } from "../functions/timing/sleep/sleep.ts";
-import { shortDelay } from "../functions/timing/humanize/humanize.ts";
 
 // NOTE: Database init is async; queries will initialize schema on demand.
 

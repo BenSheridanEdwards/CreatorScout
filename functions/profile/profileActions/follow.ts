@@ -3,10 +3,10 @@
  * These functions work on any profile page and don't require navigation.
  */
 import type { Page } from "puppeteer";
-import { createLogger } from "../../shared/logger/logger.ts";
-import { sleep } from "../../timing/sleep/sleep.ts";
-import { shortDelay } from "../../timing/humanize/humanize.ts";
 import { humanClick } from "../../navigation/humanInteraction/humanInteraction.ts";
+import { createLogger } from "../../shared/logger/logger.ts";
+import { shortDelay } from "../../timing/humanize/humanize.ts";
+import { sleep } from "../../timing/sleep/sleep.ts";
 
 const logger = createLogger(process.env.DEBUG_LOGS === "true");
 

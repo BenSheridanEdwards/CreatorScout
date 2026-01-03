@@ -19,10 +19,7 @@ export function getServerTimezone(): string {
 /**
  * Convert local time to UTC ISO string
  */
-export function localTimeToUTC(
-	localTime: string,
-	timezone: string,
-): string {
+export function localTimeToUTC(localTime: string, timezone: string): string {
 	try {
 		// Parse local time (format: "HH:mm")
 		const [hours, minutes] = localTime.split(":").map(Number);
@@ -52,7 +49,10 @@ export function localTimeToUTC(
 /**
  * Format UTC ISO string to local timezone display
  */
-export function formatToLocalTimezone(utcISO: string, timezone?: string): string {
+export function formatToLocalTimezone(
+	utcISO: string,
+	timezone?: string,
+): string {
 	try {
 		const date = new Date(utcISO);
 		const options: Intl.DateTimeFormatOptions = {
@@ -78,4 +78,3 @@ export function secondsUntil(utcISO: string): number {
 	const scheduled = new Date(utcISO).getTime();
 	return Math.max(0, Math.floor((scheduled - now) / 1000));
 }
-

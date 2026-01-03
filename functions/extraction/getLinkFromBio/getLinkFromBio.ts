@@ -1,9 +1,9 @@
 import type { ElementHandle, Page } from "puppeteer";
-import { shortDelay } from "../../timing/humanize/humanize.ts";
 import {
 	humanClick,
 	humanClickAt,
 } from "../../navigation/humanInteraction/humanInteraction.ts";
+import { shortDelay } from "../../timing/humanize/humanize.ts";
 import {
 	BLACKLISTED_DOMAINS,
 	decodeInstagramRedirect,
@@ -99,7 +99,7 @@ export async function findBioLinkElement(
 				for (let i = 0; i < 5; i++) {
 					if (!parent) break;
 					const link = parent.querySelector("a");
-					if (link && link.getAttribute("href")) {
+					if (link?.getAttribute("href")) {
 						return {
 							found: true,
 							selector: "link_icon_sibling",
@@ -121,7 +121,7 @@ export async function findBioLinkElement(
 					for (let i = 0; i < 5; i++) {
 						if (!parent) return null;
 						const link = parent.querySelector("a");
-						if (link && link.getAttribute("href")) {
+						if (link?.getAttribute("href")) {
 							return link;
 						}
 						parent = parent.parentElement;

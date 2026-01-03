@@ -1,9 +1,8 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { RunMetadata, ScheduledRun, TimelineCard } from "../../types";
 import { getImageUrl } from "../../utils/imageUrl";
 import ScheduleModal from "../ScheduleModal/ScheduleModal";
-import { useToast } from "../Toast/Toast";
-import { ToastContainer } from "../Toast/Toast";
+import { ToastContainer, useToast } from "../Toast/Toast";
 
 interface TimelineCarouselProps {
 	onRunSelect: (run: RunMetadata) => void;

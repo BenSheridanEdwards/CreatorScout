@@ -2,7 +2,7 @@
  * Graceful Shutdown Handler for Run Tracking
  * Ensures runs are properly marked as completed/error when scripts exit
  */
-import { updateRun, getCurrentRunId } from "./runs.js";
+import { getCurrentRunId, updateRun } from "./runs.js";
 
 let isShuttingDown = false;
 
@@ -88,13 +88,11 @@ export function setupGracefulShutdown(): void {
 /**
  * Mark run as successfully completed
  */
-export async function markRunComplete(
-	stats?: {
-		profilesProcessed?: number;
-		creatorsFound?: number;
-		errors?: number;
-	},
-): Promise<void> {
+export async function markRunComplete(stats?: {
+	profilesProcessed?: number;
+	creatorsFound?: number;
+	errors?: number;
+}): Promise<void> {
 	const runId = getCurrentRunId();
 	if (runId && !isShuttingDown) {
 		await updateRun(runId, {
@@ -103,4 +101,3 @@ export async function markRunComplete(
 		});
 	}
 }
-

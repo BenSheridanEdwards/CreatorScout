@@ -23,10 +23,13 @@ jest.unstable_mockModule("../../timing/sleep/sleep.ts", () => ({
 	sleep: sleepMock,
 }));
 
-jest.unstable_mockModule("../../navigation/humanInteraction/humanInteraction.ts", () => ({
-	humanClickByText: humanClickByTextMock,
-	humanClick: humanClickMock,
-}));
+jest.unstable_mockModule(
+	"../../navigation/humanInteraction/humanInteraction.ts",
+	() => ({
+		humanClickByText: humanClickByTextMock,
+		humanClick: humanClickMock,
+	}),
+);
 
 // Import after mocks are set up
 const { handleInstagramPopups } = await import("./popupHandler.ts");

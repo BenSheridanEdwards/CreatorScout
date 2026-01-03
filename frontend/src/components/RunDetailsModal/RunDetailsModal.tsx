@@ -1,4 +1,6 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
+import type { RunMetadata } from "../../types";
+import { getImageUrl } from "../../utils/imageUrl";
 import {
 	Dialog,
 	DialogClose,
@@ -7,8 +9,6 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "../ui/dialog";
-import type { RunMetadata } from "../../types";
-import { getImageUrl } from "../../utils/imageUrl";
 
 interface RunDetailsModalProps {
 	run: RunMetadata;
@@ -242,12 +242,14 @@ export default function RunDetailsModal({
 												{creator.screenshotPath && (
 													<button
 														type="button"
-														onClick={() =>
-															window.open(
-																getImageUrl(creator.screenshotPath!),
-																"_blank",
-															)
-														}
+														onClick={() => {
+															if (creator.screenshotPath) {
+																window.open(
+																	getImageUrl(creator.screenshotPath),
+																	"_blank",
+																);
+															}
+														}}
 														className="text-xs text-purple-400 hover:text-purple-300 mt-2 w-full text-left"
 													>
 														📸 View screenshot
@@ -314,10 +316,7 @@ export default function RunDetailsModal({
 												key={screenshot}
 												className="relative group cursor-pointer rounded-lg overflow-hidden border-2 border-slate-700 hover:border-slate-500 transition w-full p-0 bg-transparent"
 												onClick={() =>
-													window.open(
-														getImageUrl(screenshot),
-														"_blank",
-													)
+													window.open(getImageUrl(screenshot), "_blank")
 												}
 											>
 												<img

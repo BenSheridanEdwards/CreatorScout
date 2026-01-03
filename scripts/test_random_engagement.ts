@@ -2,19 +2,23 @@
  * Test script for random engagement actions
  * Tests each action type against a real profile
  */
+
+import chalk from "chalk";
 import { initializeInstagramSession } from "../functions/auth/sessionInitializer/sessionInitializer.ts";
 import { navigateToProfile } from "../functions/navigation/profileNavigation/profileNavigation.ts";
 import {
+	likeRandomPost,
+	performRandomEngagement,
+	scrollProfileFeed,
 	viewRandomPost,
 	watchRandomReel,
-	likeRandomPost,
-	scrollProfileFeed,
-	performRandomEngagement,
 } from "../functions/profile/profileActions/randomEngagement.ts";
 import { getProfile } from "../functions/shared/profiles/profileLoader.ts";
+import {
+	mediumDelay,
+	shortDelay,
+} from "../functions/timing/humanize/humanize.ts";
 import { sleep } from "../functions/timing/sleep/sleep.ts";
-import { shortDelay, mediumDelay } from "../functions/timing/humanize/humanize.ts";
-import chalk from "chalk";
 
 const TEST_USERNAME = "bensheridanedwards";
 
@@ -87,7 +91,7 @@ async function main() {
 				result.success
 					? chalk.green(
 							`   ✅ Success! Duration: ${result.duration.toFixed(1)}s`,
-					  )
+						)
 					: chalk.red(`   ❌ Failed`),
 			);
 		} catch (error) {
@@ -115,7 +119,7 @@ async function main() {
 				result.success
 					? chalk.green(
 							`   ✅ Success! Duration: ${result.duration.toFixed(1)}s`,
-					  )
+						)
 					: chalk.red(`   ❌ Failed (no posts found or modal issue)`),
 			);
 		} catch (error) {
@@ -143,7 +147,7 @@ async function main() {
 				result.success
 					? chalk.green(
 							`   ✅ Success! Duration: ${result.duration.toFixed(1)}s`,
-					  )
+						)
 					: chalk.red(`   ❌ Failed (no reels found)`),
 			);
 		} catch (error) {
@@ -174,7 +178,7 @@ async function main() {
 				result.success
 					? chalk.green(
 							`   ✅ Success! Duration: ${result.duration.toFixed(1)}s`,
-					  )
+						)
 					: chalk.red(`   ❌ Failed (already liked or no posts)`),
 			);
 		} catch (error) {
@@ -199,14 +203,12 @@ async function main() {
 				success: result.success,
 				duration: result.duration,
 			});
-			console.log(
-				chalk.cyan(`   🎯 Random action chosen: ${result.type}`),
-			);
+			console.log(chalk.cyan(`   🎯 Random action chosen: ${result.type}`));
 			console.log(
 				result.success
 					? chalk.green(
 							`   ✅ Success! Duration: ${result.duration.toFixed(1)}s`,
-					  )
+						)
 					: chalk.yellow(`   ⚠️  Action completed with warnings`),
 			);
 		} catch (error) {
@@ -230,9 +232,7 @@ async function main() {
 		console.log(chalk.bold(`Total Tests: ${results.length}`));
 		console.log(chalk.green(`✅ Passed: ${successCount}`));
 		console.log(chalk.red(`❌ Failed: ${failCount}`));
-		console.log(
-			chalk.blue(`⏱️  Total Duration: ${totalDuration.toFixed(1)}s`),
-		);
+		console.log(chalk.blue(`⏱️  Total Duration: ${totalDuration.toFixed(1)}s`));
 
 		console.log(chalk.gray("\n" + "━".repeat(80)));
 		console.log(chalk.bold("\nDetailed Results:\n"));
@@ -284,7 +284,9 @@ async function main() {
 	} finally {
 		// Keep browser open for inspection
 		console.log(
-			chalk.blue("\n🔍 Browser will remain open for 10 seconds for inspection..."),
+			chalk.blue(
+				"\n🔍 Browser will remain open for 10 seconds for inspection...",
+			),
 		);
 		await mediumDelay(8, 12);
 
@@ -297,4 +299,3 @@ main().catch((error) => {
 	console.error(chalk.red(`Fatal error: ${error}`));
 	process.exit(1);
 });
-

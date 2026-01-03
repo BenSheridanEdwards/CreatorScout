@@ -1,10 +1,10 @@
-import { describe, test, expect } from "@jest/globals";
+import { describe, expect, test } from "@jest/globals";
 import {
-	generateShortDM,
-	generateMediumDM,
-	generateFullPitchDM,
 	generateDM,
 	generateDMBatch,
+	generateFullPitchDM,
+	generateMediumDM,
+	generateShortDM,
 	getDMStats,
 } from "./dmVariation.ts";
 
@@ -150,7 +150,3 @@ describe("DM Variation System", () => {
 		});
 	});
 });
-
-
-
-

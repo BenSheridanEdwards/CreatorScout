@@ -11,7 +11,7 @@ const logger = createLogger();
 
 async function main() {
 	console.log("🍪 Clearing saved Instagram cookies...");
-	
+
 	try {
 		clearCookies();
 		console.log("✅ Cookies cleared successfully!");
@@ -26,4 +26,3 @@ async function main() {
 }
 
 main();
-

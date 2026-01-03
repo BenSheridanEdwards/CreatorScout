@@ -45,8 +45,8 @@ export default function RecentRuns({ onRunSelect }: RecentRunsProps) {
 				<div>
 					<h2 className="text-sm font-semibold text-slate-200">Recent Runs</h2>
 					<p className="text-[11px] text-slate-400 mt-0.5">
-						Script execution history with screenshots and metrics. Click a run to
-						view its logs.
+						Script execution history with screenshots and metrics. Click a run
+						to view its logs.
 					</p>
 				</div>
 				<button
@@ -165,4 +165,3 @@ export default function RecentRuns({ onRunSelect }: RecentRunsProps) {
 		</section>
 	);
 }
-

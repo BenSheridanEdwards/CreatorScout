@@ -1,8 +1,8 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import RunDetailsModal from "./RunDetailsModal";
 import type { RunMetadata } from "../../types";
+import RunDetailsModal from "./RunDetailsModal";
 
 const mockRun: RunMetadata = {
 	id: "run1",

@@ -9,10 +9,10 @@
  */
 
 import { initializeInstagramSession } from "../functions/auth/sessionInitializer/sessionInitializer.ts";
-import { getProfile } from "../functions/shared/profiles/profileLoader.ts";
-import { warmUpProfile } from "../functions/timing/warmup/warmup.ts";
-import { snapshot } from "../functions/shared/snapshot/snapshot.ts";
 import { stopAdsPowerProfile } from "../functions/navigation/browser/adsPowerConnector.ts";
+import { getProfile } from "../functions/shared/profiles/profileLoader.ts";
+import { snapshot } from "../functions/shared/snapshot/snapshot.ts";
+import { warmUpProfile } from "../functions/timing/warmup/warmup.ts";
 
 interface TestArgs {
 	profile: string;

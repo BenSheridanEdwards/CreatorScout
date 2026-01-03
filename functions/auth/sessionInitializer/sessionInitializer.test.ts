@@ -199,7 +199,7 @@ describe("sessionInitializer", () => {
 			expect(loginMock).toHaveBeenCalledWith(
 				mockPage,
 				{ username: "test_user", password: "test_pass" },
-				undefined,
+				expect.any(Object),
 			);
 		});
 
@@ -210,7 +210,11 @@ describe("sessionInitializer", () => {
 			const customCreds = { username: "custom_user", password: "custom_pass" };
 			await initializeInstagramSession({ credentials: customCreds });
 
-			expect(loginMock).toHaveBeenCalledWith(mockPage, customCreds, undefined);
+			expect(loginMock).toHaveBeenCalledWith(
+				mockPage,
+				customCreds,
+				expect.any(Object),
+			);
 		});
 
 		it("should pass loginOptions to login function", async () => {

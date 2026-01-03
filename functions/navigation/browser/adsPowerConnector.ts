@@ -119,7 +119,12 @@ function getApiHeaders(): Record<string, string> {
 export async function startAdsPowerProfile(
 	options: AdsPowerProfileOptions,
 ): Promise<AdsPowerStartResponse> {
-	const { profileId, headless = false, launchArgs = [], timeout = 30000 } = options;
+	const {
+		profileId,
+		headless = false,
+		launchArgs = [],
+		timeout = 30000,
+	} = options;
 
 	try {
 		logger.info("ADSPOWER", `Starting profile via API...`);
@@ -421,4 +426,3 @@ export async function getAdsPowerProfile(
 		return null;
 	}
 }
-

@@ -36,5 +36,3 @@ describe("warmup", () => {
 		expect(stats).toHaveProperty("durationSeconds");
 	});
 });
-
-

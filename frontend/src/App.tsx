@@ -1,12 +1,12 @@
 import { useState } from "react";
+import AccountFilter from "./components/AccountFilter/AccountFilter";
 import CreatorsTable from "./components/CreatorsTable/CreatorsTable";
+import RunDetailsModal from "./components/RunDetailsModal/RunDetailsModal";
+import ScreenshotModal from "./components/ScreenshotModal/ScreenshotModal";
+import Screenshots from "./components/Screenshots/Screenshots";
 import StatsCards from "./components/StatsCards/StatsCards";
 import TimelineCarousel from "./components/TimelineCarousel/TimelineCarousel";
-import AccountFilter from "./components/AccountFilter/AccountFilter";
-import Screenshots from "./components/Screenshots/Screenshots";
-import ScreenshotModal from "./components/ScreenshotModal/ScreenshotModal";
-import RunDetailsModal from "./components/RunDetailsModal/RunDetailsModal";
-import type { Screenshot, RunMetadata } from "./types";
+import type { RunMetadata, Screenshot } from "./types";
 
 function App() {
 	const [selectedScreenshot, setSelectedScreenshot] =
@@ -54,7 +54,9 @@ function App() {
 			<header className="border-b border-slate-800 px-6 py-4">
 				<div className="flex items-center justify-between">
 					<div>
-						<h1 className="text-xl font-semibold tracking-tight">Scout Studio</h1>
+						<h1 className="text-xl font-semibold tracking-tight">
+							Scout Studio
+						</h1>
 						<p className="text-sm text-slate-400">
 							Dashboard for creator discovery and outreach
 						</p>

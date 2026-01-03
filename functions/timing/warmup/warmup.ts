@@ -6,13 +6,13 @@
  * Uses ghost-cursor for human-like interactions.
  */
 import type { Page } from "puppeteer";
-import { WARMUP_DURATION_MINUTES } from "../../shared/config/config.ts";
-import { createLogger } from "../../shared/logger/logger.ts";
-import { mediumDelay, microDelay, shortDelay } from "../humanize/humanize.ts";
 import {
 	humanClick,
 	humanScroll,
 } from "../../navigation/humanInteraction/humanInteraction.ts";
+import { WARMUP_DURATION_MINUTES } from "../../shared/config/config.ts";
+import { createLogger } from "../../shared/logger/logger.ts";
+import { mediumDelay, microDelay, shortDelay } from "../humanize/humanize.ts";
 
 const logger = createLogger();
 

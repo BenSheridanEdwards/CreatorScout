@@ -13,15 +13,15 @@
 
 import type { Page } from "puppeteer";
 import { initializeInstagramSession } from "../functions/auth/sessionInitializer/sessionInitializer.ts";
+import { stopAdsPowerProfile } from "../functions/navigation/browser/adsPowerConnector.ts";
 import { navigateToProfileAndCheck } from "../functions/navigation/profileNavigation/profileNavigation.ts";
 import { analyzeProfileComprehensive } from "../functions/profile/profileAnalysis/profileAnalysis.ts";
-import {
-	markVisited,
-	markAsCreator,
-} from "../functions/shared/database/database.ts";
 import { CONFIDENCE_THRESHOLD } from "../functions/shared/config/config.ts";
+import {
+	markAsCreator,
+	markVisited,
+} from "../functions/shared/database/database.ts";
 import { getProfile } from "../functions/shared/profiles/profileLoader.ts";
-import { stopAdsPowerProfile } from "../functions/navigation/browser/adsPowerConnector.ts";
 
 interface ProfileResult {
 	username: string;

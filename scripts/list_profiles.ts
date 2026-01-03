@@ -7,7 +7,10 @@
  *   tsx scripts/list_profiles.ts
  */
 
-import { listProfiles, getGlobalSettings } from "../functions/shared/profiles/profileLoader.ts";
+import {
+	getGlobalSettings,
+	listProfiles,
+} from "../functions/shared/profiles/profileLoader.ts";
 
 function main() {
 	try {
@@ -20,17 +23,20 @@ function main() {
 		console.log(`   Engagement Ratio: ${settings.engagementRatio}:1`);
 		console.log(`   Session Stagger: ${settings.sessionStaggerMinutes}min`);
 		console.log(`   DM Strategy: ${settings.dmStrategy}`);
-		console.log(`   Vision AI: ${settings.enableVisionAI ? "enabled" : "disabled"}`);
-		console.log(`   Weekly Variance: ${settings.weeklyScheduleVariance ? "yes" : "no"}`);
+		console.log(
+			`   Vision AI: ${settings.enableVisionAI ? "enabled" : "disabled"}`,
+		);
+		console.log(
+			`   Weekly Variance: ${settings.weeklyScheduleVariance ? "yes" : "no"}`,
+		);
 		console.log("");
 	} catch (error) {
-		console.error("❌ Error:", error instanceof Error ? error.message : String(error));
+		console.error(
+			"❌ Error:",
+			error instanceof Error ? error.message : String(error),
+		);
 		process.exit(1);
 	}
 }
 
 main();
-
-
-
-

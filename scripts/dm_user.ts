@@ -7,11 +7,11 @@
  */
 
 import { initializeInstagramSession } from "../functions/auth/sessionInitializer/sessionInitializer.ts";
+import { stopAdsPowerProfile } from "../functions/navigation/browser/adsPowerConnector.ts";
 import { sendDMToUser } from "../functions/profile/profileActions/profileActions.ts";
 import { wasDmSent } from "../functions/shared/database/database.ts";
 import { getProfile } from "../functions/shared/profiles/profileLoader.ts";
 import { saveScreenshot } from "../functions/shared/snapshot/snapshot.ts";
-import { stopAdsPowerProfile } from "../functions/navigation/browser/adsPowerConnector.ts";
 
 async function dmUser(
 	targetUsername: string,

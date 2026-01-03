@@ -1,8 +1,8 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import Screenshots from "./Screenshots";
 import type { Screenshot } from "../../types";
+import Screenshots from "./Screenshots";
 
 const mockScreenshots: Screenshot[] = [
 	{

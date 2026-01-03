@@ -12,8 +12,8 @@ import { initializeInstagramSession } from "../functions/auth/sessionInitializer
 import { navigateToProfileAndCheck } from "../functions/navigation/profileNavigation/profileNavigation.ts";
 import { analyzeProfileComprehensive } from "../functions/profile/profileAnalysis/profileAnalysis.ts";
 import {
-	markVisited,
 	markAsCreator,
+	markVisited,
 } from "../functions/shared/database/database.ts";
 
 async function evaluateProfile(username: string) {

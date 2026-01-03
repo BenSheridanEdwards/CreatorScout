@@ -14,13 +14,13 @@
 
 import type { Page } from "puppeteer";
 import { humanScroll } from "../../navigation/humanInteraction/humanInteraction.ts";
-import { humanClickElement } from "../../timing/humanize/humanize.ts";
+import { createLogger } from "../../shared/logger/logger.ts";
 import {
+	humanClickElement,
 	mediumDelay,
 	microDelay,
 	shortDelay,
 } from "../../timing/humanize/humanize.ts";
-import { createLogger } from "../../shared/logger/logger.ts";
 
 const logger = createLogger();
 

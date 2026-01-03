@@ -16,8 +16,8 @@ import {
 } from "../../shared/database/database.ts";
 import { createLogger } from "../../shared/logger/logger.ts";
 import { saveScreenshot, snapshot } from "../../shared/snapshot/snapshot.ts";
+import { mediumDelay, shortDelay } from "../../timing/humanize/humanize.ts";
 import { sleep } from "../../timing/sleep/sleep.ts";
-import { shortDelay, mediumDelay } from "../../timing/humanize/humanize.ts";
 import { findMessageInput, typeMessage } from "./dmInput.ts";
 import {
 	clickMessageButton,

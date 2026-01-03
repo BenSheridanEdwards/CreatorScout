@@ -531,9 +531,9 @@ export async function login(
 				return { inboxLink, profileLink, createButton, homeIcon, feed };
 			});
 
-			const isLoggedIn = Object.values(loggedInIndicators).some(Boolean);
+			const hasLoggedInIndicators = Object.values(loggedInIndicators).some(Boolean);
 
-			if (isLoggedIn) {
+			if (hasLoggedInIndicators) {
 				logger.info(
 					"ACTION",
 					"Already logged in - found user interface elements",
@@ -743,7 +743,10 @@ export async function login(
 		throw new Error("Username selector not found");
 	}
 
-	logger.info("ACTION", "Typing username with human-like pattern using humanTypeText...");
+	logger.info(
+		"ACTION",
+		"Typing username with human-like pattern using humanTypeText...",
+	);
 	const usernameTyped = await humanTypeText(
 		page,
 		usernameSelectorUsed,
@@ -813,7 +816,7 @@ export async function login(
 			})
 			.catch(() => null);
 
-		if (passwordField && passwordField.asElement()) {
+		if (passwordField?.asElement()) {
 			logger.info("ACTION", "Password field found via associated label");
 		}
 	}
@@ -827,7 +830,10 @@ export async function login(
 	}
 
 	// Use humanTypeText for stealth - passwords typed faster (muscle memory), no typos
-	logger.info("ACTION", "Typing password with human-like pattern using humanTypeText...");
+	logger.info(
+		"ACTION",
+		"Typing password with human-like pattern using humanTypeText...",
+	);
 	const passwordTyped = await humanTypeText(
 		page,
 		passwordSelectorUsed,
@@ -1138,13 +1144,13 @@ export async function login(
 			return { inboxLink, profileMenu, createPost, feed };
 		});
 
-		const isLoggedIn =
+		const hasLoggedInIndicators =
 			successIndicators.inboxLink ||
 			successIndicators.profileMenu ||
 			successIndicators.createPost ||
 			successIndicators.feed;
 
-		if (isLoggedIn) {
+		if (hasLoggedInIndicators) {
 			logger.info("ACTION", "Login successful - user interface detected");
 			logger.info(
 				"ACTION",

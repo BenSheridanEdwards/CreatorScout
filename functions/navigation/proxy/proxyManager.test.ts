@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeEach } from "@jest/globals";
+import { beforeEach, describe, expect, test } from "@jest/globals";
 import { ProxyManager } from "./proxyManager.ts";
 
 describe("ProxyManager", () => {
@@ -159,7 +159,3 @@ describe("ProxyManager", () => {
 		});
 	});
 });
-
-
-
-

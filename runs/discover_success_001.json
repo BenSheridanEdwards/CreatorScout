@@ -1,34 +1,34 @@
 {
-  "id": "discover_success_001",
-  "scriptName": "discover",
-  "startTime": "2025-12-28T11:46:33.913Z",
-  "status": "completed",
-  "profilesProcessed": 25,
-  "creatorsFound": 8,
-  "errors": 2,
-  "screenshots": [
-    "/screenshots/2025-12-28/discover_success.png",
-    "/screenshots/2025-12-28/discover_step1.png"
-  ],
-  "profileId": "burner1",
-  "endTime": "2025-12-28T11:46:33.914Z",
-  "stats": {
-    "duration": 0,
-    "successRate": 92
-  },
-  "creatorsFoundList": [
-    {
-      "username": "creator1",
-      "confidence": 95,
-      "reason": "direct_patreon_link",
-      "timestamp": "2025-12-28T10:46:33.914Z"
-    },
-    {
-      "username": "creator2",
-      "confidence": 88,
-      "reason": "exclusive_content_in_bio",
-      "timestamp": "2025-12-28T10:47:23.914Z"
-    }
-  ],
-  "finalScreenshot": "/screenshots/2025-12-28/discover_success.png"
+	"id": "discover_success_001",
+	"scriptName": "discover",
+	"startTime": "2025-12-28T11:46:33.913Z",
+	"status": "completed",
+	"profilesProcessed": 25,
+	"creatorsFound": 8,
+	"errors": 2,
+	"screenshots": [
+		"/screenshots/2025-12-28/discover_success.png",
+		"/screenshots/2025-12-28/discover_step1.png"
+	],
+	"profileId": "burner1",
+	"endTime": "2025-12-28T11:46:33.914Z",
+	"stats": {
+		"duration": 0,
+		"successRate": 92
+	},
+	"creatorsFoundList": [
+		{
+			"username": "creator1",
+			"confidence": 95,
+			"reason": "direct_patreon_link",
+			"timestamp": "2025-12-28T10:46:33.914Z"
+		},
+		{
+			"username": "creator2",
+			"confidence": 88,
+			"reason": "exclusive_content_in_bio",
+			"timestamp": "2025-12-28T10:47:23.914Z"
+		}
+	],
+	"finalScreenshot": "/screenshots/2025-12-28/discover_success.png"
 }

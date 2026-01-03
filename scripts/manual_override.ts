@@ -18,8 +18,8 @@
  *   tsx scripts/manual_override.ts list
  */
 import "dotenv/config";
-import { getPrismaClient } from "../functions/shared/database/database.js";
 import chalk from "chalk";
+import { getPrismaClient } from "../functions/shared/database/database.js";
 
 async function manualOverride() {
 	const args = process.argv.slice(2);

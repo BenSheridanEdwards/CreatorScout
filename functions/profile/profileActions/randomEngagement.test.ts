@@ -1,11 +1,11 @@
 /**
  * Unit tests for randomEngagement.ts
  * Tests decision logic and statistics (pure functions only)
- * 
+ *
  * Note: Full integration tests with Puppeteer are in e2e tests.
  * These unit tests focus on the probabilistic logic without browser dependencies.
  */
-import { describe, it, expect } from "@jest/globals";
+import { describe, expect, it } from "@jest/globals";
 
 // Test the engagement decision logic
 describe("randomEngagement - Pure Logic", () => {
@@ -14,13 +14,13 @@ describe("randomEngagement - Pure Logic", () => {
 		it("should have lower engagement rate for low scores", () => {
 			const lowScore = 15;
 			const results: boolean[] = [];
-			
+
 			// Simulate the logic: score < 20 → 10% chance
 			for (let i = 0; i < 100; i++) {
 				const shouldEngage = Math.random() < 0.1;
 				results.push(shouldEngage);
 			}
-			
+
 			const engageCount = results.filter((r) => r).length;
 			// Should be around 10% (±8%)
 			expect(engageCount).toBeGreaterThan(2);
@@ -29,13 +29,13 @@ describe("randomEngagement - Pure Logic", () => {
 
 		it("should have medium engagement rate for medium scores", () => {
 			const results: boolean[] = [];
-			
+
 			// Simulate the logic: score 20-39 → 40% chance
 			for (let i = 0; i < 100; i++) {
 				const shouldEngage = Math.random() < 0.4;
 				results.push(shouldEngage);
 			}
-			
+
 			const engageCount = results.filter((r) => r).length;
 			// Should be around 40% (±15%)
 			expect(engageCount).toBeGreaterThan(25);
@@ -44,13 +44,13 @@ describe("randomEngagement - Pure Logic", () => {
 
 		it("should have high engagement rate for high scores", () => {
 			const results: boolean[] = [];
-			
+
 			// Simulate the logic: score >= 40 → 70% chance
 			for (let i = 0; i < 100; i++) {
 				const shouldEngage = Math.random() < 0.7;
 				results.push(shouldEngage);
 			}
-			
+
 			const engageCount = results.filter((r) => r).length;
 			// Should be around 70% (±15%)
 			expect(engageCount).toBeGreaterThan(55);

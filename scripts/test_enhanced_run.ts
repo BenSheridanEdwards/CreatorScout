@@ -1,10 +1,10 @@
 #!/usr/bin/env tsx
 import {
-	createRun,
-	updateRun,
 	addCreatorToRun,
 	addErrorToRun,
 	addScreenshotToRun,
+	createRun,
+	updateRun,
 } from "../functions/shared/runs/runs.js";
 
 async function testEnhancedRun() {
@@ -88,14 +88,8 @@ async function testEnhancedRun() {
 
 	// Add some screenshots
 	console.log("📸 Adding screenshots...");
-	await addScreenshotToRun(
-		runId,
-		"/screenshots/2025-12-24/profile_test1.png",
-	);
-	await addScreenshotToRun(
-		runId,
-		"/screenshots/2025-12-24/profile_test2.png",
-	);
+	await addScreenshotToRun(runId, "/screenshots/2025-12-24/profile_test1.png");
+	await addScreenshotToRun(runId, "/screenshots/2025-12-24/profile_test2.png");
 	await addScreenshotToRun(
 		runId,
 		"/screenshots/2025-12-24/profile_test3.png",
@@ -119,4 +113,3 @@ async function testEnhancedRun() {
 }
 
 testEnhancedRun().catch(console.error);
-

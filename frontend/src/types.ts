@@ -92,4 +92,3 @@ export interface Stats {
 	creatorsFound: number;
 	dmsSent: number;
 }
-

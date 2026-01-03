@@ -4,8 +4,8 @@
  */
 import type { Page } from "puppeteer";
 import { parseProfileStatus } from "../../profile/profileStatus/profileStatus.ts";
-import { sleep } from "../../timing/sleep/sleep.ts";
 import { humanTypeText, shortDelay } from "../../timing/humanize/humanize.ts";
+import { sleep } from "../../timing/sleep/sleep.ts";
 import { humanClick } from "../humanInteraction/humanInteraction.ts";
 
 export interface ProfileStatus {
@@ -19,6 +19,7 @@ export interface ProfileStatus {
  * This ensures any detached frames from previous navigation are cleared
  * Returns true if frame is stable, throws recoverable error if permanently detached
  */
+// biome-ignore lint/correctness/noUnusedVariables: Kept for future use
 async function waitForFrameStability(
 	page: Page,
 	timeout: number = 5000,

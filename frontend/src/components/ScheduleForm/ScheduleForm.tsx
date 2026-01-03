@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import type { ScheduledRun } from "../../types";
 
 interface ScheduleFormProps {
@@ -111,7 +111,7 @@ export default function ScheduleForm({
 			newErrors.scheduledTime = "Scheduled time is required";
 		} else {
 			const selectedDate = new Date(scheduledTime);
-			if (isNaN(selectedDate.getTime())) {
+			if (Number.isNaN(selectedDate.getTime())) {
 				newErrors.scheduledTime = "Invalid date/time";
 			} else if (selectedDate.getTime() <= Date.now()) {
 				newErrors.scheduledTime = "Scheduled time must be in the future";

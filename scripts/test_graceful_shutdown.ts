@@ -1,16 +1,16 @@
 #!/usr/bin/env tsx
+import { setupGracefulShutdown } from "../functions/shared/runs/gracefulShutdown.js";
 /**
  * Test Graceful Shutdown
  * This script tests that runs are properly closed when interrupted
  */
 import {
+	addCreatorToRun,
+	addErrorToRun,
 	createRun,
 	setCurrentRunId,
 	updateRun,
-	addCreatorToRun,
-	addErrorToRun,
 } from "../functions/shared/runs/runs.js";
-import { setupGracefulShutdown } from "../functions/shared/runs/gracefulShutdown.js";
 
 async function testGracefulShutdown() {
 	console.log("🧪 Testing Graceful Shutdown Handling\n");
@@ -83,4 +83,3 @@ testGracefulShutdown().catch((error) => {
 	console.error("\n❌ Script failed:", error);
 	process.exit(1);
 });
-

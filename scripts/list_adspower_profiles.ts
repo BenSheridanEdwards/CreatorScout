@@ -45,9 +45,13 @@ async function main(): Promise<void> {
 		return;
 	}
 
-	console.log("═══════════════════════════════════════════════════════════════");
+	console.log(
+		"═══════════════════════════════════════════════════════════════",
+	);
 	console.log("                     ADSPOWER PROFILES");
-	console.log("═══════════════════════════════════════════════════════════════\n");
+	console.log(
+		"═══════════════════════════════════════════════════════════════\n",
+	);
 
 	for (const profile of profiles) {
 		console.log(`📦 ${profile.name || "Unnamed"}`);
@@ -74,9 +78,13 @@ async function main(): Promise<void> {
 		console.log("");
 	}
 
-	console.log("═══════════════════════════════════════════════════════════════");
+	console.log(
+		"═══════════════════════════════════════════════════════════════",
+	);
 	console.log(`Total: ${profiles.length} profile(s)`);
-	console.log("═══════════════════════════════════════════════════════════════\n");
+	console.log(
+		"═══════════════════════════════════════════════════════════════\n",
+	);
 
 	// Show example config
 	console.log("📝 Example profiles.config.json entry:\n");
@@ -96,4 +104,3 @@ main().catch((error) => {
 	console.error("Error:", error.message);
 	process.exit(1);
 });
-

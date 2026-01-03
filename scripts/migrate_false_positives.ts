@@ -1,7 +1,7 @@
 #!/usr/bin/env tsx
 /**
  * Migrate False Positives - Apply New Detection Logic to Existing Profiles
- * 
+ *
  * This script re-evaluates profiles that were likely false positives:
  * - Profiles marked as creators with confidence < 80%
  * - Applies the new, stricter combined signal logic
@@ -9,9 +9,9 @@
  * - Generates a report of changes
  */
 import "dotenv/config";
-import { getPrismaClient } from "../functions/shared/database/database.js";
-import { calculateScore } from "../functions/profile/bioMatcher/bioMatcher.js";
 import chalk from "chalk";
+import { calculateScore } from "../functions/profile/bioMatcher/bioMatcher.js";
+import { getPrismaClient } from "../functions/shared/database/database.js";
 
 interface ProfileToMigrate {
 	username: string;
@@ -32,7 +32,9 @@ async function migrateFalsePositives() {
 	// Find all profiles marked as creators with medium confidence
 	// These are most likely to be false positives from the old logic
 	console.log(
-		chalk.cyan("📋 Finding profiles marked as creators with confidence < 80%..."),
+		chalk.cyan(
+			"📋 Finding profiles marked as creators with confidence < 80%...",
+		),
 	);
 
 	const profiles = await prisma.profile.findMany({
@@ -55,9 +57,7 @@ async function migrateFalsePositives() {
 		},
 	});
 
-	console.log(
-		chalk.white(`📊 Found ${profiles.length} profiles to review`),
-	);
+	console.log(chalk.white(`📊 Found ${profiles.length} profiles to review`));
 	console.log();
 
 	if (profiles.length === 0) {
@@ -103,10 +103,7 @@ async function migrateFalsePositives() {
 
 		// Estimate link confidence from old total confidence and bio score
 		// oldConfidence ≈ max(bioScore, linkConfidence)
-		const estimatedLinkConfidence = Math.max(
-			0,
-			profile.confidence - bioScore,
-		);
+		const estimatedLinkConfidence = Math.max(0, profile.confidence - bioScore);
 
 		// Apply new combined signal logic
 		let newConfidence = profile.confidence;
@@ -163,7 +160,8 @@ async function migrateFalsePositives() {
 				newConfidence,
 				oldIsCreator: profile.isCreator,
 				newIsCreator,
-				reason: "Both link and bio signals too weak (likely fitness/gaming/art creator)",
+				reason:
+					"Both link and bio signals too weak (likely fitness/gaming/art creator)",
 			});
 		} else if (bioScore + estimatedLinkConfidence < 90) {
 			// Medium signals but combined not strong enough
@@ -187,7 +185,8 @@ async function migrateFalsePositives() {
 				newConfidence,
 				oldIsCreator: profile.isCreator,
 				newIsCreator,
-				reason: "Combined signals below threshold (likely generic content creator)",
+				reason:
+					"Combined signals below threshold (likely generic content creator)",
 			});
 		} else {
 			// Passes new logic - keep as creator
@@ -197,7 +196,10 @@ async function migrateFalsePositives() {
 		}
 
 		// Update database if changed
-		if (newIsCreator !== profile.isCreator || newConfidence !== profile.confidence) {
+		if (
+			newIsCreator !== profile.isCreator ||
+			newConfidence !== profile.confidence
+		) {
 			await prisma.profile.update({
 				where: { username: profile.username },
 				data: {
@@ -270,4 +272,3 @@ migrateFalsePositives().catch((error) => {
 	console.error(chalk.red("Fatal error:"), error);
 	process.exit(1);
 });
-

@@ -20,17 +20,23 @@
 import { existsSync, readFileSync } from "node:fs";
 import type { Browser, Page } from "puppeteer";
 import { initializeInstagramSession } from "../functions/auth/sessionInitializer/sessionInitializer.ts";
+import { getProfileStats } from "../functions/extraction/getProfileStats/getProfileStats.ts";
 import {
 	extractFollowingUsernames,
 	openFollowingModal,
 	scrollFollowingModal,
 } from "../functions/navigation/modalOperations/modalOperations.ts";
 import { navigateToProfileAndCheck } from "../functions/navigation/profileNavigation/profileNavigation.ts";
+import { calculateScore } from "../functions/profile/bioMatcher/bioMatcher.ts";
 import {
 	addFollowingToQueue,
 	followUserAccount,
 	sendDMToUser,
 } from "../functions/profile/profileActions/profileActions.ts";
+import {
+	performRandomEngagement,
+	shouldEngageOnProfile,
+} from "../functions/profile/profileActions/randomEngagement.ts";
 import {
 	analyzeProfileComprehensive,
 	type ComprehensiveAnalysisResult,
@@ -39,12 +45,6 @@ import {
 	CONFIDENCE_THRESHOLD,
 	MAX_DMS_PER_DAY,
 } from "../functions/shared/config/config.ts";
-import {
-	performRandomEngagement,
-	shouldEngageOnProfile,
-} from "../functions/profile/profileActions/randomEngagement.ts";
-import { calculateScore } from "../functions/profile/bioMatcher/bioMatcher.ts";
-import { getProfileStats } from "../functions/extraction/getProfileStats/getProfileStats.ts";
 import {
 	getScrollIndex,
 	getStats,
@@ -70,9 +70,9 @@ import { snapshot } from "../functions/shared/snapshot/snapshot.ts";
 import {
 	getDelay,
 	mouseWiggle,
+	shortDelay,
 } from "../functions/timing/humanize/humanize.ts";
 import { sleep } from "../functions/timing/sleep/sleep.ts";
-import { shortDelay } from "../functions/timing/humanize/humanize.ts";
 
 // NOTE: Database init is async; we run it inside the main entrypoints.
 

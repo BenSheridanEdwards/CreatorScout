@@ -12,16 +12,16 @@
 import type { Browser, Page } from "puppeteer";
 import { initializeInstagramSession } from "../functions/auth/sessionInitializer/sessionInitializer.ts";
 import {
-	microDelay,
-	shortDelay,
-} from "../functions/timing/humanize/humanize.ts";
-import { createLogger } from "../functions/shared/logger/logger.ts";
-import { getProfile } from "../functions/shared/profiles/profileLoader.ts";
-import { handleInstagramPopups } from "../functions/profile/profileActions/popupHandler.ts";
-import {
 	humanClick,
 	humanScroll,
 } from "../functions/navigation/humanInteraction/humanInteraction.ts";
+import { handleInstagramPopups } from "../functions/profile/profileActions/popupHandler.ts";
+import { createLogger } from "../functions/shared/logger/logger.ts";
+import { getProfile } from "../functions/shared/profiles/profileLoader.ts";
+import {
+	microDelay,
+	shortDelay,
+} from "../functions/timing/humanize/humanize.ts";
 
 const logger = createLogger();
 

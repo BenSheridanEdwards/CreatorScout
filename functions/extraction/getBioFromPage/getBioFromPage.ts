@@ -1,7 +1,7 @@
 import type { Page } from "puppeteer";
+import { validateBioWithVision } from "../../profile/vision/vision.ts";
 import { createLogger } from "../../shared/logger/logger.ts";
 import { snapshot } from "../../shared/snapshot/snapshot.ts";
-import { validateBioWithVision } from "../../profile/vision/vision.ts";
 
 const logger = createLogger(process.env.DEBUG_LOGS === "true");
 

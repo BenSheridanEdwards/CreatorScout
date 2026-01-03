@@ -160,8 +160,6 @@ const pageMock = () =>
 		},
 	}) as unknown as Page;
 
-const logger = createLogger();
-
 describe("profileNavigation", () => {
 	beforeEach(() => {
 		jest.clearAllMocks();
@@ -519,7 +517,7 @@ describe("profileNavigation", () => {
 				.mockResolvedValue([mockElement]) as Page["$$"];
 			page.evaluate = jest
 				.fn<(pageFunction: unknown, ...args: unknown[]) => Promise<unknown>>()
-				.mockImplementation((fn: unknown, ...args: unknown[]) => {
+				.mockImplementation((_fn: unknown, ...args: unknown[]) => {
 					// First call: search for profile link by href
 					if (args[0] === "abc") {
 						return Promise.resolve({ found: true, href: "/abc/", index: 0 });

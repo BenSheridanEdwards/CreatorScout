@@ -3,16 +3,16 @@
  * Uses ghost-cursor for human-like interactions to avoid bot detection.
  */
 import type { Page } from "puppeteer";
-import { createLogger } from "../../shared/logger/logger.ts";
-import { snapshot } from "../../shared/snapshot/snapshot.ts";
-import { sleep } from "../../timing/sleep/sleep.ts";
-import { humanTypeText, shortDelay } from "../../timing/humanize/humanize.ts";
-import { handleInstagramPopups } from "./popupHandler.ts";
 import {
+	getGhostCursor,
 	humanClick,
 	humanScroll,
-	getGhostCursor,
 } from "../../navigation/humanInteraction/humanInteraction.ts";
+import { createLogger } from "../../shared/logger/logger.ts";
+import { snapshot } from "../../shared/snapshot/snapshot.ts";
+import { humanTypeText, shortDelay } from "../../timing/humanize/humanize.ts";
+import { sleep } from "../../timing/sleep/sleep.ts";
+import { handleInstagramPopups } from "./popupHandler.ts";
 
 // Lazy logger creation to prevent memory issues in tests
 let logger: ReturnType<typeof createLogger> | null = null;
@@ -158,7 +158,8 @@ async function navigateToProfileViaSearch(
 
 	// Use humanTypeText for stealth - handles clicking and typing with human-like patterns
 	getLogger().info("ACTION", `Typing username: @${u}`);
-	const searchSelector = 'input[placeholder*="Search"], input[aria-label*="Search"]';
+	const searchSelector =
+		'input[placeholder*="Search"], input[aria-label*="Search"]';
 	const typed = await humanTypeText(page, searchSelector, u, {
 		clearFirst: true,
 		typeDelay: 100 + Math.random() * 50, // 100-150ms per character

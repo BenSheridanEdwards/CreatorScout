@@ -15,22 +15,22 @@ if (process.argv.includes("--skip-vision")) {
 }
 
 import "dotenv/config";
-import { getProfile } from "../functions/shared/profiles/profileLoader.js";
+import chalk from "chalk";
 import { initializeInstagramSession } from "../functions/auth/sessionInitializer/sessionInitializer.js";
-import { getPrismaClient } from "../functions/shared/database/database.js";
-import { analyzeProfileComprehensive } from "../functions/profile/profileAnalysis/profileAnalysis.js";
 import { navigateToProfile } from "../functions/navigation/profileNavigation/profileNavigation.js";
+import { analyzeProfileComprehensive } from "../functions/profile/profileAnalysis/profileAnalysis.js";
+import { getPrismaClient } from "../functions/shared/database/database.js";
+import { getProfile } from "../functions/shared/profiles/profileLoader.js";
 import {
+	markRunComplete,
+	setupGracefulShutdown,
+} from "../functions/shared/runs/gracefulShutdown.js";
+import {
+	addCreatorToRun,
+	addErrorToRun,
 	setCurrentRunId,
 	updateRun,
-	addErrorToRun,
-	addCreatorToRun,
 } from "../functions/shared/runs/runs.js";
-import {
-	setupGracefulShutdown,
-	markRunComplete,
-} from "../functions/shared/runs/gracefulShutdown.js";
-import chalk from "chalk";
 
 interface ProfileRecord {
 	username: string;
@@ -184,7 +184,7 @@ async function reanalyzeProfiles() {
 		},
 	});
 
-	let stats = {
+	const stats = {
 		processed: 0,
 		newCreators: 0,
 		confidenceIncreased: 0,

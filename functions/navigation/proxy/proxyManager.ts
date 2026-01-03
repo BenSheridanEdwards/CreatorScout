@@ -15,21 +15,21 @@
  */
 
 import { randomBytes } from "node:crypto";
-import { createLogger } from "../../shared/logger/logger.ts";
 import {
-	DECODO_USERNAME,
-	DECODO_PASSWORD,
 	DECODO_HOST,
+	DECODO_PASSWORD,
 	DECODO_PORT,
-	DECODO_STICKY_SESSION_MIN,
 	DECODO_STICKY_SESSION_MAX,
-	SMARTPROXY_USERNAME,
-	SMARTPROXY_PASSWORD,
+	DECODO_STICKY_SESSION_MIN,
+	DECODO_USERNAME,
 	SMARTPROXY_HOST,
+	SMARTPROXY_PASSWORD,
 	SMARTPROXY_PORT,
-	SMARTPROXY_STICKY_SESSION_MIN,
 	SMARTPROXY_STICKY_SESSION_MAX,
+	SMARTPROXY_STICKY_SESSION_MIN,
+	SMARTPROXY_USERNAME,
 } from "../../shared/config/config.ts";
+import { createLogger } from "../../shared/logger/logger.ts";
 
 const logger = createLogger();
 
@@ -60,23 +60,23 @@ export class ProxyManager {
 
 	constructor(config: ProxyConfig) {
 		const provider = config.provider || "decodo";
-		
+
 		// Set default sticky session duration based on provider
-		const defaultSessionMin = provider === "decodo" 
-			? DECODO_STICKY_SESSION_MIN 
-			: SMARTPROXY_STICKY_SESSION_MIN;
-		const defaultSessionMax = provider === "decodo"
-			? DECODO_STICKY_SESSION_MAX
-			: SMARTPROXY_STICKY_SESSION_MAX;
+		const defaultSessionMin =
+			provider === "decodo"
+				? DECODO_STICKY_SESSION_MIN
+				: SMARTPROXY_STICKY_SESSION_MIN;
+		const defaultSessionMax =
+			provider === "decodo"
+				? DECODO_STICKY_SESSION_MAX
+				: SMARTPROXY_STICKY_SESSION_MAX;
 
 		this.config = {
 			provider,
 			stickySessionMinutes:
 				config.stickySessionMinutes ||
 				defaultSessionMin +
-					Math.floor(
-						Math.random() * (defaultSessionMax - defaultSessionMin),
-					),
+					Math.floor(Math.random() * (defaultSessionMax - defaultSessionMin)),
 			...config,
 		};
 
@@ -312,4 +312,3 @@ export const US_CITIES = [
 export function getRandomUSCity(): string {
 	return US_CITIES[Math.floor(Math.random() * US_CITIES.length)];
 }
-

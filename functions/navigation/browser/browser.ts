@@ -13,8 +13,8 @@ import puppeteer from "puppeteer";
 import { getUserDataDir } from "../../auth/sessionManager/sessionManager.ts";
 import { LOCAL_BROWSER } from "../../shared/config/config.ts";
 import { createLogger } from "../../shared/logger/logger.ts";
+import { createStickyProxy, type ProxyManager } from "../proxy/proxyManager.ts";
 import { connectToAdsPowerProfile } from "./adsPowerConnector.ts";
-import { type ProxyManager, createStickyProxy } from "../proxy/proxyManager.ts";
 
 const logger = createLogger();
 

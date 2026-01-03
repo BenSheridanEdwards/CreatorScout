@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 
 interface AccountFilterProps {
 	onAccountChange: (account: string) => void;
@@ -32,7 +32,10 @@ export default function AccountFilter({ onAccountChange }: AccountFilterProps) {
 				}
 				// 404 is OK - means no schedule endpoint
 			} catch (error) {
-				console.warn("Schedule endpoint not available for account loading:", error);
+				console.warn(
+					"Schedule endpoint not available for account loading:",
+					error,
+				);
 				// Continue with default "all" option
 			}
 		}
@@ -48,8 +51,9 @@ export default function AccountFilter({ onAccountChange }: AccountFilterProps) {
 
 	return (
 		<div className="flex items-center gap-2">
-			<label className="text-xs text-slate-400">Account:</label>
+			<label htmlFor="account-select" className="text-xs text-slate-400">Account:</label>
 			<select
+				id="account-select"
 				value={selectedAccount}
 				onChange={(e) => handleChange(e.target.value)}
 				className="rounded-md border border-slate-700 bg-slate-900 px-2.5 py-1 text-xs font-medium text-slate-200 hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500"
@@ -63,4 +67,3 @@ export default function AccountFilter({ onAccountChange }: AccountFilterProps) {
 		</div>
 	);
 }
-

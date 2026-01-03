@@ -1,7 +1,7 @@
 import fs from "node:fs/promises";
 import type { Page } from "puppeteer";
-import { LOCAL_BROWSER, DEBUG_SCREENSHOTS } from "../config/config.ts";
-import { getCurrentRunId, addScreenshotToRun } from "../runs/runs.ts";
+import { DEBUG_SCREENSHOTS, LOCAL_BROWSER } from "../config/config.ts";
+import { addScreenshotToRun, getCurrentRunId } from "../runs/runs.ts";
 
 /**
  * Check if the page is still open and accessible

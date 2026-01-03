@@ -9,8 +9,8 @@ import {
 import { DM_MESSAGE } from "../../shared/config/config.ts";
 import { createLogger } from "../../shared/logger/logger.ts";
 import { snapshot } from "../../shared/snapshot/snapshot.ts";
-import { sleep } from "../../timing/sleep/sleep.ts";
 import { shortDelay } from "../../timing/humanize/humanize.ts";
+import { sleep } from "../../timing/sleep/sleep.ts";
 
 // Lazy logger creation to prevent memory issues in tests
 let logger: ReturnType<typeof createLogger> | null = null;

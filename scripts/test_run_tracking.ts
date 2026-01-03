@@ -38,4 +38,3 @@ async function testRun() {
 }
 
 testRun().catch(console.error);
-

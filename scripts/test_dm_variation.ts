@@ -8,9 +8,17 @@
  *   tsx scripts/test_dm_variation.ts --batch 20
  */
 
-import { testDMGeneration, generateDMBatch, getDMStats } from "../functions/profile/dmVariation/dmVariation.ts";
+import {
+	generateDMBatch,
+	getDMStats,
+	testDMGeneration,
+} from "../functions/profile/dmVariation/dmVariation.ts";
 
-function parseArgs(): { count: number; strategy: "cold" | "warm" | "pitch"; batch?: number } {
+function parseArgs(): {
+	count: number;
+	strategy: "cold" | "warm" | "pitch";
+	batch?: number;
+} {
 	const args = process.argv.slice(2);
 	let count = 10;
 	let strategy: "cold" | "warm" | "pitch" = "cold";
@@ -59,7 +67,3 @@ async function main() {
 }
 
 main();
-
-
-
-

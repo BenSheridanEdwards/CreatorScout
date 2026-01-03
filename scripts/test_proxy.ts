@@ -62,9 +62,18 @@ async function testProxy(args: TestArgs): Promise<void> {
 
 	const session1 = proxy.getSession();
 	logger.info("PROXY_TEST", `✓ Session created: ${session1.sessionId}`);
-	logger.info("PROXY_TEST", `✓ Created at: ${session1.createdAt.toISOString()}`);
-	logger.info("PROXY_TEST", `✓ Expires at: ${session1.expiresAt.toISOString()}`);
-	logger.info("PROXY_TEST", `✓ Time remaining: ${proxy.getTimeRemaining()} minutes`);
+	logger.info(
+		"PROXY_TEST",
+		`✓ Created at: ${session1.createdAt.toISOString()}`,
+	);
+	logger.info(
+		"PROXY_TEST",
+		`✓ Expires at: ${session1.expiresAt.toISOString()}`,
+	);
+	logger.info(
+		"PROXY_TEST",
+		`✓ Time remaining: ${proxy.getTimeRemaining()} minutes`,
+	);
 	logger.info("PROXY_TEST", "");
 
 	// Get same session again (should be same ID)
@@ -121,7 +130,10 @@ async function testProxy(args: TestArgs): Promise<void> {
 	logger.info("PROXY_TEST", "═══════════════");
 	logger.info("PROXY_TEST", `Server: ${creds.server}`);
 	logger.info("PROXY_TEST", `Session: ${proxy.getSessionInfo()?.sessionId}`);
-	logger.info("PROXY_TEST", `Time remaining: ${proxy.getTimeRemaining()} minutes`);
+	logger.info(
+		"PROXY_TEST",
+		`Time remaining: ${proxy.getTimeRemaining()} minutes`,
+	);
 	logger.info("PROXY_TEST", `Location: ${city || "auto"}, ${country || "us"}`);
 	logger.info("PROXY_TEST", "");
 	logger.info("PROXY_TEST", "🎉 All tests passed!");
@@ -140,7 +152,3 @@ testProxy(args)
 		logger.error("PROXY_TEST", `❌ Test failed: ${error}`);
 		process.exit(1);
 	});
-
-
-
-

@@ -31,13 +31,14 @@ import {
 import { createLogger } from "../../shared/logger/logger.ts";
 
 const logger = createLogger(process.env.DEBUG_LOGS === "true");
+
 import { recordActivity } from "../../shared/dashboard/dashboard.ts";
+import { queueAdd } from "../../shared/database/database.ts";
 import { snapshot } from "../../shared/snapshot/snapshot.ts";
+import { mediumDelay, shortDelay } from "../../timing/humanize/humanize.ts";
 import { sleep } from "../../timing/sleep/sleep.ts";
-import { shortDelay, mediumDelay } from "../../timing/humanize/humanize.ts";
 import { findKeywords, isLikelyCreator } from "../bioMatcher/bioMatcher.ts";
 import { isConfirmedCreator } from "../vision/vision.ts";
-import { queueAdd } from "../../shared/database/database.ts";
 
 export interface BasicAnalysisResult {
 	bio: string | null;
@@ -384,9 +385,7 @@ export async function analyzeProfileComprehensive(
 							console.log(
 								`[VISION] Vision did not confirm creator (confidence: ${visionData?.confidence || 0}%)`,
 							);
-							result.indicators.push(
-								`Vision analysis did not confirm creator`,
-							);
+							result.indicators.push(`Vision analysis did not confirm creator`);
 						}
 					} catch (visionError) {
 						console.log(`[VISION] Vision analysis error: ${visionError}`);
@@ -395,9 +394,7 @@ export async function analyzeProfileComprehensive(
 				} else {
 					// Log why vision didn't run
 					if (SKIP_VISION) {
-						console.log(
-							`[VISION] Skipping vision - SKIP_VISION is enabled`,
-						);
+						console.log(`[VISION] Skipping vision - SKIP_VISION is enabled`);
 					} else if (!linkScreenshot) {
 						console.log(
 							`[VISION] Skipping vision - screenshot was not taken (linkScreenshot is null)`,

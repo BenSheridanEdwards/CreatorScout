@@ -215,7 +215,3 @@ export function getProxyStats(): {
 		profiles,
 	};
 }
-
-
-
-

@@ -111,8 +111,8 @@ export function isLinkInBioHighlight(title: string): boolean {
 		/premium\s+content/i,
 		/custom\s+content/i,
 		// Service indicators (requires context)
-		/menu/i,          // Price menu
-		/rates/i,         // Service rates
+		/menu/i, // Price menu
+		/rates/i, // Service rates
 		/pricing/i,
 		// Adult emojis (strong signal)
 		/💋/,

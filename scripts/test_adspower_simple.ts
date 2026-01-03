@@ -7,8 +7,8 @@
 
 import {
 	connectToAdsPowerProfile,
-	stopAdsPowerProfile,
 	listAdsPowerProfiles,
+	stopAdsPowerProfile,
 } from "../functions/navigation/browser/adsPowerConnector.ts";
 import { snapshot } from "../functions/shared/snapshot/snapshot.ts";
 
@@ -25,9 +25,13 @@ async function main(): Promise<void> {
 		console.log(`Using profile: ${profiles[0].name} (${profileId})\n`);
 	}
 
-	console.log("═══════════════════════════════════════════════════════════════");
+	console.log(
+		"═══════════════════════════════════════════════════════════════",
+	);
 	console.log("          SIMPLE ADSPOWER DIAGNOSTIC TEST");
-	console.log("═══════════════════════════════════════════════════════════════\n");
+	console.log(
+		"═══════════════════════════════════════════════════════════════\n",
+	);
 
 	let browser;
 
@@ -37,7 +41,7 @@ async function main(): Promise<void> {
 		console.log("✅ Connected!\n");
 
 		const pages = await browser.pages();
-		const page = pages[0] || await browser.newPage();
+		const page = pages[0] || (await browser.newPage());
 
 		// Set viewport
 		await page.setViewport({ width: 1440, height: 900 });
@@ -56,7 +60,10 @@ async function main(): Promise<void> {
 		await new Promise((resolve) => setTimeout(resolve, 5000));
 
 		// Take screenshot
-		const screenshotPath = await snapshot(page, `adspower_diagnostic_${Date.now()}`);
+		const screenshotPath = await snapshot(
+			page,
+			`adspower_diagnostic_${Date.now()}`,
+		);
 		console.log(`📸 Screenshot saved: ${screenshotPath}\n`);
 
 		// Get page title and some info
@@ -80,19 +87,30 @@ async function main(): Promise<void> {
 		});
 
 		console.log("\n📊 Page Analysis:");
-		console.log(`   Login form present: ${pageInfo.hasLoginForm ? "✅ Yes" : "❌ No"}`);
-		console.log(`   Inbox link present: ${pageInfo.hasInbox ? "✅ Yes (logged in)" : "❌ No"}`);
-		console.log(`   Navigation present: ${pageInfo.hasNav ? "✅ Yes" : "❌ No"}`);
+		console.log(
+			`   Login form present: ${pageInfo.hasLoginForm ? "✅ Yes" : "❌ No"}`,
+		);
+		console.log(
+			`   Inbox link present: ${pageInfo.hasInbox ? "✅ Yes (logged in)" : "❌ No"}`,
+		);
+		console.log(
+			`   Navigation present: ${pageInfo.hasNav ? "✅ Yes" : "❌ No"}`,
+		);
 		console.log(`\n📝 Body preview: ${pageInfo.bodyPreview}...`);
 
-		console.log("\n═══════════════════════════════════════════════════════════════");
+		console.log(
+			"\n═══════════════════════════════════════════════════════════════",
+		);
 		console.log("                    TEST COMPLETE ✅");
-		console.log("═══════════════════════════════════════════════════════════════\n");
+		console.log(
+			"═══════════════════════════════════════════════════════════════\n",
+		);
 
 		// Keep browser open for inspection
-		console.log("⏳ Keeping browser open for 15 seconds for manual inspection...");
+		console.log(
+			"⏳ Keeping browser open for 15 seconds for manual inspection...",
+		);
 		await new Promise((resolve) => setTimeout(resolve, 15000));
-
 	} catch (error) {
 		console.error("\n❌ Error:", error);
 		process.exit(1);
@@ -116,4 +134,3 @@ main().catch((error) => {
 	console.error("Fatal error:", error);
 	process.exit(1);
 });
-

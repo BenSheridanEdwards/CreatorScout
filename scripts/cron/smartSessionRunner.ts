@@ -16,30 +16,30 @@
 
 import type { Browser, Page } from "puppeteer";
 import { initializeInstagramSession } from "../../functions/auth/sessionInitializer/sessionInitializer.ts";
-import { warmUpProfile } from "../../functions/timing/warmup/warmup.ts";
+import { SessionController } from "../../functions/scheduling/sessionController.ts";
+import {
+	logSessionPlan,
+	planDailySessions,
+	recalculateSessions,
+	type SessionType,
+} from "../../functions/scheduling/sessionPlanner.ts";
+import {
+	queueCount,
+	queueNext,
+} from "../../functions/shared/database/database.ts";
 import {
 	batchEngagements,
 	EngagementTracker,
 } from "../../functions/shared/engagement/engagementTracker.ts";
 import { createLogger } from "../../functions/shared/logger/logger.ts";
+import { getGlobalMetricsTracker } from "../../functions/shared/metrics/metricsTracker.ts";
 import {
 	getProfileById,
 	incrementProfileAction,
 } from "../../functions/shared/profiles/profileManager.ts";
-import {
-	planDailySessions,
-	recalculateSessions,
-	logSessionPlan,
-	type SessionType,
-} from "../../functions/scheduling/sessionPlanner.ts";
-import { SessionController } from "../../functions/scheduling/sessionController.ts";
-import {
-	queueNext,
-	queueCount,
-} from "../../functions/shared/database/database.ts";
-import { processFollowingList } from "../scrape.ts";
-import { getGlobalMetricsTracker } from "../../functions/shared/metrics/metricsTracker.ts";
 import { createRun } from "../../functions/shared/runs/runs.ts";
+import { warmUpProfile } from "../../functions/timing/warmup/warmup.ts";
+import { processFollowingList } from "../scrape.ts";
 
 const logger = createLogger();
 

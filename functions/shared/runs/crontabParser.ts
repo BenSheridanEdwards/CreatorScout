@@ -74,12 +74,11 @@ export async function parseCrontab(): Promise<ScheduledRun[]> {
 			);
 
 			if (scheduleMatch) {
-				const [, cronPattern, projectPath, profileId, sessionType] = scheduleMatch;
+				const [, cronPattern, projectPath, profileId, sessionType] =
+					scheduleMatch;
 
 				// Validate session type
-				if (
-					!["morning", "afternoon", "evening"].includes(sessionType)
-				) {
+				if (!["morning", "afternoon", "evening"].includes(sessionType)) {
 					continue;
 				}
 
@@ -112,4 +111,3 @@ export async function parseCrontab(): Promise<ScheduledRun[]> {
 
 	return scheduledRuns;
 }
-

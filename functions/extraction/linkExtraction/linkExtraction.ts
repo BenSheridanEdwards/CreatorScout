@@ -1,7 +1,7 @@
 import type { Page } from "puppeteer";
+import { humanScrollTo } from "../../navigation/humanInteraction/humanInteraction.ts";
 import { CONFIDENCE_THRESHOLD } from "../../shared/config/config.ts";
 import { mediumDelay, microDelay } from "../../timing/humanize/humanize.ts";
-import { humanScrollTo } from "../../navigation/humanInteraction/humanInteraction.ts";
 
 const INSTAGRAM_HOST = "instagram.com";
 
@@ -392,8 +392,8 @@ export async function analyzeExternalLink(
 			const images = document.querySelectorAll("img");
 			const imageAlts = Array.from(images)
 				.map((img) => img.getAttribute("alt") || img.getAttribute("title"))
-				.filter(Boolean)
-				.map((alt) => alt!.toLowerCase());
+				.filter((alt): alt is string => Boolean(alt))
+				.map((alt) => alt.toLowerCase());
 
 			// Look for social media icons by src patterns
 			const socialIcons = Array.from(images)

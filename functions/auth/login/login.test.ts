@@ -133,26 +133,22 @@ const createMockPage = (): Page =>
 				},
 			) as Page["$"],
 		$$: jest.fn<Page["$$"]>().mockResolvedValue([]),
-		evaluateHandle: jest.fn<Page["evaluateHandle"]>().mockResolvedValue({
+		evaluateHandle: jest.fn().mockResolvedValue({
 			asElement: jest.fn<() => null>().mockReturnValue(null),
-		} as unknown as Awaited<
-			ReturnType<Page["evaluateHandle"]>
-		>) as Page["evaluateHandle"],
-		waitForSelector: jest.fn<Page["waitForSelector"]>().mockResolvedValue({
+		} as never) as Page["evaluateHandle"],
+		waitForSelector: jest.fn().mockResolvedValue({
 			asElement: jest.fn<() => null>().mockReturnValue(null),
-		} as Awaited<ReturnType<Page["waitForSelector"]>>),
+		} as never) as Page["waitForSelector"],
 		waitForFunction: jest
-			.fn<Page["waitForFunction"]>()
-			.mockResolvedValue(
-				undefined as unknown as Awaited<ReturnType<Page["waitForFunction"]>>,
-			),
+			.fn()
+			.mockResolvedValue(undefined as never) as Page["waitForFunction"],
 		type: jest.fn<Page["type"]>().mockResolvedValue(undefined),
 		click: jest.fn<Page["click"]>().mockResolvedValue(undefined),
-		evaluate: jest.fn<Page["evaluate"]>().mockImplementation(async (fn) => {
+		evaluate: jest.fn().mockImplementation(async (fn: unknown) => {
 			// Mock form detection - return true to indicate form is found
 			if (typeof fn === "function") {
 				try {
-					const result = await fn();
+					const result = await (fn as () => unknown)();
 					// For form detection (checking for input fields), return true
 					if (typeof result === "boolean") {
 						// Return true for form detection, false for login status
@@ -223,11 +219,17 @@ describe("login", () => {
 		// Ensure isLoggedIn returns false initially so login flow continues
 		// After form submission, it should return true to indicate successful login
 		isLoggedInMock.mockReset();
-		isLoggedInMock.mockResolvedValue(false);
+		// Default: return false initially, then true after form submission
+		isLoggedInMock.mockResolvedValueOnce(false).mockResolvedValue(true);
 		loadCookiesMock.mockReset();
 		loadCookiesMock.mockResolvedValue(false);
 		// Create a fresh page mock for each test
 		page = createMockPage();
+		// Mock page.url to transition from login page to home page
+		(page as { url: Page["url"] }).url = jest
+			.fn<Page["url"]>()
+			.mockReturnValueOnce("https://www.instagram.com/accounts/login/")
+			.mockReturnValue("https://www.instagram.com/");
 	});
 
 	// ═══════════════════════════════════════════════════════════════════════════
@@ -236,6 +238,16 @@ describe("login", () => {
 
 	describe("Step 1: Navigate to Instagram", () => {
 		test("navigates to Instagram homepage on login attempt", async () => {
+			// Mock successful login flow
+			isLoggedInMock
+				.mockResolvedValueOnce(false) // Initial check
+				.mockResolvedValueOnce(false) // After form submission
+				.mockResolvedValue(true); // Login successful
+			(page as { url: Page["url"] }).url = jest
+				.fn<Page["url"]>()
+				.mockReturnValueOnce("https://www.instagram.com/accounts/login/")
+				.mockReturnValue("https://www.instagram.com/");
+
 			await login(page, { username: "testuser", password: "testpass" });
 
 			// Login now uses navigateToHomeViaUI instead of page.goto
@@ -249,6 +261,16 @@ describe("login", () => {
 
 	describe("Step 2-3: Cookie loading and session validation", () => {
 		test("attempts to load saved cookies by default", async () => {
+			// Mock successful login flow
+			isLoggedInMock
+				.mockResolvedValueOnce(false) // Initial check
+				.mockResolvedValueOnce(false) // After form submission
+				.mockResolvedValue(true); // Login successful
+			(page as { url: Page["url"] }).url = jest
+				.fn<Page["url"]>()
+				.mockReturnValueOnce("https://www.instagram.com/accounts/login/")
+				.mockReturnValue("https://www.instagram.com/");
+
 			// The login function should check for existing session cookies
 			await login(page, { username: "testuser", password: "testpass" });
 
@@ -257,6 +279,16 @@ describe("login", () => {
 		});
 
 		test("skips cookie loading when skipCookies option is true", async () => {
+			// Mock successful login flow
+			isLoggedInMock
+				.mockResolvedValueOnce(false) // Initial check
+				.mockResolvedValueOnce(false) // After form submission
+				.mockResolvedValue(true); // Login successful
+			(page as { url: Page["url"] }).url = jest
+				.fn<Page["url"]>()
+				.mockReturnValueOnce("https://www.instagram.com/accounts/login/")
+				.mockReturnValue("https://www.instagram.com/");
+
 			await login(
 				page,
 				{ username: "testuser", password: "testpass" },
@@ -274,6 +306,16 @@ describe("login", () => {
 
 	describe("Step 4: Login form detection and credential entry", () => {
 		test("finds username field using multiple selector strategies", async () => {
+			// Mock successful login flow
+			isLoggedInMock
+				.mockResolvedValueOnce(false) // Initial check
+				.mockResolvedValueOnce(false) // After form submission
+				.mockResolvedValue(true); // Login successful
+			(page as { url: Page["url"] }).url = jest
+				.fn<Page["url"]>()
+				.mockReturnValueOnce("https://www.instagram.com/accounts/login/")
+				.mockReturnValue("https://www.instagram.com/");
+
 			await login(page, { username: "testuser", password: "testpass" });
 
 			// Should attempt to find username field
@@ -281,6 +323,16 @@ describe("login", () => {
 		});
 
 		test("fills username and password fields when found", async () => {
+			// Mock successful login flow
+			isLoggedInMock
+				.mockResolvedValueOnce(false) // Initial check
+				.mockResolvedValueOnce(false) // After form submission
+				.mockResolvedValue(true); // Login successful
+			(page as { url: Page["url"] }).url = jest
+				.fn<Page["url"]>()
+				.mockReturnValueOnce("https://www.instagram.com/accounts/login/")
+				.mockReturnValue("https://www.instagram.com/");
+
 			await login(page, { username: "testuser", password: "testpass" });
 
 			// Should interact with form elements via ElementHandle.type()
@@ -293,11 +345,11 @@ describe("login", () => {
 			(page as { $: Page["$"] }).$ = jest
 				.fn<Page["$"]>()
 				.mockResolvedValue(null) as Page["$"];
-			(page as { evaluateHandle: Page["evaluateHandle"] }).evaluateHandle = jest
-				.fn<Page["evaluateHandle"]>()
+			(page as unknown as { evaluateHandle: unknown }).evaluateHandle = jest
+				.fn()
 				.mockResolvedValue({
 					asElement: jest.fn<() => null>().mockReturnValue(null),
-				} as unknown as Awaited<ReturnType<Page["evaluateHandle"]>>);
+				} as never) as Page["evaluateHandle"];
 
 			await expect(
 				login(page, { username: "testuser", password: "testpass" }),
@@ -311,6 +363,16 @@ describe("login", () => {
 
 	describe("Step 5: Form submission and login completion", () => {
 		test("clicks submit button to complete login", async () => {
+			// Mock successful login flow
+			isLoggedInMock
+				.mockResolvedValueOnce(false) // Initial check
+				.mockResolvedValueOnce(false) // After form submission
+				.mockResolvedValue(true); // Login successful
+			(page as { url: Page["url"] }).url = jest
+				.fn<Page["url"]>()
+				.mockReturnValueOnce("https://www.instagram.com/accounts/login/")
+				.mockReturnValue("https://www.instagram.com/");
+
 			await login(page, { username: "testuser", password: "testpass" });
 
 			// Should find and click submit button
@@ -318,6 +380,15 @@ describe("login", () => {
 		});
 
 		test("skips submission when skipSubmit option is true", async () => {
+			// Mock successful login flow
+			isLoggedInMock
+				.mockResolvedValueOnce(false) // Initial check
+				.mockResolvedValue(true); // Login successful (skipSubmit means we don't wait)
+			(page as { url: Page["url"] }).url = jest
+				.fn<Page["url"]>()
+				.mockReturnValueOnce("https://www.instagram.com/accounts/login/")
+				.mockReturnValue("https://www.instagram.com/");
+
 			await login(
 				page,
 				{ username: "testuser", password: "testpass" },

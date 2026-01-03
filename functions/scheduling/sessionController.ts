@@ -8,8 +8,8 @@
  * - Natural stopping probability
  */
 
-import type { SessionPlan } from "./sessionPlanner.ts";
 import { createLogger } from "../shared/logger/logger.ts";
+import type { SessionPlan } from "./sessionPlanner.ts";
 
 const logger = createLogger();
 
@@ -152,7 +152,8 @@ export class SessionController {
 
 			// If within acceptable range, 50% chance to continue "one more"
 			if (this.stats.dmsSent < this.plan.maxAcceptable) {
-				const continueChance = 0.5 - (this.stats.dmsSent - this.plan.targetDMs) * 0.1;
+				const continueChance =
+					0.5 - (this.stats.dmsSent - this.plan.targetDMs) * 0.1;
 				if (Math.random() > continueChance) {
 					logger.debug(
 						"SESSION_CONTROL",
@@ -248,4 +249,3 @@ export class SessionController {
 		return this.stats.dmsSent / elapsed;
 	}
 }
-

@@ -14,11 +14,12 @@
  */
 
 import dotenv from "dotenv";
+
 dotenv.config();
 
 import { initializeInstagramSession } from "../functions/auth/sessionInitializer/sessionInitializer.ts";
-import { getProfile } from "../functions/shared/profiles/profileLoader.ts";
 import { stopAdsPowerProfile } from "../functions/navigation/browser/adsPowerConnector.ts";
+import { getProfile } from "../functions/shared/profiles/profileLoader.ts";
 
 // Parse arguments
 const args = process.argv.slice(2);

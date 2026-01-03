@@ -5,6 +5,10 @@
 import { createCursor, type GhostCursor } from "ghost-cursor";
 import type { Page } from "puppeteer";
 import {
+	humanScroll as humanScrollFromInteraction,
+	humanWiggle,
+} from "../../navigation/humanInteraction/humanInteraction.ts";
+import {
 	DELAY_CATEGORIES,
 	DELAY_SCALE,
 	DELAY_SCALES,
@@ -13,10 +17,6 @@ import {
 	TIMEOUTS,
 } from "../../shared/config/config.ts";
 import { sleep } from "../sleep/sleep.ts";
-import {
-	humanScroll as humanScrollFromInteraction,
-	humanWiggle,
-} from "../../navigation/humanInteraction/humanInteraction.ts";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // DELAY HELPERS

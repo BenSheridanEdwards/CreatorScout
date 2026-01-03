@@ -30,7 +30,3 @@ describe("profileConfig", () => {
 		expect(getRemainingActions(p, "follow")).toBe(0);
 	});
 });
-
-
-
-

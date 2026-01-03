@@ -171,25 +171,27 @@ describe("linkExtraction", () => {
 	describe("analyzeExternalLink() - Content Warning Gates", () => {
 		test("detects Linktree creator signal as definitive creator signal (100% confidence)", async () => {
 			const mockPage = {
-				url: jest.fn<() => string>().mockReturnValue("https://linktr.ee/testuser"),
-				goto: jest
-					.fn<() => Promise<void>>()
-					.mockResolvedValue(undefined),
+				url: jest
+					.fn<() => string>()
+					.mockReturnValue("https://linktr.ee/testuser"),
+				goto: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
 				evaluate: jest
-					.fn<() => Promise<{
-						title: string;
-						texts: string[];
-						fullText: string;
-						imageAlts: string[];
-						socialIcons: string[];
-						hasEmailForm: boolean;
-						hasSubscribeButton: boolean;
-						hasPricingIndicator: boolean;
-						hasMonetizationIndicator: boolean;
-						hasSensitiveContentGate: boolean;
-						hasMatureContentGate: boolean;
-						creatorPatterns: string[];
-					}>>()
+					.fn<
+						() => Promise<{
+							title: string;
+							texts: string[];
+							fullText: string;
+							imageAlts: string[];
+							socialIcons: string[];
+							hasEmailForm: boolean;
+							hasSubscribeButton: boolean;
+							hasPricingIndicator: boolean;
+							hasMonetizationIndicator: boolean;
+							hasSensitiveContentGate: boolean;
+							hasMatureContentGate: boolean;
+							creatorPatterns: string[];
+						}>
+					>()
 					.mockResolvedValue({
 						title: "m0mmyashleyy | Instagram, TikTok | Linktree",
 						texts: [
@@ -228,25 +230,27 @@ describe("linkExtraction", () => {
 
 		test("detects link.me creator signal as definitive creator signal (100% confidence)", async () => {
 			const mockPage = {
-				url: jest.fn<() => string>().mockReturnValue("https://link.me/testuser"),
-				goto: jest
-					.fn<() => Promise<void>>()
-					.mockResolvedValue(undefined),
+				url: jest
+					.fn<() => string>()
+					.mockReturnValue("https://link.me/testuser"),
+				goto: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
 				evaluate: jest
-					.fn<() => Promise<{
-						title: string;
-						texts: string[];
-						fullText: string;
-						imageAlts: string[];
-						socialIcons: string[];
-						hasEmailForm: boolean;
-						hasSubscribeButton: boolean;
-						hasPricingIndicator: boolean;
-						hasMonetizationIndicator: boolean;
-						hasSensitiveContentGate: boolean;
-						hasMatureContentGate: boolean;
-						creatorPatterns: string[];
-					}>>()
+					.fn<
+						() => Promise<{
+							title: string;
+							texts: string[];
+							fullText: string;
+							imageAlts: string[];
+							socialIcons: string[];
+							hasEmailForm: boolean;
+							hasSubscribeButton: boolean;
+							hasPricingIndicator: boolean;
+							hasMonetizationIndicator: boolean;
+							hasSensitiveContentGate: boolean;
+							hasMatureContentGate: boolean;
+							creatorPatterns: string[];
+						}>
+					>()
 					.mockResolvedValue({
 						title: "User Profile | link.me",
 						texts: [
@@ -285,25 +289,27 @@ describe("linkExtraction", () => {
 
 		test("returns lower confidence when no content warning gates present", async () => {
 			const mockPage = {
-				url: jest.fn<() => string>().mockReturnValue("https://linktr.ee/testuser"),
-				goto: jest
-					.fn<() => Promise<void>>()
-					.mockResolvedValue(undefined),
+				url: jest
+					.fn<() => string>()
+					.mockReturnValue("https://linktr.ee/testuser"),
+				goto: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
 				evaluate: jest
-					.fn<() => Promise<{
-						title: string;
-						texts: string[];
-						fullText: string;
-						imageAlts: string[];
-						socialIcons: string[];
-						hasEmailForm: boolean;
-						hasSubscribeButton: boolean;
-						hasPricingIndicator: boolean;
-						hasMonetizationIndicator: boolean;
-						hasSensitiveContentGate: boolean;
-						hasMatureContentGate: boolean;
-						creatorPatterns: string[];
-					}>>()
+					.fn<
+						() => Promise<{
+							title: string;
+							texts: string[];
+							fullText: string;
+							imageAlts: string[];
+							socialIcons: string[];
+							hasEmailForm: boolean;
+							hasSubscribeButton: boolean;
+							hasPricingIndicator: boolean;
+							hasMonetizationIndicator: boolean;
+							hasSensitiveContentGate: boolean;
+							hasMatureContentGate: boolean;
+							creatorPatterns: string[];
+						}>
+					>()
 					.mockResolvedValue({
 						title: "User | Instagram, TikTok | Linktree",
 						texts: ["My YouTube Channel", "My Twitter", "Contact Me"],

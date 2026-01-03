@@ -1,7 +1,7 @@
 import type { Page } from "puppeteer";
+import { humanClick } from "../../navigation/humanInteraction/humanInteraction.ts";
 import { createLogger } from "../logger/logger.ts";
 import { waitForInstagramContent } from "../waitForContent/waitForContent.ts";
-import { humanClick } from "../../navigation/humanInteraction/humanInteraction.ts";
 
 const logger = createLogger(process.env.DEBUG_LOGS === "true");
 

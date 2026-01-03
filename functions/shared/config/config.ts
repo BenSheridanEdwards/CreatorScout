@@ -27,7 +27,10 @@ export const FAST_MODE = _flag("FAST_MODE", false);
 export const SKIP_VISION = _flag("SKIP_VISION", FAST_MODE);
 export const LOCAL_BROWSER = _flag("LOCAL_BROWSER", FAST_MODE);
 export const DEBUG_SCREENSHOTS = _flag("DEBUG_SCREENSHOTS", false);
-export const PRIORITIZE_QUEUE_OVER_SEEDS = _flag("PRIORITIZE_QUEUE_OVER_SEEDS", false);
+export const PRIORITIZE_QUEUE_OVER_SEEDS = _flag(
+	"PRIORITIZE_QUEUE_OVER_SEEDS",
+	false,
+);
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // DELAYS - Intentional waits for humanization & rate limiting

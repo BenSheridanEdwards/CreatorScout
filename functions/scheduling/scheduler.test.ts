@@ -47,5 +47,3 @@ describe("scheduler", () => {
 		expect(getSessionWindow("morning")).toEqual({ start: 9, end: 10 });
 	});
 });
-
-

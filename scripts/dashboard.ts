@@ -9,8 +9,8 @@ import {
 	formatDashboard,
 	getDashboardMetrics,
 } from "../functions/shared/dashboard/dashboard.ts";
-import { sleep } from "../functions/timing/sleep/sleep.ts";
 import { mediumDelay } from "../functions/timing/humanize/humanize.ts";
+import { sleep } from "../functions/timing/sleep/sleep.ts";
 
 async function showDashboard(): Promise<void> {
 	const args = process.argv.slice(2);

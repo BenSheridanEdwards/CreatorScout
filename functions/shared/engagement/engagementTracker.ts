@@ -10,11 +10,11 @@
  * - Repeat cycle (allows 50-100 actions per session)
  */
 import type { Page } from "puppeteer";
-import { mediumDelay, microDelay } from "../../timing/humanize/humanize.ts";
 import {
 	humanClick,
 	humanScroll,
 } from "../../navigation/humanInteraction/humanInteraction.ts";
+import { mediumDelay, microDelay } from "../../timing/humanize/humanize.ts";
 import {
 	ENGAGEMENT_RATIO_MAX,
 	ENGAGEMENT_RATIO_MIN,

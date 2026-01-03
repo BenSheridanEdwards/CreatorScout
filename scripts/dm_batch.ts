@@ -14,14 +14,14 @@
  *   --max <number>       Maximum DMs to send (safety limit)
  */
 
+import { readFileSync } from "fs";
 import { initializeInstagramSession } from "../functions/auth/sessionInitializer/sessionInitializer.ts";
+import { stopAdsPowerProfile } from "../functions/navigation/browser/adsPowerConnector.ts";
 import { sendDMToUser } from "../functions/profile/profileActions/profileActions.ts";
 import { wasDmSent } from "../functions/shared/database/database.ts";
 import { getProfile } from "../functions/shared/profiles/profileLoader.ts";
 import { saveScreenshot } from "../functions/shared/snapshot/snapshot.ts";
-import { stopAdsPowerProfile } from "../functions/navigation/browser/adsPowerConnector.ts";
 import { randomDelay } from "../functions/timing/humanize/humanize.ts";
-import { readFileSync } from "fs";
 
 interface BatchResult {
 	username: string;

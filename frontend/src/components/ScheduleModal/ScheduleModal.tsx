@@ -1,3 +1,5 @@
+import type { ScheduledRun } from "../../types";
+import ScheduleForm from "../ScheduleForm/ScheduleForm";
 import {
 	Dialog,
 	DialogContent,
@@ -5,8 +7,6 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "../ui/dialog";
-import ScheduleForm from "../ScheduleForm/ScheduleForm";
-import type { ScheduledRun } from "../../types";
 
 interface ScheduleModalProps {
 	open: boolean;

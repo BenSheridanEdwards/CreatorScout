@@ -2,8 +2,8 @@
  * Instagram modal operations - following modal, username extraction, scrolling.
  */
 import type { Page } from "puppeteer";
+import { microDelay, shortDelay } from "../../timing/humanize/humanize.ts";
 import { sleep } from "../../timing/sleep/sleep.ts";
-import { shortDelay, microDelay } from "../../timing/humanize/humanize.ts";
 import {
 	humanClick,
 	humanClickAt,

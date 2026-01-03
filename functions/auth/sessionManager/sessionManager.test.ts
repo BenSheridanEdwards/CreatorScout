@@ -1,7 +1,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { jest } from "@jest/globals";
-import type { ElementHandle, Page } from "puppeteer";
+import type { Page } from "puppeteer";
 import {
 	clearCookies,
 	getUserDataDir,
@@ -36,6 +36,7 @@ type MockPage = Page & {
 	goto: jest.MockedFunction<Page["goto"]>;
 	$: jest.MockedFunction<Page["$"]>;
 	evaluate: jest.MockedFunction<Page["evaluate"]>;
+	url: jest.MockedFunction<Page["url"]>;
 };
 
 describe("sessionManager", () => {
@@ -53,7 +54,12 @@ describe("sessionManager", () => {
 			cookies: jest.fn<Page["cookies"]>().mockResolvedValue([]),
 			goto: jest.fn<Page["goto"]>().mockResolvedValue(null),
 			$: jest.fn<Page["$"]>().mockResolvedValue(null),
-			evaluate: jest.fn<Page["evaluate"]>().mockResolvedValue(false),
+			evaluate: jest.fn<Page["evaluate"]>().mockResolvedValue({
+				hasLoggedInIndicators: false,
+				hasLoginForm: false,
+				indicators: {},
+			}),
+			url: jest.fn<Page["url"]>().mockReturnValue("https://www.instagram.com/"),
 		} as unknown as MockPage;
 	});
 
@@ -208,7 +214,12 @@ describe("sessionManager", () => {
 	describe("isLoggedIn()", () => {
 		test("returns true when inbox link element is found (logged in indicator)", async () => {
 			// Simulate logged-in state via page.evaluate()
-			page.evaluate.mockResolvedValue(true as never);
+			page.url.mockReturnValue("https://www.instagram.com/");
+			page.evaluate.mockResolvedValue({
+				hasLoggedInIndicators: true,
+				hasLoginForm: false,
+				indicators: { inboxLink: true },
+			} as never);
 
 			const result = await isLoggedIn(page);
 
@@ -218,7 +229,12 @@ describe("sessionManager", () => {
 
 		test("returns false when inbox link element is not found", async () => {
 			// Simulate logged-out state via page.evaluate()
-			page.evaluate.mockResolvedValue(false as never);
+			page.url.mockReturnValue("https://www.instagram.com/");
+			page.evaluate.mockResolvedValue({
+				hasLoggedInIndicators: false,
+				hasLoginForm: true,
+				indicators: {},
+			} as never);
 
 			const result = await isLoggedIn(page);
 
@@ -227,6 +243,7 @@ describe("sessionManager", () => {
 		});
 
 		test("returns false when selector query throws an error", async () => {
+			page.url.mockReturnValue("https://www.instagram.com/");
 			page.evaluate.mockRejectedValue(new Error("Selector error") as never);
 
 			const result = await isLoggedIn(page);
@@ -235,7 +252,12 @@ describe("sessionManager", () => {
 		});
 
 		test("checks login status without requiring navigation", async () => {
-			page.evaluate.mockResolvedValue(true as never);
+			page.url.mockReturnValue("https://www.instagram.com/");
+			page.evaluate.mockResolvedValue({
+				hasLoggedInIndicators: true,
+				hasLoginForm: false,
+				indicators: { inboxLink: true },
+			} as never);
 
 			await isLoggedIn(page);
 
