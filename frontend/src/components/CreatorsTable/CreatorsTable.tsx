@@ -236,7 +236,7 @@ export default function CreatorsTable() {
 
 	return (
 		<section className="flex flex-col rounded-xl border border-slate-800 bg-slate-900/60 overflow-hidden xl:col-span-2">
-			<div className="flex items-center justify-between border-b border-slate-800 px-4 py-2.5">
+			<header className="flex items-center justify-between border-b border-slate-800 px-4 py-2.5">
 				<div>
 					<h2 className="text-sm font-semibold text-slate-200">
 						Confirmed Creators
@@ -294,10 +294,13 @@ export default function CreatorsTable() {
 						{loading ? "Loading..." : "Load creators"}
 					</button>
 				</div>
-			</div>
+			</header>
 
 			{error && (
-				<div className="px-4 py-2 text-[11px] text-amber-400 border-b border-slate-800 bg-slate-950/60">
+				<div
+					className="px-4 py-2 text-[11px] text-amber-400 border-b border-slate-800 bg-slate-950/60"
+					role="alert"
+				>
 					{error}
 				</div>
 			)}
@@ -322,7 +325,12 @@ export default function CreatorsTable() {
 									Followers
 								</th>
 								<th className="pb-2 pr-3 text-slate-400 font-semibold text-center">
-									Manual
+									<span className="relative group cursor-help">
+										Manual
+										<span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 text-[10px] font-medium text-white bg-slate-700 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+											🔧 = manually confirmed, 🤖 = auto-detected
+										</span>
+									</span>
 								</th>
 								<th className="pb-2 pr-3 text-slate-400 font-semibold text-center">
 									DM Sent
@@ -383,12 +391,18 @@ export default function CreatorsTable() {
 									</td>
 									<td className="py-2 pr-3 text-center">
 										{creator.manualOverride ? (
-											<span className="text-purple-400" title="Manual override">
-												🔧
+											<span className="relative group cursor-help">
+												<span className="text-purple-400">🔧</span>
+												<span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 text-[10px] font-medium text-white bg-slate-700 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+													Manual override
+												</span>
 											</span>
 										) : (
-											<span className="text-slate-600" title="Automated">
-												🤖
+											<span className="relative group cursor-help">
+												<span className="text-slate-600">🤖</span>
+												<span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 text-[10px] font-medium text-white bg-slate-700 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+													Automated
+												</span>
 											</span>
 										)}
 									</td>

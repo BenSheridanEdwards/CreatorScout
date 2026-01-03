@@ -81,7 +81,7 @@ describe("ScreenshotModal", () => {
 			<ScreenshotModal screenshot={mockScreenshot} onClose={mockOnClose} />,
 		);
 
-		const closeButton = screen.getByRole("button", { name: /×/ });
+		const closeButton = screen.getByLabelText("Close screenshot modal");
 		await user.click(closeButton);
 
 		expect(mockOnClose).toHaveBeenCalledTimes(1);
@@ -95,8 +95,8 @@ describe("ScreenshotModal", () => {
 		);
 
 		// User clicks on the dark backdrop area outside the modal content
-		// The backdrop is the outermost div with the onClick handler
-		const backdrop = container.firstChild as HTMLElement;
+		// The backdrop is the dialog element with the onClick handler
+		const backdrop = container.querySelector("dialog") as HTMLElement;
 		expect(backdrop).toBeInTheDocument();
 
 		// Click on the backdrop (but not on the modal content inside)

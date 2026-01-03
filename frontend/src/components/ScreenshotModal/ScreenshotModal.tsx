@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import type { Screenshot } from "../../types";
 import { getImageUrl } from "../../utils/imageUrl";
 
@@ -10,18 +11,52 @@ export default function ScreenshotModal({
 	screenshot,
 	onClose,
 }: ScreenshotModalProps) {
+	const dialogRef = useRef<HTMLDialogElement>(null);
+
+	useEffect(() => {
+		const dialog = dialogRef.current;
+		if (dialog && typeof dialog.showModal === "function") {
+			dialog.showModal();
+			const handleEscape = (e: Event) => {
+				if ((e as KeyboardEvent).key === "Escape") {
+					onClose();
+				}
+			};
+			dialog.addEventListener("cancel", handleEscape);
+			return () => {
+				dialog.removeEventListener("cancel", handleEscape);
+			};
+		}
+	}, [onClose]);
+
+	const handleBackdropClick = (e: React.MouseEvent<HTMLDialogElement>) => {
+		if (e.target === dialogRef.current) {
+			onClose();
+		}
+	};
+
+	const handleBackdropKeyDown = (e: React.KeyboardEvent<HTMLDialogElement>) => {
+		if (e.key === "Escape" && e.target === dialogRef.current) {
+			onClose();
+		}
+	};
+
 	return (
-		<div
-			className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4"
-			onClick={onClose}
+		<dialog
+			ref={dialogRef}
+			className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4 backdrop:bg-black/90"
+			onClick={handleBackdropClick}
+			onKeyDown={handleBackdropKeyDown}
+			aria-modal="true"
+			aria-labelledby="screenshot-modal-title"
 		>
-			<div
-				className="bg-slate-900 rounded-xl max-w-5xl w-full max-h-[90vh] overflow-auto"
-				onClick={(e) => e.stopPropagation()}
-			>
-				<div className="sticky top-0 bg-slate-900 border-b border-slate-800 px-4 py-3 flex items-center justify-between">
+			<div className="bg-slate-900 rounded-xl max-w-5xl w-full max-h-[90vh] overflow-auto">
+				<header className="sticky top-0 bg-slate-900 border-b border-slate-800 px-4 py-3 flex items-center justify-between">
 					<div>
-						<h3 className="text-lg font-semibold text-slate-200">
+						<h3
+							id="screenshot-modal-title"
+							className="text-lg font-semibold text-slate-200"
+						>
 							@{screenshot.username}
 						</h3>
 						<div className="flex items-center gap-2 mt-1">
@@ -36,19 +71,23 @@ export default function ScreenshotModal({
 							>
 								{screenshot.type}
 							</span>
-							<span className="text-xs text-slate-400">
+							<time
+								dateTime={screenshot.date}
+								className="text-xs text-slate-400"
+							>
 								{new Date(screenshot.date).toLocaleString()}
-							</span>
+							</time>
 						</div>
 					</div>
 					<button
 						onClick={onClose}
 						type="button"
 						className="text-slate-400 hover:text-slate-200 text-2xl w-8 h-8 flex items-center justify-center"
+						aria-label="Close screenshot modal"
 					>
 						×
 					</button>
-				</div>
+				</header>
 				<div className="p-4">
 					<img
 						src={getImageUrl(screenshot.path)}
@@ -57,6 +96,6 @@ export default function ScreenshotModal({
 					/>
 				</div>
 			</div>
-		</div>
+		</dialog>
 	);
 }

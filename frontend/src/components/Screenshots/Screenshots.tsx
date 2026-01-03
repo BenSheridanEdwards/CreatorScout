@@ -40,9 +40,13 @@ export default function Screenshots({ onScreenshotSelect }: ScreenshotsProps) {
 		}
 	}
 
+	const proofPanelId = "screenshots-proof-panel";
+	const analysisPanelId = "screenshots-analysis-panel";
+	const errorsPanelId = "screenshots-errors-panel";
+
 	return (
 		<section className="flex flex-col rounded-xl border border-slate-800 bg-slate-900/60 overflow-hidden xl:col-span-2">
-			<div className="flex items-center justify-between border-b border-slate-800 px-4 py-2.5">
+			<header className="flex items-center justify-between border-b border-slate-800 px-4 py-2.5">
 				<div>
 					<h2 className="text-sm font-semibold text-slate-200">Screenshots</h2>
 					<p className="text-[11px] text-slate-400 mt-0.5">
@@ -57,17 +61,27 @@ export default function Screenshots({ onScreenshotSelect }: ScreenshotsProps) {
 				>
 					{screenshotsLoading ? "Loading..." : "Load screenshots"}
 				</button>
-			</div>
+			</header>
 			{screenshotsError && (
-				<div className="px-4 py-2 text-[11px] text-amber-400 border-b border-slate-800 bg-slate-950/60">
+				<div
+					className="px-4 py-2 text-[11px] text-amber-400 border-b border-slate-800 bg-slate-950/60"
+					role="alert"
+				>
 					{screenshotsError}
 				</div>
 			)}
 			{/* Tabs */}
-			<div className="flex border-b border-slate-800 bg-slate-950/60">
+			<div
+				className="flex border-b border-slate-800 bg-slate-950/60"
+				role="tablist"
+			>
 				<button
+					id="screenshots-proof-tab"
 					onClick={() => setScreenshotTab("proof")}
 					type="button"
+					role="tab"
+					aria-selected={screenshotTab === "proof"}
+					aria-controls={proofPanelId}
 					className={`flex-1 px-4 py-2 text-xs font-medium transition ${
 						screenshotTab === "proof"
 							? "text-sky-300 border-b-2 border-sky-400 bg-slate-900/40"
@@ -77,8 +91,12 @@ export default function Screenshots({ onScreenshotSelect }: ScreenshotsProps) {
 					Proof ({screenshots.filter((s) => s.type === "dm").length})
 				</button>
 				<button
+					id="screenshots-analysis-tab"
 					onClick={() => setScreenshotTab("analysis")}
 					type="button"
+					role="tab"
+					aria-selected={screenshotTab === "analysis"}
+					aria-controls={analysisPanelId}
 					className={`flex-1 px-4 py-2 text-xs font-medium transition ${
 						screenshotTab === "analysis"
 							? "text-emerald-300 border-b-2 border-emerald-400 bg-slate-900/40"
@@ -93,8 +111,12 @@ export default function Screenshots({ onScreenshotSelect }: ScreenshotsProps) {
 					)
 				</button>
 				<button
+					id="screenshots-errors-tab"
 					onClick={() => setScreenshotTab("errors")}
 					type="button"
+					role="tab"
+					aria-selected={screenshotTab === "errors"}
+					aria-controls={errorsPanelId}
 					className={`flex-1 px-4 py-2 text-xs font-medium transition ${
 						screenshotTab === "errors"
 							? "text-red-300 border-b-2 border-red-400 bg-slate-900/40"
@@ -120,65 +142,86 @@ export default function Screenshots({ onScreenshotSelect }: ScreenshotsProps) {
 						return false;
 					});
 
+					const panelId =
+						screenshotTab === "proof"
+							? proofPanelId
+							: screenshotTab === "analysis"
+								? analysisPanelId
+								: errorsPanelId;
+
 					if (filteredScreenshots.length === 0) {
 						return (
-							<p className="text-xs text-slate-500">
-								No {screenshotTab} screenshots yet.
-							</p>
+							<div
+								role="tabpanel"
+								id={panelId}
+								aria-labelledby={`screenshots-${screenshotTab}-tab`}
+							>
+								<p className="text-xs text-slate-500">
+									No {screenshotTab} screenshots yet.
+								</p>
+							</div>
 						);
 					}
 
 					return (
-						<>
-							<div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-								{filteredScreenshots.slice(0, 20).map((screenshot, idx) => (
-									<button
-										key={idx}
-										onClick={() => onScreenshotSelect(screenshot)}
-										type="button"
-										className="group relative rounded-lg overflow-hidden border border-slate-800 hover:border-slate-600 transition bg-slate-900/40"
-									>
-										<img
-											src={getImageUrl(screenshot.path)}
-											alt={screenshot.username}
-											className="w-full h-32 object-cover"
-										/>
-										<div className="p-2 text-left">
-											<div className="text-xs font-medium text-slate-200 truncate">
-												@{screenshot.username}
+						<div
+							role="tabpanel"
+							id={panelId}
+							aria-labelledby={`screenshots-${screenshotTab}-tab`}
+						>
+							<ul className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+								{filteredScreenshots.slice(0, 20).map((screenshot) => (
+									<li key={`${screenshot.path}-${screenshot.date}`}>
+										<button
+											onClick={() => onScreenshotSelect(screenshot)}
+											type="button"
+											className="group relative rounded-lg overflow-hidden border border-slate-800 hover:border-slate-600 transition bg-slate-900/40 w-full"
+										>
+											<img
+												src={getImageUrl(screenshot.path)}
+												alt={screenshot.username}
+												className="w-full h-32 object-cover"
+											/>
+											<div className="p-2 text-left">
+												<p className="text-xs font-medium text-slate-200 truncate">
+													@{screenshot.username}
+												</p>
+												<div className="flex items-center gap-1 mt-1">
+													<span
+														className={`text-[10px] px-1.5 py-0.5 rounded ${
+															screenshot.type === "profile"
+																? "bg-emerald-500/20 text-emerald-300"
+																: screenshot.type === "link"
+																	? "bg-purple-500/20 text-purple-300"
+																	: screenshot.type === "dm"
+																		? "bg-sky-500/20 text-sky-300"
+																		: screenshot.type === "error"
+																			? "bg-red-500/20 text-red-300"
+																			: screenshot.type === "debug"
+																				? "bg-amber-500/20 text-amber-300"
+																				: "bg-slate-700 text-slate-400"
+														}`}
+													>
+														{screenshot.type}
+													</span>
+													<time
+														dateTime={screenshot.date}
+														className="text-[10px] text-slate-500"
+													>
+														{new Date(screenshot.date).toLocaleDateString()}
+													</time>
+												</div>
 											</div>
-											<div className="flex items-center gap-1 mt-1">
-												<span
-													className={`text-[10px] px-1.5 py-0.5 rounded ${
-														screenshot.type === "profile"
-															? "bg-emerald-500/20 text-emerald-300"
-															: screenshot.type === "link"
-																? "bg-purple-500/20 text-purple-300"
-																: screenshot.type === "dm"
-																	? "bg-sky-500/20 text-sky-300"
-																	: screenshot.type === "error"
-																		? "bg-red-500/20 text-red-300"
-																		: screenshot.type === "debug"
-																			? "bg-amber-500/20 text-amber-300"
-																			: "bg-slate-700 text-slate-400"
-													}`}
-												>
-													{screenshot.type}
-												</span>
-												<span className="text-[10px] text-slate-500">
-													{new Date(screenshot.date).toLocaleDateString()}
-												</span>
-											</div>
-										</div>
-									</button>
+										</button>
+									</li>
 								))}
-							</div>
+							</ul>
 							{filteredScreenshots.length > 20 && (
 								<p className="text-[11px] text-slate-500 mt-3 text-center">
 									Showing 20 of {filteredScreenshots.length} screenshots
 								</p>
 							)}
-						</>
+						</div>
 					);
 				})()}
 			</div>

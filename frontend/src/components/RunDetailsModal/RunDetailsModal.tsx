@@ -104,9 +104,13 @@ export default function RunDetailsModal({
 
 				{/* Tabs */}
 				<div className="border-b border-slate-800 px-4">
-					<div className="flex gap-4">
+					<div className="flex gap-4" role="tablist">
 						<button
+							id="run-details-overview-tab"
 							type="button"
+							role="tab"
+							aria-selected={activeTab === "overview"}
+							aria-controls="run-details-overview-panel"
 							onClick={() => setActiveTab("overview")}
 							className={`px-4 py-2 text-sm font-medium border-b-2 transition ${
 								activeTab === "overview"
@@ -117,7 +121,11 @@ export default function RunDetailsModal({
 							Overview
 						</button>
 						<button
+							id="run-details-logs-tab"
 							type="button"
+							role="tab"
+							aria-selected={activeTab === "logs"}
+							aria-controls="run-details-logs-panel"
 							onClick={() => setActiveTab("logs")}
 							className={`px-4 py-2 text-sm font-medium border-b-2 transition ${
 								activeTab === "logs"
@@ -128,7 +136,11 @@ export default function RunDetailsModal({
 							Logs
 						</button>
 						<button
+							id="run-details-issues-tab"
 							type="button"
+							role="tab"
+							aria-selected={activeTab === "issues"}
+							aria-controls="run-details-issues-panel"
 							onClick={() => setActiveTab("issues")}
 							className={`px-4 py-2 text-sm font-medium border-b-2 transition ${
 								activeTab === "issues"
@@ -144,65 +156,70 @@ export default function RunDetailsModal({
 
 				<div className="p-6 overflow-auto max-h-[calc(90vh-140px)]">
 					{activeTab === "overview" && (
-						<div className="space-y-6">
+						<div
+							role="tabpanel"
+							id="run-details-overview-panel"
+							aria-labelledby="run-details-overview-tab"
+							className="space-y-6"
+						>
 							{/* Key Metrics - Large Cards */}
 							<div className="grid grid-cols-2 md:grid-cols-4 gap-4">
 								<div className="bg-gradient-to-br from-slate-800/80 to-slate-900/60 rounded-xl p-4 border border-slate-700/50">
-									<div className="text-xs text-slate-400 mb-2 font-medium">
+									<p className="text-xs text-slate-400 mb-2 font-medium">
 										Profiles Processed
-									</div>
-									<div className="text-3xl font-bold text-slate-100">
+									</p>
+									<p className="text-3xl font-bold text-slate-100">
 										{run.profilesProcessed}
-									</div>
+									</p>
 									{run.stats?.successRate !== undefined && (
-										<div className="text-xs text-slate-500 mt-1">
+										<p className="text-xs text-slate-500 mt-1">
 											{run.stats.successRate.toFixed(1)}% success
-										</div>
+										</p>
 									)}
 								</div>
 								<div className="bg-gradient-to-br from-emerald-900/40 to-emerald-800/20 rounded-xl p-4 border border-emerald-500/30">
-									<div className="text-xs text-emerald-400 mb-2 font-medium">
+									<p className="text-xs text-emerald-400 mb-2 font-medium">
 										Creators Found
-									</div>
-									<div className="text-3xl font-bold text-emerald-300">
+									</p>
+									<p className="text-3xl font-bold text-emerald-300">
 										{run.creatorsFound}
-									</div>
+									</p>
 									{run.profilesProcessed > 0 && (
-										<div className="text-xs text-emerald-400/70 mt-1">
+										<p className="text-xs text-emerald-400/70 mt-1">
 											{(
 												(run.creatorsFound / run.profilesProcessed) *
 												100
 											).toFixed(1)}
 											% discovery rate
-										</div>
+										</p>
 									)}
 								</div>
 								<div className="bg-gradient-to-br from-red-900/40 to-red-800/20 rounded-xl p-4 border border-red-500/30">
-									<div className="text-xs text-red-400 mb-2 font-medium">
+									<p className="text-xs text-red-400 mb-2 font-medium">
 										Errors
-									</div>
-									<div className="text-3xl font-bold text-red-300">
+									</p>
+									<p className="text-3xl font-bold text-red-300">
 										{run.errors}
-									</div>
+									</p>
 									{run.profilesProcessed > 0 && (
-										<div className="text-xs text-red-400/70 mt-1">
+										<p className="text-xs text-red-400/70 mt-1">
 											{((run.errors / run.profilesProcessed) * 100).toFixed(1)}%
 											error rate
-										</div>
+										</p>
 									)}
 								</div>
 								<div className="bg-gradient-to-br from-slate-800/80 to-slate-900/60 rounded-xl p-4 border border-slate-700/50">
-									<div className="text-xs text-slate-400 mb-2 font-medium">
+									<p className="text-xs text-slate-400 mb-2 font-medium">
 										Duration
-									</div>
-									<div className="text-3xl font-bold text-slate-100">
+									</p>
+									<p className="text-3xl font-bold text-slate-100">
 										{formatDuration(run.stats?.duration)}
-									</div>
+									</p>
 									{run.stats?.duration && run.profilesProcessed > 0 && (
-										<div className="text-xs text-slate-500 mt-1">
+										<p className="text-xs text-slate-500 mt-1">
 											{Math.round(run.stats.duration / run.profilesProcessed)}s
 											per profile
-										</div>
+										</p>
 									)}
 								</div>
 							</div>
@@ -211,12 +228,14 @@ export default function RunDetailsModal({
 							{run.creatorsFoundList && run.creatorsFoundList.length > 0 && (
 								<div>
 									<h3 className="text-sm font-semibold text-slate-200 mb-3 flex items-center gap-2">
-										<span className="text-emerald-400">✨</span>
+										<span className="text-emerald-400" aria-hidden="true">
+											✨
+										</span>
 										Creators Found ({run.creatorsFoundList.length})
 									</h3>
-									<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 max-h-96 overflow-y-auto">
+									<ul className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 max-h-96 overflow-y-auto">
 										{run.creatorsFoundList.map((creator) => (
-											<div
+											<li
 												key={`${creator.username}-${creator.timestamp}`}
 												className="bg-gradient-to-br from-emerald-900/30 to-emerald-800/10 rounded-lg p-3 border border-emerald-500/20 hover:border-emerald-500/40 transition"
 											>
@@ -233,12 +252,15 @@ export default function RunDetailsModal({
 														{creator.confidence}%
 													</span>
 												</div>
-												<div className="text-xs text-slate-400 mb-2">
+												<p className="text-xs text-slate-400 mb-2">
 													{creator.reason}
-												</div>
-												<div className="text-[10px] text-slate-500">
+												</p>
+												<time
+													dateTime={creator.timestamp}
+													className="text-[10px] text-slate-500"
+												>
 													{new Date(creator.timestamp).toLocaleString()}
-												</div>
+												</time>
 												{creator.screenshotPath && (
 													<button
 														type="button"
@@ -255,9 +277,9 @@ export default function RunDetailsModal({
 														📸 View screenshot
 													</button>
 												)}
-											</div>
+											</li>
 										))}
-									</div>
+									</ul>
 								</div>
 							)}
 
@@ -265,12 +287,14 @@ export default function RunDetailsModal({
 							{run.errorLogs && run.errorLogs.length > 0 && (
 								<div>
 									<h3 className="text-sm font-semibold text-slate-200 mb-3 flex items-center gap-2">
-										<span className="text-red-400">❌</span>
+										<span className="text-red-400" aria-hidden="true">
+											❌
+										</span>
 										Error Logs ({run.errorLogs.length})
 									</h3>
-									<div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-96 overflow-y-auto">
+									<ul className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-96 overflow-y-auto">
 										{run.errorLogs.map((error) => (
-											<div
+											<li
 												key={`${error.timestamp}-${error.username || "unknown"}`}
 												className="bg-gradient-to-br from-red-900/30 to-red-800/10 rounded-lg p-3 border border-red-500/20"
 											>
@@ -280,13 +304,16 @@ export default function RunDetailsModal({
 															@{error.username}
 														</span>
 													)}
-													<span className="text-xs text-slate-500">
+													<time
+														dateTime={error.timestamp}
+														className="text-xs text-slate-500"
+													>
 														{new Date(error.timestamp).toLocaleTimeString()}
-													</span>
+													</time>
 												</div>
-												<div className="text-xs text-red-300 font-mono mb-2 break-words">
+												<p className="text-xs text-red-300 font-mono mb-2 break-words">
 													{error.message}
-												</div>
+												</p>
 												{error.stack && (
 													<details className="text-xs text-slate-400">
 														<summary className="cursor-pointer hover:text-slate-300 mb-1">
@@ -297,9 +324,9 @@ export default function RunDetailsModal({
 														</pre>
 													</details>
 												)}
-											</div>
+											</li>
 										))}
-									</div>
+									</ul>
 								</div>
 							)}
 
@@ -309,57 +336,65 @@ export default function RunDetailsModal({
 									<h3 className="text-sm font-semibold text-slate-200 mb-3">
 										Screenshots ({run.screenshots.length})
 									</h3>
-									<div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+									<ul className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
 										{run.screenshots.map((screenshot, idx) => (
-											<button
-												type="button"
-												key={screenshot}
-												className="relative group cursor-pointer rounded-lg overflow-hidden border-2 border-slate-700 hover:border-slate-500 transition w-full p-0 bg-transparent"
-												onClick={() =>
-													window.open(getImageUrl(screenshot), "_blank")
-												}
-											>
-												<img
-													src={getImageUrl(screenshot)}
-													alt={`Screenshot ${idx + 1}`}
-													className="w-full h-32 object-cover"
-												/>
-												<div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition flex items-center justify-center">
-													<span className="text-white opacity-0 group-hover:opacity-100 text-xs">
-														View
-													</span>
-												</div>
-											</button>
+											<li key={screenshot}>
+												<button
+													type="button"
+													className="relative group cursor-pointer rounded-lg overflow-hidden border-2 border-slate-700 hover:border-slate-500 transition w-full p-0 bg-transparent"
+													onClick={() =>
+														window.open(getImageUrl(screenshot), "_blank")
+													}
+												>
+													<img
+														src={getImageUrl(screenshot)}
+														alt={`Screenshot ${idx + 1}`}
+														className="w-full h-32 object-cover"
+													/>
+													<div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition flex items-center justify-center">
+														<span className="text-white opacity-0 group-hover:opacity-100 text-xs">
+															View
+														</span>
+													</div>
+												</button>
+											</li>
 										))}
-									</div>
+									</ul>
 								</div>
 							)}
 						</div>
 					)}
 
 					{activeTab === "logs" && (
-						<div>
+						<div
+							role="tabpanel"
+							id="run-details-logs-panel"
+							aria-labelledby="run-details-logs-tab"
+						>
 							{logsLoading ? (
-								<div className="text-center py-8 text-slate-400">
+								<p className="text-center py-8 text-slate-400">
 									Loading logs...
-								</div>
+								</p>
 							) : logs.length === 0 ? (
-								<div className="text-center py-8 text-slate-400">
+								<p className="text-center py-8 text-slate-400">
 									No logs available
-								</div>
+								</p>
 							) : (
-								<div className="space-y-1 font-mono text-xs">
+								<ul className="space-y-1 font-mono text-xs">
 									{logs.map((log, idx) => (
-										<div
+										<li
 											key={`${log.timestamp || idx}-${log.message || log.raw || idx}`}
 											className="p-2 rounded hover:bg-slate-800/50 border border-transparent hover:border-slate-700"
 										>
 											<div className="flex gap-2">
-												<span className="text-slate-500">
-													{log.timestamp
-														? new Date(log.timestamp).toLocaleTimeString()
-														: ""}
-												</span>
+												{log.timestamp && (
+													<time
+														dateTime={log.timestamp}
+														className="text-slate-500"
+													>
+														{new Date(log.timestamp).toLocaleTimeString()}
+													</time>
+												)}
 												<span
 													className={
 														log.level === "ERROR"
@@ -372,19 +407,23 @@ export default function RunDetailsModal({
 													{log.message || log.raw || JSON.stringify(log)}
 												</span>
 											</div>
-										</div>
+										</li>
 									))}
-								</div>
+								</ul>
 							)}
 						</div>
 					)}
 
 					{activeTab === "issues" && (
-						<div>
+						<div
+							role="tabpanel"
+							id="run-details-issues-panel"
+							aria-labelledby="run-details-issues-tab"
+						>
 							{run.issues && run.issues.length > 0 ? (
-								<div className="space-y-3">
+								<ul className="space-y-3">
 									{run.issues.map((issue) => (
-										<div
+										<li
 											key={`${issue.type}-${issue.detectedAt}`}
 											className={`rounded-lg p-4 border ${
 												issue.severity === "critical"
@@ -400,6 +439,7 @@ export default function RunDetailsModal({
 																? "bg-red-400"
 																: "bg-amber-400"
 														}`}
+														aria-hidden="true"
 													/>
 													<span className="text-sm font-semibold text-slate-200">
 														{issue.type.replace(/_/g, " ")}
@@ -427,19 +467,20 @@ export default function RunDetailsModal({
 													</button>
 												)}
 											</div>
-											<div className="text-sm text-slate-300">
-												{issue.message}
-											</div>
-											<div className="text-xs text-slate-500 mt-2">
-												Detected: {new Date(issue.detectedAt).toLocaleString()}
-											</div>
-										</div>
+											<p className="text-sm text-slate-300">{issue.message}</p>
+											<p className="text-xs text-slate-500 mt-2">
+												Detected:{" "}
+												<time dateTime={issue.detectedAt}>
+													{new Date(issue.detectedAt).toLocaleString()}
+												</time>
+											</p>
+										</li>
 									))}
-								</div>
+								</ul>
 							) : (
-								<div className="text-center py-8 text-slate-400">
+								<p className="text-center py-8 text-slate-400">
 									No issues detected
-								</div>
+								</p>
 							)}
 						</div>
 					)}

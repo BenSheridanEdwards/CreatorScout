@@ -86,9 +86,7 @@ describe("CreatorsTable", () => {
 		expect(screen.getByText("Confirmed Creators")).toBeInTheDocument();
 
 		// Wait for initial load to complete
-		await waitFor(() => {
-			expect(screen.getByText("@testcreator1")).toBeInTheDocument();
-		});
+		expect(await screen.findByText("@testcreator1")).toBeInTheDocument();
 
 		// After load completes, button should be available
 		expect(screen.getByText("Load creators")).toBeInTheDocument();
@@ -111,16 +109,12 @@ describe("CreatorsTable", () => {
 		render(<CreatorsTable />);
 
 		// Wait for initial load
-		await waitFor(() => {
-			expect(screen.getByText("@testcreator1")).toBeInTheDocument();
-		});
+		expect(await screen.findByText("@testcreator1")).toBeInTheDocument();
 
 		// Click load button to reload
 		await user.click(screen.getByText("Load creators"));
 
-		await waitFor(() => {
-			expect(screen.getByText("@testcreator1")).toBeInTheDocument();
-		});
+		expect(await screen.findByText("@testcreator1")).toBeInTheDocument();
 
 		expect(screen.getByText("@testcreator2")).toBeInTheDocument();
 		expect(screen.getByText("@testcreator3")).toBeInTheDocument();
@@ -133,9 +127,7 @@ describe("CreatorsTable", () => {
 	it("displays confidence badges with correct styling", async () => {
 		render(<CreatorsTable />);
 
-		await waitFor(() => {
-			expect(screen.getByText("95%")).toBeInTheDocument();
-		});
+		expect(await screen.findByText("95%")).toBeInTheDocument();
 
 		expect(screen.getByText("75%")).toBeInTheDocument();
 		expect(screen.getByText("50%")).toBeInTheDocument();
@@ -144,22 +136,18 @@ describe("CreatorsTable", () => {
 	it("displays manual override indicator correctly", async () => {
 		render(<CreatorsTable />);
 
-		await waitFor(() => {
-			expect(screen.getByText("@testcreator2")).toBeInTheDocument();
-		});
+		expect(await screen.findByText("@testcreator2")).toBeInTheDocument();
 
 		// testcreator2 has manualOverride: true, should show wrench
-		expect(screen.getByTitle("Manual override")).toBeInTheDocument();
+		expect(screen.getByText("Manual override")).toBeInTheDocument();
 		// Other creators should show robot
-		expect(screen.getAllByTitle("Automated")).toHaveLength(2);
+		expect(screen.getAllByText("Automated")).toHaveLength(2);
 	});
 
 	it("displays No bio text when bioText is null", async () => {
 		render(<CreatorsTable />);
 
-		await waitFor(() => {
-			expect(screen.getByText("No bio")).toBeInTheDocument();
-		});
+		expect(await screen.findByText("No bio")).toBeInTheDocument();
 	});
 
 	it("toggles DM checkbox and updates state", async () => {
@@ -177,9 +165,7 @@ describe("CreatorsTable", () => {
 
 		render(<CreatorsTable />);
 
-		await waitFor(() => {
-			expect(screen.getByText("@testcreator1")).toBeInTheDocument();
-		});
+		expect(await screen.findByText("@testcreator1")).toBeInTheDocument();
 
 		const checkboxes = screen.getAllByRole("checkbox");
 		// First checkbox (testcreator1) should be unchecked
@@ -187,9 +173,7 @@ describe("CreatorsTable", () => {
 
 		await user.click(checkboxes[0]);
 
-		await waitFor(() => {
-			expect(checkboxes[0]).toBeChecked();
-		});
+		await waitFor(() => expect(checkboxes[0]).toBeChecked());
 
 		expect(mockFetch).toHaveBeenCalledWith("/api/creators/testcreator1/dm", {
 			method: "PATCH",
@@ -218,9 +202,7 @@ describe("CreatorsTable", () => {
 
 		render(<CreatorsTable />);
 
-		await waitFor(() => {
-			expect(screen.getByText("@testcreator1")).toBeInTheDocument();
-		});
+		expect(await screen.findByText("@testcreator1")).toBeInTheDocument();
 
 		const select = screen.getByRole("combobox");
 		await user.selectOptions(select, "pending");
@@ -245,9 +227,7 @@ describe("CreatorsTable", () => {
 
 		render(<CreatorsTable />);
 
-		await waitFor(() => {
-			expect(screen.getByText("Page 2 of 2")).toBeInTheDocument();
-		});
+		expect(await screen.findByText("Page 2 of 2")).toBeInTheDocument();
 
 		expect(screen.getByText("Previous")).toBeInTheDocument();
 		expect(screen.getByText("Next")).toBeInTheDocument();
@@ -275,9 +255,7 @@ describe("CreatorsTable", () => {
 
 		render(<CreatorsTable />);
 
-		await waitFor(() => {
-			expect(screen.getByText("Page 2 of 2")).toBeInTheDocument();
-		});
+		expect(await screen.findByText("Page 2 of 2")).toBeInTheDocument();
 
 		await user.click(screen.getByText("Previous"));
 
@@ -298,9 +276,7 @@ describe("CreatorsTable", () => {
 
 		render(<CreatorsTable />);
 
-		await waitFor(() => {
-			expect(screen.getByText("Page 2 of 2")).toBeInTheDocument();
-		});
+		expect(await screen.findByText("Page 2 of 2")).toBeInTheDocument();
 
 		expect(screen.getByText("Next")).toBeDisabled();
 	});
@@ -308,9 +284,7 @@ describe("CreatorsTable", () => {
 	it("renders Instagram links correctly", async () => {
 		render(<CreatorsTable />);
 
-		await waitFor(() => {
-			expect(screen.getByText("@testcreator1")).toBeInTheDocument();
-		});
+		expect(await screen.findByText("@testcreator1")).toBeInTheDocument();
 
 		// User can see and click the creator link
 		const link = screen.getByRole("link", { name: "@testcreator1" });
@@ -322,9 +296,7 @@ describe("CreatorsTable", () => {
 	it("displays DM sent date when available", async () => {
 		render(<CreatorsTable />);
 
-		await waitFor(() => {
-			expect(screen.getByText("@testcreator2")).toBeInTheDocument();
-		});
+		expect(await screen.findByText("@testcreator2")).toBeInTheDocument();
 
 		// testcreator2 has dmSentAt set
 		const formattedDate = new Date(
@@ -334,13 +306,9 @@ describe("CreatorsTable", () => {
 	});
 
 	it("displays DM sent by field with edit functionality", async () => {
-		const user = userEvent.setup();
-
 		render(<CreatorsTable />);
 
-		await waitFor(() => {
-			expect(screen.getByText("@testcreator2")).toBeInTheDocument();
-		});
+		expect(await screen.findByText("@testcreator2")).toBeInTheDocument();
 
 		// testcreator2 has dmSentBy set, should show value with edit button
 		expect(screen.getByText("profile1")).toBeInTheDocument();
@@ -351,9 +319,7 @@ describe("CreatorsTable", () => {
 	it("shows input field when dmSentBy is empty", async () => {
 		render(<CreatorsTable />);
 
-		await waitFor(() => {
-			expect(screen.getByText("@testcreator1")).toBeInTheDocument();
-		});
+		expect(await screen.findByText("@testcreator1")).toBeInTheDocument();
 
 		// testcreator1 has no dmSentBy, should show input field
 		const inputs = screen.getAllByPlaceholderText("username");
@@ -376,9 +342,7 @@ describe("CreatorsTable", () => {
 
 		render(<CreatorsTable />);
 
-		await waitFor(() => {
-			expect(screen.getByText("@testcreator2")).toBeInTheDocument();
-		});
+		expect(await screen.findByText("@testcreator2")).toBeInTheDocument();
 
 		// Click edit button
 		const editButton = screen.getAllByTitle("Edit DM sent by")[0];
@@ -424,9 +388,7 @@ describe("CreatorsTable", () => {
 
 		render(<CreatorsTable />);
 
-		await waitFor(() => {
-			expect(screen.getByText("@testcreator1")).toBeInTheDocument();
-		});
+		expect(await screen.findByText("@testcreator1")).toBeInTheDocument();
 
 		// Find the input for testcreator1 (which has no dmSentBy)
 		const inputs = screen.getAllByPlaceholderText("username");
@@ -480,9 +442,7 @@ describe("CreatorsTable", () => {
 
 		render(<CreatorsTable />);
 
-		await waitFor(() => {
-			expect(screen.getByText("@testcreator1")).toBeInTheDocument();
-		});
+		expect(await screen.findByText("@testcreator1")).toBeInTheDocument();
 
 		// Find the hide button (✕)
 		const hideButtons = screen.getAllByTitle(
@@ -506,9 +466,7 @@ describe("CreatorsTable", () => {
 	it("displays followers count", async () => {
 		render(<CreatorsTable />);
 
-		await waitFor(() => {
-			expect(screen.getByText("@testcreator1")).toBeInTheDocument();
-		});
+		expect(await screen.findByText("@testcreator1")).toBeInTheDocument();
 
 		// testcreator1 has 50000 followers
 		expect(screen.getByText("50,000")).toBeInTheDocument();
@@ -535,9 +493,7 @@ describe("CreatorsTable", () => {
 
 		render(<CreatorsTable />);
 
-		await waitFor(() => {
-			expect(screen.getByText("@testcreator1")).toBeInTheDocument();
-		});
+		expect(await screen.findByText("@testcreator1")).toBeInTheDocument();
 
 		// Find the toggle button for followers filter
 		const toggleButton = screen

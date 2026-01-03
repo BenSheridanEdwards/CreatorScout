@@ -30,7 +30,7 @@ export default function StatsCards() {
 
 	return (
 		<section className="xl:col-span-2">
-			<div className="flex items-center justify-between mb-4">
+			<header className="flex items-center justify-between mb-4">
 				<h2 className="text-sm font-semibold text-slate-300 uppercase tracking-wide">
 					Statistics
 				</h2>
@@ -42,7 +42,7 @@ export default function StatsCards() {
 				>
 					{statsLoading ? "Loading..." : "Refresh"}
 				</button>
-			</div>
+			</header>
 			<div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
 				<div className="rounded-xl border border-slate-800 bg-slate-900/60 p-4">
 					<div className="flex items-center justify-between">
@@ -57,6 +57,7 @@ export default function StatsCards() {
 										fill="none"
 										stroke="currentColor"
 										viewBox="0 0 24 24"
+										aria-hidden="true"
 									>
 										<path
 											strokeLinecap="round"
@@ -92,6 +93,7 @@ export default function StatsCards() {
 								fill="none"
 								stroke="currentColor"
 								viewBox="0 0 24 24"
+								aria-hidden="true"
 							>
 								<path
 									strokeLinecap="round"
@@ -125,6 +127,7 @@ export default function StatsCards() {
 								fill="none"
 								stroke="currentColor"
 								viewBox="0 0 24 24"
+								aria-hidden="true"
 							>
 								<path
 									strokeLinecap="round"

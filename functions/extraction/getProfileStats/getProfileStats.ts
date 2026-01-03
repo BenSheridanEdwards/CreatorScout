@@ -16,7 +16,7 @@ export interface ProfileStats {
 /**
  * Parse a count string like "314K", "1.2M", "5,234", "0" into a number
  */
-function parseCount(text: string): number | null {
+export function parseCount(text: string): number | null {
 	if (!text) return null;
 
 	// Clean the text
@@ -76,6 +76,12 @@ export async function getProfileStats(page: Page): Promise<ProfileStats> {
 				hasZeroFollowing: !followingLink && headerText.includes("0 following"),
 			};
 		});
+
+		// Log raw extracted text for debugging
+		logger.debug(
+			"PROFILE",
+			`Raw stats text - followers: "${statsData.followersText}", following: "${statsData.followingText}", posts: "${statsData.postsText}"`,
+		);
 
 		// Parse the counts
 		if (statsData.hasZeroFollowing) {

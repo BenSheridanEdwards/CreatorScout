@@ -52,7 +52,7 @@ function ToastComponent({ toast, onDismiss }: ToastProps) {
 			role="alert"
 		>
 			<div className="flex items-start gap-3">
-				<span className="text-lg font-bold flex-shrink-0">
+				<span className="text-lg font-bold flex-shrink-0" aria-hidden="true">
 					{icons[toast.type]}
 				</span>
 				<p className="flex-1 text-sm font-medium">{toast.message}</p>

@@ -4,6 +4,83 @@ import { getImageUrl } from "../../utils/imageUrl";
 import ScheduleModal from "../ScheduleModal/ScheduleModal";
 import { ToastContainer, useToast } from "../Toast/Toast";
 
+interface DeleteDialogProps {
+	onClose: () => void;
+	onConfirm: () => void;
+}
+
+function DeleteDialog({ onClose, onConfirm }: DeleteDialogProps) {
+	const dialogRef = useRef<HTMLDialogElement>(null);
+
+	useEffect(() => {
+		const dialog = dialogRef.current;
+		if (dialog && typeof dialog.showModal === "function") {
+			dialog.showModal();
+			const handleEscape = (e: Event) => {
+				if ((e as KeyboardEvent).key === "Escape") {
+					onClose();
+				}
+			};
+			dialog.addEventListener("cancel", handleEscape);
+			return () => {
+				dialog.removeEventListener("cancel", handleEscape);
+			};
+		}
+	}, [onClose]);
+
+	const handleBackdropClick = (e: React.MouseEvent<HTMLDialogElement>) => {
+		if (e.target === dialogRef.current) {
+			onClose();
+		}
+	};
+
+	const handleBackdropKeyDown = (e: React.KeyboardEvent<HTMLDialogElement>) => {
+		if (e.key === "Escape" && e.target === dialogRef.current) {
+			onClose();
+		}
+	};
+
+	return (
+		<dialog
+			ref={dialogRef}
+			className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop:bg-black/50"
+			onClick={handleBackdropClick}
+			onKeyDown={handleBackdropKeyDown}
+			aria-modal="true"
+			aria-labelledby="delete-dialog-title"
+		>
+			<div className="bg-slate-900 rounded-lg border border-slate-700 p-6 max-w-sm w-full mx-4">
+				<h3
+					id="delete-dialog-title"
+					className="text-lg font-semibold text-slate-200 mb-2"
+				>
+					Delete Schedule?
+				</h3>
+				<p className="text-sm text-slate-400 mb-4">
+					Are you sure you want to delete this scheduled run? This action cannot
+					be undone.
+				</p>
+				<div className="flex items-center justify-end gap-3">
+					<button
+						type="button"
+						onClick={onClose}
+						className="px-4 py-2 text-sm font-medium text-slate-300 hover:text-slate-100 transition rounded-md border border-slate-700 hover:border-slate-600"
+					>
+						Cancel
+					</button>
+					<button
+						type="button"
+						onClick={onConfirm}
+						className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-md transition"
+					>
+						Delete
+					</button>
+				</div>
+			</div>
+		</dialog>
+	);
+}
+
 interface TimelineCarouselProps {
 	onRunSelect: (run: RunMetadata) => void;
 	selectedAccount?: string;
@@ -33,7 +110,9 @@ export default function TimelineCarousel({
 	const [scheduledRuns, setScheduledRuns] = useState<ScheduledRun[]>([]);
 	const [loading, setLoading] = useState(false);
 	const [currentTime, setCurrentTime] = useState(Date.now());
-	const [isHovered, setIsHovered] = useState(false);
+	const [userHasScrolled, setUserHasScrolled] = useState(false);
+	const [showPastRuns, setShowPastRuns] = useState(false);
+	const isProgrammaticScrollRef = useRef(false);
 	const timelineRef = useRef<HTMLDivElement>(null);
 	const timelineContentRef = useRef<HTMLDivElement>(null);
 	const currentTimeLineRef = useRef<HTMLDivElement>(null);
@@ -300,7 +379,7 @@ export default function TimelineCarousel({
 	);
 
 	// Convert to timeline cards
-	const timelineCards: TimelineCard[] = [
+	const allTimelineCards: TimelineCard[] = [
 		...filteredRuns.map((run) => ({
 			id: run.id,
 			type: run.status as "scheduled" | "running" | "completed" | "error",
@@ -337,6 +416,15 @@ export default function TimelineCarousel({
 		(a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
 	);
 
+	// Filter out past runs if toggle is off (but always show scheduled runs)
+	const timelineCards = showPastRuns
+		? allTimelineCards
+		: allTimelineCards.filter(
+				(card) =>
+					card.type === "scheduled" ||
+					new Date(card.timestamp).getTime() >= currentTime,
+			);
+
 	// Calculate timeline bounds - center on current time
 	const allTimestamps = timelineCards.map((card) =>
 		new Date(card.timestamp).getTime(),
@@ -358,9 +446,39 @@ export default function TimelineCarousel({
 	const startTime = currentTime - halfWindow;
 	const endTime = currentTime + halfWindow;
 
-	// Auto-scroll to center timeline on current time
+	// Track manual scrolling (only user-initiated, not programmatic)
 	useEffect(() => {
-		if (!isHovered && timelineRef.current) {
+		const timeline = timelineRef.current;
+		if (!timeline) return;
+
+		const handleScroll = () => {
+			// Only mark as user-scrolled if it wasn't a programmatic scroll
+			if (!isProgrammaticScrollRef.current) {
+				setUserHasScrolled(true);
+			}
+		};
+
+		// Track user input events to detect manual scrolling
+		const handleUserInput = () => {
+			setUserHasScrolled(true);
+		};
+
+		timeline.addEventListener("scroll", handleScroll);
+		timeline.addEventListener("mousedown", handleUserInput);
+		timeline.addEventListener("touchstart", handleUserInput);
+		timeline.addEventListener("wheel", handleUserInput);
+
+		return () => {
+			timeline.removeEventListener("scroll", handleScroll);
+			timeline.removeEventListener("mousedown", handleUserInput);
+			timeline.removeEventListener("touchstart", handleUserInput);
+			timeline.removeEventListener("wheel", handleUserInput);
+		};
+	}, []);
+
+	// Auto-scroll to center timeline on current time (only if user hasn't manually scrolled)
+	useEffect(() => {
+		if (!userHasScrolled && timelineRef.current) {
 			const currentTimePos = calculateTimelinePosition(
 				new Date(currentTime).toISOString(),
 				startTime,
@@ -372,12 +490,25 @@ export default function TimelineCarousel({
 				currentTimePos - timelineRef.current.clientWidth / 2,
 			);
 
-			timelineRef.current.scrollTo({
-				left: scrollPosition,
-				behavior: "smooth",
+			// Mark that we're doing a programmatic scroll
+			isProgrammaticScrollRef.current = true;
+
+			// Use requestAnimationFrame to ensure DOM is ready
+			requestAnimationFrame(() => {
+				if (timelineRef.current) {
+					timelineRef.current.scrollTo({
+						left: scrollPosition,
+						behavior: "smooth",
+					});
+				}
 			});
+
+			// Reset the flag after scroll completes
+			setTimeout(() => {
+				isProgrammaticScrollRef.current = false;
+			}, 500);
 		}
-	}, [currentTime, startTime, isHovered]);
+	}, [currentTime, startTime, userHasScrolled]);
 
 	const currentTimePosition = calculateTimelinePosition(
 		new Date(currentTime).toISOString(),
@@ -385,32 +516,63 @@ export default function TimelineCarousel({
 	);
 
 	// Debug logging
-	const scheduledCount = timelineCards.filter(
+	const scheduledCount = allTimelineCards.filter(
 		(c) => c.type === "scheduled",
 	).length;
-	const runCount = timelineCards.filter((c) => c.type !== "scheduled").length;
+	const runCount = allTimelineCards.filter(
+		(c) => c.type !== "scheduled",
+	).length;
 	useEffect(() => {
-		if (timelineCards.length > 0) {
+		console.log("=== Timeline Debug ===");
+		console.log(`Total scheduled runs loaded: ${filteredScheduled.length}`);
+		console.log(
+			`All timeline cards: ${allTimelineCards.length} (${scheduledCount} scheduled, ${runCount} runs)`,
+		);
+		console.log(`Showing after filter: ${timelineCards.length}`);
+		console.log(`Show past runs: ${showPastRuns}`);
+		console.log(`Current time: ${new Date(currentTime).toISOString()}`);
+
+		if (filteredScheduled.length > 0) {
 			console.log(
-				`Timeline: ${timelineCards.length} cards (${scheduledCount} scheduled, ${runCount} runs)`,
-			);
-			console.log(
-				"Scheduled runs:",
+				"Scheduled runs details:",
 				filteredScheduled.map((s) => ({
 					id: s.id,
-					time: s.scheduledTime,
+					name: s.name,
+					accountName: s.accountName,
+					scheduledTime: s.scheduledTime,
+					scheduledTimeISO: new Date(s.scheduledTime).toISOString(),
+					isPast: new Date(s.scheduledTime).getTime() < currentTime,
 					countdown: Math.floor(
 						(new Date(s.scheduledTime).getTime() - currentTime) / 1000,
 					),
 				})),
 			);
 		}
+
+		const scheduledCards = allTimelineCards.filter(
+			(c) => c.type === "scheduled",
+		);
+		if (scheduledCards.length > 0) {
+			console.log(
+				"Scheduled timeline cards:",
+				scheduledCards.map((c) => ({
+					id: c.id,
+					timestamp: c.timestamp,
+					timestampISO: new Date(c.timestamp).toISOString(),
+					isPast: new Date(c.timestamp).getTime() < currentTime,
+					willShow:
+						showPastRuns || new Date(c.timestamp).getTime() >= currentTime,
+				})),
+			);
+		}
 	}, [
+		allTimelineCards,
 		timelineCards.length,
 		scheduledCount,
 		runCount,
 		filteredScheduled,
 		currentTime,
+		showPastRuns,
 	]);
 
 	// Update timeline width when content changes
@@ -439,13 +601,8 @@ export default function TimelineCarousel({
 	}, [endTime, startTime]);
 
 	return (
-		<section
-			className="flex flex-col rounded-xl border border-slate-800 bg-slate-900/60 overflow-hidden"
-			onMouseEnter={() => setIsHovered(true)}
-			onMouseLeave={() => setIsHovered(false)}
-			aria-label="Run timeline"
-		>
-			<div className="flex items-center justify-between border-b border-slate-800 px-4 py-2.5">
+		<section className="flex flex-col rounded-xl border border-slate-800 bg-slate-900/60 overflow-hidden">
+			<header className="flex items-center justify-between border-b border-slate-800 px-4 py-2.5">
 				<div>
 					<h2 className="text-sm font-semibold text-slate-200">Run Timeline</h2>
 					<p className="text-[11px] text-slate-400 mt-0.5">
@@ -456,6 +613,21 @@ export default function TimelineCarousel({
 					</p>
 				</div>
 				<div className="flex items-center gap-2">
+					<button
+						type="button"
+						onClick={() => {
+							setShowPastRuns(!showPastRuns);
+							setUserHasScrolled(false); // Reset scroll state to allow re-centering
+						}}
+						className={`rounded-md border px-2.5 py-1 text-xs font-medium transition ${
+							showPastRuns
+								? "border-sky-600 bg-sky-600/20 text-sky-300 hover:bg-sky-600/30"
+								: "border-slate-700 bg-slate-900 text-slate-400 hover:bg-slate-800 hover:text-slate-300"
+						}`}
+						aria-pressed={showPastRuns}
+					>
+						{showPastRuns ? "Hide Past" : "Show Past"}
+					</button>
 					<button
 						onClick={() => {
 							setEditingSchedule(undefined);
@@ -475,58 +647,37 @@ export default function TimelineCarousel({
 						{loading ? "Loading..." : "Refresh"}
 					</button>
 				</div>
-			</div>
+			</header>
 			<div
 				ref={timelineRef}
 				className="relative flex-1 overflow-x-auto overflow-y-visible bg-gradient-to-b from-slate-950/60 to-slate-950/40"
 				style={{ height: "600px", minHeight: "600px" }}
 			>
-				{loading && timelineCards.length === 0 ? (
-					<div className="flex flex-col items-center justify-center h-full gap-4">
-						<div className="flex items-center gap-2 text-slate-400">
-							<div className="w-4 h-4 border-2 border-slate-600 border-t-sky-500 rounded-full animate-spin" />
-							<span className="text-sm">Loading timeline...</span>
-						</div>
-						<div className="flex gap-2">
-							{[...Array(3)].map((_, i) => (
-								<div
-									key={`skeleton-loader-${Date.now()}-${i}`}
-									className="w-40 h-64 bg-slate-800/50 rounded-xl border border-slate-700 animate-pulse"
-								/>
-							))}
-						</div>
-					</div>
-				) : timelineCards.length === 0 ? (
-					<div className="flex flex-col items-center justify-center h-full text-slate-500">
-						<div className="text-sm mb-2">
-							No runs scheduled or completed yet
-						</div>
-						<div className="text-xs text-slate-600">
-							Run discovery scripts or check crontab for scheduled runs
-						</div>
-					</div>
-				) : (
+				<div
+					ref={timelineContentRef}
+					className="relative h-full"
+					style={{
+						minWidth: `${Math.max(2000, ((endTime - startTime) / (1000 * 60)) * 2)}px`,
+						paddingTop: "100px",
+						paddingBottom: "100px",
+					}}
+				>
+					{/* Timeline axis line - positioned lower to give more space for cards above */}
 					<div
-						ref={timelineContentRef}
-						className="relative h-full"
+						className="absolute h-1 bg-gradient-to-r from-transparent via-slate-600/60 to-transparent z-0"
 						style={{
-							minWidth: `${Math.max(2000, ((endTime - startTime) / (1000 * 60)) * 2)}px`,
-							paddingTop: "100px",
-							paddingBottom: "100px",
+							top: "75%",
+							left: 0,
+							width: `${timelineWidth}px`,
+							transform: "translateY(-50%)",
 						}}
-					>
-						{/* Timeline axis line - positioned lower to give more space for cards above */}
-						<div
-							className="absolute h-1 bg-gradient-to-r from-transparent via-slate-600/60 to-transparent z-0"
-							style={{
-								top: "75%",
-								left: 0,
-								width: `${timelineWidth}px`,
-								transform: "translateY(-50%)",
-							}}
-						/>
+					/>
 
-						{/* Time markers - show scheduled time for each run */}
+					{/* Time markers - show scheduled time for each run */}
+					<ul
+						className="absolute z-0"
+						style={{ top: "75%", left: 0, width: "100%" }}
+					>
 						{timelineCards.map((card) => {
 							const markerPosition = calculateTimelinePosition(
 								card.timestamp,
@@ -538,7 +689,7 @@ export default function TimelineCarousel({
 
 							const markerTime = new Date(card.timestamp);
 							return (
-								<div
+								<li
 									key={`marker-${card.id}`}
 									className="absolute z-0"
 									style={{
@@ -556,36 +707,47 @@ export default function TimelineCarousel({
 										timeZoneName: "short",
 									})}
 								>
-									<div className="w-0.5 h-4 bg-slate-600/40" />
-									<div className="absolute top-6 left-1/2 -translate-x-1/2 text-[10px] text-slate-500 whitespace-nowrap font-mono">
+									<div
+										className="w-0.5 h-4 bg-slate-600/40"
+										aria-hidden="true"
+									/>
+									<time
+										dateTime={card.timestamp}
+										className="absolute top-6 left-1/2 -translate-x-1/2 text-[10px] text-slate-500 whitespace-nowrap font-mono"
+									>
 										{markerTime.toLocaleTimeString([], {
 											timeZone: timezone,
 											hour: "2-digit",
 											minute: "2-digit",
 										})}
-									</div>
-								</div>
+									</time>
+								</li>
 							);
 						})}
+					</ul>
 
-						{/* Current-time line */}
-						{currentTimePosition >= 0 && (
-							<div
-								ref={currentTimeLineRef}
-								className="absolute top-0 bottom-0 w-0.5 bg-gradient-to-b from-transparent via-amber-400/20 to-transparent z-30 pointer-events-none"
-								style={{
-									left: `${currentTimePosition}px`,
-									transform: "translateX(-50%)",
-								}}
-							>
-								{/* Horizontal marker on timeline axis */}
-								<div className="absolute top-[75%] -translate-y-1/2 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-amber-400/40" />
-								{/* Central dot on timeline */}
-								<div className="absolute top-[75%] -translate-y-1/2 left-1/2 -translate-x-1/2 w-2 h-2 bg-amber-400/50 rounded-full border border-amber-400/60" />
-							</div>
-						)}
+					{/* Current-time line */}
+					{currentTimePosition >= 0 && (
+						<div
+							ref={currentTimeLineRef}
+							className="absolute top-0 bottom-0 w-0.5 bg-gradient-to-b from-transparent via-amber-400/20 to-transparent z-30 pointer-events-none"
+							style={{
+								left: `${currentTimePosition}px`,
+								transform: "translateX(-50%)",
+							}}
+						>
+							{/* Horizontal marker on timeline axis */}
+							<div className="absolute top-[75%] -translate-y-1/2 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-amber-400/40" />
+							{/* Central dot on timeline */}
+							<div className="absolute top-[75%] -translate-y-1/2 left-1/2 -translate-x-1/2 w-2 h-2 bg-amber-400/50 rounded-full border border-amber-400/60" />
+						</div>
+					)}
 
-						{/* Timeline cards - positioned horizontally, stacked when overlapping */}
+					{/* Timeline cards - positioned horizontally, stacked when overlapping */}
+					<ul
+						className="absolute z-20"
+						style={{ top: 0, left: 0, width: "100%", height: "100%" }}
+					>
 						{(() => {
 							// Group cards by overlapping horizontal positions
 							const cardWidth = 160; // w-40 = 160px
@@ -676,221 +838,260 @@ export default function TimelineCarousel({
 								isCompleted,
 								isError,
 							}) => {
+								const cardTypeLabel = isScheduled
+									? "scheduled"
+									: isRunning
+										? "running"
+										: isCompleted
+											? "completed"
+											: "error";
 								return (
-									<button
+									<li
 										key={card.id}
-										type="button"
-										className="absolute cursor-pointer z-20 group border-0 bg-transparent p-0"
+										className="absolute z-20"
 										style={{
 											left: `${position}px`,
 											top: cardTop,
 											transform: "translateX(-50%)",
 										}}
-										onClick={(e) => {
-											// Don't trigger run select if clicking on action menu
-											if (
-												(e.target as HTMLElement).closest(".schedule-actions")
-											) {
-												return;
-											}
-											const run = runs.find((r) => r.id === card.id);
-											if (run) {
-												onRunSelect(run);
-											}
-										}}
 									>
-										{/* Connection line to timeline */}
-										<div
-											className={`absolute left-1/2 -translate-x-1/2 w-0.5 ${
-												isScheduled
-													? "bg-slate-500/50"
-													: isRunning
-														? "bg-sky-400/50"
-														: isCompleted
-															? "bg-emerald-400/50"
-															: "bg-red-400/50"
-											}`}
-											style={{
-												height: `${connectionLineHeight}px`,
-												bottom: `-${connectionLineHeight}px`,
+										<button
+											type="button"
+											className="cursor-pointer group border-0 bg-transparent p-0 w-full"
+											aria-label={`${cardTypeLabel} run for ${card.accountName}`}
+											onClick={(e) => {
+												// Don't trigger run select if clicking on action menu
+												if (
+													(e.target as HTMLElement).closest(".schedule-actions")
+												) {
+													return;
+												}
+												const run = runs.find((r) => r.id === card.id);
+												if (run) {
+													onRunSelect(run);
+												}
 											}}
-										/>
-
-										{/* Card - Pokemon card style: tall and thin, height adjusts when stacked */}
-										<div
-											className={`w-40 rounded-xl border-2 transition-all shadow-xl hover:shadow-2xl hover:scale-105 backdrop-blur-sm flex flex-col ${
-												isScheduled
-													? "bg-slate-800/95 border-slate-600 border-dashed hover:border-slate-500"
-													: isRunning
-														? "bg-gradient-to-b from-sky-900/95 to-sky-800/95 border-sky-400 hover:border-sky-300 ring-2 ring-sky-500/30 animate-pulse"
-														: isCompleted
-															? "bg-gradient-to-b from-emerald-900/70 to-emerald-800/50 border-emerald-500 hover:border-emerald-400"
-															: "bg-gradient-to-b from-red-900/70 to-red-800/50 border-red-500 hover:border-red-400"
-											}`}
-											style={{ height: `${cardHeight}px` }}
 										>
-											{/* Card header */}
-											<div className="p-3 border-b border-slate-700/50">
-												{card.name && (
-													<div
-														className="text-[10px] font-semibold text-slate-300 mb-1.5 truncate capitalize"
-														title={card.name}
-													>
-														{card.name}
-													</div>
-												)}
-												<div className="flex items-center justify-between mb-2">
-													<span className="text-xs font-bold text-slate-100 truncate">
-														{card.accountName}
-													</span>
-													<div className="flex items-center gap-1">
-														{card.hasIssues && (
-															<span className="w-2 h-2 bg-amber-400 rounded-full flex-shrink-0 shadow-lg shadow-amber-400/50" />
-														)}
-														{isScheduled && (
-															<div className="schedule-actions relative">
-																<button
-																	type="button"
-																	onClick={(e) => {
-																		e.stopPropagation();
-																		const schedule = scheduledRuns.find(
-																			(s) => s.id === card.id,
-																		);
-																		if (
-																			schedule &&
-																			!schedule.id.startsWith("scheduled_")
-																		) {
-																			setEditingSchedule(schedule);
-																			setScheduleModalOpen(true);
-																		} else {
-																			toast.warning(
-																				"Cannot edit cron schedules via UI",
-																			);
-																		}
-																	}}
-																	className="w-5 h-5 flex items-center justify-center text-slate-400 hover:text-slate-200 hover:bg-slate-700/50 rounded transition"
-																	title="Edit schedule"
-																>
-																	<svg
-																		className="w-3 h-3"
-																		fill="none"
-																		stroke="currentColor"
-																		viewBox="0 0 24 24"
-																		aria-hidden="true"
-																	>
-																		<path
-																			strokeLinecap="round"
-																			strokeLinejoin="round"
-																			strokeWidth={2}
-																			d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"
-																		/>
-																	</svg>
-																</button>
-															</div>
-														)}
-													</div>
-												</div>
-												{isRunning && (
-													<span className="px-1.5 py-0.5 text-[9px] font-bold text-sky-100 bg-sky-500/40 rounded animate-pulse border border-sky-400/50">
-														LIVE
-													</span>
-												)}
-											</div>
+											{/* Connection line to timeline */}
+											<div
+												className={`absolute left-1/2 -translate-x-1/2 w-0.5 ${
+													isScheduled
+														? "bg-slate-500/50"
+														: isRunning
+															? "bg-sky-400/50"
+															: isCompleted
+																? "bg-emerald-400/50"
+																: "bg-red-400/50"
+												}`}
+												style={{
+													height: `${connectionLineHeight}px`,
+													bottom: `-${connectionLineHeight}px`,
+												}}
+											/>
 
-											{/* Card body */}
-											<div className="flex-1 p-3 flex flex-col">
-												{isScheduled && card.countdown !== undefined && (
-													<div className="text-center mb-3">
-														<div className="text-[10px] text-slate-400 mb-1">
-															⏰ Scheduled
-														</div>
-														<div className="text-lg font-mono font-bold text-slate-200">
-															{formatDuration(card.countdown)}
-														</div>
-														<div className="text-[9px] text-slate-500 mt-1">
-															until start
-														</div>
-														{card.scriptName && (
-															<div className="text-[10px] font-bold text-slate-200 uppercase mt-3 px-3 py-1.5 bg-slate-700/50 border border-slate-600/50 rounded-md tracking-wide">
-																{card.scriptName}
-															</div>
-														)}
-													</div>
-												)}
-												{/* Action buttons for scheduled runs */}
-												{isScheduled && !card.id.startsWith("scheduled_") && (
-													<div className="mt-auto pt-2 border-t border-slate-700/50 schedule-actions">
-														<button
-															type="button"
-															onClick={(e) => {
-																e.stopPropagation();
-																setDeletingScheduleId(card.id);
-															}}
-															className="w-full px-2 py-1 text-[10px] text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded transition"
+											{/* Card - Pokemon card style: tall and thin, height adjusts when stacked */}
+											<div
+												className={`w-40 rounded-xl border-2 transition-all shadow-xl hover:shadow-2xl hover:scale-105 backdrop-blur-sm flex flex-col ${
+													isScheduled
+														? "bg-slate-800/95 border-slate-600 border-dashed hover:border-slate-500"
+														: isRunning
+															? "bg-gradient-to-b from-sky-900/95 to-sky-800/95 border-sky-400 hover:border-sky-300 ring-2 ring-sky-500/30 animate-pulse"
+															: isCompleted
+																? "bg-gradient-to-b from-emerald-900/70 to-emerald-800/50 border-emerald-500 hover:border-emerald-400"
+																: "bg-gradient-to-b from-red-900/70 to-red-800/50 border-red-500 hover:border-red-400"
+												}`}
+												style={{ height: `${cardHeight}px` }}
+											>
+												{/* Card header */}
+												<header className="p-3 border-b border-slate-700/50">
+													{card.name && (
+														<h3
+															className="text-[10px] font-semibold text-slate-300 mb-1.5 truncate capitalize"
+															title={card.name}
 														>
-															Delete
-														</button>
+															{card.name}
+														</h3>
+													)}
+													<div className="flex items-center justify-between mb-2">
+														<span className="text-xs font-bold text-slate-100 truncate">
+															{card.accountName}
+														</span>
+														<div className="flex items-center gap-1">
+															{card.hasIssues && (
+																<span className="w-2 h-2 bg-amber-400 rounded-full flex-shrink-0 shadow-lg shadow-amber-400/50" />
+															)}
+															{isScheduled && (
+																<div className="schedule-actions relative">
+																	<button
+																		type="button"
+																		onClick={(e) => {
+																			e.stopPropagation();
+																			const schedule = scheduledRuns.find(
+																				(s) => s.id === card.id,
+																			);
+																			if (
+																				schedule &&
+																				!schedule.id.startsWith("scheduled_")
+																			) {
+																				setEditingSchedule(schedule);
+																				setScheduleModalOpen(true);
+																			} else {
+																				toast.warning(
+																					"Cannot edit cron schedules via UI",
+																				);
+																			}
+																		}}
+																		className="w-5 h-5 flex items-center justify-center text-slate-400 hover:text-slate-200 hover:bg-slate-700/50 rounded transition"
+																		title="Edit schedule"
+																	>
+																		<svg
+																			className="w-3 h-3"
+																			fill="none"
+																			stroke="currentColor"
+																			viewBox="0 0 24 24"
+																			aria-hidden="true"
+																		>
+																			<path
+																				strokeLinecap="round"
+																				strokeLinejoin="round"
+																				strokeWidth={2}
+																				d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"
+																			/>
+																		</svg>
+																	</button>
+																</div>
+															)}
+														</div>
 													</div>
-												)}
-												{isRunning && card.elapsed !== undefined && (
-													<div className="text-center mb-3">
-														<div className="text-[10px] text-sky-400 mb-1 flex items-center justify-center gap-1">
-															<span className="w-1.5 h-1.5 bg-sky-400 rounded-full animate-pulse" />
-															<span>Running</span>
-														</div>
-														<div className="text-lg font-mono font-bold text-sky-200">
-															{formatDuration(card.elapsed)}
-														</div>
-														<div className="text-[9px] text-sky-400/70 mt-1">
-															elapsed
-														</div>
-													</div>
-												)}
-												{isCompleted && (
-													<div className="text-center mb-3">
-														<div className="text-2xl mb-2">✓</div>
-														<div className="text-xs text-emerald-300 font-semibold">
-															Completed
-														</div>
-													</div>
-												)}
-												{isError && (
-													<div className="text-center mb-3">
-														<div className="text-2xl mb-2">✗</div>
-														<div className="text-xs text-red-300 font-semibold">
-															Error
-														</div>
-													</div>
-												)}
+													{isRunning && (
+														<span className="px-1.5 py-0.5 text-[9px] font-bold text-sky-100 bg-sky-500/40 rounded animate-pulse border border-sky-400/50">
+															LIVE
+														</span>
+													)}
+												</header>
 
-												{/* Thumbnail - only show if card is tall enough */}
-												{card.thumbnail && cardHeight > 150 && (
-													<div className="mt-auto rounded-lg overflow-hidden border border-slate-700/50 group-hover:border-slate-600 transition">
-														<img
-															src={getImageUrl(card.thumbnail)}
-															alt="Thumbnail"
-															className="w-full object-cover"
-															style={{
-																height: `${Math.min(128, cardHeight * 0.5)}px`,
-															}}
-															onError={(e) => {
-																(e.target as HTMLImageElement).style.display =
-																	"none";
-															}}
-														/>
-													</div>
-												)}
+												{/* Card body */}
+												<div className="flex-1 p-3 flex flex-col">
+													{isScheduled && card.countdown !== undefined && (
+														<div className="text-center mb-3">
+															<p className="text-[10px] text-slate-400 mb-1">
+																<span aria-hidden="true">⏰</span> Scheduled
+															</p>
+															<time
+																dateTime={`PT${card.countdown}S`}
+																className="text-lg font-mono font-bold text-slate-200"
+															>
+																{formatDuration(card.countdown)}
+															</time>
+															<p className="text-[9px] text-slate-500 mt-1">
+																until start
+															</p>
+															{card.scriptName && (
+																<span className="text-[10px] font-bold text-slate-200 uppercase mt-3 px-3 py-1.5 bg-slate-700/50 border border-slate-600/50 rounded-md tracking-wide">
+																	{card.scriptName}
+																</span>
+															)}
+														</div>
+													)}
+													{/* Action buttons for scheduled runs */}
+													{isScheduled && !card.id.startsWith("scheduled_") && (
+														<div className="mt-auto pt-2 border-t border-slate-700/50 schedule-actions">
+															<button
+																type="button"
+																onClick={(e) => {
+																	e.stopPropagation();
+																	setDeletingScheduleId(card.id);
+																}}
+																className="w-full px-2 py-1 text-[10px] text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded transition"
+															>
+																Delete
+															</button>
+														</div>
+													)}
+													{isRunning && card.elapsed !== undefined && (
+														<div className="text-center mb-3">
+															<p className="text-[10px] text-sky-400 mb-1 flex items-center justify-center gap-1">
+																<span
+																	className="w-1.5 h-1.5 bg-sky-400 rounded-full animate-pulse"
+																	aria-hidden="true"
+																/>
+																<span>Running</span>
+															</p>
+															<time
+																dateTime={`PT${card.elapsed}S`}
+																className="text-lg font-mono font-bold text-sky-200"
+															>
+																{formatDuration(card.elapsed)}
+															</time>
+															<p className="text-[9px] text-sky-400/70 mt-1">
+																elapsed
+															</p>
+														</div>
+													)}
+													{isCompleted && (
+														<div className="text-center mb-3">
+															<span
+																className="text-2xl mb-2"
+																aria-hidden="true"
+															>
+																✓
+															</span>
+															<p className="text-xs text-emerald-300 font-semibold">
+																Completed
+															</p>
+														</div>
+													)}
+													{isError && (
+														<div className="text-center mb-3">
+															<span
+																className="text-2xl mb-2"
+																aria-hidden="true"
+															>
+																✗
+															</span>
+															<p className="text-xs text-red-300 font-semibold">
+																Error
+															</p>
+														</div>
+													)}
+
+													{/* Thumbnail - only show if card is tall enough */}
+													{card.thumbnail && cardHeight > 150 && (
+														<div className="mt-auto rounded-lg overflow-hidden border border-slate-700/50 group-hover:border-slate-600 transition">
+															<img
+																src={getImageUrl(card.thumbnail)}
+																alt="Thumbnail"
+																className="w-full object-cover"
+																style={{
+																	height: `${Math.min(128, cardHeight * 0.5)}px`,
+																}}
+																onError={(e) => {
+																	(e.target as HTMLImageElement).style.display =
+																		"none";
+																}}
+															/>
+														</div>
+													)}
+												</div>
 											</div>
-										</div>
-									</button>
+										</button>
+									</li>
 								);
 							},
 						)}
-					</div>
-				)}
-			</div>
+					</ul>
 
-			{/* Schedule Modal */}
+					{/* Empty state overlay */}
+					{timelineCards.length === 0 && !loading && (
+						<div className="absolute inset-0 flex flex-col items-center justify-center text-slate-500 pointer-events-none">
+							<p className="text-sm mb-2">No runs scheduled or completed yet</p>
+							<p className="text-xs text-slate-600">
+								Click "Schedule Run" to create a scheduled run
+							</p>
+						</div>
+					)}
+				</div>
+			</div>
 			<ScheduleModal
 				open={scheduleModalOpen}
 				onOpenChange={setScheduleModalOpen}
@@ -907,52 +1108,26 @@ export default function TimelineCarousel({
 
 			{/* Delete Confirmation Dialog */}
 			{deletingScheduleId && (
-				<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-					<div className="bg-slate-900 rounded-lg border border-slate-700 p-6 max-w-sm w-full mx-4">
-						<h3 className="text-lg font-semibold text-slate-200 mb-2">
-							Delete Schedule?
-						</h3>
-						<p className="text-sm text-slate-400 mb-4">
-							Are you sure you want to delete this scheduled run? This action
-							cannot be undone.
-						</p>
-						<div className="flex items-center justify-end gap-3">
-							<button
-								type="button"
-								onClick={() => setDeletingScheduleId(null)}
-								className="px-4 py-2 text-sm font-medium text-slate-300 hover:text-slate-100 transition rounded-md border border-slate-700 hover:border-slate-600"
-							>
-								Cancel
-							</button>
-							<button
-								type="button"
-								onClick={async () => {
-									try {
-										const res = await fetch(
-											`/api/schedule/${deletingScheduleId}`,
-											{
-												method: "DELETE",
-											},
-										);
-										if (res.ok) {
-											toast.success("Schedule deleted successfully");
-											setDeletingScheduleId(null);
-											void loadData();
-										} else {
-											const error = (await res.json()) as { error?: string };
-											toast.error(error.error || "Failed to delete schedule");
-										}
-									} catch {
-										toast.error("Failed to delete schedule");
-									}
-								}}
-								className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-md transition"
-							>
-								Delete
-							</button>
-						</div>
-					</div>
-				</div>
+				<DeleteDialog
+					onClose={() => setDeletingScheduleId(null)}
+					onConfirm={async () => {
+						try {
+							const res = await fetch(`/api/schedule/${deletingScheduleId}`, {
+								method: "DELETE",
+							});
+							if (res.ok) {
+								toast.success("Schedule deleted successfully");
+								setDeletingScheduleId(null);
+								void loadData();
+							} else {
+								const error = (await res.json()) as { error?: string };
+								toast.error(error.error || "Failed to delete schedule");
+							}
+						} catch {
+							toast.error("Failed to delete schedule");
+						}
+					}}
+				/>
 			)}
 
 			{/* Toast Container */}
