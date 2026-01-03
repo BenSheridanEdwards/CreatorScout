@@ -29,6 +29,12 @@ const STRONG_SIGNALS: Array<{
 	points: number;
 	label: string;
 }> = [
+	// "Yes I have one" / "I have one" - classic creator language meaning "Yes I have an Patreon"
+	{ pattern: "yes i have one", points: 50, label: "yes_i_have_one" },
+	{ pattern: "yep i have one", points: 50, label: "yes_i_have_one" },
+	{ pattern: "yeah i have one", points: 50, label: "yes_i_have_one" },
+	{ pattern: "i have one", points: 40, label: "i_have_one" },
+	
 	// Highlight redirects - classic creator tactic
 	{ pattern: "highlight for more", points: 40, label: "highlight_redirect" },
 	{ pattern: "highlights for more", points: 40, label: "highlight_redirect" },
@@ -351,6 +357,17 @@ export function calculateScore(bio: string, username?: string): BioScoreResult {
 	if (hasHighlightRedirect && emojiCount >= 2) {
 		score += 20;
 		reasons.push("COMBO: highlight redirect + emojis: +20");
+	}
+
+	// "Yes I have one" / "I have one" + highlight redirect = DEFINITIVE creator signal
+	// This phrase specifically means "Yes I have an Patreon"
+	const hasIHaveOne = strongMatches.some(
+		(m) => m === "yes i have one" || m === "yep i have one" || m === "yeah i have one" || 
+		       m === "i have one" || m === "yes_i_have_one" || m === "i_have_one",
+	);
+	if (hasIHaveOne && hasHighlightRedirect) {
+		score += 30;
+		reasons.push("COMBO: 'i have one' + highlight redirect = DEFINITIVE: +30");
 	}
 
 	// Alt account reference + any link content
