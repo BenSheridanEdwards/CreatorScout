@@ -63,15 +63,28 @@ export async function getProfileStats(page: Page): Promise<ProfileStats> {
 			const header = document.querySelector("header");
 			const headerText = header?.textContent || "";
 
-			// Look for patterns like "314K followers", "0 following", "31 posts"
-			const followersMatch = headerText.match(/([\d,.]+[KMB]?)\s*followers?/i);
-			const followingMatch = headerText.match(/([\d,.]+[KMB]?)\s*following/i);
-			const postsMatch = headerText.match(/([\d,.]+[KMB]?)\s*posts?/i);
+			// Look for patterns like "314K followers", "346 K followers", "0 following", "31 posts"
+			// Allow optional space between number and K/M/B suffix
+			const followersMatch = headerText.match(
+				/([\d,.]+)\s*([KMB])?\s*followers?/i,
+			);
+			const followingMatch = headerText.match(
+				/([\d,.]+)\s*([KMB])?\s*following/i,
+			);
+			const postsMatch = headerText.match(/([\d,.]+)\s*([KMB])?\s*posts?/i);
+
+			// Reconstruct the count string with suffix if present
+			const extractCount = (match: RegExpMatchArray | null): string | null => {
+				if (!match) return null;
+				const num = match[1];
+				const suffix = match[2] || "";
+				return num + suffix;
+			};
 
 			return {
-				followersText: followersText || followersMatch?.[1] || null,
-				followingText: followingText || followingMatch?.[1] || null,
-				postsText: postsMatch?.[1] || null,
+				followersText: followersText || extractCount(followersMatch) || null,
+				followingText: followingText || extractCount(followingMatch) || null,
+				postsText: extractCount(postsMatch) || null,
 				// Check for 0 following specifically (no link created for 0)
 				hasZeroFollowing: !followingLink && headerText.includes("0 following"),
 			};

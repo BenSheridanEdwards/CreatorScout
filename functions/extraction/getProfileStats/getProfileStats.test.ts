@@ -115,6 +115,14 @@ describe("parseCount", () => {
 		test("parses decimal without suffix", () => {
 			expect(parseCount("1.5")).toBe(2); // rounds to nearest integer
 		});
+
+		test("handles space between number and K suffix", () => {
+			expect(parseCount("346 K")).toBe(346000);
+		});
+
+		test("handles space between number and M suffix", () => {
+			expect(parseCount("1.3 M")).toBe(1300000);
+		});
 	});
 });
 
