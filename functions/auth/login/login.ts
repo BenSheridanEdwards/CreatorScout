@@ -531,7 +531,8 @@ export async function login(
 				return { inboxLink, profileLink, createButton, homeIcon, feed };
 			});
 
-			const hasLoggedInIndicators = Object.values(loggedInIndicators).some(Boolean);
+			const hasLoggedInIndicators =
+				Object.values(loggedInIndicators).some(Boolean);
 
 			if (hasLoggedInIndicators) {
 				logger.info(
@@ -728,7 +729,7 @@ export async function login(
 			})
 			.catch(() => null);
 
-		if (usernameField && usernameField.asElement()) {
+		if (usernameField?.asElement()) {
 			logger.info("ACTION", "Username field found via associated label");
 		}
 	}

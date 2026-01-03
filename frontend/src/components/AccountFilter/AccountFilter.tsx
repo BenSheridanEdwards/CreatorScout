@@ -51,7 +51,9 @@ export default function AccountFilter({ onAccountChange }: AccountFilterProps) {
 
 	return (
 		<div className="flex items-center gap-2">
-			<label htmlFor="account-select" className="text-xs text-slate-400">Account:</label>
+			<label htmlFor="account-select" className="text-xs text-slate-400">
+				Account:
+			</label>
 			<select
 				id="account-select"
 				value={selectedAccount}

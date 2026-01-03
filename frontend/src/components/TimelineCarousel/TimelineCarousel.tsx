@@ -49,7 +49,7 @@ export default function TimelineCarousel({
 	);
 	const toast = useToast();
 	const [timezone, setTimezone] = useState<string>("UTC");
-	const [errorShown, setErrorShown] = useState<Set<string>>(new Set());
+	const [, setErrorShown] = useState<Set<string>>(new Set());
 
 	// Update current time every second
 	useEffect(() => {
@@ -146,7 +146,7 @@ export default function TimelineCarousel({
 			if (!(error instanceof TypeError && error.message.includes("fetch"))) {
 				setErrorShown((prev) => {
 					if (!prev.has("network")) {
-						toast.error("Network error: " + errorMessage);
+						toast.error(`Network error: ${errorMessage}`);
 						return new Set(prev).add("network");
 					}
 					return prev;
@@ -272,7 +272,9 @@ export default function TimelineCarousel({
 									? {
 											...run,
 											finalScreenshot: data.thumbnail,
-											screenshots: [...run.screenshots, data.thumbnail!],
+											screenshots: data.thumbnail
+												? [...run.screenshots, data.thumbnail]
+												: run.screenshots,
 										}
 									: run,
 							),
@@ -383,14 +385,12 @@ export default function TimelineCarousel({
 	);
 
 	// Debug logging
+	const scheduledCount = timelineCards.filter(
+		(c) => c.type === "scheduled",
+	).length;
+	const runCount = timelineCards.filter((c) => c.type !== "scheduled").length;
 	useEffect(() => {
 		if (timelineCards.length > 0) {
-			const scheduledCount = timelineCards.filter(
-				(c) => c.type === "scheduled",
-			).length;
-			const runCount = timelineCards.filter(
-				(c) => c.type !== "scheduled",
-			).length;
 			console.log(
 				`Timeline: ${timelineCards.length} cards (${scheduledCount} scheduled, ${runCount} runs)`,
 			);
@@ -405,7 +405,13 @@ export default function TimelineCarousel({
 				})),
 			);
 		}
-	}, [timelineCards.length, filteredScheduled, currentTime]);
+	}, [
+		timelineCards.length,
+		scheduledCount,
+		runCount,
+		filteredScheduled,
+		currentTime,
+	]);
 
 	// Update timeline width when content changes
 	useEffect(() => {
@@ -430,13 +436,14 @@ export default function TimelineCarousel({
 		}
 
 		return () => resizeObserver.disconnect();
-	}, [endTime, startTime, timelineCards]);
+	}, [endTime, startTime]);
 
 	return (
 		<section
 			className="flex flex-col rounded-xl border border-slate-800 bg-slate-900/60 overflow-hidden"
 			onMouseEnter={() => setIsHovered(true)}
 			onMouseLeave={() => setIsHovered(false)}
+			aria-label="Run timeline"
 		>
 			<div className="flex items-center justify-between border-b border-slate-800 px-4 py-2.5">
 				<div>
@@ -483,7 +490,7 @@ export default function TimelineCarousel({
 						<div className="flex gap-2">
 							{[...Array(3)].map((_, i) => (
 								<div
-									key={i}
+									key={`skeleton-loader-${Date.now()}-${i}`}
 									className="w-40 h-64 bg-slate-800/50 rounded-xl border border-slate-700 animate-pulse"
 								/>
 							))}
@@ -622,7 +629,7 @@ export default function TimelineCarousel({
 							const cardSpacing = 8; // Space between stacked cards
 							const baseOffset = 20; // Distance from timeline
 
-							return groups.flatMap((group, groupIndex) => {
+							return groups.flatMap((group) => {
 								const stackHeight = group.length;
 								const cardHeight =
 									stackHeight > 1
@@ -670,9 +677,10 @@ export default function TimelineCarousel({
 								isError,
 							}) => {
 								return (
-									<div
+									<button
 										key={card.id}
-										className="absolute cursor-pointer z-20 group"
+										type="button"
+										className="absolute cursor-pointer z-20 group border-0 bg-transparent p-0"
 										style={{
 											left: `${position}px`,
 											top: cardTop,
@@ -768,6 +776,7 @@ export default function TimelineCarousel({
 																		fill="none"
 																		stroke="currentColor"
 																		viewBox="0 0 24 24"
+																		aria-hidden="true"
 																	>
 																		<path
 																			strokeLinecap="round"
@@ -873,7 +882,7 @@ export default function TimelineCarousel({
 												)}
 											</div>
 										</div>
-									</div>
+									</button>
 								);
 							},
 						)}
@@ -933,7 +942,7 @@ export default function TimelineCarousel({
 											const error = (await res.json()) as { error?: string };
 											toast.error(error.error || "Failed to delete schedule");
 										}
-									} catch (error) {
+									} catch {
 										toast.error("Failed to delete schedule");
 									}
 								}}
