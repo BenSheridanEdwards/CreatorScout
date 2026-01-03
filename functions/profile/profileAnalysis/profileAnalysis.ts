@@ -273,9 +273,12 @@ export async function analyzeProfileComprehensive(
 
 	if (externalLinks.length > 0) {
 		result.indicators.push("External links in profile");
-		
+
 		// ALWAYS check links - they're the best indicator of a creator
-		logger.info("ANALYSIS", `🔗 Found ${externalLinks.length} external link(s) - checking all regardless of bio score`);
+		logger.info(
+			"ANALYSIS",
+			`🔗 Found ${externalLinks.length} external link(s) - checking all regardless of bio score`,
+		);
 
 		// Save current URL to return to profile
 		const profileUrl = page.url();

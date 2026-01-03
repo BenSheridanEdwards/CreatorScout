@@ -24,39 +24,48 @@ function isRateLimitError(error: unknown): boolean {
 	);
 }
 
-const LINKTREE_PROMPT = `You are analyzing a screenshot of a link page (linktree, beacons, allmylinks, etc.) for an Instagram user.
+const LINKTREE_PROMPT = `You are analyzing a screenshot of a link page (linktree, beacons, hoo.be, allmylinks, etc.) for an Instagram user.
 
-Determine if this person is an Patreon/premium content creator.
+Your task: Determine if this person is an creator (Patreon, Ko-fi, etc.) - NOT a regular influencer.
 
-**VISUAL ANALYSIS PRIORITY**: Look for visual branding FIRST - logos, icons, brand colors, and visual elements are more reliable than text.
+**CRITICAL - READ FIRST**:
+Regular influencers with shopping links, brand deals, and social media are NOT influencers.
+Only mark as influencer if you see EXPLICIT adult platform links or content warnings.
 
-STRONG INDICATORS (high confidence if present):
-- **CRITICAL - HIGHEST PRIORITY**: Patreon logo/branding visible anywhere on the page - the distinctive "OF" logo with wing element, Patreon brand colors (blue/teal), Patreon icon, or any Patreon visual branding = INSTANT 100% confidence. If you see the Patreon logo (even without text), this is definitive proof.
-- Direct links to: Patreon, Ko-fi, FanVue, Fanfix, Fanhouse, LoyalFans, Pornhub, ManyVids
-- Text like "Exclusive Content", "Premium Content", "VIP Access", "Private Content"
-- Discount language: "% OFF", "Sale", "Limited offer", "Free trial"
-- Subscription CTAs: "Subscribe", "Join me", "Unlock", "See more"
-- Adult warnings: "exclusive", "NSFW", "Adults only", "Must be 18"
-- **CRITICAL**: Content warning gates - "Sensitive Content" (Linktree), "Mature Content Disclaimer" (link.me), etc. - this is VERY HIGH confidence
-- Content gates requiring "Continue", "I'm exclusive", or age verification to access - padlock icons, age verification boxes
-- Creator/dominant language with pricing: "mommy treatment", "daddy treatment", "you belong to me", "belong to mommy" combined with discounts/pricing
+**INSTANT DISQUALIFIERS (is_adult_creator = FALSE, confidence = 0)**:
+- Shopping links ONLY: Amazon Storefront, Depop, Poshmark, Etsy, Shopify stores
+- Regular social media ONLY: TikTok, YouTube, Pinterest, Spotify, Twitter/X, Snapchat
+- Brand discount codes (e.g., "Shop Edikted code 'xxx'", "Use code xxx for 10% off")
+- Fashion/lifestyle content without adult platform links
+- Business inquiries/contact info without premium content signals
+- Music/podcast/gaming links
+- If the page has NO adult platform links AND only has shopping/social links = NOT an influencer
 
-MODERATE INDICATORS (consider with other factors):
-- Link/revealing imagery (bikini, lingerie, provocative poses)
-- Emojis: 🔥💋🍑🍒💕✨ combined with subscription language
-- Words: "Spicy", "Naughty", "Uncensored", "Unfiltered", "Content creator"
-- High follower counts with link aggregator pages
+**DEFINITIVE ADULT CREATOR SIGNALS (is_adult_creator = TRUE)**:
+- Direct links to: Patreon, Ko-fi, FanVue, Fanfix, LoyalFans, ManyVids, Pornhub
+- Patreon logo/branding (distinctive "OF" logo with wing element) = 100% confidence
+- Text: "exclusive", "NSFW", "Adults only", "Must be exclusive"
+- Content warning gates: "Sensitive Content", "Mature Content Disclaimer", age verification
+- "Exclusive Content" or "Premium Content" WITH adult platform link
+- "Subscribe to see more" WITH adult platform link
 
-IMPORTANT: 
-- If you see the Patreon logo/icon/branding visually (the "OF" logo with wing), mark as creator with 100% confidence immediately
-- "Exclusive Content" + discount (e.g., "80% OFF") + link imagery = VERY HIGH confidence even without explicit creator link
+**NOT ENOUGH ON THEIR OWN** (need adult platform link to confirm):
+- Link photos (could be fitness/fashion influencer)
+- "Content creator" label (applies to all influencers)
+- Emojis like 🔥💋🍑 (common for fashion/beauty too)
+- "DM for collabs" (standard influencer language)
+
+**DECISION LOGIC**:
+1. If page has adult platform links (Patreon, Ko-fi, etc.) → is_adult_creator = TRUE
+2. If page has ONLY shopping + social media links → is_adult_creator = FALSE
+3. If unsure and no adult platform visible → is_adult_creator = FALSE
 
 Return EXACTLY this JSON:
 {
   "is_adult_creator": true or false,
   "confidence": 0-100,
   "platform_links": ["patreon.com/xxx", "ko-fi.com/xxx"] or [],
-  "indicators": ["Exclusive Content with discount", "link imagery", ...] or [],
+  "indicators": ["what you observed"] or [],
   "reason": "brief explanation (max 15 words)"
 }`;
 
@@ -106,9 +115,10 @@ export interface VisionAnalysisResult {
 export async function analyzeLinktree(
 	imagePath: string,
 ): Promise<VisionAnalysisResult | null> {
+	const imageBuffer = readFileSync(imagePath);
+	const base64 = imageBuffer.toString("base64");
+
 	try {
-		const imageBuffer = readFileSync(imagePath);
-		const base64 = imageBuffer.toString("base64");
 		const response = await client.chat.completions.create({
 			model: VISION_MODEL,
 			messages: [
@@ -227,35 +237,72 @@ export async function isConfirmedCreator(
 		return [false, null];
 	}
 
-	// ULTIMATE SIGNALS: Definitive creator indicators = instant 100% confidence
+	// Check platform links first - most reliable signal
 	const indicators = data.indicators || [];
 	const reason = data.reason || "";
 	const allText = [...indicators, reason].join(" ").toLowerCase();
+	const platformLinks = data.platform_links || [];
 
+	// If vision found actual adult platform links, trust it
+	const hasAdultPlatformLink = platformLinks.some((link) =>
+		/patreon|ko-fi|fanvue|loyalfans|manyvids|pornhub/i.test(link),
+	);
+
+	if (hasAdultPlatformLink) {
+		data.is_adult_creator = true;
+		data.confidence = 100;
+		return [true, data];
+	}
+
+	// DISQUALIFIERS: Regular influencer signals = NOT influencer
+	const disqualifiers = [
+		"amazon storefront",
+		"amazon store",
+		"depop shop",
+		"depop",
+		"poshmark",
+		"etsy shop",
+		"pinterest",
+		"tiktok",
+		"youtube",
+		"spotify",
+		"brand code",
+		"discount code",
+		"shop edikted",
+		"use code",
+		"shopping links only",
+		"social media only",
+		"regular influencer",
+		"fashion influencer",
+		"not an influencer",
+		"no adult",
+	];
+
+	for (const disqualifier of disqualifiers) {
+		if (allText.includes(disqualifier)) {
+			data.is_adult_creator = false;
+			data.confidence = 0;
+			return [false, data];
+		}
+	}
+
+	// DEFINITIVE SIGNALS: Only adult platform names (not vague terms)
 	const definitiveSignals = [
-		{ text: "patreon logo", label: "PATREON LOGO" },
-		{ text: "of logo", label: "PATREON LOGO" },
-		{ text: "patreon branding", label: "PATREON BRANDING" },
-		{ text: "patreon visual", label: "PATREON VISUAL" },
-		{ text: "exclusive content", label: "EXCLUSIVE CONTENT" },
 		{ text: "patreon", label: "PATREON" },
 		{ text: "creator link", label: "PATREON" },
+		{ text: "patreon logo", label: "PATREON LOGO" },
 		{ text: "ko-fi", label: "KO-FI" },
-		{ text: "premium content", label: "PREMIUM CONTENT" },
-		{ text: "nsfw", label: "NSFW" },
-		{ text: "exclusive", label: "exclusive" },
-		{ text: "18 +", label: "exclusive" },
-		{ text: "+18", label: "exclusive" },
 		{ text: "fanvue", label: "FANVUE" },
-		{ text: "custom content", label: "CUSTOM CONTENT" },
 		{ text: "loyalfans", label: "LOYALFANS" },
 		{ text: "loyal fans", label: "LOYALFANS" },
 		{ text: "manyvids", label: "MANYVIDS" },
-		{ text: "mature content", label: "MATURE CONTENT" },
+		{ text: "nsfw", label: "NSFW" },
+		{ text: "exclusive", label: "exclusive" },
+		{ text: "+18", label: "exclusive" },
+		{ text: "adults only", label: "ADULTS ONLY" },
 		{ text: "content disclaimer", label: "MATURE CONTENT DISCLAIMER" },
-		{ text: "mommy treatment", label: "MOMMY TREATMENT" },
-		{ text: "daddy treatment", label: "DADDY TREATMENT" },
-		{ text: "you belong to", label: "CREATOR LANGUAGE" },
+		{ text: "age verification", label: "AGE VERIFICATION" },
+		{ text: "sensitive content warning", label: "CONTENT WARNING" },
 	];
 
 	for (const signal of definitiveSignals) {
@@ -270,20 +317,9 @@ export async function isConfirmedCreator(
 		}
 	}
 
-	let isConfirmed = data.is_adult_creator && data.confidence >= threshold;
-
-	// Heuristic override: Exclusive content + discount language
-	if (!isConfirmed && _hasExclusiveDiscountSignal(data)) {
-		data.is_adult_creator = true;
-		data.confidence = Math.max(data.confidence, threshold);
-		if (
-			!indicators.some((i) => i.toLowerCase().includes("exclusive+discount"))
-		) {
-			indicators.push("exclusive+discount offer");
-			data.indicators = indicators;
-		}
-		isConfirmed = true;
-	}
+	// Trust the vision model's decision if it meets threshold
+	// No more heuristic overrides - they cause false positives
+	const isConfirmed = data.is_adult_creator && data.confidence >= threshold;
 
 	return [isConfirmed, data];
 }
