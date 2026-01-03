@@ -273,6 +273,9 @@ export async function analyzeProfileComprehensive(
 
 	if (externalLinks.length > 0) {
 		result.indicators.push("External links in profile");
+		
+		// ALWAYS check links - they're the best indicator of a creator
+		logger.info("ANALYSIS", `🔗 Found ${externalLinks.length} external link(s) - checking all regardless of bio score`);
 
 		// Save current URL to return to profile
 		const profileUrl = page.url();
@@ -293,7 +296,7 @@ export async function analyzeProfileComprehensive(
 					`link_analysis_${username}`,
 				);
 
-				// Take screenshot of the link page for records (functional - always enabled)
+				// ALWAYS take screenshot of link page - best evidence for creator verification
 				// Do this BEFORE checking isCreator so vision can run even if text analysis missed it
 				const linkScreenshot = await snapshot(
 					page,
@@ -302,6 +305,9 @@ export async function analyzeProfileComprehensive(
 				);
 				if (linkScreenshot) {
 					result.screenshots.push(linkScreenshot);
+					logger.info("ANALYSIS", `📸 Screenshot saved: ${linkScreenshot}`);
+				} else {
+					logger.warn("ANALYSIS", `⚠️ Failed to take screenshot of link page`);
 				}
 
 				if (linkAnalysis.isCreator) {
