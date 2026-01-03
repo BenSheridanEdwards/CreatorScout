@@ -158,8 +158,8 @@ export async function verifyDmSent(
 	// Wait a bit for message to be sent and appear in the thread
 	await shortDelay(1.5, 2.5);
 
-	// Take screenshot as proof (before verification)
-	const proofPath = await snapshot(page, `dm_${username}`);
+	// Take screenshot as proof of DM (always enabled - this is critical evidence)
+	const proofPath = await snapshot(page, `dm_proof_${username}`, true);
 
 	// Verify we're in a DM thread
 	const isInDmThread = await page

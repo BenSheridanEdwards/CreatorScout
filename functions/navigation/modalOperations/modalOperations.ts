@@ -303,46 +303,60 @@ export async function clickUsernameInModal(
 
 	try {
 		// Find the link element for this username within the modal
-		const linkHandle = await page.evaluateHandle(
-			(targetUser: string) => {
-				const dialog = document.querySelector('div[role="dialog"]');
-				if (!dialog) return null;
+		// First, try direct selector approach
+		const directSelector = `div[role="dialog"] a[href="/${targetUsername}/"]`;
+		let linkHandle = await page.$(directSelector);
 
-				const links = dialog.querySelectorAll('a[href^="/"]');
-				for (const link of links) {
-					const href = link.getAttribute("href") || "";
-					const parts = href.split("/").filter(Boolean);
+		// If not found, search within modal using evaluate
+		if (!linkHandle) {
+			const linkIndex = await page.evaluate(
+				(targetUser: string) => {
+					const dialog = document.querySelector('div[role="dialog"]');
+					if (!dialog) return -1;
 
-					// Username links are /{username}/ format (single path segment)
-					if (parts.length === 1) {
-						const linkUsername = parts[0].toLowerCase();
-						if (linkUsername === targetUser) {
-							return link;
+					const links = dialog.querySelectorAll('a[href^="/"]');
+					for (let i = 0; i < links.length; i++) {
+						const link = links[i];
+						const href = link.getAttribute("href") || "";
+						const parts = href.split("/").filter(Boolean);
+
+						// Username links are /{username}/ format (single path segment)
+						if (parts.length === 1) {
+							const linkUsername = parts[0].toLowerCase();
+							if (linkUsername === targetUser) {
+								return i;
+							}
 						}
 					}
-				}
-				return null;
-			},
-			targetUsername,
-		);
+					return -1;
+				},
+				targetUsername,
+			);
 
-		if (!linkHandle || (await linkHandle.evaluate((el) => el === null))) {
+			if (linkIndex === -1) {
+				console.log(
+					`[MODAL] Username @${targetUsername} not found in modal`,
+				);
+				return false;
+			}
+
+			// Get the link by index
+			const links = await page.$$('div[role="dialog"] a[href^="/"]');
+			if (linkIndex >= 0 && linkIndex < links.length) {
+				linkHandle = links[linkIndex];
+			}
+		}
+
+		if (!linkHandle) {
 			console.log(
 				`[MODAL] Username @${targetUsername} not found in modal`,
 			);
 			return false;
 		}
 
-		// Verify it's an ElementHandle before clicking
-		const elementHandle = linkHandle.asElement();
-		if (!elementHandle) {
-			console.log(`[MODAL] Could not get element handle for @${targetUsername}`);
-			return false;
-		}
-
 		// Click with ghost-cursor for human-like behavior
 		console.log(`[MODAL] Clicking on @${targetUsername} link in modal...`);
-		await humanClick(page, elementHandle, { elementType: "link" });
+		await humanClick(page, linkHandle, { elementType: "link" });
 
 		// Wait for navigation to start
 		await shortDelay(1, 2);

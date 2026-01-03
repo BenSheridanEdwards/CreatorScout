@@ -23,8 +23,13 @@ jest.unstable_mockModule("../../timing/sleep/sleep.ts", () => ({
 	sleep: sleepMock,
 }));
 
-const humanClickMock =
-	jest.fn<(page: Page, handle: ElementHandle<Element>) => Promise<void>>();
+const humanClickMock = jest.fn<
+	(
+		page: Page,
+		handle: ElementHandle<Element>,
+		options?: { elementType?: string },
+	) => Promise<void>
+>();
 const humanClickAtMock = jest.fn<() => Promise<void>>();
 const humanScrollMock = jest.fn<() => Promise<void>>();
 const humanWiggleMock = jest.fn<() => Promise<void>>();
@@ -35,8 +40,12 @@ jest.unstable_mockModule("../humanInteraction/humanInteraction.ts", () => ({
 	humanWiggle: humanWiggleMock,
 }));
 
-const { extractFollowingUsernames, openFollowingModal, scrollFollowingModal } =
-	await import("./modalOperations.ts");
+const {
+	clickUsernameInModal,
+	extractFollowingUsernames,
+	openFollowingModal,
+	scrollFollowingModal,
+} = await import("./modalOperations.ts");
 
 describe("modalOperations", () => {
 	beforeEach(() => {
@@ -181,6 +190,183 @@ describe("modalOperations", () => {
 			// Should only include realuser, not explore
 			expect(names).toContain("realuser");
 			expect(names).not.toContain("explore");
+		});
+	});
+
+	// ═══════════════════════════════════════════════════════════════════════════
+	// clickUsernameInModal() - Click Username Link in Modal
+	// ═══════════════════════════════════════════════════════════════════════════
+
+	describe("clickUsernameInModal()", () => {
+		test("returns false when modal is not found", async () => {
+			const page = {
+				waitForSelector: jest
+					.fn<() => Promise<ElementHandle<Element>>>()
+					.mockRejectedValue(new Error("timeout")),
+			} as unknown as Page;
+
+			const result = await clickUsernameInModal(page, "testuser");
+
+			expect(result).toBe(false);
+			expect(humanClickMock).not.toHaveBeenCalled();
+		});
+
+		test("clicks username link found via direct selector and confirms navigation", async () => {
+			const mockLinkElement = {} as ElementHandle<Element>;
+			const mockDialog = {} as ElementHandle<Element>;
+
+			const page = {
+				waitForSelector: jest
+					.fn<() => Promise<ElementHandle<Element>>>()
+					.mockResolvedValue(mockDialog),
+				$: jest
+					.fn<() => Promise<ElementHandle<Element> | null>>()
+					.mockResolvedValue(mockLinkElement), // Direct selector finds link
+				url: jest
+					.fn<() => string>()
+					.mockReturnValueOnce("https://www.instagram.com/seeduser/") // Initial URL
+					.mockReturnValueOnce("https://www.instagram.com/testuser/"), // After navigation
+				waitForFunction: jest
+					.fn<() => Promise<void>>()
+					.mockResolvedValue(undefined), // Modal closes
+			} as unknown as Page;
+
+			const result = await clickUsernameInModal(page, "testuser");
+
+			expect(result).toBe(true);
+			expect(humanClickMock).toHaveBeenCalledWith(
+				page,
+				mockLinkElement,
+				expect.objectContaining({ elementType: "link" }),
+			);
+		});
+
+		test("finds username via evaluate/index approach when direct selector fails", async () => {
+			const mockLinkElement1 = {} as ElementHandle<Element>;
+			const mockLinkElement2 = {} as ElementHandle<Element>;
+			const mockDialog = {} as ElementHandle<Element>;
+
+			const page = {
+				waitForSelector: jest
+					.fn<() => Promise<ElementHandle<Element>>>()
+					.mockResolvedValue(mockDialog),
+				$: jest
+					.fn<() => Promise<ElementHandle<Element> | null>>()
+					.mockResolvedValue(null), // Direct selector fails
+				$$: jest
+					.fn<() => Promise<ElementHandle<Element>[]>>()
+					.mockResolvedValue([mockLinkElement1, mockLinkElement2]),
+				evaluate: jest
+					.fn<() => Promise<number>>()
+					.mockResolvedValue(1), // Username found at index 1
+				url: jest
+					.fn<() => string>()
+					.mockReturnValueOnce("https://www.instagram.com/seeduser/")
+					.mockReturnValueOnce("https://www.instagram.com/testuser/"),
+				waitForFunction: jest
+					.fn<() => Promise<void>>()
+					.mockResolvedValue(undefined),
+			} as unknown as Page;
+
+			const result = await clickUsernameInModal(page, "testuser");
+
+			expect(result).toBe(true);
+			expect(page.evaluate).toHaveBeenCalled();
+			expect(humanClickMock).toHaveBeenCalledWith(
+				page,
+				mockLinkElement2, // Should click element at index 1
+				expect.objectContaining({ elementType: "link" }),
+			);
+		});
+
+		test("returns false when username not found in modal", async () => {
+			const mockDialog = {} as ElementHandle<Element>;
+
+			const page = {
+				waitForSelector: jest
+					.fn<() => Promise<ElementHandle<Element>>>()
+					.mockResolvedValue(mockDialog),
+				$: jest
+					.fn<() => Promise<ElementHandle<Element> | null>>()
+					.mockResolvedValue(null), // Direct selector fails
+				$$: jest
+					.fn<() => Promise<ElementHandle<Element>[]>>()
+					.mockResolvedValue([]),
+				evaluate: jest
+					.fn<() => Promise<number>>()
+					.mockResolvedValue(-1), // Username not found
+			} as unknown as Page;
+
+			const result = await clickUsernameInModal(page, "nonexistent");
+
+			expect(result).toBe(false);
+			expect(humanClickMock).not.toHaveBeenCalled();
+		});
+
+		test("confirms navigation via URL change when modal doesn't close immediately", async () => {
+			const mockLinkElement = {} as ElementHandle<Element>;
+			const mockDialog = {} as ElementHandle<Element>;
+
+			const page = {
+				waitForSelector: jest
+					.fn<() => Promise<ElementHandle<Element>>>()
+					.mockResolvedValue(mockDialog),
+				$: jest
+					.fn<() => Promise<ElementHandle<Element> | null>>()
+					.mockResolvedValue(mockLinkElement),
+				url: jest
+					.fn<() => string>()
+					.mockReturnValueOnce("https://www.instagram.com/seeduser/")
+					.mockReturnValueOnce("https://www.instagram.com/testuser/"), // URL changed
+				waitForFunction: jest
+					.fn<() => Promise<void>>()
+					.mockRejectedValue(new Error("timeout")), // Modal doesn't close immediately
+			} as unknown as Page;
+
+			const result = await clickUsernameInModal(page, "testuser");
+
+			expect(result).toBe(true);
+			expect(humanClickMock).toHaveBeenCalled();
+		});
+
+		test("returns false when click succeeds but navigation not confirmed", async () => {
+			const mockLinkElement = {} as ElementHandle<Element>;
+			const mockDialog = {} as ElementHandle<Element>;
+
+			const page = {
+				waitForSelector: jest
+					.fn<() => Promise<ElementHandle<Element>>>()
+					.mockResolvedValue(mockDialog),
+				$: jest
+					.fn<() => Promise<ElementHandle<Element> | null>>()
+					.mockResolvedValue(mockLinkElement),
+				url: jest
+					.fn<() => string>()
+					.mockReturnValue("https://www.instagram.com/seeduser/"), // URL doesn't change
+				waitForFunction: jest
+					.fn<() => Promise<void>>()
+					.mockRejectedValue(new Error("timeout")), // Modal doesn't close
+			} as unknown as Page;
+
+			const result = await clickUsernameInModal(page, "testuser");
+
+			expect(result).toBe(false);
+			expect(humanClickMock).toHaveBeenCalled(); // Click was attempted
+		});
+
+		test("handles errors gracefully and returns false", async () => {
+			const page = {
+				waitForSelector: jest
+					.fn<() => Promise<ElementHandle<Element>>>()
+					.mockResolvedValue({} as ElementHandle<Element>),
+				$: jest
+					.fn<() => Promise<ElementHandle<Element> | null>>()
+					.mockRejectedValue(new Error("Unexpected error")),
+			} as unknown as Page;
+
+			const result = await clickUsernameInModal(page, "testuser");
+
+			expect(result).toBe(false);
 		});
 	});
 

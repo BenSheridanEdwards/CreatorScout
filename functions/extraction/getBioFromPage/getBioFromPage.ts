@@ -14,13 +14,15 @@ export async function validateBioExtraction(
 	extractedBio: string | null,
 	username: string,
 ): Promise<{ valid: boolean; correctedBio: string | null }> {
-	// If bio looks complete (reasonable length), skip validation
-	if (extractedBio && extractedBio.length > 30) {
-		return { valid: true, correctedBio: null };
-	}
-
 	try {
+		// Try to take screenshot for validation
+		// Note: Screenshots on Instagram are disabled by default to avoid detection
+		// This will return empty string if DEBUG_SCREENSHOTS=false
 		const screenshotPath = await snapshot(page, `bio_validation_${username}`);
+		if (!screenshotPath) {
+			// Screenshots disabled - skip validation, assume extraction is valid
+			return { valid: true, correctedBio: null };
+		}
 		const visionResult = await validateBioWithVision(screenshotPath);
 
 		if (visionResult) {
@@ -250,6 +252,7 @@ export async function getBioFromPage(page: Page): Promise<string | null> {
 	}
 
 	// Take screenshot and validate with vision when bio extraction fails
+	// Note: Screenshots on Instagram are disabled by default to avoid detection
 	try {
 		const username = await page.evaluate(() => {
 			const urlParts = window.location.pathname.split("/").filter(Boolean);
@@ -260,6 +263,16 @@ export async function getBioFromPage(page: Page): Promise<string | null> {
 			page,
 			`bio_extraction_failed_${username}`,
 		);
+
+		// Skip vision validation if screenshot was disabled
+		if (!screenshotPath) {
+			logger.info(
+				"ANALYSIS",
+				`Bio extraction returned null for @${username} (vision validation skipped - screenshots disabled)`,
+			);
+			return null;
+		}
+
 		logger.warn(
 			"ANALYSIS",
 			`Bio extraction failed for @${username} - validating with vision...`,
