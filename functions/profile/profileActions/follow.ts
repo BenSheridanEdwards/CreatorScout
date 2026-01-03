@@ -5,6 +5,7 @@
 import type { Page } from "puppeteer";
 import { createLogger } from "../../shared/logger/logger.ts";
 import { sleep } from "../../timing/sleep/sleep.ts";
+import { shortDelay } from "../../timing/humanize/humanize.ts";
 import { humanClick } from "../../navigation/humanInteraction/humanInteraction.ts";
 
 const logger = createLogger(process.env.DEBUG_LOGS === "true");
@@ -124,7 +125,7 @@ export async function detectFollowState(
 					`Follow button text not found on page, waiting and retrying (attempt ${attempt + 1}/3) for @${username}...`,
 				);
 			}
-			await sleep(2000);
+			await shortDelay(1, 2);
 		}
 	}
 

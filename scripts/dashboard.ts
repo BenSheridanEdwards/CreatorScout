@@ -10,6 +10,7 @@ import {
 	getDashboardMetrics,
 } from "../functions/shared/dashboard/dashboard.ts";
 import { sleep } from "../functions/timing/sleep/sleep.ts";
+import { mediumDelay } from "../functions/timing/humanize/humanize.ts";
 
 async function showDashboard(): Promise<void> {
 	const args = process.argv.slice(2);
@@ -44,7 +45,7 @@ async function showDashboard(): Promise<void> {
 		} catch (error) {
 			console.error("❌ Dashboard error:", error);
 			if (!watchMode) break;
-			await sleep(5000); // Wait 5 seconds on error
+			await mediumDelay(3, 6); // Wait on error
 		}
 	} while (watchMode);
 }

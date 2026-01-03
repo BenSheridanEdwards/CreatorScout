@@ -9,8 +9,9 @@
  * - humanClick(), humanClickSelector(), humanClickByText()
  * - humanScroll(), humanScrollToElement()
  * - humanMove(), humanMoveToElement(), humanWiggle()
+ * - humanTypeText() - for typing text with human-like patterns
  * - cursor.click() / cursor.moveTo() from ghost-cursor (in humanInteraction.ts only)
- * - page.keyboard.press() / page.keyboard.type() - keyboard actions are acceptable
+ * - page.keyboard.press() - for single key presses (Enter, Escape, etc.)
  * - window.scrollBy/scrollTo with behavior: "smooth" - smooth scrolling is acceptable
  * - element.scrollIntoView({ behavior: "smooth" }) - smooth scroll into view is acceptable
  *
@@ -18,6 +19,7 @@
  * - element.click() - direct Puppeteer click
  * - page.click() - direct page click
  * - page.mouse.click() / page.mouse.move() / page.mouse.down() / page.mouse.up()
+ * - page.keyboard.type() - direct typing (use humanTypeText() instead)
  * - (el as HTMLElement).click() - DOM click in evaluate
  */
 
@@ -132,6 +134,29 @@ const VIOLATION_PATTERNS: Array<{
 		name: "scrollIntoView() without smooth behavior",
 		severity: "error",
 		suggestion: "Use humanScrollElementIntoView() from humanInteraction.ts",
+	},
+	{
+		// Fixed delay without randomness - detectable pattern
+		pattern: /await\s+sleep\s*\(\s*\d+\s*\)/,
+		name: "Fixed delay without randomness",
+		severity: "warning",
+		suggestion:
+			"Use shortDelay(), mediumDelay(), microDelay(), or add Math.random()",
+		allowedContexts: [
+			/sleep\(\s*\d+\s*\+\s*Math\.random/, // Already has randomness
+			/sleep\(\s*\d+\s*\*\s*Math\.random/, // Already has randomness
+			/shortDelay|mediumDelay|microDelay|longDelay/, // Using delay helpers
+		],
+	},
+	{
+		// page.keyboard.type() - direct typing is detectable
+		pattern: /page\.keyboard\.type\s*\(/,
+		name: "Direct page.keyboard.type()",
+		severity: "error",
+		suggestion: "Use humanTypeText(page, selector, text) from humanize.ts",
+		allowedContexts: [
+			/humanTypeText/, // humanTypeText legitimately uses keyboard.type internally
+		],
 	},
 ];
 

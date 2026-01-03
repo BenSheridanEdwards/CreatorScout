@@ -17,6 +17,7 @@ import {
 import { createLogger } from "../../shared/logger/logger.ts";
 import { saveScreenshot, snapshot } from "../../shared/snapshot/snapshot.ts";
 import { sleep } from "../../timing/sleep/sleep.ts";
+import { shortDelay, mediumDelay } from "../../timing/humanize/humanize.ts";
 import { findMessageInput, typeMessage } from "./dmInput.ts";
 import {
 	clickMessageButton,
@@ -156,7 +157,7 @@ export async function followUserAccount(
 		// Navigate to profile using search-based navigation (more human-like)
 		await navigateToProfile(page, username);
 
-		await sleep(3000); // Wait longer for page to fully load
+		await mediumDelay(1.5, 2.5); // Wait for page to fully load
 
 		// Detect follow state using modular function
 		const followState = await detectFollowState(page, username);
@@ -210,7 +211,7 @@ export async function followUserAccount(
 				return true;
 			} else {
 				// Wait a moment for page to stabilize
-				await sleep(1000);
+				await shortDelay(0.5, 1);
 
 				// Verify we're still on the profile page
 				const currentUrl = page.url();
@@ -274,7 +275,7 @@ export async function followUserAccount(
 			return false;
 		} else {
 			// Wait a moment for page to stabilize
-			await sleep(1000);
+			await shortDelay(0.5, 1);
 
 			// Verify we're still on the profile page before taking screenshot
 			const currentUrl = page.url();
@@ -352,7 +353,7 @@ export async function addFollowingToQueue(
 	}
 
 	await page.keyboard.press("Escape"); // Close modal
-	await sleep(1000);
+	await shortDelay(0.5, 1);
 
 	return added;
 }

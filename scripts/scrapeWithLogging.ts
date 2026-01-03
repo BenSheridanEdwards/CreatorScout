@@ -50,6 +50,7 @@ import {
 	mouseWiggle,
 } from "../functions/timing/humanize/humanize.ts";
 import { sleep } from "../functions/timing/sleep/sleep.ts";
+import { shortDelay } from "../functions/timing/humanize/humanize.ts";
 
 // NOTE: Database init is async; queries will initialize schema on demand.
 
@@ -489,7 +490,7 @@ export async function processFollowingList(
 		);
 		// Close the modal before returning
 		await page.keyboard.press("Escape");
-		await sleep(1000);
+		await shortDelay(0.5, 1);
 		return;
 	}
 
@@ -503,7 +504,7 @@ export async function processFollowingList(
 		for (let i = 0; i < Math.floor(scrollIndex / 500); i++) {
 			await scrollFollowingModal(page, 500);
 		}
-		await sleep(2000);
+		await shortDelay(1, 2);
 	}
 
 	let processedInBatch = 0;
@@ -534,7 +535,7 @@ export async function processFollowingList(
 
 					// Close the modal before visiting profile
 					await page.keyboard.press("Escape");
-					await sleep(1000); // brief delay after modal close
+					await shortDelay(0.5, 1); // brief delay after modal close
 
 					await processProfile(
 						username,
@@ -560,7 +561,7 @@ export async function processFollowingList(
 							for (let i = 0; i < Math.floor(scrollIndex / 500); i++) {
 								await scrollFollowingModal(page, 500);
 							}
-							await sleep(2000);
+							await shortDelay(1, 2);
 						}
 					}
 				} else {
@@ -578,7 +579,7 @@ export async function processFollowingList(
 				await scrollFollowingModal(page, 500);
 				scrollIndex += 500;
 				await updateScrollIndex(seedUsername, scrollIndex);
-				await sleep(2000);
+				await shortDelay(1, 2);
 			} else {
 				consecutiveAllVisited = 0;
 				// Processed new profiles, continue with next batch

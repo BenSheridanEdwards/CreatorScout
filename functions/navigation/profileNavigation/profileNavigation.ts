@@ -3,11 +3,9 @@
  * Uses human-like interactions via ghost-cursor to avoid bot detection.
  */
 import type { Page } from "puppeteer";
-import { login } from "../../auth/login/login.ts";
 import { parseProfileStatus } from "../../profile/profileStatus/profileStatus.ts";
-import { IG_PASS, IG_USER } from "../../shared/config/config.ts";
-import type { Logger } from "../../shared/logger/logger.ts";
 import { sleep } from "../../timing/sleep/sleep.ts";
+import { humanTypeText, shortDelay } from "../../timing/humanize/humanize.ts";
 import { humanClick } from "../humanInteraction/humanInteraction.ts";
 
 export interface ProfileStatus {
@@ -32,7 +30,7 @@ async function waitForFrameStability(
 		});
 
 		// Additional wait for frame stability in Browserless
-		await sleep(1000);
+		await shortDelay(0.5, 1);
 
 		// Verify the main frame is accessible by checking page URL
 		try {
@@ -43,7 +41,7 @@ async function waitForFrameStability(
 				frameError instanceof Error ? frameError.message : String(frameError);
 
 			// Wait a bit more and try again
-			await sleep(2000);
+			await shortDelay(1, 2);
 
 			try {
 				page.url(); // Verify again
@@ -149,7 +147,7 @@ async function navigateToProfileViaSearch(
 			if (exploreLink) {
 				await humanClick(page, exploreLink, { elementType: "link" });
 				console.log("NAVIGATE", "✅ Clicked explore link (human-like)");
-				await sleep(2000);
+				await shortDelay(1, 2);
 				const { verifyExplorePageLoaded } = await import(
 					"../../shared/pageVerification/pageVerification.ts"
 				);
@@ -160,7 +158,7 @@ async function navigateToProfileViaSearch(
 		} catch (err) {
 			console.warn(`UI navigation to explore page failed: ${err}`);
 		}
-		await sleep(2000);
+		await shortDelay(1, 2);
 		const searchInput = await page.$(
 			'input[placeholder*="Search"], input[aria-label*="Search"]',
 		);
@@ -174,12 +172,19 @@ async function navigateToProfileViaSearch(
 		throw new Error("Could not find or click search input");
 	}
 
-	await sleep(500 + Math.random() * 500);
+	// Use humanTypeText for stealth - handles clicking and typing with human-like patterns
+	const searchSelector =
+		'input[placeholder*="Search"], input[aria-label*="Search"]';
+	const typed = await humanTypeText(page, searchSelector, u, {
+		clearFirst: true,
+		typeDelay: 100 + Math.random() * 50, // 100-150ms per character
+		wordPause: 200 + Math.random() * 100,
+		mistakeRate: 0.01, // Very low typo rate for usernames (1%)
+		correctionDelay: 300 + Math.random() * 200,
+	});
 
-	// Type the username character by character (human-like typing with delays)
-	for (const char of u) {
-		await page.keyboard.type(char, { delay: 100 + Math.random() * 150 });
-		await sleep(50 + Math.random() * 100);
+	if (!typed) {
+		throw new Error("Failed to type username in search");
 	}
 
 	await sleep(1500 + Math.random() * 1000);
@@ -346,87 +351,6 @@ export async function verifyLoggedIn(page: Page): Promise<boolean> {
 		);
 		return hasInbox || hasHomeIcon || !hasLoginButton;
 	});
-}
-
-/**
- * @deprecated Use initializeInstagramSession() from functions/auth/sessionInitializer/sessionInitializer.ts instead.
- * This function is kept for backward compatibility but will be removed in a future version.
- *
- * Ensure we're logged in, re-logging if necessary.
- */
-export async function ensureLoggedIn(
-	page: Page,
-	logger: Logger,
-): Promise<void> {
-	console.warn(
-		"⚠️  DEPRECATION WARNING: ensureLoggedIn() is deprecated. Use initializeInstagramSession() instead.",
-	);
-
-	logger.info("WAIT", "Checking if logged in");
-
-	// Check if logged in by looking for multiple indicators.
-	// Use element queries instead of page.evaluate so unit tests can mock easily.
-	const inboxLink = await page.$('a[href="/direct/inbox/"]');
-	if (inboxLink) return; // Strong signal we're logged in
-
-	const [profileLink, createButton, homeIcon, loginButton] = await Promise.all([
-		page.$('[aria-label*="profile"]'),
-		page.$('[aria-label*="create"]'),
-		page.$('[aria-label*="home"]'),
-		page.$('a[href*="/accounts/login"]'),
-	]);
-
-	const isLoggedIn = (profileLink || createButton || homeIcon) && !loginButton;
-
-	if (isLoggedIn) {
-		return; // Already logged in
-	}
-
-	// Need to log in - add realistic human delay before attempting
-	console.log("🔐 Not logged in, preparing to login...");
-	await sleep(2000 + Math.random() * 3000); // 2-5 second human-like pause
-
-	if (!IG_USER || !IG_PASS) {
-		throw new Error(
-			"Instagram credentials not configured. Set IG_USER and IG_PASS environment variables.",
-		);
-	}
-
-	// Ensure frame is stable before attempting login (prevents detached frame errors)
-	try {
-		// Check if page is closed
-		if (page?.isClosed()) {
-			throw new Error("Page is closed, cannot login");
-		}
-
-		// Try to access frame - this will throw if detached
-		page.url();
-	} catch (frameError) {
-		const errorMsg =
-			frameError instanceof Error ? frameError.message : String(frameError);
-
-		// If frame is detached, wait for stability before proceeding
-		if (errorMsg.includes("detached Frame")) {
-			console.warn(
-				"⚠️ Frame is detached, waiting for stability before login...",
-			);
-			await waitForFrameStability(page, 5000);
-
-			// Verify frame is now accessible
-			try {
-				page.url();
-			} catch (retryError) {
-				throw new Error(
-					`Frame remains detached after stability wait: ${retryError instanceof Error ? retryError.message : String(retryError)}`,
-				);
-			}
-		} else {
-			// Re-throw other errors
-			throw frameError;
-		}
-	}
-
-	await login(page, { username: IG_USER, password: IG_PASS });
 }
 
 /**

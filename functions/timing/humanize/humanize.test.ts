@@ -26,7 +26,7 @@
 import { jest } from "@jest/globals";
 import type { Page } from "puppeteer";
 
-// Mock sleep function
+// Mock sleep function (used internally by delay functions)
 const sleepMock = jest.fn<() => Promise<void>>().mockResolvedValue(undefined);
 
 jest.unstable_mockModule("../../timing/sleep/sleep.ts", () => ({

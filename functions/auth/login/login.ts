@@ -11,6 +11,7 @@ import {
 	verifyHomePageLoaded,
 } from "../../shared/pageVerification/pageVerification.ts";
 import { snapshot } from "../../shared/snapshot/snapshot.ts";
+import { humanTypeText } from "../../timing/humanize/humanize.ts";
 import { sleep } from "../../timing/sleep/sleep.ts";
 import {
 	isLoggedIn,
@@ -736,46 +737,28 @@ export async function login(
 		throw new Error("Could not find username input field");
 	}
 
-	// Cast to ElementHandle<Element> after null check
-	const usernameElement =
-		usernameField.asElement() as import("puppeteer").ElementHandle<Element>;
-
-	// Use human-like click on the username field (ghost-cursor)
-	logger.info("ACTION", "Clicking username field with human-like movement...");
-	try {
-		await humanClick(page, usernameElement, {
-			elementType: "input",
-			moveDelay: 150 + Math.random() * 100,
-		});
-	} catch (clickErr) {
-		logger.warn("ACTION", `Ghost-cursor click failed: ${clickErr}`);
-		// Try focusing by selector as fallback (focus is acceptable)
-		if (usernameSelectorUsed) {
-			await page.focus(usernameSelectorUsed);
-		}
+	// Use humanTypeText for stealth - it handles clicking and typing with human-like patterns
+	// This includes variable delays, capital letter handling, word pauses, and optional typos
+	if (!usernameSelectorUsed) {
+		throw new Error("Username selector not found");
 	}
 
-	// Small pause after clicking, like a human would
-	await sleep(200 + Math.random() * 300);
+	logger.info("ACTION", "Typing username with human-like pattern using humanTypeText...");
+	const usernameTyped = await humanTypeText(
+		page,
+		usernameSelectorUsed,
+		creds.username,
+		{
+			clearFirst: true, // Clear any existing text
+			typeDelay: 70 + Math.random() * 60, // Base 70-130ms per character
+			wordPause: 200 + Math.random() * 150, // Pause between words
+			mistakeRate: 0.02, // 2% chance of typos (human-like)
+			correctionDelay: 300 + Math.random() * 200,
+		},
+	);
 
-	// Type username with human-like patterns (variable delays, occasional pauses)
-	logger.info("ACTION", "Typing username with human-like pattern...");
-	for (const char of creds.username) {
-		// Variable typing speed: faster for common letters, slower for symbols/numbers
-		let charDelay = 70 + Math.random() * 60; // Base 70-130ms
-
-		// Slower for special characters and numbers
-		if (/[^a-zA-Z]/.test(char)) {
-			charDelay += 30 + Math.random() * 40;
-		}
-
-		// Occasional longer pause (thinking/hesitation)
-		if (Math.random() < 0.08) {
-			charDelay += 150 + Math.random() * 200;
-		}
-
-		await page.keyboard.type(char);
-		await sleep(charDelay);
+	if (!usernameTyped) {
+		throw new Error("Failed to type username");
 	}
 	logger.info("ACTION", "Username entered");
 
@@ -794,10 +777,12 @@ export async function login(
 	];
 
 	let passwordField = null;
+	let passwordSelectorUsed: string | null = null;
 	for (const selector of passwordSelectors) {
 		try {
 			passwordField = await page.$(selector);
 			if (passwordField) {
+				passwordSelectorUsed = selector;
 				logger.info(
 					"ACTION",
 					`Password field found with selector: ${selector}`,
@@ -837,43 +822,27 @@ export async function login(
 		throw new Error("Could not find password input field");
 	}
 
-	// Cast to ElementHandle<Element> after null check
-	const passwordElement =
-		passwordField.asElement() as import("puppeteer").ElementHandle<Element>;
-
-	// Use human-like click on the password field (ghost-cursor)
-	logger.info("ACTION", "Clicking password field with human-like movement...");
-	try {
-		await humanClick(page, passwordElement, {
-			elementType: "input",
-			moveDelay: 100 + Math.random() * 150,
-		});
-	} catch (clickErr) {
-		logger.warn("ACTION", `Ghost-cursor click failed on password: ${clickErr}`);
-		// Continue anyway - the field may still be focused from typing
+	if (!passwordSelectorUsed) {
+		throw new Error("Password selector not found");
 	}
 
-	// Small pause after clicking
-	await sleep(150 + Math.random() * 250);
+	// Use humanTypeText for stealth - passwords typed faster (muscle memory), no typos
+	logger.info("ACTION", "Typing password with human-like pattern using humanTypeText...");
+	const passwordTyped = await humanTypeText(
+		page,
+		passwordSelectorUsed,
+		creds.password,
+		{
+			clearFirst: true, // Clear any existing text
+			typeDelay: 50 + Math.random() * 50, // Faster typing for memorized passwords (50-100ms)
+			wordPause: 150 + Math.random() * 100, // Shorter pauses (passwords are continuous)
+			mistakeRate: 0, // NO TYPOS for passwords - users have muscle memory
+			correctionDelay: 0, // Not used since mistakeRate is 0
+		},
+	);
 
-	// Type password with human-like patterns (slightly faster than username - muscle memory)
-	logger.info("ACTION", "Typing password with human-like pattern...");
-	for (const char of creds.password) {
-		// Passwords are typed faster (muscle memory)
-		let charDelay = 50 + Math.random() * 50; // Base 50-100ms
-
-		// Slower for special characters (shift key)
-		if (/[A-Z!@#$%^&*()_+\-=\[\]{}|;':",.<>?]/.test(char)) {
-			charDelay += 20 + Math.random() * 30;
-		}
-
-		// Very occasional pause (rare for memorized passwords)
-		if (Math.random() < 0.03) {
-			charDelay += 100 + Math.random() * 150;
-		}
-
-		await page.keyboard.type(char);
-		await sleep(charDelay);
+	if (!passwordTyped) {
+		throw new Error("Failed to type password");
 	}
 	logger.info("ACTION", "Password entered");
 

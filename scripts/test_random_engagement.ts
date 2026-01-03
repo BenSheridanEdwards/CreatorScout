@@ -13,6 +13,7 @@ import {
 } from "../functions/profile/profileActions/randomEngagement.ts";
 import { getProfile } from "../functions/shared/profiles/profileLoader.ts";
 import { sleep } from "../functions/timing/sleep/sleep.ts";
+import { shortDelay, mediumDelay } from "../functions/timing/humanize/humanize.ts";
 import chalk from "chalk";
 
 const TEST_USERNAME = "bensheridanedwards";
@@ -60,7 +61,7 @@ async function main() {
 			chalk.blue(`\n📍 Navigating to test profile: @${TEST_USERNAME}...`),
 		);
 		await navigateToProfile(page, TEST_USERNAME);
-		await sleep(2000);
+		await shortDelay(1, 2);
 
 		console.log(chalk.green(`✅ Successfully loaded @${TEST_USERNAME}\n`));
 		console.log(chalk.gray("━".repeat(80)));
@@ -99,7 +100,7 @@ async function main() {
 			console.log(chalk.red(`   ❌ Error: ${error}`));
 		}
 
-		await sleep(1500);
+		await shortDelay(0.8, 1.5);
 
 		// Test 2: View Random Post
 		console.log(chalk.bold.yellow("\n🖼️  Test 2: View Random Post"));
@@ -127,7 +128,7 @@ async function main() {
 			console.log(chalk.red(`   ❌ Error: ${error}`));
 		}
 
-		await sleep(1500);
+		await shortDelay(0.8, 1.5);
 
 		// Test 3: Watch Random Reel
 		console.log(chalk.bold.yellow("\n🎬 Test 3: Watch Random Reel"));
@@ -155,7 +156,7 @@ async function main() {
 			console.log(chalk.red(`   ❌ Error: ${error}`));
 		}
 
-		await sleep(1500);
+		await shortDelay(0.8, 1.5);
 
 		// Test 4: Like Random Post
 		console.log(chalk.bold.yellow("\n❤️  Test 4: Like Random Post"));
@@ -186,7 +187,7 @@ async function main() {
 			console.log(chalk.red(`   ❌ Error: ${error}`));
 		}
 
-		await sleep(1500);
+		await shortDelay(0.8, 1.5);
 
 		// Test 5: Random Action (Full Flow)
 		console.log(chalk.bold.yellow("\n🎲 Test 5: Perform Random Engagement"));
@@ -285,7 +286,7 @@ async function main() {
 		console.log(
 			chalk.blue("\n🔍 Browser will remain open for 10 seconds for inspection..."),
 		);
-		await sleep(10000);
+		await mediumDelay(8, 12);
 
 		console.log(chalk.gray("Closing browser..."));
 		await browser.close();

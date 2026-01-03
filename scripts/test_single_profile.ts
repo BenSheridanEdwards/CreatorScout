@@ -31,6 +31,7 @@ import {
 } from "../functions/profile/vision/vision.ts";
 import { snapshot } from "../functions/shared/snapshot/snapshot.ts";
 import { sleep } from "../functions/timing/sleep/sleep.ts";
+import { shortDelay } from "../functions/timing/humanize/humanize.ts";
 import {
 	initDb,
 	getPrismaClient,
@@ -178,7 +179,7 @@ async function testProfile(username: string): Promise<ProfileTestResult> {
 		// Navigate to profile
 		console.log(`\n🌐 Navigating to ${result.url}`);
 		await page.goto(result.url, { waitUntil: "networkidle2", timeout: 30000 });
-		await sleep(2000);
+		await shortDelay(1, 2);
 
 		// ===== STEP 1: RAW EXTRACTION =====
 		console.log("\n" + "-".repeat(40));
@@ -393,7 +394,7 @@ async function testProfile(username: string): Promise<ProfileTestResult> {
 					waitUntil: "networkidle2",
 					timeout: 15000,
 				});
-				await sleep(1000);
+				await shortDelay(0.5, 1);
 			}
 		} else {
 			console.log("[LINK] No bio link to click");

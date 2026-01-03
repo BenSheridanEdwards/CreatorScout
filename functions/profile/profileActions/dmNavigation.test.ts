@@ -6,7 +6,7 @@ import { jest } from "@jest/globals";
 import type { Page } from "puppeteer";
 import { createPageMock } from "../../__test__/testUtils.ts";
 
-// Mock sleep to avoid delays in tests
+// Mock sleep function (used internally by delay functions) to avoid delays in tests
 const sleepMock = jest
 	.fn<(ms: number) => Promise<void>>()
 	.mockResolvedValue(undefined);
@@ -35,6 +35,12 @@ const mockCursor = {
 const getGhostCursorMock = jest
 	.fn<() => Promise<typeof mockCursor>>()
 	.mockResolvedValue(mockCursor);
+const humanScrollMock = jest
+	.fn<() => Promise<void>>()
+	.mockResolvedValue(undefined);
+const humanWiggleMock = jest
+	.fn<() => Promise<void>>()
+	.mockResolvedValue(undefined);
 
 jest.unstable_mockModule("../../timing/sleep/sleep.ts", () => ({
 	sleep: sleepMock,
@@ -45,10 +51,36 @@ jest.unstable_mockModule("./popupHandler.ts", () => ({
 jest.unstable_mockModule("../../shared/snapshot/snapshot.ts", () => ({
 	snapshot: snapshotMock,
 }));
-jest.unstable_mockModule("../../navigation/humanInteraction/humanInteraction.ts", () => ({
-	humanClick: humanClickMock,
-	humanClickAt: humanClickAtMock,
-	getGhostCursor: getGhostCursorMock,
+jest.unstable_mockModule(
+	"../../navigation/humanInteraction/humanInteraction.ts",
+	() => ({
+		humanClick: humanClickMock,
+		humanClickAt: humanClickAtMock,
+		getGhostCursor: getGhostCursorMock,
+		humanScroll: humanScrollMock,
+		humanWiggle: humanWiggleMock,
+	}),
+);
+
+// Mock humanize functions that use delay/sleep
+const humanClickElementMock = jest
+	.fn<(page: Page, selector: string, options?: unknown) => Promise<boolean>>()
+	.mockResolvedValue(true);
+const humanTypeTextMock = jest
+	.fn<
+		(
+			page: Page,
+			selector: string,
+			text: string,
+			options?: unknown,
+		) => Promise<boolean>
+	>()
+	.mockResolvedValue(true);
+
+jest.unstable_mockModule("../../timing/humanize/humanize.ts", () => ({
+	humanClickElement: humanClickElementMock,
+	humanTypeText: humanTypeTextMock,
+	shortDelay: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
 }));
 
 // Import after mocks are set up
@@ -66,6 +98,8 @@ describe("dmNavigation", () => {
 		jest.clearAllMocks();
 		mockCursor.moveTo.mockClear();
 		mockCursor.click.mockClear();
+		humanClickElementMock.mockResolvedValue(true);
+		humanTypeTextMock.mockResolvedValue(true);
 	});
 
 	describe("navigateToProfile", () => {
@@ -83,9 +117,10 @@ describe("dmNavigation", () => {
 						} | null>
 					>()
 					.mockResolvedValue({ x: 0, y: 0, width: 100, height: 40 }),
-				evaluate: jest.fn<() => Promise<string>>().mockResolvedValue(""),
+				evaluate: jest.fn<() => Promise<string>>().mockResolvedValue("input"),
 			} as unknown as import("puppeteer").ElementHandle<Element>;
 
+			let evaluateCallCount = 0;
 			const page = createPageMock({
 				goto: jest
 					.fn<(url: string, opts?: object) => Promise<void>>()
@@ -100,11 +135,12 @@ describe("dmNavigation", () => {
 						) => Promise<import("puppeteer").ElementHandle<Element> | null>
 					>()
 					.mockImplementation((selector: string) => {
-						// Return element for search input or popup buttons
+						// Return element for search input, popup buttons, or profile link
 						if (
 							selector.includes("Search") ||
 							selector.includes("explore") ||
-							selector.includes("button")
+							selector.includes("button") ||
+							selector.includes("/testuser/")
 						) {
 							return Promise.resolve(mockElement);
 						}
@@ -119,9 +155,23 @@ describe("dmNavigation", () => {
 					.mockResolvedValue([mockElement]) as unknown as Page["$$"],
 				evaluate: jest
 					.fn<(pageFunction: unknown, ...args: unknown[]) => Promise<unknown>>()
-					.mockResolvedValueOnce({ found: false }) // Popup handler - no popups
-					.mockResolvedValueOnce(true) // Profile found in search results
-					.mockResolvedValue("") as unknown as Page["evaluate"],
+					.mockImplementation(async (fn: unknown, ...args: unknown[]) => {
+						evaluateCallCount++;
+						// First call: tagName check (line 86-88)
+						if (evaluateCallCount === 1) {
+							return "input";
+						}
+						// Profile search calls - return found profile
+						if (
+							typeof fn === "function" &&
+							args.length > 0 &&
+							args[0] === "testuser"
+						) {
+							return { found: true, href: "/testuser/", index: 0 };
+						}
+						// Default for other evaluate calls
+						return "";
+					}) as unknown as Page["evaluate"],
 				waitForFunction: jest
 					.fn<() => Promise<void>>()
 					.mockResolvedValue(undefined),
@@ -160,20 +210,19 @@ describe("dmNavigation", () => {
 						} | null>
 					>()
 					.mockResolvedValue({ x: 0, y: 0, width: 100, height: 40 }),
-				evaluate: jest.fn<() => Promise<string>>().mockResolvedValue(""),
+				evaluate: jest.fn<() => Promise<string>>().mockResolvedValue("input"),
 			} as unknown as import("puppeteer").ElementHandle<Element>;
 
+			let evaluateCallCount = 0;
 			const page = createPageMock({
 				goto: jest
 					.fn<(url: string, opts?: object) => Promise<void>>()
 					.mockResolvedValue(undefined),
 				url: jest
 					.fn<() => string>()
-					.mockReturnValueOnce("https://www.instagram.com/") // Initial URL (line 92)
-					.mockReturnValueOnce("https://www.instagram.com/testuser/") // After search navigation (line 265)
-					.mockReturnValueOnce("https://www.instagram.com/testuser/") // After second check (line 269)
-					.mockReturnValueOnce("https://www.instagram.com/testuser/") // Logging (line 278)
-					.mockReturnValue("https://www.instagram.com/accounts/login/"), // After profile check - login page (line 292)
+					.mockReturnValueOnce("https://www.instagram.com/") // Initial URL
+					.mockReturnValueOnce("https://www.instagram.com/testuser/") // After search navigation
+					.mockReturnValue("https://www.instagram.com/accounts/login/"), // After profile check - login page
 				isClosed: jest.fn<() => boolean>().mockReturnValue(false),
 				$: jest
 					.fn<
@@ -182,10 +231,12 @@ describe("dmNavigation", () => {
 						) => Promise<import("puppeteer").ElementHandle<Element> | null>
 					>()
 					.mockImplementation((selector: string) => {
+						// Return element for search input, popup buttons, or profile link
 						if (
 							selector.includes("Search") ||
 							selector.includes("explore") ||
-							selector.includes("button")
+							selector.includes("button") ||
+							selector.includes("/testuser/")
 						) {
 							return Promise.resolve(mockElement);
 						}
@@ -200,9 +251,23 @@ describe("dmNavigation", () => {
 					.mockResolvedValue([mockElement]) as unknown as Page["$$"],
 				evaluate: jest
 					.fn<(pageFunction: unknown, ...args: unknown[]) => Promise<unknown>>()
-					.mockResolvedValueOnce({ found: false }) // Popup handler - no popups
-					.mockResolvedValueOnce(true) // Profile found in search
-					.mockResolvedValue("") as unknown as Page["evaluate"],
+					.mockImplementation(async (fn: unknown, ...args: unknown[]) => {
+						evaluateCallCount++;
+						// First call: tagName check
+						if (evaluateCallCount === 1) {
+							return "input";
+						}
+						// Profile search calls - return found profile
+						if (
+							typeof fn === "function" &&
+							args.length > 0 &&
+							args[0] === "testuser"
+						) {
+							return { found: true, href: "/testuser/", index: 0 };
+						}
+						// Default for other evaluate calls
+						return "";
+					}) as unknown as Page["evaluate"],
 				waitForFunction: jest
 					.fn<() => Promise<void>>()
 					.mockResolvedValue(undefined),
@@ -237,7 +302,8 @@ describe("dmNavigation", () => {
 
 			await simulateNaturalBehavior(page as unknown as Page);
 
-			expect(page.evaluate).toHaveBeenCalled();
+			// Now uses humanScroll instead of page.evaluate with window.scrollBy
+			expect(humanScrollMock).toHaveBeenCalled();
 			// Now uses ghost-cursor via getGhostCursor mock
 			expect(mockCursor.moveTo).toHaveBeenCalled();
 		});

@@ -6,6 +6,7 @@ import type { Page } from "puppeteer";
 import { createLogger } from "../../shared/logger/logger.ts";
 import { snapshot } from "../../shared/snapshot/snapshot.ts";
 import { sleep } from "../../timing/sleep/sleep.ts";
+import { humanTypeText, shortDelay } from "../../timing/humanize/humanize.ts";
 import { handleInstagramPopups } from "./popupHandler.ts";
 import {
 	humanClick,
@@ -127,7 +128,7 @@ async function navigateToProfileViaSearch(
 			if (exploreLink) {
 				await humanClick(page, exploreLink, { elementType: "link" });
 				getLogger().info("ACTION", "✅ Clicked explore link (human-like)");
-				await sleep(2000);
+				await shortDelay(1, 2);
 				const { verifyExplorePageLoaded } = await import(
 					"../../shared/pageVerification/pageVerification.ts"
 				);
@@ -141,7 +142,7 @@ async function navigateToProfileViaSearch(
 				`UI navigation to explore page failed: ${err}`,
 			);
 		}
-		await sleep(2000);
+		await shortDelay(1, 2);
 		const searchInput = await page.$(
 			'input[placeholder*="Search"], input[aria-label*="Search"]',
 		);
@@ -155,14 +156,19 @@ async function navigateToProfileViaSearch(
 		throw new Error("Could not find or click search input");
 	}
 
-	// Wait a moment for search input to be ready
-	await sleep(500 + Math.random() * 500);
-
-	// Type the username character by character (human-like)
+	// Use humanTypeText for stealth - handles clicking and typing with human-like patterns
 	getLogger().info("ACTION", `Typing username: @${u}`);
-	for (const char of u) {
-		await page.keyboard.type(char, { delay: 100 + Math.random() * 150 });
-		await sleep(50 + Math.random() * 100);
+	const searchSelector = 'input[placeholder*="Search"], input[aria-label*="Search"]';
+	const typed = await humanTypeText(page, searchSelector, u, {
+		clearFirst: true,
+		typeDelay: 100 + Math.random() * 50, // 100-150ms per character
+		wordPause: 200 + Math.random() * 100,
+		mistakeRate: 0.01, // Very low typo rate for usernames (1%)
+		correctionDelay: 300 + Math.random() * 200,
+	});
+
+	if (!typed) {
+		throw new Error("Failed to type username in search");
 	}
 
 	// Wait for search results to appear
@@ -256,7 +262,7 @@ async function navigateToProfileViaSearch(
 	const finalUrl = page.url();
 	if (!finalUrl.includes(`/${u}/`)) {
 		// Wait a bit more and check again
-		await sleep(2000);
+		await shortDelay(1, 2);
 		const finalUrl2 = page.url();
 		if (!finalUrl2.includes(`/${u}/`)) {
 			getLogger().warn(

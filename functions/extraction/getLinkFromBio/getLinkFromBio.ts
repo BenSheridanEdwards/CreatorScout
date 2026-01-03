@@ -1,5 +1,5 @@
 import type { ElementHandle, Page } from "puppeteer";
-import { sleep } from "../../timing/sleep/sleep.ts";
+import { shortDelay } from "../../timing/humanize/humanize.ts";
 import {
 	humanClick,
 	humanClickAt,
@@ -199,7 +199,7 @@ export async function clickBioLink(page: Page): Promise<{
 		// Click with ghost-cursor (human-like)
 		console.log("[BIO_LINK] Clicking with ghost-cursor...");
 		await humanClick(page, linkElement, { elementType: "link" });
-		await sleep(3000);
+		await shortDelay(1.5, 2.5);
 
 		// Check if we navigated away (link might stay on same page or open in new tab)
 		const currentUrl = page.url();
@@ -250,7 +250,7 @@ export async function clickBioLink(page: Page): Promise<{
 			const y = box.y + box.height / 2;
 
 			await humanClickAt(page, x, y, { elementType: "link" });
-			await sleep(3000);
+			await shortDelay(1.5, 2.5);
 
 			// Check again for navigation or new tab
 			const afterClickUrl = page.url();

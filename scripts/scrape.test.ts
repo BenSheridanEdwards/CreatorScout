@@ -27,7 +27,6 @@ const mockFollowUserAccount = jest.fn<() => Promise<boolean>>();
 const mockAddFollowingToQueue = jest.fn<() => Promise<number>>();
 const mockGetDelay = jest.fn<() => number>();
 const mockSleep = jest.fn<() => Promise<void>>();
-const mockEnsureLoggedIn = jest.fn<() => Promise<void>>();
 const mockOpenFollowingModal = jest.fn<() => Promise<void>>();
 const mockExtractFollowingUsernames = jest.fn<() => Promise<string[]>>();
 const mockScrollFollowingModal = jest.fn<() => Promise<void>>();
@@ -104,7 +103,6 @@ jest.unstable_mockModule(
 	"../functions/navigation/profileNavigation/profileNavigation.ts",
 	() => ({
 		navigateToProfileAndCheck: mockNavigateToProfileAndCheck,
-		ensureLoggedIn: mockEnsureLoggedIn,
 	}),
 );
 
@@ -242,7 +240,6 @@ describe.skip("scrape.ts", () => {
 		mockQueueNext.mockResolvedValue(null);
 		mockWasDmSent.mockResolvedValue(false);
 		mockWasFollowed.mockResolvedValue(false);
-		mockEnsureLoggedIn.mockResolvedValue(undefined);
 
 		mockCycleManager = {
 			recordWarning: jest.fn<() => void>(),
@@ -1547,7 +1544,6 @@ user2
 
 			expect(mockCreateBrowser).toHaveBeenCalledWith({ headless: true });
 			expect(mockCreatePage).toHaveBeenCalledWith(mockBrowser);
-			expect(mockEnsureLoggedIn).toHaveBeenCalledWith(mockPage);
 			expect(mockLogger.info).toHaveBeenCalledWith(
 				"ACTION",
 				"🚀 Scout - Instagram Patreon Creator Discovery Agent",

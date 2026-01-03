@@ -68,7 +68,7 @@ jest.unstable_mockModule("../vision/vision.ts", () => ({
 	validateBioWithVision: validateBioWithVisionMock,
 }));
 
-// Mock sleep to avoid delays in tests
+// Mock sleep function (used internally by delay functions) to avoid delays in tests
 const sleepMock = jest
 	.fn<(ms: number) => Promise<void>>()
 	.mockResolvedValue(undefined);

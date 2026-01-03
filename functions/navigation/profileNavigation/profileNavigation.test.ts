@@ -34,7 +34,31 @@ const parseProfileStatusMock = jest
 	.fn<(text: string) => { isPrivate: boolean; notFound: boolean }>()
 	.mockReturnValue({ isPrivate: false, notFound: false });
 const sleepMock = jest.fn<() => Promise<void>>();
-const configMock = { IG_USER: "u", IG_PASS: "p", DEBUG_SCREENSHOTS: false };
+const configMock = {
+	IG_USER: "u",
+	IG_PASS: "p",
+	DEBUG_SCREENSHOTS: false,
+	DELAY_SCALE: 1.0,
+	DELAY_SCALES: {
+		navigation: 1.0,
+		modal: 1.0,
+		input: 1.0,
+		action: 1.0,
+		pacing: 1.0,
+	},
+	DELAYS: {
+		after_scroll: [0.5, 1.5],
+		after_navigate: [1, 3],
+		after_action: [0.5, 1.5],
+	},
+	DELAY_CATEGORIES: {},
+	TIMEOUT_SCALE: 1.0,
+	TIMEOUTS: {
+		page_load: 30000,
+		element_wait: 10000,
+		navigation: 30000,
+	},
+};
 
 // Mock humanInteraction to avoid ghost-cursor initialization in tests
 const humanClickMock = jest
@@ -49,18 +73,47 @@ jest.unstable_mockModule(
 	() => ({ parseProfileStatus: parseProfileStatusMock }),
 );
 jest.unstable_mockModule("../../shared/config/config.ts", () => configMock);
+// Mock sleep function (used internally by delay functions)
 jest.unstable_mockModule("../../timing/sleep/sleep.ts", () => ({
 	sleep: sleepMock,
 }));
+const humanScrollMock = jest
+	.fn<() => Promise<void>>()
+	.mockResolvedValue(undefined);
+const humanWiggleMock = jest
+	.fn<() => Promise<void>>()
+	.mockResolvedValue(undefined);
 jest.unstable_mockModule("../humanInteraction/humanInteraction.ts", () => ({
 	humanClick: humanClickMock,
+	humanScroll: humanScrollMock,
+	humanWiggle: humanWiggleMock,
+}));
+
+// Mock humanize functions that use delay/sleep
+const humanClickElementMock = jest
+	.fn<(page: Page, selector: string, options?: unknown) => Promise<boolean>>()
+	.mockResolvedValue(true);
+const humanTypeTextMock = jest
+	.fn<
+		(
+			page: Page,
+			selector: string,
+			text: string,
+			options?: unknown,
+		) => Promise<boolean>
+	>()
+	.mockResolvedValue(true);
+
+jest.unstable_mockModule("../../timing/humanize/humanize.ts", () => ({
+	humanClickElement: humanClickElementMock,
+	humanTypeText: humanTypeTextMock,
+	shortDelay: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
 }));
 
 const {
 	navigateToProfile,
 	checkProfileStatus,
 	verifyLoggedIn,
-	ensureLoggedIn,
 	navigateToProfileAndCheck,
 } = await import("./profileNavigation.ts");
 
@@ -118,6 +171,8 @@ describe("profileNavigation", () => {
 			isPrivate: false,
 			notFound: false,
 		});
+		humanClickElementMock.mockResolvedValue(true);
+		humanTypeTextMock.mockResolvedValue(true);
 	});
 
 	// ═══════════════════════════════════════════════════════════════════════════
@@ -145,10 +200,46 @@ describe("profileNavigation", () => {
 					}
 					return Promise.resolve(null);
 				}) as Page["$"];
+			let evaluateCallCount = 0;
 			// Mock evaluate for clicking profile in search results
 			page.evaluate = jest
-				.fn<(pageFunction: unknown, ...args: unknown[]) => Promise<boolean>>()
-				.mockResolvedValue(true) as Page["evaluate"];
+				.fn<(pageFunction: unknown, ...args: unknown[]) => Promise<unknown>>()
+				.mockImplementation(async (fn: unknown, ...args: unknown[]) => {
+					evaluateCallCount++;
+					// First call: tagName check
+					if (evaluateCallCount === 1) {
+						return "input";
+					}
+					// Profile search calls - return found profile
+					if (
+						typeof fn === "function" &&
+						args.length > 0 &&
+						args[0] === "user123"
+					) {
+						return { found: true, href: "/user123/", index: 0 };
+					}
+					// Default for other evaluate calls
+					return "";
+				}) as Page["evaluate"];
+			// Mock page.$ to return element for profile link
+			page.$ = jest
+				.fn<
+					(
+						selector: string,
+					) => Promise<import("puppeteer").ElementHandle<Element> | null>
+				>()
+				.mockImplementation((selector: string) => {
+					if (selector.includes("Search") || selector.includes("explore")) {
+						return Promise.resolve(mockElement);
+					}
+					if (
+						selector.includes('a[href="/user123/"]') ||
+						selector.includes("/user123/")
+					) {
+						return Promise.resolve(mockElement);
+					}
+					return Promise.resolve(null);
+				}) as Page["$"];
 
 			await navigateToProfile(page, "user123");
 
@@ -165,7 +256,9 @@ describe("profileNavigation", () => {
 			const page = pageMock();
 			const mockElement = {
 				click: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
+				evaluate: jest.fn<() => Promise<string>>().mockResolvedValue("input"),
 			} as unknown as import("puppeteer").ElementHandle<Element>;
+			let evaluateCallCount = 0;
 			page.$ = jest
 				.fn<
 					(
@@ -176,15 +269,37 @@ describe("profileNavigation", () => {
 					if (selector.includes("Search") || selector.includes("explore")) {
 						return Promise.resolve(mockElement);
 					}
+					if (
+						selector.includes('a[href="/user123/"]') ||
+						selector.includes("/user123/")
+					) {
+						return Promise.resolve(mockElement);
+					}
 					return Promise.resolve(null);
 				}) as Page["$"];
 			page.evaluate = jest
-				.fn<(pageFunction: unknown, ...args: unknown[]) => Promise<boolean>>()
-				.mockResolvedValue(true) as Page["evaluate"];
+				.fn<(pageFunction: unknown, ...args: unknown[]) => Promise<unknown>>()
+				.mockImplementation(async (fn: unknown, ...args: unknown[]) => {
+					evaluateCallCount++;
+					// First call: tagName check
+					if (evaluateCallCount === 1) {
+						return "input";
+					}
+					// Profile search calls - return found profile
+					if (
+						typeof fn === "function" &&
+						args.length > 0 &&
+						args[0] === "user123"
+					) {
+						return { found: true, href: "/user123/", index: 0 };
+					}
+					// Default for other evaluate calls
+					return "";
+				}) as Page["evaluate"];
 
 			await navigateToProfile(page, "user123");
 
-			// Should have called sleep during navigation
+			// Should have called sleep during navigation (either directly or via delay functions)
 			expect(sleepMock).toHaveBeenCalled();
 		});
 
@@ -203,11 +318,18 @@ describe("profileNavigation", () => {
 					if (selector.includes("Search") || selector.includes("explore")) {
 						return Promise.resolve(mockElement);
 					}
+					if (selector.includes('a[href="/user123/"]')) {
+						return Promise.resolve(mockElement);
+					}
 					return Promise.resolve(null);
 				}) as Page["$"];
 			page.evaluate = jest
-				.fn<(pageFunction: unknown, ...args: unknown[]) => Promise<boolean>>()
-				.mockResolvedValue(true) as Page["evaluate"];
+				.fn<(pageFunction: unknown, ...args: unknown[]) => Promise<unknown>>()
+				.mockResolvedValue({
+					found: true,
+					href: "/user123/",
+					index: 0,
+				}) as Page["evaluate"];
 			page.waitForSelector = jest
 				.fn<
 					(
@@ -241,11 +363,18 @@ describe("profileNavigation", () => {
 					if (selector.includes("Search") || selector.includes("explore")) {
 						return Promise.resolve(mockElement);
 					}
+					if (selector.includes('a[href="/user123/"]')) {
+						return Promise.resolve(mockElement);
+					}
 					return Promise.resolve(null);
 				}) as Page["$"];
 			page.evaluate = jest
-				.fn<(pageFunction: unknown, ...args: unknown[]) => Promise<boolean>>()
-				.mockResolvedValue(true) as Page["evaluate"];
+				.fn<(pageFunction: unknown, ...args: unknown[]) => Promise<unknown>>()
+				.mockResolvedValue({
+					found: true,
+					href: "/user123/",
+					index: 0,
+				}) as Page["evaluate"];
 
 			await navigateToProfile(page, "user123", { timeout: 10000 });
 
@@ -356,63 +485,6 @@ describe("profileNavigation", () => {
 	});
 
 	// ═══════════════════════════════════════════════════════════════════════════
-	// ensureLoggedIn() - Ensure Authenticated Session
-	// ═══════════════════════════════════════════════════════════════════════════
-
-	describe("ensureLoggedIn()", () => {
-		test("returns immediately when inbox link exists (already logged in)", async () => {
-			const page = pageMock();
-			page.$ = jest
-				.fn<
-					(
-						selector: string,
-					) => Promise<import("puppeteer").ElementHandle<Element> | null>
-				>()
-				.mockResolvedValue(
-					{} as import("puppeteer").ElementHandle<Element>,
-				) as Page["$"];
-
-			await ensureLoggedIn(page, logger);
-
-			expect(loginMock).not.toHaveBeenCalled();
-		});
-
-		test("triggers login when no login indicators are found", async () => {
-			const page = pageMock();
-			page.$ = jest.fn<() => Promise<null>>().mockResolvedValue(null);
-			loginMock.mockResolvedValue(undefined);
-
-			await ensureLoggedIn(page, logger);
-
-			expect(loginMock).toHaveBeenCalledWith(page, {
-				username: "u",
-				password: "p",
-			});
-		});
-
-		test("throws error when credentials are not configured", async () => {
-			configMock.IG_USER = "";
-			configMock.IG_PASS = "";
-			const page = pageMock();
-			page.$ = jest
-				.fn<
-					(
-						selector: string,
-					) => Promise<import("puppeteer").ElementHandle<Element> | null>
-				>()
-				.mockResolvedValue(null) as Page["$"];
-
-			jest.resetModules();
-			const { ensureLoggedIn } = await import("./profileNavigation.ts");
-
-			await expect(ensureLoggedIn(page, logger)).rejects.toThrow(
-				"Instagram credentials not configured",
-			);
-			expect(loginMock).not.toHaveBeenCalled();
-		});
-	});
-
-	// ═══════════════════════════════════════════════════════════════════════════
 	// navigateToProfileAndCheck() - Navigate and Check Status
 	// ═══════════════════════════════════════════════════════════════════════════
 
@@ -433,12 +505,28 @@ describe("profileNavigation", () => {
 					if (selector.includes("Search") || selector.includes("explore")) {
 						return Promise.resolve(mockElement);
 					}
+					if (selector.includes('a[href="/abc/"]')) {
+						return Promise.resolve(mockElement);
+					}
 					return Promise.resolve(null);
 				}) as Page["$"];
+			page.$$ = jest
+				.fn<
+					(
+						selector: string,
+					) => Promise<import("puppeteer").ElementHandle<Element>[]>
+				>()
+				.mockResolvedValue([mockElement]) as Page["$$"];
 			page.evaluate = jest
 				.fn<(pageFunction: unknown, ...args: unknown[]) => Promise<unknown>>()
-				.mockResolvedValueOnce(true) // Profile found in search
-				.mockResolvedValue("text") as Page["evaluate"]; // Body text for status check
+				.mockImplementation((fn: unknown, ...args: unknown[]) => {
+					// First call: search for profile link by href
+					if (args[0] === "abc") {
+						return Promise.resolve({ found: true, href: "/abc/", index: 0 });
+					}
+					// Second call: checkProfileStatus body text
+					return Promise.resolve("text");
+				}) as Page["evaluate"];
 			parseProfileStatusMock.mockReturnValue({
 				isPrivate: false,
 				notFound: true,

@@ -17,7 +17,8 @@
 import { jest } from "@jest/globals";
 import type { ElementHandle, Page } from "puppeteer";
 
-const sleepMock = jest.fn<() => Promise<void>>();
+// Mock sleep function (used internally by delay functions)
+const sleepMock = jest.fn<(ms: number) => Promise<void>>();
 jest.unstable_mockModule("../../timing/sleep/sleep.ts", () => ({
 	sleep: sleepMock,
 }));
@@ -25,9 +26,13 @@ jest.unstable_mockModule("../../timing/sleep/sleep.ts", () => ({
 const humanClickMock =
 	jest.fn<(page: Page, handle: ElementHandle<Element>) => Promise<void>>();
 const humanClickAtMock = jest.fn<() => Promise<void>>();
+const humanScrollMock = jest.fn<() => Promise<void>>();
+const humanWiggleMock = jest.fn<() => Promise<void>>();
 jest.unstable_mockModule("../humanInteraction/humanInteraction.ts", () => ({
 	humanClick: humanClickMock,
 	humanClickAt: humanClickAtMock,
+	humanScroll: humanScrollMock,
+	humanWiggle: humanWiggleMock,
 }));
 
 const { extractFollowingUsernames, openFollowingModal, scrollFollowingModal } =
@@ -204,7 +209,11 @@ describe("modalOperations", () => {
 
 			await scrollFollowingModal(page, 600);
 
-			expect(sleepMock).toHaveBeenCalledWith(400);
+			// microDelay(0.2, 0.5) uses delay function which internally calls sleep with random value between 200-500ms
+			expect(sleepMock).toHaveBeenCalled();
+			const sleepCall = sleepMock.mock.calls[0]?.[0];
+			expect(sleepCall).toBeGreaterThanOrEqual(200);
+			expect(sleepCall).toBeLessThanOrEqual(500);
 		});
 
 		test("uses default scroll amount of 600px when not specified", async () => {

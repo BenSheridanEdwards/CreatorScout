@@ -1,6 +1,6 @@
 import type { Page } from "puppeteer";
 import { CONFIDENCE_THRESHOLD } from "../../shared/config/config.ts";
-import { sleep } from "../../timing/sleep/sleep.ts";
+import { mediumDelay, microDelay } from "../../timing/humanize/humanize.ts";
 import { humanScrollTo } from "../../navigation/humanInteraction/humanInteraction.ts";
 
 const INSTAGRAM_HOST = "instagram.com";
@@ -191,21 +191,17 @@ export async function analyzeExternalLink(
 		if (isAlreadyOnExternalPage) {
 			console.log(`[LINK_ANALYSIS] Already on external page: ${currentUrl}`);
 			finalUrl = currentUrl;
-			// Wait 5 seconds for page to fully load even if we're already on it
-			console.log(
-				`[LINK_ANALYSIS] Waiting 5 seconds for page to fully load...`,
-			);
-			await sleep(5000);
+			// Wait for page to fully load even if we're already on it
+			console.log(`[LINK_ANALYSIS] Waiting for page to fully load...`);
+			await mediumDelay(2, 4);
 		} else {
 			// Navigate to the external link
 			console.log(`[LINK_ANALYSIS] Navigating to: ${linkUrl}`);
 			await page.goto(linkUrl, { waitUntil: "networkidle2", timeout: 15000 });
 			finalUrl = page.url();
-			// Wait 5 seconds for page to fully load before doing any checks
-			console.log(
-				`[LINK_ANALYSIS] Waiting 5 seconds for page to fully load...`,
-			);
-			await sleep(5000);
+			// Wait for page to fully load before doing any checks
+			console.log(`[LINK_ANALYSIS] Waiting for page to fully load...`);
+			await mediumDelay(2, 4);
 		}
 
 		// Check if the URL is blacklisted (non-creator domains)
@@ -277,10 +273,10 @@ export async function analyzeExternalLink(
 		try {
 			// Scroll to bottom using ghost-cursor
 			await humanScrollTo(page, "bottom");
-			await sleep(500);
+			await microDelay(0.3, 0.6);
 			// Scroll back to top to capture everything
 			await humanScrollTo(page, "top");
-			await sleep(300);
+			await microDelay(0.2, 0.4);
 		} catch (scrollError) {
 			console.log(
 				`[LINK_ANALYSIS] Scroll failed (non-critical): ${scrollError}`,

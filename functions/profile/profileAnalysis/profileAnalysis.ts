@@ -34,6 +34,7 @@ const logger = createLogger(process.env.DEBUG_LOGS === "true");
 import { recordActivity } from "../../shared/dashboard/dashboard.ts";
 import { snapshot } from "../../shared/snapshot/snapshot.ts";
 import { sleep } from "../../timing/sleep/sleep.ts";
+import { shortDelay, mediumDelay } from "../../timing/humanize/humanize.ts";
 import { findKeywords, isLikelyCreator } from "../bioMatcher/bioMatcher.ts";
 import { isConfirmedCreator } from "../vision/vision.ts";
 import { queueAdd } from "../../shared/database/database.ts";
@@ -417,7 +418,7 @@ export async function analyzeProfileComprehensive(
 				waitUntil: "networkidle2",
 				timeout: 15000,
 			});
-			await sleep(2000);
+			await shortDelay(1, 2);
 		} else {
 			console.log(`[ANALYSIS] Could not click bio link: ${clickResult.error}`);
 
@@ -536,7 +537,7 @@ export async function analyzeProfileComprehensive(
 					waitUntil: "networkidle2",
 					timeout: 15000,
 				});
-				await sleep(2000);
+				await shortDelay(1, 2);
 			}
 		}
 	}
@@ -601,9 +602,9 @@ export async function analyzeLinkWithVision(
 			waitUntil: "networkidle2",
 			timeout: 15000,
 		});
-		// Wait 5 seconds for page to fully load before doing any checks
-		console.log(`[VISION] Waiting 5 seconds for page to fully load...`);
-		await sleep(5000);
+		// Wait for page to fully load before doing any checks
+		console.log(`[VISION] Waiting for page to fully load...`);
+		await mediumDelay(2, 4);
 
 		// Take screenshot (functional - always enabled for vision analysis)
 		const screenshotPath = await snapshot(

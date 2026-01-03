@@ -6,7 +6,7 @@ import { jest } from "@jest/globals";
 import type { Page } from "puppeteer";
 import { createPageMock } from "../../__test__/testUtils.ts";
 
-// Mock sleep to avoid delays in tests
+// Mock sleep function (used internally by delay functions) to avoid delays in tests
 const sleepMock = jest
 	.fn<(ms: number) => Promise<void>>()
 	.mockResolvedValue(undefined);
@@ -25,10 +25,14 @@ jest.unstable_mockModule("../../timing/sleep/sleep.ts", () => ({
 	sleep: sleepMock,
 }));
 
+const humanScrollMock = jest.fn<() => Promise<void>>();
+const humanWiggleMock = jest.fn<() => Promise<void>>();
 jest.unstable_mockModule(
 	"../../navigation/humanInteraction/humanInteraction.ts",
 	() => ({
 		humanClickByText: humanClickByTextMock,
+		humanScroll: humanScrollMock,
+		humanWiggle: humanWiggleMock,
 	}),
 );
 

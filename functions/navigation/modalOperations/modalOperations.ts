@@ -3,6 +3,7 @@
  */
 import type { Page } from "puppeteer";
 import { sleep } from "../../timing/sleep/sleep.ts";
+import { shortDelay, microDelay } from "../../timing/humanize/humanize.ts";
 import {
 	humanClick,
 	humanClickAt,
@@ -16,7 +17,7 @@ export async function openFollowingModal(page: Page): Promise<boolean> {
 	console.log("[MODAL] Attempting to open following modal...");
 
 	// Wait for page to stabilize
-	await sleep(2000);
+	await shortDelay(1, 2);
 
 	// Get current URL to construct the following link selector
 	const currentUrl = page.url();
@@ -67,7 +68,7 @@ export async function openFollowingModal(page: Page): Promise<boolean> {
 				// Click with ghost-cursor
 				console.log(`[MODAL] Clicking with ghost-cursor...`);
 				await humanClick(page, handle, { elementType: "link" });
-				await sleep(3000);
+				await shortDelay(1.5, 2.5);
 
 				// Check if modal opened
 				const modalOpened = await page
@@ -128,7 +129,7 @@ export async function openFollowingModal(page: Page): Promise<boolean> {
 				elementType: "link",
 			});
 
-			await sleep(3000);
+			await shortDelay(1.5, 2.5);
 
 			const modalOpened = await page
 				.$('div[role="dialog"]')
@@ -201,11 +202,11 @@ export async function extractFollowingUsernames(
 	}
 
 	// Wait for content to load
-	await sleep(1500);
+	await shortDelay(0.8, 1.5);
 
 	// Scroll to load content
 	await scrollFollowingModal(page, 600);
-	await sleep(1000);
+	await shortDelay(0.5, 1);
 
 	// Extract usernames from links in the modal
 	const usernames = await page.evaluate((maxCount: number) => {
@@ -276,7 +277,7 @@ export async function scrollFollowingModal(
 				(scrollable as HTMLElement).scrollTop += amount;
 			}
 		}, scrollAmount);
-		await sleep(400);
+		await microDelay(0.2, 0.5);
 	} catch (e) {
 		console.log(`[MODAL] Could not scroll modal: ${e}`);
 	}
@@ -288,7 +289,7 @@ export async function scrollFollowingModal(
 export async function closeModal(page: Page): Promise<boolean> {
 	try {
 		await page.keyboard.press("Escape");
-		await sleep(1000);
+		await shortDelay(0.5, 1);
 		return true;
 	} catch {
 		return false;
