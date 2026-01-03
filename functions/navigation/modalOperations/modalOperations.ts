@@ -167,17 +167,19 @@ export async function isFollowingModalEmpty(page: Page): Promise<boolean> {
 			if (!dialog) return false;
 
 			const text = (dialog.textContent || "").toLowerCase();
-			
+
 			// Check for various empty state indicators
 			const emptyIndicators = [
 				// Primary empty state
-				text.includes("people you follow") && text.includes("once you follow people"),
+				text.includes("people you follow") &&
+					text.includes("once you follow people"),
 				// Alternative phrasing
 				text.includes("no one") && text.includes("follow"),
 				// Check if only "Suggested for you" exists with no actual users
-				text.includes("suggested for you") && !dialog.querySelector('a[href^="/"]:not([href*="explore"])'),
+				text.includes("suggested for you") &&
+					!dialog.querySelector('a[href^="/"]:not([href*="explore"])'),
 			];
-			
+
 			// Also check if there are any user links in the modal (excluding system links)
 			const userLinks = dialog.querySelectorAll('a[href^="/"]');
 			let actualUserCount = 0;
@@ -186,13 +188,22 @@ export async function isFollowingModalEmpty(page: Page): Promise<boolean> {
 				const parts = href.split("/").filter(Boolean);
 				if (parts.length === 1) {
 					const name = parts[0].toLowerCase();
-					const systemPages = ["explore", "direct", "accounts", "stories", "reels", "p", "tv", "reel"];
+					const systemPages = [
+						"explore",
+						"direct",
+						"accounts",
+						"stories",
+						"reels",
+						"p",
+						"tv",
+						"reel",
+					];
 					if (!systemPages.includes(name)) {
 						actualUserCount++;
 					}
 				}
 			}
-			
+
 			// Empty if we have empty indicators OR if there are no actual user links
 			return emptyIndicators.some(Boolean) || actualUserCount === 0;
 		});
@@ -287,7 +298,9 @@ export async function clickUsernameInModal(
 	username: string,
 ): Promise<boolean> {
 	const targetUsername = username.toLowerCase().trim();
-	console.log(`[MODAL] Attempting to click username @${targetUsername} in modal...`);
+	console.log(
+		`[MODAL] Attempting to click username @${targetUsername} in modal...`,
+	);
 
 	try {
 		// Ensure modal is open
@@ -309,34 +322,29 @@ export async function clickUsernameInModal(
 
 		// If not found, search within modal using evaluate
 		if (!linkHandle) {
-			const linkIndex = await page.evaluate(
-				(targetUser: string) => {
-					const dialog = document.querySelector('div[role="dialog"]');
-					if (!dialog) return -1;
+			const linkIndex = await page.evaluate((targetUser: string) => {
+				const dialog = document.querySelector('div[role="dialog"]');
+				if (!dialog) return -1;
 
-					const links = dialog.querySelectorAll('a[href^="/"]');
-					for (let i = 0; i < links.length; i++) {
-						const link = links[i];
-						const href = link.getAttribute("href") || "";
-						const parts = href.split("/").filter(Boolean);
+				const links = dialog.querySelectorAll('a[href^="/"]');
+				for (let i = 0; i < links.length; i++) {
+					const link = links[i];
+					const href = link.getAttribute("href") || "";
+					const parts = href.split("/").filter(Boolean);
 
-						// Username links are /{username}/ format (single path segment)
-						if (parts.length === 1) {
-							const linkUsername = parts[0].toLowerCase();
-							if (linkUsername === targetUser) {
-								return i;
-							}
+					// Username links are /{username}/ format (single path segment)
+					if (parts.length === 1) {
+						const linkUsername = parts[0].toLowerCase();
+						if (linkUsername === targetUser) {
+							return i;
 						}
 					}
-					return -1;
-				},
-				targetUsername,
-			);
+				}
+				return -1;
+			}, targetUsername);
 
 			if (linkIndex === -1) {
-				console.log(
-					`[MODAL] Username @${targetUsername} not found in modal`,
-				);
+				console.log(`[MODAL] Username @${targetUsername} not found in modal`);
 				return false;
 			}
 
@@ -348,9 +356,7 @@ export async function clickUsernameInModal(
 		}
 
 		if (!linkHandle) {
-			console.log(
-				`[MODAL] Username @${targetUsername} not found in modal`,
-			);
+			console.log(`[MODAL] Username @${targetUsername} not found in modal`);
 			return false;
 		}
 
@@ -372,7 +378,9 @@ export async function clickUsernameInModal(
 				},
 				{ timeout: 3000 },
 			);
-			console.log(`[MODAL] Modal closed, navigation to @${targetUsername} started`);
+			console.log(
+				`[MODAL] Modal closed, navigation to @${targetUsername} started`,
+			);
 			return true;
 		} catch {
 			// Modal might not close immediately, or navigation might be delayed
@@ -401,8 +409,7 @@ export async function clickUsernameInModal(
 			return false;
 		}
 	} catch (error) {
-		const errorMsg =
-			error instanceof Error ? error.message : String(error);
+		const errorMsg = error instanceof Error ? error.message : String(error);
 		console.log(`[MODAL] Failed to click @${targetUsername}: ${errorMsg}`);
 		return false;
 	}
