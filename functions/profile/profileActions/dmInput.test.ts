@@ -25,9 +25,12 @@ jest.unstable_mockModule("../../timing/sleep/sleep.ts", () => ({
 	sleep: sleepMock,
 }));
 
-jest.unstable_mockModule("../../navigation/humanInteraction/humanInteraction.ts", () => ({
-	humanClickByText: humanClickByTextMock,
-}));
+jest.unstable_mockModule(
+	"../../navigation/humanInteraction/humanInteraction.ts",
+	() => ({
+		humanClickByText: humanClickByTextMock,
+	}),
+);
 
 jest.unstable_mockModule("./popupHandler.ts", () => ({
 	handleInstagramPopups: handleInstagramPopupsMock,

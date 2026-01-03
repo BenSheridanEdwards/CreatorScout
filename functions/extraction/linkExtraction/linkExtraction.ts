@@ -356,7 +356,7 @@ export async function analyzeExternalLink(
 		const pageContent = await page.evaluate(() => {
 			// Check for content warning gates (Linktree "Sensitive Content", link.me "Mature Content", etc.)
 			const bodyText = document.body.textContent?.toLowerCase() || "";
-			
+
 			// Linktree pattern: "Sensitive Content" + "not appropriate for all audiences" or "Continue"
 			const hasSensitiveContentGate =
 				(bodyText.includes("sensitive content") &&
@@ -368,7 +368,7 @@ export async function analyzeExternalLink(
 						bodyText.includes("adult") ||
 						bodyText.includes("mature") ||
 						bodyText.includes("exclusive")));
-			
+
 			// link.me and other platforms: "Mature Content" + "disclaimer" or "exclusive" or "Continue"
 			const hasMatureContentGate =
 				bodyText.includes("mature content") &&
@@ -616,7 +616,7 @@ export async function analyzeExternalLink(
 			);
 			return result;
 		}
-		
+
 		// Check link.me's "Mature Content" gate
 		if (pageContent.hasMatureContentGate) {
 			result.isCreator = true;
