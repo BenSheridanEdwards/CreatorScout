@@ -34,7 +34,7 @@ const STRONG_SIGNALS: Array<{
 	{ pattern: "yep i have one", points: 50, label: "yes_i_have_one" },
 	{ pattern: "yeah i have one", points: 50, label: "yes_i_have_one" },
 	{ pattern: "i have one", points: 40, label: "i_have_one" },
-	
+
 	// Highlight redirects - classic creator tactic
 	{ pattern: "highlight for more", points: 40, label: "highlight_redirect" },
 	{ pattern: "highlights for more", points: 40, label: "highlight_redirect" },
@@ -362,8 +362,13 @@ export function calculateScore(bio: string, username?: string): BioScoreResult {
 	// "Yes I have one" / "I have one" + highlight redirect = DEFINITIVE creator signal
 	// This phrase specifically means "Yes I have an Patreon"
 	const hasIHaveOne = strongMatches.some(
-		(m) => m === "yes i have one" || m === "yep i have one" || m === "yeah i have one" || 
-		       m === "i have one" || m === "yes_i_have_one" || m === "i_have_one",
+		(m) =>
+			m === "yes i have one" ||
+			m === "yep i have one" ||
+			m === "yeah i have one" ||
+			m === "i have one" ||
+			m === "yes_i_have_one" ||
+			m === "i_have_one",
 	);
 	if (hasIHaveOne && hasHighlightRedirect) {
 		score += 30;

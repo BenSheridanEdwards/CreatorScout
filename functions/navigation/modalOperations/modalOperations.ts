@@ -278,6 +278,123 @@ export async function extractFollowingUsernames(
 }
 
 /**
+ * Click on a username link directly in the open following modal.
+ * This navigates to the profile without closing the modal first.
+ * Returns true if successful, false if username not found or click failed.
+ */
+export async function clickUsernameInModal(
+	page: Page,
+	username: string,
+): Promise<boolean> {
+	const targetUsername = username.toLowerCase().trim();
+	console.log(`[MODAL] Attempting to click username @${targetUsername} in modal...`);
+
+	try {
+		// Ensure modal is open
+		await page.waitForSelector('div[role="dialog"]', { timeout: 5000 });
+		console.log("[MODAL] Modal dialog found");
+	} catch {
+		console.log("[MODAL] No modal dialog found");
+		return false;
+	}
+
+	// Wait for content to load
+	await shortDelay(0.5, 1);
+
+	try {
+		// Find the link element for this username within the modal
+		const linkHandle = await page.evaluateHandle(
+			(targetUser: string) => {
+				const dialog = document.querySelector('div[role="dialog"]');
+				if (!dialog) return null;
+
+				const links = dialog.querySelectorAll('a[href^="/"]');
+				for (const link of links) {
+					const href = link.getAttribute("href") || "";
+					const parts = href.split("/").filter(Boolean);
+
+					// Username links are /{username}/ format (single path segment)
+					if (parts.length === 1) {
+						const linkUsername = parts[0].toLowerCase();
+						if (linkUsername === targetUser) {
+							return link;
+						}
+					}
+				}
+				return null;
+			},
+			targetUsername,
+		);
+
+		if (!linkHandle || (await linkHandle.evaluate((el) => el === null))) {
+			console.log(
+				`[MODAL] Username @${targetUsername} not found in modal`,
+			);
+			return false;
+		}
+
+		// Verify it's an ElementHandle before clicking
+		const elementHandle = linkHandle.asElement();
+		if (!elementHandle) {
+			console.log(`[MODAL] Could not get element handle for @${targetUsername}`);
+			return false;
+		}
+
+		// Click with ghost-cursor for human-like behavior
+		console.log(`[MODAL] Clicking on @${targetUsername} link in modal...`);
+		await humanClick(page, elementHandle, { elementType: "link" });
+
+		// Wait for navigation to start
+		await shortDelay(1, 2);
+
+		// Check if navigation occurred by waiting for URL change or modal to close
+		// The modal should close automatically when clicking a username link
+		try {
+			// Wait a bit to see if modal closes (indicates navigation started)
+			await page.waitForFunction(
+				() => {
+					const dialog = document.querySelector('div[role="dialog"]');
+					return dialog === null;
+				},
+				{ timeout: 3000 },
+			);
+			console.log(`[MODAL] Modal closed, navigation to @${targetUsername} started`);
+			return true;
+		} catch {
+			// Modal might not close immediately, or navigation might be delayed
+			// Check if URL changed instead
+			const currentUrl = page.url();
+			if (currentUrl.includes(`/${targetUsername}/`)) {
+				console.log(
+					`[MODAL] Successfully navigated to @${targetUsername} profile`,
+				);
+				return true;
+			}
+
+			// Give it a bit more time
+			await shortDelay(1, 2);
+			const finalUrl = page.url();
+			if (finalUrl.includes(`/${targetUsername}/`)) {
+				console.log(
+					`[MODAL] Successfully navigated to @${targetUsername} profile (delayed)`,
+				);
+				return true;
+			}
+
+			console.log(
+				`[MODAL] Click succeeded but navigation not confirmed for @${targetUsername}`,
+			);
+			return false;
+		}
+	} catch (error) {
+		const errorMsg =
+			error instanceof Error ? error.message : String(error);
+		console.log(`[MODAL] Failed to click @${targetUsername}: ${errorMsg}`);
+		return false;
+	}
+}
+
+/**
  * Scroll the following modal to load more profiles.
  */
 export async function scrollFollowingModal(

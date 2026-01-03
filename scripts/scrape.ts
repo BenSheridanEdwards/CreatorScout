@@ -22,6 +22,7 @@ import type { Browser, Page } from "puppeteer";
 import { initializeInstagramSession } from "../functions/auth/sessionInitializer/sessionInitializer.ts";
 import { getProfileStats } from "../functions/extraction/getProfileStats/getProfileStats.ts";
 import {
+	clickUsernameInModal,
 	extractFollowingUsernames,
 	isFollowingModalEmpty,
 	openFollowingModal,
@@ -892,10 +893,18 @@ export async function processFollowingList(
 				if (!(await wasVisited(username))) {
 					allVisited = false;
 
-					// Close the modal before visiting profile
-					logger.debug("NAVIGATION", `Closing modal to visit @${username}`);
-					await page.keyboard.press("Escape");
-					await shortDelay(0.5, 1); // brief delay after modal close
+					// Try clicking directly on the username in the modal
+					logger.debug("NAVIGATION", `Clicking @${username} directly in modal...`);
+					const clicked = await clickUsernameInModal(page, username);
+					if (!clicked) {
+						// Fallback: close modal and navigate via search
+						logger.debug(
+							"NAVIGATION",
+							`Direct click failed for @${username}, falling back to search`,
+						);
+						await page.keyboard.press("Escape");
+						await shortDelay(0.5, 1); // brief delay after modal close
+					}
 
 					try {
 						await processProfile(
