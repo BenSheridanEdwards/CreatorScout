@@ -26,7 +26,10 @@ import {
 import { createLogger } from "../functions/shared/logger/logger.ts";
 import { getProfile } from "../functions/shared/profiles/profileLoader.ts";
 import { createRun } from "../functions/shared/runs/runs.ts";
-import { humanLikeClickHandle } from "../functions/navigation/humanClick/humanClick.ts";
+import {
+	humanClick,
+	humanScroll,
+} from "../functions/navigation/humanInteraction/humanInteraction.ts";
 
 const logger = createLogger();
 
@@ -91,21 +94,14 @@ async function naturalScroll(
 		const stepDistance = distance / steps;
 
 		for (let i = 0; i < steps; i++) {
-			await page.evaluate((d) => {
-				window.scrollBy({
-					top: d,
-					behavior: "smooth",
-				});
-			}, stepDistance);
+			await humanScroll(page, { deltaY: stepDistance });
 
 			// Small pause between steps
 			await microDelay(0.1, 0.3);
 		}
 	} else {
 		// Instant scroll (less common but still natural)
-		await page.evaluate((d) => {
-			window.scrollBy(0, d);
-		}, distance);
+		await humanScroll(page, { deltaY: distance });
 	}
 }
 
@@ -115,12 +111,7 @@ async function naturalScroll(
 async function scrollBackUp(page: Page): Promise<void> {
 	// Small scroll back (50-200px)
 	const backDistance = 50 + Math.random() * 150;
-	await page.evaluate((d) => {
-		window.scrollBy({
-			top: -d,
-			behavior: "smooth",
-		});
-	}, backDistance);
+	await humanScroll(page, { deltaY: -backDistance });
 	await microDelay(0.5, 1.5);
 }
 
@@ -212,14 +203,9 @@ async function likeRandomPost(page: Page): Promise<boolean> {
 		await shortDelay(0.5, 1);
 
 		// Click like using ghost cursor for human-like movement
-		try {
-			await humanLikeClickHandle(page, button, {
-				elementType: "button",
-			});
-		} catch {
-			// Fallback to direct click if ghost cursor fails
-			await button.click();
-		}
+		await humanClick(page, button, {
+			elementType: "button",
+		});
 		await microDelay(0.3, 0.8);
 
 		return true;
@@ -255,8 +241,8 @@ async function watchReel(page: Page): Promise<number> {
 
 		await shortDelay(0.5, 1);
 
-		// Click to open reel
-		await reelLink.click();
+		// Click to open reel using ghost cursor for human-like movement
+		await humanClick(page, reelLink, { elementType: "link" });
 		await shortDelay(1, 2);
 
 		// Watch for 3-8 seconds (natural viewing time)
@@ -271,12 +257,7 @@ async function watchReel(page: Page): Promise<number> {
 		// 50% chance to watch a second reel by scrolling up
 		if (Math.random() < 0.5) {
 			// Scroll up to find another reel
-			await page.evaluate(() => {
-				window.scrollBy({
-					top: -400 - Math.random() * 300, // Scroll up 400-700px
-					behavior: "smooth",
-				});
-			});
+			await humanScroll(page, { deltaY: -(400 + Math.random() * 300) }); // Scroll up 400-700px
 			await shortDelay(1, 2);
 
 			// Try to find another reel
@@ -296,14 +277,9 @@ async function watchReel(page: Page): Promise<number> {
 				await shortDelay(0.5, 1);
 
 				// Click to open second reel using ghost cursor for human-like movement
-				try {
-					await humanLikeClickHandle(page, secondReelLink, {
-						elementType: "link",
-					});
-				} catch {
-					// Fallback to direct click if ghost cursor fails
-					await secondReelLink.click();
-				}
+				await humanClick(page, secondReelLink, {
+					elementType: "link",
+				});
 				await shortDelay(1, 2);
 
 				// Watch for 3-8 seconds

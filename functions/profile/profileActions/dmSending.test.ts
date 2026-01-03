@@ -220,12 +220,12 @@ describe("dmSending", () => {
 			expect(result).toBe(true);
 		});
 
-		test("falls back to clickAny when selectors fail", async () => {
+		test("falls back to humanClickByText when selectors fail", async () => {
 			const page = createPageMock({
 				$: jest
 					.fn<(selector: string) => Promise<unknown>>()
 					.mockImplementation(async (_selector: string) => {
-						// All selectors fail, clickAny will also fail and fall back to Enter
+						// All selectors fail, humanClickByText will also fail and fall back to Enter
 						return null;
 					}) as unknown as Page["$"],
 				mouse: {

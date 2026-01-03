@@ -5,6 +5,7 @@
 import type { Page } from "puppeteer";
 import { createLogger } from "../../shared/logger/logger.ts";
 import { sleep } from "../../timing/sleep/sleep.ts";
+import { humanClick } from "../../navigation/humanInteraction/humanInteraction.ts";
 
 const logger = createLogger(process.env.DEBUG_LOGS === "true");
 
@@ -157,11 +158,7 @@ export async function clickFollowButton(
 			!text.includes("following") &&
 			!text.includes("unfollow")
 		) {
-			// Use human-like clicking instead of direct .click()
-			const { humanLikeClickHandle } = await import(
-				"../../navigation/humanClick/humanClick.ts"
-			);
-			await humanLikeClickHandle(page, btn);
+			await humanClick(page, btn);
 			return true;
 		}
 	}

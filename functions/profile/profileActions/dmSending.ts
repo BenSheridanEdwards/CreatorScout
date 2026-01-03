@@ -2,11 +2,13 @@
  * Message sending logic - clicking send button and verification
  */
 import type { Page } from "puppeteer";
-import { clickAny } from "../../navigation/clickAny/clickAny.ts";
+import {
+	humanClickByText,
+	humanClickSelector,
+} from "../../navigation/humanInteraction/humanInteraction.ts";
 import { DM_MESSAGE } from "../../shared/config/config.ts";
 import { createLogger } from "../../shared/logger/logger.ts";
 import { snapshot } from "../../shared/snapshot/snapshot.ts";
-import { humanClickElement } from "../../timing/humanize/humanize.ts";
 import { sleep } from "../../timing/sleep/sleep.ts";
 
 // Lazy logger creation to prevent memory issues in tests
@@ -57,20 +59,13 @@ export async function sendMessage(page: Page): Promise<boolean> {
 						`Found visible send button with selector: ${selector}`,
 					);
 					// Use human-like click with mouse movement
-					const clicked = await humanClickElement(page, selector, {
+					await humanClickSelector(page, selector, {
 						elementType: "button",
-						hoverDelay: 150 + Math.random() * 200,
+						moveDelay: 150 + Math.random() * 200,
 					});
-					if (clicked) {
-						getLogger().info("ACTION", "Successfully clicked send button");
-						await sleep(3000 + Math.random() * 1000);
-						return true;
-					} else {
-						getLogger().info(
-							"ACTION",
-							`Button found but click failed for selector: ${selector}`,
-						);
-					}
+					getLogger().info("ACTION", "Successfully clicked send button");
+					await sleep(3000 + Math.random() * 1000);
+					return true;
 				} else {
 					getLogger().info(
 						"ACTION",
@@ -89,7 +84,7 @@ export async function sendMessage(page: Page): Promise<boolean> {
 	}
 
 	// Try XPath for div[role="button"] containing "Send" text (Instagram's current structure)
-	// Use humanClickElement for human-like clicking behavior
+	// Use humanClickSelector for human-like clicking behavior
 	getLogger().info(
 		"ACTION",
 		"Trying XPath for div[role='button'] with 'Send' text (using human-like click)...",
@@ -101,27 +96,23 @@ export async function sendMessage(page: Page): Promise<boolean> {
 		if (sendButtonXPath) {
 			getLogger().info(
 				"ACTION",
-				"Found send button with XPath (div[role='button']), using humanClickElement",
+				"Found send button with XPath (div[role='button']), using humanClickSelector",
 			);
-			// Use humanClickElement for human-like clicking with mouse movement
-			const clicked = await humanClickElement(
+			// Use humanClickSelector for human-like clicking with mouse movement
+			await humanClickSelector(
 				page,
 				'xpath//div[@role="button" and contains(normalize-space(), "Send")]',
 				{
 					elementType: "button",
-					hoverDelay: 150 + Math.random() * 200,
+					moveDelay: 150 + Math.random() * 200,
 				},
 			);
-			if (clicked) {
-				getLogger().info(
-					"ACTION",
-					"Successfully clicked send button via humanClickElement",
-				);
-				await sleep(3000 + Math.random() * 1000);
-				return true;
-			} else {
-				getLogger().info("ACTION", "Button found but humanClickElement failed");
-			}
+			getLogger().info(
+				"ACTION",
+				"Successfully clicked send button via humanClickSelector",
+			);
+			await sleep(3000 + Math.random() * 1000);
+			return true;
 		} else {
 			getLogger().info("ACTION", "No send button found with XPath selector");
 		}
@@ -129,15 +120,21 @@ export async function sendMessage(page: Page): Promise<boolean> {
 		getLogger().info("ACTION", `XPath send button selector failed: ${err}`);
 	}
 
-	// If send button not found, try clicking by text using clickAny
-	getLogger().info("ACTION", "Trying clickAny to find Send button by text...");
-	const clickedByText = await clickAny(page, ["Send"]);
+	// If send button not found, try clicking by text using humanClickByText
+	getLogger().info(
+		"ACTION",
+		"Trying humanClickByText to find Send button by text...",
+	);
+	const clickedByText = await humanClickByText(page, ["Send"]);
 	if (clickedByText) {
-		getLogger().info("ACTION", "Send button clicked by text via clickAny");
+		getLogger().info(
+			"ACTION",
+			"Send button clicked by text via humanClickByText",
+		);
 		await sleep(3000 + Math.random() * 1000);
 		return true;
 	} else {
-		getLogger().info("ACTION", "clickAny did not find Send button");
+		getLogger().info("ACTION", "humanClickByText did not find Send button");
 	}
 
 	// If still not sent, try Enter key

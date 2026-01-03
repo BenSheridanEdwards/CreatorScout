@@ -1,0 +1,6 @@
+#!/bin/sh
+. "$(dirname "$0")/_/husky.sh"
+
+# Run the programmatic actions check
+npx tsx scripts/hooks/check-programmatic-actions.ts --pre-commit
+

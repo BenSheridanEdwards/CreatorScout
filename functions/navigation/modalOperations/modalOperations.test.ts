@@ -22,12 +22,12 @@ jest.unstable_mockModule("../../timing/sleep/sleep.ts", () => ({
 	sleep: sleepMock,
 }));
 
-const humanLikeClickHandleMock =
+const humanClickMock =
 	jest.fn<(page: Page, handle: ElementHandle<Element>) => Promise<void>>();
-const humanLikeClickAtMock = jest.fn<() => Promise<void>>();
-jest.unstable_mockModule("../humanClick/humanClick.ts", () => ({
-	humanLikeClickHandle: humanLikeClickHandleMock,
-	humanLikeClickAt: humanLikeClickAtMock,
+const humanClickAtMock = jest.fn<() => Promise<void>>();
+jest.unstable_mockModule("../humanInteraction/humanInteraction.ts", () => ({
+	humanClick: humanClickMock,
+	humanClickAt: humanClickAtMock,
 }));
 
 const { extractFollowingUsernames, openFollowingModal, scrollFollowingModal } =
@@ -43,67 +43,86 @@ describe("modalOperations", () => {
 	// ═══════════════════════════════════════════════════════════════════════════
 
 	describe("openFollowingModal()", () => {
-	test("clicks following link when found by CSS selector", async () => {
-		const mockElement = {
-			evaluate: jest
-				.fn<(fn: unknown) => Promise<string>>()
-				.mockResolvedValueOnce("/testuser/following/") // href
-				.mockResolvedValueOnce("following"), // text
-		} as unknown as ElementHandle<Element>;
+		test("clicks following link when found by CSS selector", async () => {
+			const mockElement = {
+				evaluate: jest
+					.fn<(fn: unknown) => Promise<string>>()
+					.mockResolvedValueOnce("/testuser/following/") // href
+					.mockResolvedValueOnce("following"), // text
+			} as unknown as ElementHandle<Element>;
 
-		const page = {
-			url: jest.fn<() => string>().mockReturnValue("https://www.instagram.com/testuser/"),
-			$: jest
-				.fn<() => Promise<ElementHandle<Element> | null>>()
-				.mockResolvedValueOnce(mockElement) // First selector finds element
-				.mockResolvedValueOnce(mockElement), // Modal check finds dialog
-			evaluate: jest.fn(),
-		} as unknown as Page;
+			const page = {
+				url: jest
+					.fn<() => string>()
+					.mockReturnValue("https://www.instagram.com/testuser/"),
+				$: jest
+					.fn<() => Promise<ElementHandle<Element> | null>>()
+					.mockResolvedValueOnce(mockElement) // First selector finds element
+					.mockResolvedValueOnce(mockElement), // Modal check finds dialog
+				evaluate: jest.fn(),
+			} as unknown as Page;
 
-		const ok = await openFollowingModal(page);
+			const ok = await openFollowingModal(page);
 
-		expect(ok).toBe(true);
-		expect(humanLikeClickHandleMock).toHaveBeenCalled();
-		expect(sleepMock).toHaveBeenCalled();
-	});
+			expect(ok).toBe(true);
+			expect(humanClickMock).toHaveBeenCalled();
+			expect(sleepMock).toHaveBeenCalled();
+		});
 
-	test("falls back to page.evaluate when CSS selectors fail", async () => {
-		const mockDialog = {} as ElementHandle<Element>;
-		const page = {
-			url: jest.fn<() => string>().mockReturnValue("https://www.instagram.com/testuser/"),
-			$: jest
-				.fn<() => Promise<ElementHandle<Element> | null>>()
-				.mockResolvedValue(null) // All CSS selectors fail (5 selectors)
-				.mockResolvedValueOnce(null)
-				.mockResolvedValueOnce(null)
-				.mockResolvedValueOnce(null)
-				.mockResolvedValueOnce(null)
-				.mockResolvedValueOnce(null)
-				.mockResolvedValueOnce(mockDialog), // Modal check succeeds
-			evaluate: jest.fn<() => Promise<{ found: boolean; x: number; y: number; href: string }>>()
-				.mockResolvedValue({ found: true, x: 100, y: 200, href: "/testuser/following/" }),
-		} as unknown as Page;
+		test("falls back to page.evaluate when CSS selectors fail", async () => {
+			const mockDialog = {} as ElementHandle<Element>;
+			const page = {
+				url: jest
+					.fn<() => string>()
+					.mockReturnValue("https://www.instagram.com/testuser/"),
+				$: jest
+					.fn<() => Promise<ElementHandle<Element> | null>>()
+					.mockResolvedValue(null) // All CSS selectors fail (5 selectors)
+					.mockResolvedValueOnce(null)
+					.mockResolvedValueOnce(null)
+					.mockResolvedValueOnce(null)
+					.mockResolvedValueOnce(null)
+					.mockResolvedValueOnce(null)
+					.mockResolvedValueOnce(mockDialog), // Modal check succeeds
+				evaluate: jest
+					.fn<
+						() => Promise<{
+							found: boolean;
+							x: number;
+							y: number;
+							href: string;
+						}>
+					>()
+					.mockResolvedValue({
+						found: true,
+						x: 100,
+						y: 200,
+						href: "/testuser/following/",
+					}),
+			} as unknown as Page;
 
-		const ok = await openFollowingModal(page);
+			const ok = await openFollowingModal(page);
 
-		expect(ok).toBe(true);
-		expect(page.evaluate).toHaveBeenCalled();
-		expect(sleepMock).toHaveBeenCalled();
-	});
+			expect(ok).toBe(true);
+			expect(page.evaluate).toHaveBeenCalled();
+			expect(sleepMock).toHaveBeenCalled();
+		});
 
-	test("returns false when neither CSS selector nor evaluate finds following link", async () => {
-		const page = {
-			url: jest.fn<() => string>().mockReturnValue("https://www.instagram.com/testuser/"),
-			$: jest
-				.fn<() => Promise<ElementHandle<Element> | null>>()
-				.mockResolvedValue(null),
-			evaluate: jest.fn<() => Promise<boolean>>().mockResolvedValue(false),
-		} as unknown as Page;
+		test("returns false when neither CSS selector nor evaluate finds following link", async () => {
+			const page = {
+				url: jest
+					.fn<() => string>()
+					.mockReturnValue("https://www.instagram.com/testuser/"),
+				$: jest
+					.fn<() => Promise<ElementHandle<Element> | null>>()
+					.mockResolvedValue(null),
+				evaluate: jest.fn<() => Promise<boolean>>().mockResolvedValue(false),
+			} as unknown as Page;
 
-		const ok = await openFollowingModal(page);
+			const ok = await openFollowingModal(page);
 
-		expect(ok).toBe(false);
-	});
+			expect(ok).toBe(false);
+		});
 	});
 
 	// ═══════════════════════════════════════════════════════════════════════════

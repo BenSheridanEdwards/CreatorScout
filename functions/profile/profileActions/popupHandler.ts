@@ -2,7 +2,10 @@
  * Handle Instagram popups and error pages (notifications, reload prompts, etc.)
  */
 import type { Page } from "puppeteer";
-import { clickAny } from "../../navigation/clickAny/clickAny.ts";
+import {
+	humanClick,
+	humanClickByText,
+} from "../../navigation/humanInteraction/humanInteraction.ts";
 import { createLogger } from "../../shared/logger/logger.ts";
 import { sleep } from "../../timing/sleep/sleep.ts";
 
@@ -25,6 +28,7 @@ async function clickButtonLikeByText(
 	labels: string[],
 ): Promise<boolean> {
 	// Find the element using the original logic
+
 	const elementInfo = await page.evaluate((texts) => {
 		const candidates = Array.from(
 			document.querySelectorAll('button, div[role="button"]'),
@@ -55,11 +59,7 @@ async function clickButtonLikeByText(
 			(el.textContent || "").trim().toLowerCase(),
 		);
 		if (labels.some((label) => text.includes(label.toLowerCase()))) {
-			// Use human-like clicking instead of direct .click()
-			const { humanLikeClickHandle } = await import(
-				"../../navigation/humanClick/humanClick.ts"
-			);
-			await humanLikeClickHandle(page, candidate);
+			await humanClick(page, candidate);
 			return true;
 		}
 	}
@@ -75,15 +75,17 @@ export async function handleInstagramPopups(page: Page): Promise<void> {
 	// Check for the specific popup text first
 	const hasMessagingTabPopup = await page.evaluate(() => {
 		const bodyText = document.body?.innerText || "";
-		return bodyText.includes("The messaging tab has a new look") ||
+		return (
+			bodyText.includes("The messaging tab has a new look") ||
 			bodyText.includes("messaging tab has a new look") ||
-			bodyText.includes("You can now go to your inbox by tapping this icon");
+			bodyText.includes("You can now go to your inbox by tapping this icon")
+		);
 	});
 
 	if (hasMessagingTabPopup) {
 		const messagingTabDismissed =
 			(await clickButtonLikeByText(page, ["ok", "got it", "dismiss"])) ||
-			(await clickAny(page, ["OK", "Got it", "Got It", "Dismiss"]));
+			(await humanClickByText(page, ["OK", "Got it", "Got It", "Dismiss"]));
 		if (messagingTabDismissed) {
 			getLogger().info("ACTION", "Dismissed messaging tab popup");
 			await sleep(1000 + Math.random() * 1000);
@@ -97,7 +99,8 @@ export async function handleInstagramPopups(page: Page): Promise<void> {
 			"Cancel",
 			"close",
 			"turn on notifications",
-		])) || (await clickAny(page, ["Not Now", "Not now", "Cancel", "Close"]));
+		])) ||
+		(await humanClickByText(page, ["Not Now", "Not now", "Cancel", "Close"]));
 	if (notificationDismissed) {
 		getLogger().info("ACTION", "Dismissed notification popup");
 		await sleep(1000 + Math.random() * 1000);
@@ -106,7 +109,7 @@ export async function handleInstagramPopups(page: Page): Promise<void> {
 	// Handle "Reload page" button if error page appears
 	const reloadClicked =
 		(await clickButtonLikeByText(page, ["reload page", "reload"])) ||
-		(await clickAny(page, ["Reload page", "Reload"]));
+		(await humanClickByText(page, ["Reload page", "Reload"]));
 	if (reloadClicked) {
 		getLogger().info("ACTION", "Clicked reload page button");
 		await sleep(3000 + Math.random() * 2000);

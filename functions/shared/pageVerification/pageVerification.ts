@@ -1,6 +1,7 @@
 import type { Page } from "puppeteer";
 import { createLogger } from "../logger/logger.ts";
 import { waitForInstagramContent } from "../waitForContent/waitForContent.ts";
+import { humanClick } from "../../navigation/humanInteraction/humanInteraction.ts";
 
 const logger = createLogger(process.env.DEBUG_LOGS === "true");
 
@@ -271,11 +272,11 @@ export async function navigateToHomeViaUI(page: Page): Promise<void> {
 
 			const homeElement = await page.$(selector);
 			if (homeElement) {
-				await homeElement.click({ delay: 100 + Math.random() * 100 });
+				await humanClick(page, homeElement, { elementType: "link" });
 				clicked = true;
 				logger.info(
 					"NAVIGATE",
-					`✅ Clicked home icon using selector: ${selector}`,
+					`✅ Clicked home icon using selector: ${selector} (human-like)`,
 				);
 				break;
 			}
@@ -292,32 +293,42 @@ export async function navigateToHomeViaUI(page: Page): Promise<void> {
 	}
 
 	if (!clicked) {
-		// Fallback: try clicking any element with "Home" text
+		// Fallback: try finding any element with "Home" text and click it properly
 		try {
 			// Check frame before evaluate
 			if (page.isClosed()) {
 				throw new Error("Page closed during navigation attempt");
 			}
 
-			const homeByText = await page.evaluate(() => {
+			// Find the element info without clicking in DOM
+			const homeLinkInfo = await page.evaluate(() => {
 				const links = Array.from(
 					document.querySelectorAll("a, div[role='link']"),
 				);
-				for (const link of links) {
+				for (let i = 0; i < links.length; i++) {
+					const link = links[i];
 					const text = link.textContent?.toLowerCase() || "";
 					const ariaLabel =
 						link.getAttribute("aria-label")?.toLowerCase() || "";
 					if (text.includes("home") || ariaLabel.includes("home")) {
-						(link as HTMLElement).click();
-						return true;
+						return { found: true, index: i };
 					}
 				}
-				return false;
+				return { found: false };
 			});
 
-			if (homeByText) {
-				logger.info("NAVIGATE", "✅ Clicked home via text search");
-				clicked = true;
+			if (homeLinkInfo.found && typeof homeLinkInfo.index === "number") {
+				// Re-select and click with human-like behavior
+				const links = await page.$$("a, div[role='link']");
+				const targetLink = links[homeLinkInfo.index];
+				if (targetLink) {
+					await humanClick(page, targetLink, { elementType: "link" });
+					logger.info(
+						"NAVIGATE",
+						"✅ Clicked home via text search (human-like)",
+					);
+					clicked = true;
+				}
 			}
 		} catch (err) {
 			const errorMsg = err instanceof Error ? err.message : String(err);

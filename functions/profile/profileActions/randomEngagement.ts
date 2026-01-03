@@ -13,6 +13,7 @@
  */
 
 import type { Page } from "puppeteer";
+import { humanScroll } from "../../navigation/humanInteraction/humanInteraction.ts";
 import { humanClickElement } from "../../timing/humanize/humanize.ts";
 import {
 	mediumDelay,
@@ -291,9 +292,7 @@ export async function scrollProfileFeed(
 
 		for (let i = 0; i < scrollCount; i++) {
 			const scrollAmount = 200 + Math.random() * 300; // 200-500px
-			await page.evaluate((amount) => {
-				window.scrollBy(0, amount);
-			}, scrollAmount);
+			await humanScroll(page, { deltaY: scrollAmount });
 
 			// Pause between scrolls (natural reading time)
 			await new Promise((resolve) =>
@@ -303,9 +302,7 @@ export async function scrollProfileFeed(
 
 		// Scroll back up a bit (more natural behavior)
 		if (Math.random() > 0.5) {
-			await page.evaluate(() => {
-				window.scrollBy(0, -(100 + Math.random() * 150));
-			});
+			await humanScroll(page, { deltaY: -(100 + Math.random() * 150) });
 			await microDelay(0.3, 0.8);
 		}
 

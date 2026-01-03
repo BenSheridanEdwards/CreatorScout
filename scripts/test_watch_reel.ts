@@ -17,7 +17,10 @@ import {
 } from "../functions/timing/humanize/humanize.ts";
 import { createLogger } from "../functions/shared/logger/logger.ts";
 import { getProfile } from "../functions/shared/profiles/profileLoader.ts";
-import { humanLikeClickHandle } from "../functions/navigation/humanClick/humanClick.ts";
+import {
+	humanClick,
+	humanScroll,
+} from "../functions/navigation/humanInteraction/humanInteraction.ts";
 
 const logger = createLogger();
 
@@ -86,14 +89,9 @@ async function watchReel(
 
 		// Click to open reel using ghost cursor for human-like movement
 		logger.info("ENGAGEMENT", "Opening first reel...");
-		try {
-			await humanLikeClickHandle(page, reelLink, {
-				elementType: "link",
-			});
-		} catch {
-			// Fallback to direct click if ghost cursor fails
-			await reelLink.click();
-		}
+		await humanClick(page, reelLink, {
+			elementType: "link",
+		});
 		await shortDelay(1, 2);
 
 		// Watch for 3-8 seconds (natural viewing time)
@@ -116,12 +114,7 @@ async function watchReel(
 			logger.info("ENGAGEMENT", "Attempting to watch a second reel...");
 
 			// Scroll up to find another reel
-			await page.evaluate(() => {
-				window.scrollBy({
-					top: -400 - Math.random() * 300, // Scroll up 400-700px
-					behavior: "smooth",
-				});
-			});
+			await humanScroll(page, { deltaY: -(400 + Math.random() * 300) }); // Scroll up 400-700px
 			await shortDelay(1, 2);
 
 			// Try to find another reel
@@ -142,14 +135,9 @@ async function watchReel(
 
 				// Click to open second reel using ghost cursor for human-like movement
 				logger.info("ENGAGEMENT", "Opening second reel...");
-				try {
-					await humanLikeClickHandle(page, secondReelLink, {
-						elementType: "link",
-					});
-				} catch {
-					// Fallback to direct click if ghost cursor fails
-					await secondReelLink.click();
-				}
+				await humanClick(page, secondReelLink, {
+					elementType: "link",
+				});
 				await shortDelay(1, 2);
 
 				// Watch for 3-8 seconds

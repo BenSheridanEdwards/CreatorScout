@@ -1,14 +1,16 @@
 import fs from "node:fs/promises";
 import type { Page } from "puppeteer";
-import { clickAny } from "../../navigation/clickAny/clickAny.ts";
+import {
+	humanClick,
+	humanClickByText,
+	humanClickSelector,
+} from "../../navigation/humanInteraction/humanInteraction.ts";
 import { createLogger } from "../../shared/logger/logger.ts";
 import {
 	navigateToHomeViaUI,
 	verifyHomePageLoaded,
 } from "../../shared/pageVerification/pageVerification.ts";
 import { snapshot } from "../../shared/snapshot/snapshot.ts";
-import { humanClickElement, humanTypeText, microDelay } from "../../timing/humanize/humanize.ts";
-import { humanLikeClickHandle } from "../../navigation/humanClick/humanClick.ts";
 import { sleep } from "../../timing/sleep/sleep.ts";
 import {
 	isLoggedIn,
@@ -325,7 +327,7 @@ export async function login(
 		await delay(3000);
 
 		// Handle any popups that appeared
-		await clickAny(page, ["OK", "Got it", "Got It", "Dismiss"]);
+		await humanClickByText(page, ["OK", "Got it", "Got It", "Dismiss"]);
 		await debugSnapshot(page, `login_after_cookies_${Date.now()}`);
 	}
 
@@ -382,7 +384,7 @@ export async function login(
 	}
 
 	try {
-		await clickAny(page, [
+		await humanClickByText(page, [
 			"Decline optional cookies",
 			"Accept All",
 			"Accept",
@@ -393,7 +395,7 @@ export async function login(
 		]);
 
 		// Handle "The messaging tab has a new look" popup that often appears
-		await clickAny(page, ["OK", "Got it", "Got It", "Dismiss"]);
+		await humanClickByText(page, ["OK", "Got it", "Got It", "Dismiss"]);
 	} catch (err) {
 		const errorMsg = err instanceof Error ? err.message : String(err);
 
@@ -453,40 +455,60 @@ export async function login(
 		// Also try case-insensitive placeholder/aria-label/label matching in JavaScript
 		if (!formFound) {
 			const foundViaJS = await page.evaluate(() => {
-				const inputs = Array.from(document.querySelectorAll('input[type="text"], input:not([type])'));
+				const inputs = Array.from(
+					document.querySelectorAll('input[type="text"], input:not([type])'),
+				);
 				for (const input of inputs) {
-					const placeholder = (input.getAttribute('placeholder') || '').toLowerCase();
-					const ariaLabel = (input.getAttribute('aria-label') || '').toLowerCase();
-					const name = (input.getAttribute('name') || '').toLowerCase();
-					
+					const placeholder = (
+						input.getAttribute("placeholder") || ""
+					).toLowerCase();
+					const ariaLabel = (
+						input.getAttribute("aria-label") || ""
+					).toLowerCase();
+					const name = (input.getAttribute("name") || "").toLowerCase();
+
 					// Check associated label element
-					const id = input.getAttribute('id');
-					let labelText = '';
+					const id = input.getAttribute("id");
+					let labelText = "";
 					if (id) {
 						const label = document.querySelector(`label[for="${id}"]`);
 						if (label) {
-							labelText = (label.textContent || '').toLowerCase();
+							labelText = (label.textContent || "").toLowerCase();
 						}
 					}
-					
+
 					if (
-						name === 'username' ||
-						name === 'email' || // Instagram uses name="email" for username field
-						placeholder.includes('mobile number') && (placeholder.includes('username') || placeholder.includes('email')) ||
-						placeholder.includes('phone number') && (placeholder.includes('username') || placeholder.includes('email')) ||
-						ariaLabel.includes('mobile number') && (ariaLabel.includes('username') || ariaLabel.includes('email')) ||
-						ariaLabel.includes('phone number') && (ariaLabel.includes('username') || ariaLabel.includes('email')) ||
-						labelText.includes('mobile number') && (labelText.includes('username') || labelText.includes('email')) ||
-						labelText.includes('phone number') && (labelText.includes('username') || labelText.includes('email'))
+						name === "username" ||
+						name === "email" || // Instagram uses name="email" for username field
+						(placeholder.includes("mobile number") &&
+							(placeholder.includes("username") ||
+								placeholder.includes("email"))) ||
+						(placeholder.includes("phone number") &&
+							(placeholder.includes("username") ||
+								placeholder.includes("email"))) ||
+						(ariaLabel.includes("mobile number") &&
+							(ariaLabel.includes("username") ||
+								ariaLabel.includes("email"))) ||
+						(ariaLabel.includes("phone number") &&
+							(ariaLabel.includes("username") ||
+								ariaLabel.includes("email"))) ||
+						(labelText.includes("mobile number") &&
+							(labelText.includes("username") ||
+								labelText.includes("email"))) ||
+						(labelText.includes("phone number") &&
+							(labelText.includes("username") || labelText.includes("email")))
 					) {
 						return true;
 					}
 				}
 				return false;
 			});
-			
+
 			if (foundViaJS) {
-				logger.info("ACTION", "Login form found via JavaScript placeholder/aria-label/label matching");
+				logger.info(
+					"ACTION",
+					"Login form found via JavaScript placeholder/aria-label/label matching",
+				);
 				formFound = true;
 			}
 		}
@@ -684,24 +706,27 @@ export async function login(
 
 	// Fallback: Find by associated label text (Instagram uses label elements)
 	if (!usernameField) {
-		usernameField = await page.evaluateHandle(() => {
-			const labels = Array.from(document.querySelectorAll('label'));
-			for (const label of labels) {
-				const labelText = (label.textContent || '').toLowerCase();
-				if (
-					(labelText.includes('mobile number') || labelText.includes('phone number')) &&
-					(labelText.includes('username') || labelText.includes('email'))
-				) {
-					const forAttr = label.getAttribute('for');
-					if (forAttr) {
-						const input = document.querySelector(`input#${forAttr}`);
-						if (input) return input;
+		usernameField = await page
+			.evaluateHandle(() => {
+				const labels = Array.from(document.querySelectorAll("label"));
+				for (const label of labels) {
+					const labelText = (label.textContent || "").toLowerCase();
+					if (
+						(labelText.includes("mobile number") ||
+							labelText.includes("phone number")) &&
+						(labelText.includes("username") || labelText.includes("email"))
+					) {
+						const forAttr = label.getAttribute("for");
+						if (forAttr) {
+							const input = document.querySelector(`input#${forAttr}`);
+							if (input) return input;
+						}
 					}
 				}
-			}
-			return null;
-		}).catch(() => null);
-		
+				return null;
+			})
+			.catch(() => null);
+
 		if (usernameField && usernameField.asElement()) {
 			logger.info("ACTION", "Username field found via associated label");
 		}
@@ -711,26 +736,25 @@ export async function login(
 		throw new Error("Could not find username input field");
 	}
 
+	// Cast to ElementHandle<Element> after null check
+	const usernameElement =
+		usernameField.asElement() as import("puppeteer").ElementHandle<Element>;
+
 	// Use human-like click on the username field (ghost-cursor)
 	logger.info("ACTION", "Clicking username field with human-like movement...");
 	try {
-		await humanLikeClickHandle(page, usernameField, {
+		await humanClick(page, usernameElement, {
 			elementType: "input",
-			hoverDelay: 150 + Math.random() * 100,
+			moveDelay: 150 + Math.random() * 100,
 		});
 	} catch (clickErr) {
-		logger.warn("ACTION", `Ghost-cursor click failed, trying fallback: ${clickErr}`);
-		// Fallback to direct click if ghost-cursor fails
-		try {
-			await usernameField.click();
-		} catch {
-			// Try focusing by selector if we have one
-			if (usernameSelectorUsed) {
-				await page.focus(usernameSelectorUsed);
-			}
+		logger.warn("ACTION", `Ghost-cursor click failed: ${clickErr}`);
+		// Try focusing by selector as fallback (focus is acceptable)
+		if (usernameSelectorUsed) {
+			await page.focus(usernameSelectorUsed);
 		}
 	}
-	
+
 	// Small pause after clicking, like a human would
 	await sleep(200 + Math.random() * 300);
 
@@ -739,17 +763,17 @@ export async function login(
 	for (const char of creds.username) {
 		// Variable typing speed: faster for common letters, slower for symbols/numbers
 		let charDelay = 70 + Math.random() * 60; // Base 70-130ms
-		
+
 		// Slower for special characters and numbers
 		if (/[^a-zA-Z]/.test(char)) {
 			charDelay += 30 + Math.random() * 40;
 		}
-		
+
 		// Occasional longer pause (thinking/hesitation)
 		if (Math.random() < 0.08) {
 			charDelay += 150 + Math.random() * 200;
 		}
-		
+
 		await page.keyboard.type(char);
 		await sleep(charDelay);
 	}
@@ -785,23 +809,25 @@ export async function login(
 
 	// Fallback: Find by associated label text (Instagram uses label elements)
 	if (!passwordField) {
-		passwordField = await page.evaluateHandle(() => {
-			const labels = Array.from(document.querySelectorAll('label'));
-			for (const label of labels) {
-				const labelText = (label.textContent || '').toLowerCase();
-				if (labelText.includes('password')) {
-					const forAttr = label.getAttribute('for');
-					if (forAttr) {
-						const input = document.querySelector(`input#${forAttr}`);
-						if (input && input.getAttribute('type') === 'password') {
-							return input;
+		passwordField = await page
+			.evaluateHandle(() => {
+				const labels = Array.from(document.querySelectorAll("label"));
+				for (const label of labels) {
+					const labelText = (label.textContent || "").toLowerCase();
+					if (labelText.includes("password")) {
+						const forAttr = label.getAttribute("for");
+						if (forAttr) {
+							const input = document.querySelector(`input#${forAttr}`);
+							if (input && input.getAttribute("type") === "password") {
+								return input;
+							}
 						}
 					}
 				}
-			}
-			return null;
-		}).catch(() => null);
-		
+				return null;
+			})
+			.catch(() => null);
+
 		if (passwordField && passwordField.asElement()) {
 			logger.info("ACTION", "Password field found via associated label");
 		}
@@ -811,22 +837,22 @@ export async function login(
 		throw new Error("Could not find password input field");
 	}
 
+	// Cast to ElementHandle<Element> after null check
+	const passwordElement =
+		passwordField.asElement() as import("puppeteer").ElementHandle<Element>;
+
 	// Use human-like click on the password field (ghost-cursor)
 	logger.info("ACTION", "Clicking password field with human-like movement...");
 	try {
-		await humanLikeClickHandle(page, passwordField, {
+		await humanClick(page, passwordElement, {
 			elementType: "input",
-			hoverDelay: 100 + Math.random() * 150,
+			moveDelay: 100 + Math.random() * 150,
 		});
 	} catch (clickErr) {
-		logger.warn("ACTION", `Ghost-cursor click failed on password, trying fallback: ${clickErr}`);
-		try {
-			await passwordField.click();
-		} catch {
-			// ignore
-		}
+		logger.warn("ACTION", `Ghost-cursor click failed on password: ${clickErr}`);
+		// Continue anyway - the field may still be focused from typing
 	}
-	
+
 	// Small pause after clicking
 	await sleep(150 + Math.random() * 250);
 
@@ -835,17 +861,17 @@ export async function login(
 	for (const char of creds.password) {
 		// Passwords are typed faster (muscle memory)
 		let charDelay = 50 + Math.random() * 50; // Base 50-100ms
-		
+
 		// Slower for special characters (shift key)
 		if (/[A-Z!@#$%^&*()_+\-=\[\]{}|;':",.<>?]/.test(char)) {
 			charDelay += 20 + Math.random() * 30;
 		}
-		
+
 		// Very occasional pause (rare for memorized passwords)
 		if (Math.random() < 0.03) {
 			charDelay += 100 + Math.random() * 150;
 		}
-		
+
 		await page.keyboard.type(char);
 		await sleep(charDelay);
 	}
@@ -903,20 +929,26 @@ export async function login(
 			const submitButton = await page.$(selector);
 			if (submitButton) {
 				// Use human-like click with ghost-cursor for the submit button
-				logger.info("ACTION", `Found submit button with selector: ${selector}, clicking...`);
+				logger.info(
+					"ACTION",
+					`Found submit button with selector: ${selector}, clicking...`,
+				);
 				try {
-					await humanLikeClickHandle(page, submitButton, {
+					await humanClick(page, submitButton, {
 						elementType: "button",
-						hoverDelay: 80 + Math.random() * 100, // Quick confident click
+						moveDelay: 80 + Math.random() * 100, // Quick confident click
 					});
 					submitClicked = true;
 					logger.info("ACTION", "Submit button clicked with ghost-cursor");
 				} catch (clickErr) {
-					// Fallback to direct click
-					logger.warn("ACTION", `Ghost-cursor failed on submit: ${clickErr}, using direct click`);
-					await submitButton.click();
+					// If ghost-cursor fails, use keyboard Enter as fallback
+					logger.warn(
+						"ACTION",
+						`Ghost-cursor failed on submit: ${clickErr}, using Enter key`,
+					);
+					await page.keyboard.press("Enter");
 					submitClicked = true;
-					logger.info("ACTION", "Submit button clicked with fallback direct click");
+					logger.info("ACTION", "Login submitted via Enter key");
 				}
 				break;
 			}
@@ -953,16 +985,16 @@ export async function login(
 	});
 
 	if (saveInfoButtonFound) {
-		const clicked = await humanClickElement(
+		const clicked = await humanClickSelector(
 			page,
 			'button[data-scout-save-info="true"]',
 			{
 				elementType: "button",
-				hoverDelay: 200 + Math.random() * 300,
+				moveDelay: 200 + Math.random() * 300,
 			},
 		).catch(async () => {
-			// Fallback to clickAny if humanClickElement doesn't work
-			return await clickAny(page, ["Save info", "Save Info", "Save"]);
+			// Fallback to humanClickByText if humanClickSelector doesn't work
+			return await humanClickByText(page, ["Save info", "Save Info", "Save"]);
 		});
 		if (clicked) {
 			logger.info(
@@ -985,7 +1017,7 @@ export async function login(
 			);
 
 			// Try to click "Continue" or "Use this account" button on onetap page
-			const onetapClicked = await clickAny(page, [
+			const onetapClicked = await humanClickByText(page, [
 				"Continue",
 				"Use this account",
 				"Use Account",
@@ -1073,16 +1105,22 @@ export async function login(
 				// Check login status
 				const currentUrlCheck = page.url();
 				loggedIn = await isLoggedIn(page);
-				
+
 				if (loggedIn) {
-					logger.info("ACTION", `Login detected via polling at ${currentUrlCheck}`);
+					logger.info(
+						"ACTION",
+						`Login detected via polling at ${currentUrlCheck}`,
+					);
 					break;
 				}
-				
+
 				// Log progress every 10 seconds
 				const elapsed = Math.floor((Date.now() - startTime) / 1000);
 				if (elapsed % 10 === 0 && elapsed > 0) {
-					logger.info("ACTION", `Still waiting for login... (${elapsed}s elapsed, URL: ${currentUrlCheck})`);
+					logger.info(
+						"ACTION",
+						`Still waiting for login... (${elapsed}s elapsed, URL: ${currentUrlCheck})`,
+					);
 				}
 
 				// Check for error indicators
@@ -1170,16 +1208,20 @@ export async function login(
 			});
 
 			if (saveInfoButtonFound) {
-				const clicked = await humanClickElement(
+				const clicked = await humanClickSelector(
 					page,
 					'button[data-scout-save-info="true"]',
 					{
 						elementType: "button",
-						hoverDelay: 200 + Math.random() * 300,
+						moveDelay: 200 + Math.random() * 300,
 					},
 				).catch(async () => {
-					// Fallback to clickAny if humanClickElement doesn't work
-					return await clickAny(page, ["Save info", "Save Info", "Save"]);
+					// Fallback to humanClickByText if humanClickSelector doesn't work
+					return await humanClickByText(page, [
+						"Save info",
+						"Save Info",
+						"Save",
+					]);
 				});
 				if (clicked) {
 					logger.info(
@@ -1189,8 +1231,8 @@ export async function login(
 					await delay(1000);
 				}
 			} else {
-				// Fallback: use clickAny if button not found
-				const saveInfoClicked = await clickAny(page, [
+				// Fallback: use humanClickByText if button not found
+				const saveInfoClicked = await humanClickByText(page, [
 					"Save info",
 					"Save Info",
 					"Save",
@@ -1203,7 +1245,10 @@ export async function login(
 					await delay(1000);
 				} else {
 					// Last resort: try "Not now" if "Save info" not found
-					const notNowClicked = await clickAny(page, ["Not now", "Not Now"]);
+					const notNowClicked = await humanClickByText(page, [
+						"Not now",
+						"Not Now",
+					]);
 					if (notNowClicked) {
 						logger.info(
 							"ACTION",
@@ -1216,7 +1261,7 @@ export async function login(
 
 			// Handle "The messaging tab has a new look" popup that may appear after login
 			await delay(1000);
-			await clickAny(page, ["OK", "Got it", "Got It", "Dismiss"]);
+			await humanClickByText(page, ["OK", "Got it", "Got It", "Dismiss"]);
 
 			// Save cookies after successful login
 			await saveCookies(page);
@@ -1367,16 +1412,16 @@ export async function login(
 		});
 
 		if (saveInfoButtonFound) {
-			const clicked = await humanClickElement(
+			const clicked = await humanClickSelector(
 				page,
 				'button[data-scout-save-info="true"]',
 				{
 					elementType: "button",
-					hoverDelay: 200 + Math.random() * 300,
+					moveDelay: 200 + Math.random() * 300,
 				},
 			).catch(async () => {
-				// Fallback to clickAny if humanClickElement doesn't work
-				return await clickAny(page, ["Save info", "Save Info", "Save"]);
+				// Fallback to humanClickByText if humanClickSelector doesn't work
+				return await humanClickByText(page, ["Save info", "Save Info", "Save"]);
 			});
 			if (clicked) {
 				logger.info(
@@ -1386,8 +1431,8 @@ export async function login(
 				await delay(1000);
 			}
 		} else {
-			// Fallback: use clickAny if button not found
-			const saveInfoClicked = await clickAny(page, [
+			// Fallback: use humanClickByText if button not found
+			const saveInfoClicked = await humanClickByText(page, [
 				"Save info",
 				"Save Info",
 				"Save",
@@ -1397,7 +1442,10 @@ export async function login(
 				await delay(1000);
 			} else {
 				// Last resort: try "Not now" if "Save info" not found
-				const notNowClicked = await clickAny(page, ["Not now", "Not Now"]);
+				const notNowClicked = await humanClickByText(page, [
+					"Not now",
+					"Not Now",
+				]);
 				if (notNowClicked) {
 					logger.info(
 						"ACTION",
@@ -1532,29 +1580,40 @@ export async function login(
 			"ACTION",
 			`Login wait completed. Current URL: ${currentUrl}. Checking final status...`,
 		);
-		
+
 		// If we're on the homepage, wait a bit more for page to fully load
-		if (currentUrl.includes("instagram.com") && !currentUrl.includes("/accounts/login")) {
-			logger.info("ACTION", "On Instagram homepage - waiting for page to fully load...");
+		if (
+			currentUrl.includes("instagram.com") &&
+			!currentUrl.includes("/accounts/login")
+		) {
+			logger.info(
+				"ACTION",
+				"On Instagram homepage - waiting for page to fully load...",
+			);
 			await delay(5000); // Give page more time to load
-			
+
 			// Check if login form is present (if not, we might be logged in)
 			const hasLoginForm = await page.evaluate(() => {
-				return !!document.querySelector('input[name="username"]') ||
-					Array.from(document.querySelectorAll("button")).some(
-						(btn) => btn.textContent?.toLowerCase().includes("log in")
-					);
+				return (
+					!!document.querySelector('input[name="username"]') ||
+					Array.from(document.querySelectorAll("button")).some((btn) =>
+						btn.textContent?.toLowerCase().includes("log in"),
+					)
+				);
 			});
-			
+
 			if (!hasLoginForm) {
-				logger.info("ACTION", "No login form detected on homepage - assuming logged in");
+				logger.info(
+					"ACTION",
+					"No login form detected on homepage - assuming logged in",
+				);
 				// Save cookies to maintain session
 				await saveCookies(page);
 				logger.info("ACTION", "Cookies saved to maintain session");
 				return; // Success - we're logged in
 			}
 		}
-		
+
 		// Final check if we're actually logged in
 		const finalCheck = await isLoggedIn(page);
 		if (finalCheck) {

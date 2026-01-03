@@ -21,6 +21,21 @@ const snapshotMock = jest
 	.fn<() => Promise<string>>()
 	.mockResolvedValue("test-screenshot.png");
 
+// Mock humanInteraction to avoid ghost-cursor initialization in tests
+const humanClickMock = jest
+	.fn<(page: Page, element: unknown, options?: unknown) => Promise<void>>()
+	.mockResolvedValue(undefined);
+const humanClickAtMock = jest
+	.fn<(page: Page, x: number, y: number, options?: unknown) => Promise<void>>()
+	.mockResolvedValue(undefined);
+const mockCursor = {
+	moveTo: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
+	click: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
+};
+const getGhostCursorMock = jest
+	.fn<() => Promise<typeof mockCursor>>()
+	.mockResolvedValue(mockCursor);
+
 jest.unstable_mockModule("../../timing/sleep/sleep.ts", () => ({
 	sleep: sleepMock,
 }));
@@ -29,6 +44,11 @@ jest.unstable_mockModule("./popupHandler.ts", () => ({
 }));
 jest.unstable_mockModule("../../shared/snapshot/snapshot.ts", () => ({
 	snapshot: snapshotMock,
+}));
+jest.unstable_mockModule("../../navigation/humanInteraction/humanInteraction.ts", () => ({
+	humanClick: humanClickMock,
+	humanClickAt: humanClickAtMock,
+	getGhostCursor: getGhostCursorMock,
 }));
 
 // Import after mocks are set up
@@ -42,6 +62,12 @@ const {
 } = await import("./dmNavigation.ts");
 
 describe("dmNavigation", () => {
+	beforeEach(() => {
+		jest.clearAllMocks();
+		mockCursor.moveTo.mockClear();
+		mockCursor.click.mockClear();
+	});
+
 	describe("navigateToProfile", () => {
 		test("navigates to profile successfully", async () => {
 			// Create mock element with boundingBox for popup handler
@@ -212,7 +238,8 @@ describe("dmNavigation", () => {
 			await simulateNaturalBehavior(page as unknown as Page);
 
 			expect(page.evaluate).toHaveBeenCalled();
-			expect(page.mouse.move).toHaveBeenCalled();
+			// Now uses ghost-cursor via getGhostCursor mock
+			expect(mockCursor.moveTo).toHaveBeenCalled();
 		});
 	});
 
@@ -349,9 +376,9 @@ describe("dmNavigation", () => {
 
 			await clickMessageButton(page as unknown as Page, buttonInfo);
 
-			expect(page.mouse.move).toHaveBeenCalled();
-			expect(page.mouse.down).toHaveBeenCalled();
-			expect(page.mouse.up).toHaveBeenCalled();
+			// Now uses ghost-cursor via getGhostCursor mock
+			expect(mockCursor.moveTo).toHaveBeenCalled();
+			expect(mockCursor.click).toHaveBeenCalled();
 		});
 	});
 
@@ -370,7 +397,8 @@ describe("dmNavigation", () => {
 
 			await navigateToDmThread(page as unknown as Page, "testuser", true);
 
-			expect(page.mouse.move).toHaveBeenCalled();
+			// Now uses ghost-cursor via getGhostCursor mock
+			expect(mockCursor.moveTo).toHaveBeenCalled();
 		});
 
 		test("uses fallback when message button was not clicked", async () => {

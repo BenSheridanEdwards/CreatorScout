@@ -3,16 +3,16 @@
  *
  * Quick 1-2 minute warm-up before starting outbound actions.
  * Makes the session look natural without wasting time.
+ * Uses ghost-cursor for human-like interactions.
  */
 import type { Page } from "puppeteer";
 import { WARMUP_DURATION_MINUTES } from "../../shared/config/config.ts";
 import { createLogger } from "../../shared/logger/logger.ts";
+import { mediumDelay, microDelay, shortDelay } from "../humanize/humanize.ts";
 import {
+	humanClick,
 	humanScroll,
-	mediumDelay,
-	microDelay,
-	shortDelay,
-} from "../humanize/humanize.ts";
+} from "../../navigation/humanInteraction/humanInteraction.ts";
 
 const logger = createLogger();
 
@@ -79,7 +79,7 @@ export async function warmUpProfile(
 
 		// Final scroll
 		if (Date.now() - startTime < targetDuration) {
-			await humanScroll(page, 1);
+			await humanScroll(page);
 			stats.scrolls++;
 		}
 	} catch (error) {
@@ -110,7 +110,7 @@ async function quickScrollFeed(page: Page): Promise<number> {
 		// Random scroll distance
 		const distance = 300 + Math.floor(Math.random() * 700); // 300-1000px
 
-		await page.evaluate((d) => window.scrollBy(0, d), distance);
+		await humanScroll(page, { deltaY: distance });
 		scrolls++;
 
 		// Short pause
@@ -121,7 +121,7 @@ async function quickScrollFeed(page: Page): Promise<number> {
 }
 
 /**
- * Like visible posts in the feed
+ * Like visible posts in the feed using human-like clicking
  */
 async function likeVisiblePosts(page: Page, maxLikes: number): Promise<number> {
 	let liked = 0;
@@ -134,8 +134,8 @@ async function likeVisiblePosts(page: Page, maxLikes: number): Promise<number> {
 
 		for (const button of likeButtons.slice(0, maxLikes)) {
 			try {
-				// Click the button
-				await button.click();
+				// Click the button with human-like behavior
+				await humanClick(page, button, { elementType: "button" });
 				liked++;
 
 				// Quick delay between likes
@@ -144,7 +144,7 @@ async function likeVisiblePosts(page: Page, maxLikes: number): Promise<number> {
 				// Button may have become stale, continue
 			}
 		}
-	} catch (error) {
+	} catch {
 		logger.warn("WARMUP", "Could not like posts during warm-up");
 	}
 
@@ -158,13 +158,13 @@ async function watchReels(page: Page, count: number): Promise<number> {
 	let watched = 0;
 
 	try {
-		// Try to find and click on Reels link
+		// Try to find and click on Reels link with human-like behavior
 		const reelsLink = await page.$('a[href="/reels/"]');
 		if (!reelsLink) {
 			return 0;
 		}
 
-		await reelsLink.click();
+		await humanClick(page, reelsLink, { elementType: "link" });
 		await shortDelay(1, 2);
 
 		// Watch a couple reels
@@ -181,7 +181,7 @@ async function watchReels(page: Page, count: number): Promise<number> {
 		// Go back to feed
 		await page.goBack();
 		await shortDelay(1, 2);
-	} catch (error) {
+	} catch {
 		logger.warn("WARMUP", "Could not watch reels during warm-up");
 	}
 
@@ -196,7 +196,9 @@ export async function minimalWarmup(page: Page): Promise<void> {
 	logger.info("WARMUP", "Minimal warm-up (30s)...");
 
 	// Just scroll the feed a couple times
-	await humanScroll(page, 2);
+	await humanScroll(page);
+	await shortDelay(0.5, 1);
+	await humanScroll(page);
 	await shortDelay(1, 2);
 
 	logger.info("WARMUP", "Minimal warm-up complete");
@@ -213,7 +215,3 @@ export function needsWarmup(lastActivityTime?: Date): boolean {
 	const fiveMinutesAgo = Date.now() - 5 * 60 * 1000;
 	return lastActivityTime.getTime() < fiveMinutesAgo;
 }
-
-
-
-

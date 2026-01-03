@@ -1,9 +1,9 @@
 import type { ElementHandle, Page } from "puppeteer";
 import { sleep } from "../../timing/sleep/sleep.ts";
 import {
-	humanLikeClickAt,
-	humanLikeClickHandle,
-} from "../../navigation/humanClick/humanClick.ts";
+	humanClick,
+	humanClickAt,
+} from "../../navigation/humanInteraction/humanInteraction.ts";
 import {
 	BLACKLISTED_DOMAINS,
 	decodeInstagramRedirect,
@@ -129,7 +129,7 @@ export async function findBioLinkElement(
 					return null;
 				}, linkIcon);
 
-				const element = linkHandle.asElement();
+				const element = linkHandle.asElement() as ElementHandle<Element> | null;
 				if (element) {
 					console.log("[BIO_LINK] Found bio link via link icon");
 					return element;
@@ -198,7 +198,7 @@ export async function clickBioLink(page: Page): Promise<{
 	try {
 		// Click with ghost-cursor (human-like)
 		console.log("[BIO_LINK] Clicking with ghost-cursor...");
-		await humanLikeClickHandle(page, linkElement, { elementType: "link" });
+		await humanClick(page, linkElement, { elementType: "link" });
 		await sleep(3000);
 
 		// Check if we navigated away (link might stay on same page or open in new tab)
@@ -249,7 +249,7 @@ export async function clickBioLink(page: Page): Promise<{
 			const x = box.x + box.width / 2;
 			const y = box.y + box.height / 2;
 
-			await humanLikeClickAt(page, x, y, { elementType: "link" });
+			await humanClickAt(page, x, y, { elementType: "link" });
 			await sleep(3000);
 
 			// Check again for navigation or new tab

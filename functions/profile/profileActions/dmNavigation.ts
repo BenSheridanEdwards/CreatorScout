@@ -1,12 +1,17 @@
 /**
  * Navigation logic for DM flow - navigating to profile and clicking message button
+ * Uses ghost-cursor for human-like interactions to avoid bot detection.
  */
 import type { Page } from "puppeteer";
-import { executeWithCircuitBreaker } from "../../shared/circuitBreaker/circuitBreaker.ts";
 import { createLogger } from "../../shared/logger/logger.ts";
 import { snapshot } from "../../shared/snapshot/snapshot.ts";
 import { sleep } from "../../timing/sleep/sleep.ts";
 import { handleInstagramPopups } from "./popupHandler.ts";
+import {
+	humanClick,
+	humanScroll,
+	getGhostCursor,
+} from "../../navigation/humanInteraction/humanInteraction.ts";
 
 // Lazy logger creation to prevent memory issues in tests
 let logger: ReturnType<typeof createLogger> | null = null;
@@ -23,64 +28,6 @@ export interface ButtonInfo {
 	width: number;
 	height: number;
 	isVisible: boolean;
-}
-
-/**
- * Wait for frame stability after navigation (critical for Browserless)
- * This ensures any detached frames from previous navigation are cleared
- * Returns true if frame is stable, throws recoverable error if permanently detached
- */
-async function waitForFrameStability(
-	page: Page,
-	timeout: number = 5000,
-): Promise<boolean> {
-	try {
-		// Wait for the main frame to be ready
-		await page.waitForFunction(() => document.readyState === "complete", {
-			timeout,
-		});
-
-		// Additional wait for frame stability in Browserless
-		await sleep(1000);
-
-		// Verify the main frame is accessible by checking page URL
-		try {
-			page.url(); // This will throw if frame is detached
-			return true; // Frame is stable
-		} catch (frameError) {
-			const errorMsg =
-				frameError instanceof Error ? frameError.message : String(frameError);
-
-			// Wait a bit more and try again
-			await sleep(2000);
-
-			try {
-				page.url(); // Verify again
-				return true; // Frame recovered
-			} catch (retryError) {
-				// Frame is permanently detached - throw recoverable error
-				const retryMsg =
-					retryError instanceof Error ? retryError.message : String(retryError);
-				throw new Error(
-					`Frame remains detached after retry: ${retryMsg}. Original error: ${errorMsg}`,
-				);
-			}
-		}
-	} catch (err) {
-		const errorMsg = err instanceof Error ? err.message : String(err);
-
-		// If it's a detached frame error, throw it as a recoverable error
-		if (errorMsg.includes("detached Frame")) {
-			throw new Error(`Frame is permanently detached: ${errorMsg}`);
-		}
-
-		// For timeout or other errors, log and throw recoverable error
-		getLogger().warn(
-			"ACTION",
-			`Frame stability check timed out or failed: ${err}`,
-		);
-		throw new Error(`Frame stability check failed: ${errorMsg}`);
-	}
 }
 
 /**
@@ -140,30 +87,33 @@ async function navigateToProfileViaSearch(
 					element,
 				);
 				if (tagName === "input") {
-					await element.click({ delay: 100 + Math.random() * 100 });
+					await humanClick(page, element, { elementType: "input" });
 					searchClicked = true;
 					getLogger().info(
 						"ACTION",
-						`Found and clicked search input: ${selector}`,
+						`Found and clicked search input: ${selector} (human-like)`,
 					);
 					break;
 				} else {
 					// It's a link/icon - click to navigate to search page
-					await element.click({ delay: 100 + Math.random() * 100 });
+					await humanClick(page, element, { elementType: "link" });
 					await sleep(1500 + Math.random() * 1000);
 					// Now look for the search input on the search page
 					const searchInput = await page.$(
 						'input[placeholder*="Search"], input[aria-label*="Search"]',
 					);
 					if (searchInput) {
-						await searchInput.click({ delay: 100 + Math.random() * 100 });
+						await humanClick(page, searchInput, { elementType: "input" });
 						searchClicked = true;
-						getLogger().info("ACTION", `Opened search page and clicked input`);
+						getLogger().info(
+							"ACTION",
+							`Opened search page and clicked input (human-like)`,
+						);
 						break;
 					}
 				}
 			}
-		} catch (err) {}
+		} catch {}
 	}
 
 	if (!searchClicked) {
@@ -175,8 +125,8 @@ async function navigateToProfileViaSearch(
 		try {
 			const exploreLink = await page.$('a[href="/explore/"]');
 			if (exploreLink) {
-				await exploreLink.click({ delay: 100 + Math.random() * 100 });
-				getLogger().info("ACTION", "✅ Clicked explore link");
+				await humanClick(page, exploreLink, { elementType: "link" });
+				getLogger().info("ACTION", "✅ Clicked explore link (human-like)");
 				await sleep(2000);
 				const { verifyExplorePageLoaded } = await import(
 					"../../shared/pageVerification/pageVerification.ts"
@@ -196,7 +146,7 @@ async function navigateToProfileViaSearch(
 			'input[placeholder*="Search"], input[aria-label*="Search"]',
 		);
 		if (searchInput) {
-			await searchInput.click({ delay: 100 + Math.random() * 100 });
+			await humanClick(page, searchInput, { elementType: "input" });
 			searchClicked = true;
 		}
 	}
@@ -219,12 +169,13 @@ async function navigateToProfileViaSearch(
 	getLogger().info("ACTION", "Waiting for search results");
 	await sleep(1500 + Math.random() * 1000);
 
-	// Find and click the profile in search results
+	// Find the profile in search results and click it with human-like behavior
 	getLogger().info("ACTION", "Looking for profile in search results");
-	const profileFound = await page.evaluate((targetUsername) => {
+	const profileLinkInfo = await page.evaluate((targetUsername) => {
 		// Look for profile links in search results
 		const links = Array.from(document.querySelectorAll('a[href*="/"]'));
-		for (const link of links) {
+		for (let i = 0; i < links.length; i++) {
+			const link = links[i];
 			const href = link.getAttribute("href") || "";
 			const text = (link.textContent || "").toLowerCase();
 			// Match exact username in href or text
@@ -238,21 +189,29 @@ async function navigateToProfileViaSearch(
 					href.match(/^\/[^/]+\/?$/) ||
 					href.includes(`/${targetUsername}/`)
 				) {
-					(link as HTMLElement).click();
-					return true;
+					return { found: true, href, index: i };
 				}
 			}
 		}
-		return false;
+		return { found: false };
 	}, u);
 
-	if (!profileFound) {
+	if (profileLinkInfo.found && profileLinkInfo.href) {
+		// Find the element again and click it with human-like behavior
+		const profileLink = await page.$(`a[href="${profileLinkInfo.href}"]`);
+		if (profileLink) {
+			await humanClick(page, profileLink, { elementType: "link" });
+		} else {
+			throw new Error(`Could not re-find profile link for @${u}`);
+		}
+	} else {
 		// Try alternative: look for divs with role="link" or buttons
-		const altFound = await page.evaluate((targetUsername) => {
+		const altLinkInfo = await page.evaluate((targetUsername) => {
 			const clickableElements = Array.from(
 				document.querySelectorAll('div[role="link"], div[role="button"], a'),
 			);
-			for (const el of clickableElements) {
+			for (let i = 0; i < clickableElements.length; i++) {
+				const el = clickableElements[i];
 				const text = (el.textContent || "").toLowerCase();
 				const ariaLabel = (el.getAttribute("aria-label") || "").toLowerCase();
 				if (
@@ -260,14 +219,21 @@ async function navigateToProfileViaSearch(
 					text.includes(`@${targetUsername}`) ||
 					ariaLabel.includes(targetUsername)
 				) {
-					(el as HTMLElement).click();
-					return true;
+					return { found: true, index: i };
 				}
 			}
-			return false;
+			return { found: false };
 		}, u);
 
-		if (!altFound) {
+		if (altLinkInfo.found && typeof altLinkInfo.index === "number") {
+			const elements = await page.$$('div[role="link"], div[role="button"], a');
+			const targetElement = elements[altLinkInfo.index];
+			if (targetElement) {
+				await humanClick(page, targetElement, { elementType: "link" });
+			} else {
+				throw new Error(`Could not find profile @${u} in search results`);
+			}
+		} else {
 			throw new Error(`Could not find profile @${u} in search results`);
 		}
 	}
@@ -305,9 +271,11 @@ async function navigateToProfileViaSearch(
 	// Handle any popups that appeared during navigation
 	await handleInstagramPopups(page);
 
-	// Simulate reading the profile (mouse movement)
-	await page.mouse.move(Math.random() * 500 + 200, Math.random() * 300 + 200, {
-		steps: 10,
+	// Simulate reading the profile using ghost-cursor for natural movement
+	const cursor = await getGhostCursor(page);
+	await cursor.moveTo({
+		x: Math.random() * 500 + 200,
+		y: Math.random() * 300 + 200,
 	});
 	await sleep(1000 + Math.random() * 1000);
 
@@ -335,8 +303,6 @@ export async function navigateToProfile(
 	page: Page,
 	username: string,
 ): Promise<void> {
-	const u = username.toLowerCase().trim();
-
 	// Use ONLY search-based navigation - no fallback to direct URL
 	// This is more human-like and avoids frame detachment issues
 	await navigateToProfileViaSearch(page, username);
@@ -344,23 +310,20 @@ export async function navigateToProfile(
 
 /**
  * Simulate natural user behavior before clicking message button
+ * Uses ghost-cursor for human-like mouse movements
  */
 export async function simulateNaturalBehavior(page: Page): Promise<void> {
-	// 1. Scroll page naturally to see the button
+	// 1. Scroll page naturally to see the button using ghost-cursor
 	getLogger().info("ACTION", "Scrolling page naturally like a real user");
-	await page.evaluate(() => {
-		window.scrollBy(0, Math.random() * 200 + 100);
-	});
-	await sleep(500 + Math.random() * 500);
+	await humanScroll(page, { deltaY: Math.random() * 200 + 100 });
 
-	// 2. Move mouse around naturally (looking at profile)
+	// 2. Move mouse around naturally using ghost-cursor (looking at profile)
 	getLogger().info("ACTION", "Moving mouse naturally around the page");
+	const cursor = await getGhostCursor(page);
 	for (let i = 0; i < 3 + Math.floor(Math.random() * 3); i++) {
 		const randomX = Math.random() * 800 + 200;
 		const randomY = Math.random() * 600 + 200;
-		await page.mouse.move(randomX, randomY, {
-			steps: 20 + Math.floor(Math.random() * 20),
-		});
+		await cursor.moveTo({ x: randomX, y: randomY });
 		await sleep(200 + Math.random() * 400);
 	}
 }
@@ -402,7 +365,7 @@ export async function findMessageButton(
 }
 
 /**
- * Scroll to make button visible if needed
+ * Scroll to make button visible if needed (uses smooth scrolling)
  */
 export async function scrollToButtonIfNeeded(
 	page: Page,
@@ -410,14 +373,9 @@ export async function scrollToButtonIfNeeded(
 ): Promise<ButtonInfo> {
 	if (!buttonInfo.isVisible) {
 		getLogger().info("ACTION", "Button not visible, scrolling to it naturally");
-		await page.evaluate((targetY) => {
-			const currentScroll = window.pageYOffset;
-			const distance = targetY - currentScroll - 300; // Scroll to show button
-			window.scrollBy({
-				top: distance,
-				behavior: "smooth",
-			});
-		}, buttonInfo.y);
+		const currentScroll = await page.evaluate(() => window.pageYOffset);
+		const distance = buttonInfo.y - currentScroll - 300; // Scroll to show button
+		await humanScroll(page, { deltaY: distance });
 		await sleep(1000 + Math.random() * 1000);
 
 		// Re-get coordinates after scroll
@@ -431,80 +389,38 @@ export async function scrollToButtonIfNeeded(
 
 /**
  * Move mouse in natural curved path to button and click it
+ * Uses ghost-cursor for sophisticated human-like movement
  */
 export async function clickMessageButton(
 	page: Page,
 	buttonInfo: ButtonInfo,
 ): Promise<void> {
-	// 5. Move mouse in NATURAL CURVED PATH to button (not straight line)
 	getLogger().info(
 		"ACTION",
-		"Moving mouse in natural curved path to Message button",
+		"Moving mouse in natural curved path to Message button using ghost-cursor",
 	);
-	const currentPos = await page.evaluate(() => ({
-		x:
-			(window as Window & { mouseX?: number; mouseY?: number }).mouseX ||
-			window.innerWidth / 2,
-		y:
-			(window as Window & { mouseX?: number; mouseY?: number }).mouseY ||
-			window.innerHeight / 2,
-	}));
 
-	// Create waypoints for natural curved movement
-	const waypoints = [];
-	const numWaypoints = 3 + Math.floor(Math.random() * 2);
-	for (let i = 1; i <= numWaypoints; i++) {
-		const t = i / (numWaypoints + 1);
-		// Bezier-like curve with randomness
-		const midX =
-			currentPos.x +
-			(buttonInfo.x - currentPos.x) * t +
-			(Math.random() - 0.5) * 100;
-		const midY =
-			currentPos.y +
-			(buttonInfo.y - currentPos.y) * t +
-			(Math.random() - 0.5) * 50;
-		waypoints.push({ x: midX, y: midY });
-	}
+	const cursor = await getGhostCursor(page);
 
-	// Move through waypoints (natural path)
-	for (const waypoint of waypoints) {
-		await page.mouse.move(waypoint.x, waypoint.y, {
-			steps: 15 + Math.floor(Math.random() * 10),
-		});
-		await sleep(50 + Math.random() * 100);
-	}
+	// Move to target with ghost-cursor's natural bezier curves
+	// Add a small random offset for natural clicking
+	const targetX =
+		buttonInfo.x + (Math.random() - 0.5) * (buttonInfo.width * 0.3);
+	const targetY =
+		buttonInfo.y + (Math.random() - 0.5) * (buttonInfo.height * 0.3);
 
-	// 6. Move near button, pause, then move to it (human behavior)
-	const nearX = buttonInfo.x - 30 + Math.random() * 60;
-	const nearY = buttonInfo.y - 20 + Math.random() * 40;
-	await page.mouse.move(nearX, nearY, { steps: 10 });
-	await sleep(300 + Math.random() * 500); // Pause like reading
+	await cursor.moveTo({ x: targetX, y: targetY });
 
-	// 7. Final movement to button center with small random offset
-	const finalX =
-		buttonInfo.x + (Math.random() - 0.5) * (buttonInfo.width * 0.2);
-	const finalY =
-		buttonInfo.y + (Math.random() - 0.5) * (buttonInfo.height * 0.2);
-	await page.mouse.move(finalX, finalY, {
-		steps: 8 + Math.floor(Math.random() * 5),
-	});
-
-	// 8. Hover over button (real user pauses before clicking)
+	// Hover over button (real user pauses before clicking)
 	await sleep(400 + Math.random() * 600);
 
-	// 9. Click with natural timing
-	getLogger().info(
-		"ACTION",
-		"Clicking Message button with natural cursor movement",
-	);
-	await page.mouse.down();
-	await sleep(80 + Math.random() * 120); // Natural click hold time
-	await page.mouse.up();
+	// Click using ghost-cursor's natural click method
+	getLogger().info("ACTION", "Clicking Message button with ghost-cursor");
+	await cursor.click();
 
 	getLogger().info(
 		"ACTION",
-		"Message button clicked - mimicked real user exactly",
+		"Message button clicked - mimicked real user with ghost-cursor",
 	);
 	await sleep(1000 + Math.random() * 1000);
 }
@@ -514,7 +430,7 @@ export async function clickMessageButton(
  */
 export async function navigateToDmThread(
 	page: Page,
-	username: string,
+	_username: string,
 	messageButtonClicked: boolean,
 ): Promise<void> {
 	if (!messageButtonClicked) {
@@ -535,12 +451,12 @@ export async function navigateToDmThread(
 		// Handle popups immediately after clicking Message
 		await handleInstagramPopups(page);
 
-		// Simulate reading the DM interface
-		await page.mouse.move(
-			Math.random() * 400 + 300,
-			Math.random() * 200 + 200,
-			{ steps: 15 },
-		);
+		// Simulate reading the DM interface using ghost-cursor
+		const cursor = await getGhostCursor(page);
+		await cursor.moveTo({
+			x: Math.random() * 400 + 300,
+			y: Math.random() * 200 + 200,
+		});
 		await sleep(1000 + Math.random() * 1000);
 	}
 

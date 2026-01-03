@@ -1,5 +1,6 @@
 /**
  * Profile navigation and status checking utilities.
+ * Uses human-like interactions via ghost-cursor to avoid bot detection.
  */
 import type { Page } from "puppeteer";
 import { login } from "../../auth/login/login.ts";
@@ -7,6 +8,7 @@ import { parseProfileStatus } from "../../profile/profileStatus/profileStatus.ts
 import { IG_PASS, IG_USER } from "../../shared/config/config.ts";
 import type { Logger } from "../../shared/logger/logger.ts";
 import { sleep } from "../../timing/sleep/sleep.ts";
+import { humanClick } from "../humanInteraction/humanInteraction.ts";
 
 export interface ProfileStatus {
 	isPrivate: boolean;
@@ -75,7 +77,7 @@ async function waitForFrameStability(
 async function navigateToProfileViaSearch(
 	page: Page,
 	username: string,
-	options?: { timeout?: number },
+	_options?: { timeout?: number },
 ): Promise<void> {
 	const u = username.toLowerCase().trim();
 
@@ -117,17 +119,17 @@ async function navigateToProfileViaSearch(
 					element,
 				);
 				if (tagName === "input") {
-					await element.click({ delay: 100 + Math.random() * 100 });
+					await humanClick(page, element, { elementType: "input" });
 					searchClicked = true;
 					break;
 				} else {
-					await element.click({ delay: 100 + Math.random() * 100 });
+					await humanClick(page, element, { elementType: "link" });
 					await sleep(1500 + Math.random() * 1000);
 					const searchInput = await page.$(
 						'input[placeholder*="Search"], input[aria-label*="Search"]',
 					);
 					if (searchInput) {
-						await searchInput.click({ delay: 100 + Math.random() * 100 });
+						await humanClick(page, searchInput, { elementType: "input" });
 						searchClicked = true;
 						break;
 					}
@@ -145,8 +147,8 @@ async function navigateToProfileViaSearch(
 		try {
 			const exploreLink = await page.$('a[href="/explore/"]');
 			if (exploreLink) {
-				await exploreLink.click({ delay: 100 + Math.random() * 100 });
-				console.log("NAVIGATE", "✅ Clicked explore link");
+				await humanClick(page, exploreLink, { elementType: "link" });
+				console.log("NAVIGATE", "✅ Clicked explore link (human-like)");
 				await sleep(2000);
 				const { verifyExplorePageLoaded } = await import(
 					"../../shared/pageVerification/pageVerification.ts"
@@ -163,7 +165,7 @@ async function navigateToProfileViaSearch(
 			'input[placeholder*="Search"], input[aria-label*="Search"]',
 		);
 		if (searchInput) {
-			await searchInput.click({ delay: 100 + Math.random() * 100 });
+			await humanClick(page, searchInput, { elementType: "input" });
 			searchClicked = true;
 		}
 	}
@@ -174,7 +176,7 @@ async function navigateToProfileViaSearch(
 
 	await sleep(500 + Math.random() * 500);
 
-	// Type the username character by character
+	// Type the username character by character (human-like typing with delays)
 	for (const char of u) {
 		await page.keyboard.type(char, { delay: 100 + Math.random() * 150 });
 		await sleep(50 + Math.random() * 100);
@@ -182,10 +184,11 @@ async function navigateToProfileViaSearch(
 
 	await sleep(1500 + Math.random() * 1000);
 
-	// Find and click the profile in search results
-	const profileFound = await page.evaluate((targetUsername) => {
+	// Find the profile in search results and click it using human-like click
+	const profileLinkInfo = await page.evaluate((targetUsername) => {
 		const links = Array.from(document.querySelectorAll('a[href*="/"]'));
-		for (const link of links) {
+		for (let i = 0; i < links.length; i++) {
+			const link = links[i];
 			const href = link.getAttribute("href") || "";
 			const text = (link.textContent || "").toLowerCase();
 			if (
@@ -197,20 +200,30 @@ async function navigateToProfileViaSearch(
 					href.match(/^\/[^/]+\/?$/) ||
 					href.includes(`/${targetUsername}/`)
 				) {
-					(link as HTMLElement).click();
-					return true;
+					// Return the href so we can find and click it properly
+					return { found: true, href, index: i };
 				}
 			}
 		}
-		return false;
+		return { found: false };
 	}, u);
 
-	if (!profileFound) {
-		const altFound = await page.evaluate((targetUsername) => {
+	if (profileLinkInfo.found && profileLinkInfo.href) {
+		// Find the element again and click it with human-like behavior
+		const profileLink = await page.$(`a[href="${profileLinkInfo.href}"]`);
+		if (profileLink) {
+			await humanClick(page, profileLink, { elementType: "link" });
+		} else {
+			throw new Error(`Could not re-find profile link for @${u}`);
+		}
+	} else {
+		// Try alternative search for clickable elements
+		const altLinkInfo = await page.evaluate((targetUsername) => {
 			const clickableElements = Array.from(
 				document.querySelectorAll('div[role="link"], div[role="button"], a'),
 			);
-			for (const el of clickableElements) {
+			for (let i = 0; i < clickableElements.length; i++) {
+				const el = clickableElements[i];
 				const text = (el.textContent || "").toLowerCase();
 				const ariaLabel = (el.getAttribute("aria-label") || "").toLowerCase();
 				if (
@@ -218,14 +231,25 @@ async function navigateToProfileViaSearch(
 					text.includes(`@${targetUsername}`) ||
 					ariaLabel.includes(targetUsername)
 				) {
-					(el as HTMLElement).click();
-					return true;
+					// Return identifying info
+					const tagName = el.tagName.toLowerCase();
+					const href = el.getAttribute("href");
+					return { found: true, index: i, tagName, href };
 				}
 			}
-			return false;
+			return { found: false };
 		}, u);
 
-		if (!altFound) {
+		if (altLinkInfo.found && typeof altLinkInfo.index === "number") {
+			// Re-select and click with human-like behavior
+			const elements = await page.$$('div[role="link"], div[role="button"], a');
+			const targetElement = elements[altLinkInfo.index];
+			if (targetElement) {
+				await humanClick(page, targetElement, { elementType: "link" });
+			} else {
+				throw new Error(`Could not find profile @${u} in search results`);
+			}
+		} else {
 			throw new Error(`Could not find profile @${u} in search results`);
 		}
 	}

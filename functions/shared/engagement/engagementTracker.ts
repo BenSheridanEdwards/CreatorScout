@@ -10,11 +10,11 @@
  * - Repeat cycle (allows 50-100 actions per session)
  */
 import type { Page } from "puppeteer";
+import { mediumDelay, microDelay } from "../../timing/humanize/humanize.ts";
 import {
-	mediumDelay,
-	microDelay,
-	shortDelay,
-} from "../../timing/humanize/humanize.ts";
+	humanClick,
+	humanScroll,
+} from "../../navigation/humanInteraction/humanInteraction.ts";
 import {
 	ENGAGEMENT_RATIO_MAX,
 	ENGAGEMENT_RATIO_MIN,
@@ -208,7 +208,7 @@ export async function batchEngagements(
 			if (actionType < 0.6) {
 				// 60% scrolls (quickest)
 				const distance = 300 + Math.floor(Math.random() * 500);
-				await page.evaluate((d) => window.scrollBy(0, d), distance);
+				await humanScroll(page, { deltaY: distance });
 				tracker.recordEngagement("scroll");
 				await microDelay(0.5, 1.5);
 			} else if (actionType < 0.9) {
@@ -218,7 +218,7 @@ export async function batchEngagements(
 					tracker.recordEngagement("like");
 				} else {
 					// Fall back to scroll
-					await page.evaluate(() => window.scrollBy(0, 400));
+					await humanScroll(page, { deltaY: 400 });
 					tracker.recordEngagement("scroll");
 				}
 				await microDelay(0.5, 1.5);
@@ -229,7 +229,7 @@ export async function batchEngagements(
 			}
 
 			performed++;
-		} catch (error) {
+		} catch {
 			// Continue on error
 		}
 	}
@@ -239,7 +239,7 @@ export async function batchEngagements(
 }
 
 /**
- * Try to like a visible post
+ * Try to like a visible post using human-like clicking
  */
 async function tryLikePost(page: Page): Promise<boolean> {
 	try {
@@ -248,7 +248,7 @@ async function tryLikePost(page: Page): Promise<boolean> {
 		);
 
 		if (likeButton) {
-			await likeButton.click();
+			await humanClick(page, likeButton, { elementType: "button" });
 			return true;
 		}
 	} catch {
@@ -273,7 +273,3 @@ export function getGlobalEngagementTracker(): EngagementTracker {
 export function resetGlobalEngagementTracker(): void {
 	globalTracker = null;
 }
-
-
-
-

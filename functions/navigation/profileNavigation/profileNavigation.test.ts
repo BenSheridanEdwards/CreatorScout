@@ -36,6 +36,11 @@ const parseProfileStatusMock = jest
 const sleepMock = jest.fn<() => Promise<void>>();
 const configMock = { IG_USER: "u", IG_PASS: "p", DEBUG_SCREENSHOTS: false };
 
+// Mock humanInteraction to avoid ghost-cursor initialization in tests
+const humanClickMock = jest
+	.fn<(page: Page, element: unknown, options?: unknown) => Promise<void>>()
+	.mockResolvedValue(undefined);
+
 jest.unstable_mockModule("../../auth/login/login.ts", () => ({
 	login: loginMock,
 }));
@@ -46,6 +51,9 @@ jest.unstable_mockModule(
 jest.unstable_mockModule("../../shared/config/config.ts", () => configMock);
 jest.unstable_mockModule("../../timing/sleep/sleep.ts", () => ({
 	sleep: sleepMock,
+}));
+jest.unstable_mockModule("../humanInteraction/humanInteraction.ts", () => ({
+	humanClick: humanClickMock,
 }));
 
 const {

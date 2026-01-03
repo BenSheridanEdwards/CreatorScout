@@ -1,16 +1,19 @@
 import type { Page } from "puppeteer";
 import { createLogger } from "../logger/logger.ts";
+import { humanClick } from "../../navigation/humanInteraction/humanInteraction.ts";
 
 const logger = createLogger(process.env.DEBUG_LOGS === "true");
 
 /**
- * Dismiss cookie banner if present
+ * Dismiss cookie banner if present using human-like clicking
  */
 export async function dismissCookieBanner(page: Page): Promise<boolean> {
 	try {
-		const clicked = await page.evaluate(() => {
+		// Find the cookie button without clicking it in DOM
+		const buttonInfo = await page.evaluate(() => {
 			const buttons = document.querySelectorAll("button, a, [role='button']");
-			for (const btn of buttons) {
+			for (let i = 0; i < buttons.length; i++) {
+				const btn = buttons[i];
 				const text = btn.textContent?.trim().toLowerCase();
 				if (
 					text === "allow all cookies" ||
@@ -18,18 +21,27 @@ export async function dismissCookieBanner(page: Page): Promise<boolean> {
 					text === "accept" ||
 					text === "decline optional cookies"
 				) {
-					(btn as HTMLElement).click();
-					return true;
+					return { found: true, index: i, text };
 				}
 			}
-			return false;
+			return { found: false };
 		});
 
-		if (clicked) {
-			logger.info("WAIT", "✅ Cookie banner dismissed");
-			await new Promise((r) => setTimeout(r, 1000));
+		if (buttonInfo.found && typeof buttonInfo.index === "number") {
+			// Re-select and click with human-like behavior
+			const buttons = await page.$$("button, a, [role='button']");
+			const targetButton = buttons[buttonInfo.index];
+			if (targetButton) {
+				await humanClick(page, targetButton, { elementType: "button" });
+				logger.info(
+					"WAIT",
+					`✅ Cookie banner dismissed (human-like): ${buttonInfo.text}`,
+				);
+				await new Promise((r) => setTimeout(r, 1000));
+				return true;
+			}
 		}
-		return clicked;
+		return false;
 	} catch {
 		return false;
 	}

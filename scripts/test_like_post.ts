@@ -18,7 +18,10 @@ import {
 import { createLogger } from "../functions/shared/logger/logger.ts";
 import { getProfile } from "../functions/shared/profiles/profileLoader.ts";
 import { handleInstagramPopups } from "../functions/profile/profileActions/popupHandler.ts";
-import { humanLikeClickHandle } from "../functions/navigation/humanClick/humanClick.ts";
+import {
+	humanClick,
+	humanScroll,
+} from "../functions/navigation/humanInteraction/humanInteraction.ts";
 
 const logger = createLogger();
 
@@ -175,9 +178,7 @@ async function likeRandomPost(page: Page): Promise<boolean> {
 			logger.warn("ENGAGEMENT", "No unliked posts found in feed");
 			// Try scrolling to load more content
 			logger.info("ENGAGEMENT", "Scrolling to load more posts...");
-			await page.evaluate(() => {
-				window.scrollBy({ top: 800, behavior: "smooth" });
-			});
+			await humanScroll(page, { deltaY: 800 });
 			await shortDelay(2, 3);
 
 			// Try again after scrolling
@@ -227,32 +228,7 @@ async function likeRandomPost(page: Page): Promise<boolean> {
 
 		// Click like using ghost cursor for human-like movement
 		logger.info("ENGAGEMENT", "Clicking like button with ghost cursor...");
-		try {
-			await humanLikeClickHandle(page, button, {
-				elementType: "button",
-			});
-		} catch (error) {
-			logger.warn(
-				"ENGAGEMENT",
-				`Ghost cursor click failed, trying fallback: ${error}`,
-			);
-			// Fallback to direct click if ghost cursor fails
-			try {
-				await (
-					button as import("puppeteer").ElementHandle<HTMLElement>
-				).click();
-			} catch {
-				// Last resort: click via evaluate
-				await button.evaluate((el: Element) => {
-					const parent = el.closest('button, [role="button"]');
-					if (parent) {
-						(parent as HTMLElement).click();
-					} else {
-						(el as HTMLElement).click();
-					}
-				});
-			}
-		}
+		await humanClick(page, button, { elementType: "button" });
 		await microDelay(0.3, 0.8);
 
 		logger.info("ENGAGEMENT", "✓ Post liked successfully");
@@ -324,15 +300,11 @@ async function testLikePost(args: LikeTestArgs): Promise<void> {
 
 		// Scroll a bit to load posts
 		logger.info("TEST", "Scrolling to load feed content...");
-		await page.evaluate(() => {
-			window.scrollBy({ top: 500, behavior: "smooth" });
-		});
+		await humanScroll(page, { deltaY: 500 });
 		await shortDelay(2, 3);
 
 		// Scroll back up a bit
-		await page.evaluate(() => {
-			window.scrollBy({ top: -200, behavior: "smooth" });
-		});
+		await humanScroll(page, { deltaY: -200 });
 		await shortDelay(1, 2);
 
 		logger.info("TEST", "✓ Home feed loaded");

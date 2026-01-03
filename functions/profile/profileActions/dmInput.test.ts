@@ -11,8 +11,8 @@ const sleepMock = jest
 	.fn<(ms: number) => Promise<void>>()
 	.mockResolvedValue(undefined);
 
-// Mock clickAny to avoid complex humanLikeClickHandle chain that causes memory issues
-const clickAnyMock = jest
+// Mock humanClickByText to avoid complex humanClick chain that causes memory issues
+const humanClickByTextMock = jest
 	.fn<(page: Page, texts: string[]) => Promise<boolean>>()
 	.mockResolvedValue(false);
 
@@ -25,8 +25,8 @@ jest.unstable_mockModule("../../timing/sleep/sleep.ts", () => ({
 	sleep: sleepMock,
 }));
 
-jest.unstable_mockModule("../../navigation/clickAny/clickAny.ts", () => ({
-	clickAny: clickAnyMock,
+jest.unstable_mockModule("../../navigation/humanInteraction/humanInteraction.ts", () => ({
+	humanClickByText: humanClickByTextMock,
 }));
 
 jest.unstable_mockModule("./popupHandler.ts", () => ({

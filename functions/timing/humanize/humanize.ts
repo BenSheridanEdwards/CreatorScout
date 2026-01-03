@@ -13,6 +13,10 @@ import {
 	TIMEOUTS,
 } from "../../shared/config/config.ts";
 import { sleep } from "../sleep/sleep.ts";
+import {
+	humanScroll as humanScrollFromInteraction,
+	humanWiggle,
+} from "../../navigation/humanInteraction/humanInteraction.ts";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // DELAY HELPERS
@@ -151,6 +155,11 @@ function randomInt(min: number, max: number): number {
 	return Math.floor(Math.random() * (max - min)) + min;
 }
 
+/**
+ * Natural scrolling using ghost-cursor.
+ * @param page - Puppeteer page
+ * @param times - Number of scroll iterations (optional, defaults based on DELAY_SCALE)
+ */
 export async function humanScroll(
 	page: Page,
 	times?: number | null,
@@ -159,14 +168,16 @@ export async function humanScroll(
 		times = DELAY_SCALE < 1 ? randomInt(2, 5) : randomInt(3, 7);
 	}
 	for (let i = 0; i < times; i++) {
-		await page.evaluate(`window.scrollBy(0, ${randomInt(300, 701)})`);
+		await humanScrollFromInteraction(page, { deltaY: randomInt(300, 700) });
 		await delay("after_scroll");
 	}
 }
 
+/**
+ * Natural mouse wiggle using ghost-cursor.
+ */
 export async function mouseWiggle(page: Page): Promise<void> {
-	const steps = DELAY_SCALE < 1 ? randomInt(8, 21) : randomInt(15, 36);
-	await page.mouse.move(randomInt(200, 1601), randomInt(200, 901), { steps });
+	await humanWiggle(page);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

@@ -1,6 +1,7 @@
 import type { Page } from "puppeteer";
 import { CONFIDENCE_THRESHOLD } from "../../shared/config/config.ts";
 import { sleep } from "../../timing/sleep/sleep.ts";
+import { humanScrollTo } from "../../navigation/humanInteraction/humanInteraction.ts";
 
 const INSTAGRAM_HOST = "instagram.com";
 
@@ -274,14 +275,12 @@ export async function analyzeExternalLink(
 
 		// Scroll the page to load all content (especially for aggregator platforms)
 		try {
-			await page.evaluate(async () => {
-				// Scroll to bottom
-				window.scrollTo(0, document.body.scrollHeight);
-				await new Promise((resolve) => setTimeout(resolve, 500));
-				// Scroll back to top to capture everything
-				window.scrollTo(0, 0);
-				await new Promise((resolve) => setTimeout(resolve, 300));
-			});
+			// Scroll to bottom using ghost-cursor
+			await humanScrollTo(page, "bottom");
+			await sleep(500);
+			// Scroll back to top to capture everything
+			await humanScrollTo(page, "top");
+			await sleep(300);
 		} catch (scrollError) {
 			console.log(
 				`[LINK_ANALYSIS] Scroll failed (non-critical): ${scrollError}`,

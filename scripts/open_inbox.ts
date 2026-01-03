@@ -6,7 +6,7 @@
  */
 
 import { initializeInstagramSession } from "../functions/auth/sessionInitializer/sessionInitializer.ts";
-import { clickAny } from "../functions/navigation/clickAny/clickAny.ts";
+import { humanClickByText } from "../functions/navigation/humanInteraction/humanInteraction.ts";
 import { sendDMToUser } from "../functions/profile/profileActions/profileActions.ts";
 
 /**
@@ -14,7 +14,7 @@ import { sendDMToUser } from "../functions/profile/profileActions/profileActions
  */
 async function handleInboxPopupsAndErrors(page: import("puppeteer").Page) {
 	// Dismiss "Turn on Notifications" / similar modals
-	const dismissedNotifications = await clickAny(page, [
+	const dismissedNotifications = await humanClickByText(page, [
 		"Not Now",
 		"Not now",
 		"Cancel",
@@ -34,7 +34,7 @@ async function handleInboxPopupsAndErrors(page: import("puppeteer").Page) {
 		console.log("⚠️ Detected 'Something went wrong' error state on inbox page");
 
 		// Try clicking "Reload page" button if present
-		const reloaded = await clickAny(page, ["Reload page", "Reload"]);
+		const reloaded = await humanClickByText(page, ["Reload page", "Reload"]);
 		if (reloaded) {
 			console.log("🔄 Clicked 'Reload page', waiting for reload...");
 			await page

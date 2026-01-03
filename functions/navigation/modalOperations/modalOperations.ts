@@ -1,12 +1,12 @@
 /**
  * Instagram modal operations - following modal, username extraction, scrolling.
  */
-import type { ElementHandle, Page } from "puppeteer";
+import type { Page } from "puppeteer";
 import { sleep } from "../../timing/sleep/sleep.ts";
 import {
-	humanLikeClickAt,
-	humanLikeClickHandle,
-} from "../humanClick/humanClick.ts";
+	humanClick,
+	humanClickAt,
+} from "../humanInteraction/humanInteraction.ts";
 
 /**
  * Open the "Following" modal for a profile.
@@ -66,7 +66,7 @@ export async function openFollowingModal(page: Page): Promise<boolean> {
 
 				// Click with ghost-cursor
 				console.log(`[MODAL] Clicking with ghost-cursor...`);
-				await humanLikeClickHandle(page, handle, { elementType: "link" });
+				await humanClick(page, handle, { elementType: "link" });
 				await sleep(3000);
 
 				// Check if modal opened
@@ -116,13 +116,15 @@ export async function openFollowingModal(page: Page): Promise<boolean> {
 		});
 
 		if (linkInfo.found && linkInfo.x && linkInfo.y) {
-			console.log(`[MODAL] Found following link via evaluate: ${linkInfo.href}`);
+			console.log(
+				`[MODAL] Found following link via evaluate: ${linkInfo.href}`,
+			);
 			console.log(
 				`[MODAL] Clicking at coordinates: (${linkInfo.x}, ${linkInfo.y})`,
 			);
 
 			// Click at coordinates using ghost-cursor
-			await humanLikeClickAt(page, linkInfo.x, linkInfo.y, {
+			await humanClickAt(page, linkInfo.x, linkInfo.y, {
 				elementType: "link",
 			});
 

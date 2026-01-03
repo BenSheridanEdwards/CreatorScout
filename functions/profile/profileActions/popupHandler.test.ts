@@ -11,17 +11,21 @@ const sleepMock = jest
 	.fn<(ms: number) => Promise<void>>()
 	.mockResolvedValue(undefined);
 
-// Mock clickAny to avoid complex humanLikeClickHandle chain that causes memory issues
-const clickAnyMock = jest
+// Mock humanClickByText and humanClick to avoid complex ghost-cursor chain that causes memory issues
+const humanClickByTextMock = jest
 	.fn<(page: Page, texts: string[]) => Promise<boolean>>()
 	.mockResolvedValue(false);
+const humanClickMock = jest
+	.fn<(page: Page, element: unknown, options?: unknown) => Promise<void>>()
+	.mockResolvedValue(undefined);
 
 jest.unstable_mockModule("../../timing/sleep/sleep.ts", () => ({
 	sleep: sleepMock,
 }));
 
-jest.unstable_mockModule("../../navigation/clickAny/clickAny.ts", () => ({
-	clickAny: clickAnyMock,
+jest.unstable_mockModule("../../navigation/humanInteraction/humanInteraction.ts", () => ({
+	humanClickByText: humanClickByTextMock,
+	humanClick: humanClickMock,
 }));
 
 // Import after mocks are set up
@@ -31,7 +35,7 @@ describe("popupHandler", () => {
 	beforeEach(() => {
 		jest.clearAllMocks();
 		sleepMock.mockResolvedValue(undefined);
-		clickAnyMock.mockResolvedValue(false);
+		humanClickByTextMock.mockResolvedValue(false);
 	});
 
 	describe("handleInstagramPopups", () => {
@@ -59,8 +63,8 @@ describe("popupHandler", () => {
 			expect(page.evaluate).toHaveBeenCalled();
 		});
 
-		test("dismisses messaging tab popup when found via clickAny", async () => {
-			clickAnyMock.mockResolvedValueOnce(true); // clickAny finds and clicks popup
+		test("dismisses messaging tab popup when found via humanClickByText", async () => {
+			humanClickByTextMock.mockResolvedValueOnce(true); // humanClickByText finds and clicks popup
 			const page = createPageMock({
 				evaluate: jest
 					.fn<(fn: unknown, ...args: unknown[]) => Promise<boolean>>()
@@ -71,7 +75,7 @@ describe("popupHandler", () => {
 
 			// Function should complete without errors
 			expect(page.evaluate).toHaveBeenCalled();
-			expect(clickAnyMock).toHaveBeenCalled();
+			expect(humanClickByTextMock).toHaveBeenCalled();
 		});
 
 		test("dismisses notification popup", async () => {
@@ -133,7 +137,7 @@ describe("popupHandler", () => {
 						return false;
 					}) as unknown as Page["evaluate"],
 			});
-			clickAnyMock.mockResolvedValue(false); // clickAny doesn't find reload
+			humanClickByTextMock.mockResolvedValue(false); // humanClickByText doesn't find reload
 
 			await handleInstagramPopups(page as unknown as Page);
 
@@ -148,7 +152,7 @@ describe("popupHandler", () => {
 					.fn<(fn: unknown, ...args: unknown[]) => Promise<boolean>>()
 					.mockResolvedValue(false) as unknown as Page["evaluate"], // No popups found
 			});
-			clickAnyMock.mockResolvedValue(false); // clickAny finds nothing
+			humanClickByTextMock.mockResolvedValue(false); // humanClickByText finds nothing
 
 			await handleInstagramPopups(page as unknown as Page);
 
