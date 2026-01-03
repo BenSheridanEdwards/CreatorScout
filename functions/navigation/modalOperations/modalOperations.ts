@@ -166,12 +166,35 @@ export async function isFollowingModalEmpty(page: Page): Promise<boolean> {
 			const dialog = document.querySelector('div[role="dialog"]');
 			if (!dialog) return false;
 
-			const text = dialog.textContent || "";
-			const hasEmptyMessage =
-				text.includes("People you follow") &&
-				text.includes("Once you follow people, you'll see them here");
-
-			return hasEmptyMessage;
+			const text = (dialog.textContent || "").toLowerCase();
+			
+			// Check for various empty state indicators
+			const emptyIndicators = [
+				// Primary empty state
+				text.includes("people you follow") && text.includes("once you follow people"),
+				// Alternative phrasing
+				text.includes("no one") && text.includes("follow"),
+				// Check if only "Suggested for you" exists with no actual users
+				text.includes("suggested for you") && !dialog.querySelector('a[href^="/"]:not([href*="explore"])'),
+			];
+			
+			// Also check if there are any user links in the modal (excluding system links)
+			const userLinks = dialog.querySelectorAll('a[href^="/"]');
+			let actualUserCount = 0;
+			for (const link of userLinks) {
+				const href = link.getAttribute("href") || "";
+				const parts = href.split("/").filter(Boolean);
+				if (parts.length === 1) {
+					const name = parts[0].toLowerCase();
+					const systemPages = ["explore", "direct", "accounts", "stories", "reels", "p", "tv", "reel"];
+					if (!systemPages.includes(name)) {
+						actualUserCount++;
+					}
+				}
+			}
+			
+			// Empty if we have empty indicators OR if there are no actual user links
+			return emptyIndicators.some(Boolean) || actualUserCount === 0;
 		});
 
 		if (isEmpty) {

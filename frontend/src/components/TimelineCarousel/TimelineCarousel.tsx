@@ -93,13 +93,15 @@ function formatDuration(seconds: number): string {
 	return `${mins}m ${secs}s`;
 }
 
+// Consistent scale: 2 pixels per minute = 120 pixels per hour
+const PIXELS_PER_MINUTE = 2;
+
 function calculateTimelinePosition(
 	timestamp: string,
 	startTime: number,
 ): number {
 	const time = new Date(timestamp).getTime();
-	const pixelsPerMinute = 8; // 8 pixels per minute for better spacing between cards
-	return ((time - startTime) / (1000 * 60)) * pixelsPerMinute;
+	return ((time - startTime) / (1000 * 60)) * PIXELS_PER_MINUTE;
 }
 
 export default function TimelineCarousel({
@@ -127,6 +129,8 @@ export default function TimelineCarousel({
 		null,
 	);
 	const toast = useToast();
+	const toastRef = useRef(toast);
+	toastRef.current = toast;
 	const [timezone, setTimezone] = useState<string>("UTC");
 	const [, setErrorShown] = useState<Set<string>>(new Set());
 
@@ -162,7 +166,7 @@ export default function TimelineCarousel({
 				if (runsRes.status !== 404) {
 					setErrorShown((prev) => {
 						if (!prev.has("runs")) {
-							toast.error(errorText);
+							toastRef.current.error(errorText);
 							return new Set(prev).add("runs");
 						}
 						return prev;
@@ -186,7 +190,7 @@ export default function TimelineCarousel({
 					console.warn("Failed to load schedule:", scheduleRes.status);
 					setErrorShown((prev) => {
 						if (!prev.has("schedule")) {
-							toast.warning("Failed to load scheduled runs");
+							toastRef.current.warning("Failed to load scheduled runs");
 							return new Set(prev).add("schedule");
 						}
 						return prev;
@@ -225,7 +229,7 @@ export default function TimelineCarousel({
 			if (!(error instanceof TypeError && error.message.includes("fetch"))) {
 				setErrorShown((prev) => {
 					if (!prev.has("network")) {
-						toast.error(`Network error: ${errorMessage}`);
+						toastRef.current.error(`Network error: ${errorMessage}`);
 						return new Set(prev).add("network");
 					}
 					return prev;
@@ -234,7 +238,7 @@ export default function TimelineCarousel({
 		} finally {
 			setLoading(false);
 		}
-	}, [toast]);
+	}, []);
 
 	useEffect(() => {
 		void loadData();
@@ -585,7 +589,10 @@ export default function TimelineCarousel({
 				setTimelineWidth(
 					Math.max(
 						width,
-						Math.max(2000, ((endTime - startTime) / (1000 * 60)) * 2),
+						Math.max(
+							2000,
+							((endTime - startTime) / (1000 * 60)) * PIXELS_PER_MINUTE,
+						),
 					),
 				);
 			}
@@ -657,7 +664,7 @@ export default function TimelineCarousel({
 					ref={timelineContentRef}
 					className="relative h-full"
 					style={{
-						minWidth: `${Math.max(2000, ((endTime - startTime) / (1000 * 60)) * 2)}px`,
+						minWidth: `${Math.max(2000, ((endTime - startTime) / (1000 * 60)) * PIXELS_PER_MINUTE)}px`,
 						paddingTop: "100px",
 						paddingBottom: "100px",
 					}}
@@ -683,7 +690,8 @@ export default function TimelineCarousel({
 								card.timestamp,
 								startTime,
 							);
-							const maxPosition = ((endTime - startTime) / (1000 * 60)) * 8; // Match pixelsPerMinute
+							const maxPosition =
+								((endTime - startTime) / (1000 * 60)) * PIXELS_PER_MINUTE;
 							if (markerPosition < 0 || markerPosition > maxPosition)
 								return null;
 
@@ -730,16 +738,27 @@ export default function TimelineCarousel({
 					{currentTimePosition >= 0 && (
 						<div
 							ref={currentTimeLineRef}
-							className="absolute top-0 bottom-0 w-0.5 bg-gradient-to-b from-transparent via-amber-400/20 to-transparent z-30 pointer-events-none"
+							className="absolute top-0 bottom-0 w-0.5 bg-gradient-to-b from-transparent via-amber-400/60 to-transparent z-30 pointer-events-none"
 							style={{
 								left: `${currentTimePosition}px`,
 								transform: "translateX(-50%)",
 							}}
 						>
 							{/* Horizontal marker on timeline axis */}
-							<div className="absolute top-[75%] -translate-y-1/2 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-amber-400/40" />
+							<div className="absolute top-[75%] -translate-y-1/2 left-1/2 -translate-x-1/2 w-10 h-0.5 bg-amber-400/80" />
 							{/* Central dot on timeline */}
-							<div className="absolute top-[75%] -translate-y-1/2 left-1/2 -translate-x-1/2 w-2 h-2 bg-amber-400/50 rounded-full border border-amber-400/60" />
+							<div className="absolute top-[75%] -translate-y-1/2 left-1/2 -translate-x-1/2 w-3 h-3 bg-amber-400 rounded-full border-2 border-amber-300 shadow-lg shadow-amber-400/50" />
+							{/* Current time label */}
+							<time
+								dateTime={new Date(currentTime).toISOString()}
+								className="absolute top-[75%] mt-5 left-1/2 -translate-x-1/2 text-xs text-amber-400 whitespace-nowrap font-mono font-bold bg-slate-900/80 px-2 py-0.5 rounded"
+							>
+								{new Date(currentTime).toLocaleTimeString([], {
+									timeZone: timezone,
+									hour: "2-digit",
+									minute: "2-digit",
+								})}
+							</time>
 						</div>
 					)}
 

@@ -284,21 +284,8 @@ export async function initializeInstagramSession(
 
 			const creds: Credentials = { username, password };
 
-			// When using AdsPower, skip loading our local cookies - AdsPower manages its own
-			const finalLoginOptions = {
-				...loginOptions,
-				skipCookies: adsPowerProfileId ? true : loginOptions?.skipCookies,
-			};
-
-			if (adsPowerProfileId && !finalLoginOptions.skipCookies) {
-				logger.info(
-					"SESSION",
-					"Using AdsPower profile - skipping local cookie loading",
-				);
-			}
-
 			logger.info("SESSION", `Logging in as @${creds.username}...`);
-			await login(page, creds, finalLoginOptions);
+			await login(page, creds, loginOptions);
 			logger.info("SESSION", "✅ Login successful");
 		}
 
@@ -310,26 +297,29 @@ export async function initializeInstagramSession(
 		logger.info("SESSION", "🎉 Instagram session initialized successfully");
 		return { browser, page, logger };
 	} catch (error) {
-		// Don't close browser on login timeout - keep it open for inspection
-		const errorMessage = error instanceof Error ? error.message : String(error);
-		const isLoginTimeout = errorMessage.includes("Login timeout");
-
 		logger.error("SESSION", `❌ Session initialization failed: ${error}`);
-
-		if (isLoginTimeout) {
-			logger.warn(
-				"SESSION",
-				"⚠️  Browser kept open due to login timeout - please inspect manually",
-			);
-			// Keep browser open - don't close it
-		} else {
-			// Only close browser for non-timeout errors
-			try {
-				await browser.close();
-			} catch (closeError) {
-				logger.error("SESSION", `Failed to close browser: ${closeError}`);
-			}
+		logger.warn(
+			"SESSION",
+			"⚠️  Browser kept open for 3 minutes for manual inspection",
+		);
+		logger.info(
+			"SESSION", 
+			"💡 Please check the browser window - you may need to solve a CAPTCHA, complete verification, or inspect the issue"
+		);
+		
+		// Always wait 3 minutes before closing to allow manual intervention
+		const waitTimeMs = 3 * 60 * 1000; // 3 minutes
+		logger.info("SESSION", `⏳ Waiting 3 minutes before closing browser...`);
+		
+		await new Promise((resolve) => setTimeout(resolve, waitTimeMs));
+		
+		logger.info("SESSION", "⏰ 3 minute wait period ended, closing browser");
+		try {
+			await browser.close();
+		} catch (closeError) {
+			logger.error("SESSION", `Failed to close browser: ${closeError}`);
 		}
+		
 		throw error;
 	}
 }

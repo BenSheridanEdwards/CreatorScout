@@ -107,30 +107,22 @@ export async function getBioFromPage(page: Page): Promise<string | null> {
 				);
 				const trimmed = txt?.trim();
 
-				// Collect bio-like content from spans
-				if (trimmed && trimmed.length > 1 && trimmed.length < 100) {
-					// Check if this looks like bio content
-					const isBioLike =
-						!trimmed.includes("Follow") &&
-						!trimmed.includes("Followed") && // "Followed user1, user2, and user3"
-						!trimmed.includes("Message") &&
-						!trimmed.includes("Options") &&
-						!trimmed.match(/^\d/) &&
-						!trimmed.includes("posts") &&
-						!trimmed.includes("followers") &&
-						!trimmed.includes("following") &&
-						!trimmed.match(/Followed .+ and /) && // Instagram mutual follows UI
-						trimmed !== "Links" &&
-						trimmed !== "lanahyummy"; // Exclude username
+				// Collect bio-like content from spans (allow up to 300 chars for longer bios)
+				if (trimmed && trimmed.length > 1 && trimmed.length < 300) {
+					// Quick reject: stats and UI elements
+					const isUIText =
+						trimmed.includes("Follow") ||
+						trimmed.includes("Followed") ||
+						trimmed.includes("Message") ||
+						trimmed.includes("Options") ||
+						trimmed.match(/^\d/) ||
+						trimmed.includes("posts") ||
+						trimmed.includes("followers") ||
+						trimmed.includes("following") ||
+						trimmed === "Links";
 
-					if (isBioLike) {
-						logger.info(
-							"ANALYSIS",
-							`Found potential bio content with selector ${i + 1}/${selectors.length}: "${trimmed}"`,
-						);
-
-						// If we found what looks like bio content, try to get more complete bio
-						// by looking at the parent element for additional context
+					if (!isUIText) {
+						// Found bio content - try to enhance from parent
 						try {
 							const parentText = await el.evaluate((node: Element) => {
 								const parent = node.parentElement;
@@ -153,30 +145,20 @@ export async function getBioFromPage(page: Page): Promise<string | null> {
 								parentText.length > trimmed.length &&
 								parentText.length < 200
 							) {
-								const cleanedParent = cleanBioText(parentText);
-								logger.info(
-									"ANALYSIS",
-									`Enhanced bio from parent: "${cleanedParent}"`,
-								);
-								return cleanedParent;
+								return cleanBioText(parentText);
 							}
 						} catch (e) {
 							// Continue with original text
 						}
 
 						return cleanBioText(trimmed);
-					} else {
-						logger.debug(
-							"ANALYSIS",
-							`Selector ${i + 1} found non-bio content: "${trimmed.substring(0, 30)}"`,
-						);
 					}
 				}
 			}
 		} catch (_e) {}
 	}
 
-	logger.debug("ANALYSIS", "All specific selectors failed, trying fallback...");
+	// Fallback: parse from header text
 
 	// Fallback: get all text from header and try to extract bio
 	try {
@@ -257,10 +239,6 @@ export async function getBioFromPage(page: Page): Promise<string | null> {
 				if (validBioParts.length > 0) {
 					const combinedBio = cleanBioText(validBioParts.join(" ").trim());
 					if (combinedBio.length > 5) {
-						logger.info(
-							"ANALYSIS",
-							`Extracted bio from header parsing: "${combinedBio}"`,
-						);
 						return combinedBio;
 					}
 				}

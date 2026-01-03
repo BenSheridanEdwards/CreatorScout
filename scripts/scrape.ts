@@ -23,6 +23,7 @@ import { initializeInstagramSession } from "../functions/auth/sessionInitializer
 import { getProfileStats } from "../functions/extraction/getProfileStats/getProfileStats.ts";
 import {
 	extractFollowingUsernames,
+	isFollowingModalEmpty,
 	openFollowingModal,
 	scrollFollowingModal,
 } from "../functions/navigation/modalOperations/modalOperations.ts";
@@ -45,6 +46,7 @@ import {
 	CONFIDENCE_THRESHOLD,
 	MAX_DMS_PER_DAY,
 } from "../functions/shared/config/config.ts";
+import { warmUpProfile } from "../functions/timing/warmup/warmup.ts";
 import {
 	getScrollIndex,
 	getStats,
@@ -305,13 +307,16 @@ export async function processProfile(
 	// Use the higher of quickScore or analysis.confidence (which includes link analysis)
 	const effectiveConfidence = Math.max(quickScore, analysis.confidence);
 
+	// Check if profile has links that should be verified before rejecting
+	const hasLinksToCheck = analysis.links && analysis.links.length > 0;
+
 	// SMART FILTERING: Quick reject low-scoring profiles
-	// Only reject if BOTH bio score AND comprehensive analysis confidence are low
-	if (effectiveConfidence < 20 && !analysis.isCreator) {
-		// Very low score from all signals - quick reject (saves time)
+	// BUT: Never quick-reject if there are links to check - links are the best indicator!
+	if (effectiveConfidence < 20 && !analysis.isCreator && !hasLinksToCheck) {
+		// Very low score from all signals AND no links - quick reject (saves time)
 		logger.debug(
 			"ANALYSIS",
-			`Quick reject: Low combined score (bio: ${quickScore}, analysis: ${analysis.confidence} < 20)`,
+			`Quick reject: Low combined score (bio: ${quickScore}, analysis: ${analysis.confidence} < 20) and no links`,
 		);
 		await markVisited(
 			username,
@@ -342,6 +347,14 @@ export async function processProfile(
 		logger.info("SUMMARY", `💡 Reason: Very low scores from all signals`);
 		logger.info("SUMMARY", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 		return;
+	}
+
+	// If we have links but low score, log that we're continuing to check links
+	if (hasLinksToCheck && effectiveConfidence < 40) {
+		logger.info(
+			"ANALYSIS",
+			`📎 Low score (${effectiveConfidence}%) but has ${analysis.links.length} links to verify - continuing analysis`,
+		);
 	}
 
 	// RANDOM ENGAGEMENT: Break bot patterns with natural actions
@@ -809,9 +822,6 @@ export async function processFollowingList(
 	logger.debug("NAVIGATION", `Following modal opened successfully`);
 
 	// Check if the modal is empty (no people followed)
-	const { isFollowingModalEmpty } = await import(
-		"../../functions/navigation/modalOperations/modalOperations.ts"
-	);
 	const isEmpty = await isFollowingModalEmpty(page);
 	if (isEmpty) {
 		logger.warn(
@@ -1206,15 +1216,17 @@ export async function runScrapeLoopWithoutDM(
 }
 
 /**
- * Main scrape function - does the full automation flow (WITHOUT sending DMs)
- * @param debug - If true, enables logging output
+ * Main scrape function - does the full automation flow
+ * @param options - Configuration options
  */
-export async function scrape(debug: boolean = false): Promise<void> {
+export async function scrape(options: { debug?: boolean; skipWarmup?: boolean } = {}): Promise<void> {
+	const { debug = false, skipWarmup = false } = options;
+	
 	logger.info(
 		"ACTION",
 		"🚀 Scout - Instagram Patreon Creator Discovery Agent",
 	);
-	logger.info("SYSTEM", `Debug mode: ${debug}`);
+	logger.info("SYSTEM", `Debug: ${debug}, Skip warmup: ${skipWarmup}`);
 
 	// Initialize metrics tracking
 	const metricsTracker = getGlobalMetricsTracker();
@@ -1235,7 +1247,19 @@ export async function scrape(debug: boolean = false): Promise<void> {
 		});
 		browser = session.browser;
 		const page = session.page;
-		logger.info("ACTION", "✅ Session initialized successfully!");
+		logger.info("ACTION", "✅ Session initialized!");
+
+		// Warm up the session before starting automation (unless skipped)
+		if (!skipWarmup) {
+			logger.info("WARMUP", "🔥 Starting warm-up routine...");
+			const warmupStats = await warmUpProfile(page, 1.5);
+			logger.info(
+				"WARMUP",
+				`✅ Warm-up complete: ${warmupStats.scrolls} scrolls, ${warmupStats.likes} likes, ${warmupStats.reelsWatched} reels watched`,
+			);
+		} else {
+			logger.info("WARMUP", "⏭️ Skipping warm-up (--skip-warmup)");
+		}
 
 		// Load seeds
 		const seedsLoaded = await loadSeeds();
@@ -1306,14 +1330,16 @@ export async function scrape(debug: boolean = false): Promise<void> {
 /**
  * Main scrape function - does the full automation flow (WITHOUT sending DMs)
  * This function discovers creators but doesn't send DMs - useful for passive discovery.
- * @param debug - If true, enables logging output
+ * @param options - Configuration options
  */
-export async function scrapeWithoutDM(debug: boolean = false): Promise<void> {
+export async function scrapeWithoutDM(options: { debug?: boolean; skipWarmup?: boolean } = {}): Promise<void> {
+	const { debug = false, skipWarmup = false } = options;
+	
 	logger.info(
 		"ACTION",
 		"🔍 Scout - Instagram Patreon Creator Discovery Agent (Discovery Mode - No DMs)",
 	);
-	logger.info("SYSTEM", `Debug mode: ${debug}`);
+	logger.info("SYSTEM", `Debug: ${debug}, Skip warmup: ${skipWarmup}`);
 
 	// Initialize metrics tracking
 	const metricsTracker = getGlobalMetricsTracker();
@@ -1334,7 +1360,19 @@ export async function scrapeWithoutDM(debug: boolean = false): Promise<void> {
 		});
 		browser = session.browser;
 		const page = session.page;
-		logger.info("ACTION", "✅ Session initialized successfully!");
+		logger.info("ACTION", "✅ Session initialized!");
+
+		// Warm up the session before starting automation (unless skipped)
+		if (!skipWarmup) {
+			logger.info("WARMUP", "🔥 Starting warm-up routine...");
+			const warmupStats = await warmUpProfile(page, 1.5);
+			logger.info(
+				"WARMUP",
+				`✅ Warm-up complete: ${warmupStats.scrolls} scrolls, ${warmupStats.likes} likes, ${warmupStats.reelsWatched} reels watched`,
+			);
+		} else {
+			logger.info("WARMUP", "⏭️ Skipping warm-up (--skip-warmup)");
+		}
 
 		// Load seeds
 		const seedsLoaded = await loadSeeds();
@@ -1411,16 +1449,21 @@ if (
 	const debug = process.argv.includes("--debug") || process.argv.includes("-d");
 	const noDM =
 		process.argv.includes("--no-dm") || process.argv.includes("--discovery");
+	const skipWarmup = process.argv.includes("--skip-warmup");
+
+	const options = { debug, skipWarmup };
 
 	if (noDM) {
 		console.log("🔍 Running in DISCOVERY MODE (no DMs will be sent)");
-		scrapeWithoutDM(debug).catch((err) => {
+		if (skipWarmup) console.log("⏭️ Skipping warmup");
+		scrapeWithoutDM(options).catch((err) => {
 			console.error(err);
 			process.exit(1);
 		});
 	} else {
 		console.log("🚀 Running in FULL MODE (will send DMs to creators)");
-		scrape(debug).catch((err) => {
+		if (skipWarmup) console.log("⏭️ Skipping warmup");
+		scrape(options).catch((err) => {
 			console.error(err);
 			process.exit(1);
 		});

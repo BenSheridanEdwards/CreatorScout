@@ -45,70 +45,66 @@ export async function getProfileStats(page: Page): Promise<ProfileStats> {
 	};
 
 	try {
-		const statsData = await page.evaluate(() => {
-			// Method 1: Look for links with href containing /followers/ or /following/
+		// Extract raw text data from page - keep evaluate simple to avoid __name issues
+		const rawData = await page.evaluate(() => {
 			const links = Array.from(document.querySelectorAll("a"));
-			const followersLink = links.find((l) =>
-				l.getAttribute("href")?.includes("/followers"),
-			);
-			const followingLink = links.find((l) =>
-				l.getAttribute("href")?.includes("/following"),
-			);
+			
+			let followersText = "";
+			let followingText = "";
+			
+			for (const link of links) {
+				const href = link.getAttribute("href") || "";
+				const text = link.textContent?.trim() || "";
+				if (href.includes("/followers") && !href.includes("/following")) {
+					followersText = text;
+				} else if (href.includes("/following")) {
+					followingText = text;
+				}
+			}
 
-			// Extract text from links
-			const followersText = followersLink?.textContent?.trim() || "";
-			const followingText = followingLink?.textContent?.trim() || "";
-
-			// Method 2: Parse from header text for edge cases (like 0 following)
+			// Get header text for fallback parsing
 			const header = document.querySelector("header");
 			const headerText = header?.textContent || "";
 
-			// Look for patterns like "314K followers", "346 K followers", "0 following", "31 posts"
-			// Allow optional space between number and K/M/B suffix
-			const followersMatch = headerText.match(
-				/([\d,.]+)\s*([KMB])?\s*followers?/i,
-			);
-			const followingMatch = headerText.match(
-				/([\d,.]+)\s*([KMB])?\s*following/i,
-			);
-			const postsMatch = headerText.match(/([\d,.]+)\s*([KMB])?\s*posts?/i);
-
-			// Reconstruct the count string with suffix if present
-			const extractCount = (match: RegExpMatchArray | null): string | null => {
-				if (!match) return null;
-				const num = match[1];
-				const suffix = match[2] || "";
-				return num + suffix;
-			};
-
-			return {
-				followersText: followersText || extractCount(followersMatch) || null,
-				followingText: followingText || extractCount(followingMatch) || null,
-				postsText: extractCount(postsMatch) || null,
-				// Check for 0 following specifically (no link created for 0)
-				hasZeroFollowing: !followingLink && headerText.includes("0 following"),
-			};
+			return { followersText, followingText, headerText };
 		});
 
-		// Log raw extracted text for debugging
-		logger.debug(
-			"PROFILE",
-			`Raw stats text - followers: "${statsData.followersText}", following: "${statsData.followingText}", posts: "${statsData.postsText}"`,
-		);
-
-		// Parse the counts
-		if (statsData.hasZeroFollowing) {
-			stats.following = 0;
-		} else if (statsData.followingText) {
-			stats.following = parseCount(statsData.followingText);
+		// Parse counts outside of evaluate to avoid __name issues
+		if (rawData.followersText) {
+			stats.followers = parseCount(rawData.followersText);
+		}
+		
+		if (rawData.followingText) {
+			stats.following = parseCount(rawData.followingText);
 		}
 
-		if (statsData.followersText) {
-			stats.followers = parseCount(statsData.followersText);
-		}
+		// Fallback: parse from header text
+		if (!stats.followers || !stats.following) {
+			const headerText = rawData.headerText;
+			
+			const followersMatch = headerText.match(/([\d,.]+)\s*([KMB])?\s*followers?/i);
+			const followingMatch = headerText.match(/([\d,.]+)\s*([KMB])?\s*following/i);
+			const postsMatch = headerText.match(/([\d,.]+)\s*([KMB])?\s*posts?/i);
 
-		if (statsData.postsText) {
-			stats.posts = parseCount(statsData.postsText);
+			if (!stats.followers && followersMatch) {
+				const countStr = followersMatch[1] + (followersMatch[2] || "");
+				stats.followers = parseCount(countStr);
+			}
+			
+			if (!stats.following && followingMatch) {
+				const countStr = followingMatch[1] + (followingMatch[2] || "");
+				stats.following = parseCount(countStr);
+			}
+			
+			if (postsMatch) {
+				const countStr = postsMatch[1] + (postsMatch[2] || "");
+				stats.posts = parseCount(countStr);
+			}
+
+			// Check for 0 following specifically
+			if (!stats.following && headerText.includes("0 following")) {
+				stats.following = 0;
+			}
 		}
 
 		// Calculate ratio
@@ -121,7 +117,7 @@ export async function getProfileStats(page: Page): Promise<ProfileStats> {
 			`Stats: ${stats.followers} followers, ${stats.following} following, ${stats.posts} posts`,
 		);
 	} catch (error) {
-		logger.error("ERROR", `Error extracting profile stats: ${error}`);
+		logger.warn("PROFILE", `Could not extract profile stats: ${error}`);
 	}
 
 	return stats;

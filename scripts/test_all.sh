@@ -120,7 +120,3 @@ echo "      npm run cron:smart -- --profile $PROFILE --session morning --dry-run
 echo "   3. Install crontab:"
 echo "      ./scripts/cron/setup_crontab.sh"
 echo ""
-
-
-
-

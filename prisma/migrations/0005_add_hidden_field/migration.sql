@@ -4,3 +4,5 @@ ALTER TABLE "profiles" ADD COLUMN "hidden_at" TIMESTAMPTZ(6);
 
 
 
+
+

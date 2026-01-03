@@ -84,7 +84,7 @@ export const DELAYS: Record<string, [number, number]> = {
 	dm_action: [10, 30], // Between DM actions
 
 	// ═══ PACING - Rate limiting ═══
-	between_seeds: [18, 36], // Between seed profiles (reduced by 60%, min 18s)
+	between_seeds: [5, 12], // Between seed profiles
 	queue_empty: [120, 240], // 2-4 min when queue empty
 
 	// ═══ LOGIN - Critical path ═══
