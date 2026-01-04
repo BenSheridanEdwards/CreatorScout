@@ -200,8 +200,12 @@ export async function startAdsPowerProfile(
  * Stop an AdsPower browser profile via the Local API
  *
  * @param profileId - Profile user_id to stop
+ * @param timeout - Timeout in milliseconds (default: 10000)
  */
-export async function stopAdsPowerProfile(profileId: string): Promise<void> {
+export async function stopAdsPowerProfile(
+	profileId: string,
+	timeout: number = 10000,
+): Promise<void> {
 	try {
 		logger.info("ADSPOWER", `Stopping profile: ${profileId}`);
 
@@ -209,13 +213,19 @@ export async function stopAdsPowerProfile(profileId: string): Promise<void> {
 			user_id: profileId,
 		});
 
+		const controller = new AbortController();
+		const timeoutId = setTimeout(() => controller.abort(), timeout);
+
 		const response = await fetch(
 			`${getApiBase()}/api/v1/browser/stop?${params.toString()}`,
 			{
 				method: "GET",
 				headers: getApiHeaders(),
+				signal: controller.signal,
 			},
 		);
+
+		clearTimeout(timeoutId);
 
 		if (!response.ok) {
 			throw new Error(
@@ -231,7 +241,25 @@ export async function stopAdsPowerProfile(profileId: string): Promise<void> {
 
 		logger.info("SUCCESS", "Profile stopped successfully");
 	} catch (error) {
-		logger.error("ADSPOWER", `Failed to stop profile: ${error}`);
+		const errorMessage = error instanceof Error ? error.message : String(error);
+		logger.error("ADSPOWER", `Failed to stop profile: ${errorMessage}`);
+
+		// Provide helpful error messages
+		if (
+			errorMessage.includes("fetch failed") ||
+			errorMessage.includes("ECONNREFUSED")
+		) {
+			throw new Error(
+				`Cannot connect to AdsPower API. Make sure AdsPower is still running and Local API is enabled.`,
+			);
+		}
+
+		if (errorMessage.includes("abort")) {
+			throw new Error(
+				`Stop request timed out after ${timeout}ms. Profile may still be running.`,
+			);
+		}
+
 		throw error;
 	}
 }

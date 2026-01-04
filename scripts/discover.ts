@@ -361,16 +361,25 @@ async function main() {
 
 		logger.info("ACTION", "🔍 Discovery session completed successfully");
 	} finally {
-		browser.disconnect();
-
-		// Stop AdsPower profile
+		// IMPORTANT: Stop AdsPower profile FIRST, then disconnect
+		// This ensures the browser window actually closes
 		if (profileConfig?.adsPowerProfileId) {
 			try {
+				logger.info("ACTION", "Stopping AdsPower profile...");
 				await stopAdsPowerProfile(profileConfig.adsPowerProfileId);
 				console.log("✅ AdsPower profile stopped");
 			} catch (e) {
-				console.warn(`⚠️  Could not stop AdsPower profile: ${e}`);
+				console.warn(`⚠️  Could not stop AdsPower profile via API: ${e}`);
+				console.log("Attempting to disconnect browser anyway...");
 			}
+		}
+
+		// Then disconnect Puppeteer
+		try {
+			await browser.disconnect();
+			console.log("✅ Browser disconnected");
+		} catch (e) {
+			console.warn(`⚠️  Could not disconnect browser: ${e}`);
 		}
 	}
 }
