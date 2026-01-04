@@ -1434,7 +1434,7 @@ export async function login(
 
 		// Try to continue anyway - Instagram might be using a different UI
 		return;
-	} catch (_waitError) {
+	} catch {
 		const currentUrl = page.url();
 		logger.error("ACTION", `Login timeout - current URL: ${currentUrl}`);
 

@@ -302,7 +302,7 @@ describe("Metrics System Documentation", () => {
 		});
 
 		it("records DM sent successfully", () => {
-			tracker.recordDMSent("creator_user");
+			tracker.recordDMSent();
 
 			expect(mockUpdateSessionMetrics).toHaveBeenCalledWith("test-session", {
 				profilesVisited: 0,
@@ -317,7 +317,7 @@ describe("Metrics System Documentation", () => {
 		});
 
 		it("records follow completed", () => {
-			tracker.recordFollowCompleted("creator_user");
+			tracker.recordFollowCompleted();
 
 			expect(mockUpdateSessionMetrics).toHaveBeenCalledWith("test-session", {
 				profilesVisited: 0,
@@ -332,11 +332,11 @@ describe("Metrics System Documentation", () => {
 		});
 
 		it("tracks multiple actions", () => {
-			tracker.recordDMSent("creator1");
-			tracker.recordFollowCompleted("creator1");
-			tracker.recordDMSent("creator2");
-			tracker.recordFollowCompleted("creator2");
-			tracker.recordFollowCompleted("creator3"); // Follow without DM
+			tracker.recordDMSent();
+			tracker.recordFollowCompleted();
+			tracker.recordDMSent();
+			tracker.recordFollowCompleted();
+			tracker.recordFollowCompleted(); // Follow without DM
 
 			expect(mockUpdateSessionMetrics).toHaveBeenNthCalledWith(
 				1,
@@ -626,7 +626,7 @@ describe("Metrics System Documentation", () => {
 			// Add some metrics first
 			tracker.recordProfileVisit("user1", 1.0, "seed", 0, undefined, [], 0);
 			tracker.recordCreatorFound("user1", 80, 1);
-			tracker.recordDMSent("user1");
+			tracker.recordDMSent();
 
 			// End session
 			tracker.endSession();
@@ -794,8 +794,8 @@ describe("Metrics System Documentation", () => {
 			tracker.recordCreatorFound("creator1", 85, 1);
 
 			// Send DM and follow
-			tracker.recordDMSent("creator1");
-			tracker.recordFollowCompleted("creator1");
+			tracker.recordDMSent();
+			tracker.recordFollowCompleted();
 
 			// Process another profile with error
 			tracker.recordProfileVisit(

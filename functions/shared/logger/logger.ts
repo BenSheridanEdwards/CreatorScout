@@ -80,7 +80,6 @@ class LoggerImpl implements Logger {
 	}
 
 	private formatMessage(
-		_level: LogLevel,
 		prefix: LogPrefix,
 		message: string,
 		...args: unknown[]
@@ -95,9 +94,7 @@ class LoggerImpl implements Logger {
 		message: string,
 		...args: unknown[]
 	): void {
-		// All logs always show - Instagram can't see our server logs anyway
-		// The enabled flag is kept for backward compatibility but ignored
-		const formatted = this.formatMessage(level, prefix, message, ...args);
+		const formatted = this.formatMessage(prefix, message, ...args);
 
 		switch (level) {
 			case "DEBUG":

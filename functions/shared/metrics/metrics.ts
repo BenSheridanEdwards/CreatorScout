@@ -84,12 +84,12 @@ export class MetricsTracker {
 	}
 
 	// Action metrics
-	recordDMSent(_username: string): void {
+	recordDMSent(): void {
 		this.sessionMetrics.dmsSent++;
 		this.updateSessionMetrics();
 	}
 
-	recordFollowCompleted(_username: string): void {
+	recordFollowCompleted(): void {
 		this.sessionMetrics.followsCompleted++;
 		this.updateSessionMetrics();
 	}

@@ -45,7 +45,7 @@ async function waitForPageReady(
 			// If on login page, wait a bit more in case of redirect
 			await new Promise((resolve) => setTimeout(resolve, 2000));
 		}
-	} catch (_err) {
+	} catch {
 		// Timeout or page closed is okay, just continue
 	}
 }
@@ -149,7 +149,7 @@ export async function snapshot(
 								return file;
 							}
 						}
-					} catch (_cdpErr) {
+					} catch {
 						// CDP also failed, throw original error
 						throw new Error(
 							`Cannot take screenshot: page was closed. Original error: ${puppeteerErr.message}`,
@@ -243,7 +243,7 @@ async function waitForProfilePage(
 		});
 
 		return hasContent;
-	} catch (_err) {
+	} catch {
 		return false;
 	}
 }
@@ -369,7 +369,7 @@ export async function saveScreenshot(
 								return file;
 							}
 						}
-					} catch (_cdpErr) {
+					} catch {
 						// CDP also failed, throw original error
 						throw new Error(
 							`Cannot take screenshot: page was closed. Original error: ${puppeteerErr.message}`,

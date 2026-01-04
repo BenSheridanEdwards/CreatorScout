@@ -82,14 +82,14 @@ export class CostTracker {
 	/**
 	 * Record proxy bandwidth usage
 	 */
-	recordProxyUsage(_profileId: string, bytes: number): void {
+	recordProxyUsage(bytes: number): void {
 		this.usageStats.proxyBandwidthBytes += bytes;
 	}
 
 	/**
 	 * Record Vision API call
 	 */
-	recordApiCall(service: string, _cost: number): void {
+	recordApiCall(service: string): void {
 		if (service === "vision") {
 			this.usageStats.visionApiCalls++;
 		}

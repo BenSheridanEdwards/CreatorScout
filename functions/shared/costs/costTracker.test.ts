@@ -3,7 +3,7 @@ import { CostTracker } from "./costTracker.ts";
 describe("costTracker", () => {
 	it("computes monthly costs with a given plan selection", () => {
 		const t = new CostTracker();
-		t.recordApiCall("vision", 0);
+		t.recordApiCall("vision");
 		const costs = t.getMonthlyCosts({
 			adspowerPlan: "base",
 			vpsPlan: "recommended",

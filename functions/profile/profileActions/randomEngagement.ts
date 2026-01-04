@@ -68,7 +68,7 @@ export async function performRandomEngagement(
 		// 15% - Scroll feed
 		logger.debug("ENGAGEMENT", `@${username}: Scrolling feed`);
 		return await scrollProfileFeed(page, username);
-	} catch (_error) {
+	} catch {
 		logger.debug(
 			"ENGAGEMENT",
 			`@${username}: Engagement failed (natural timeout)`,
@@ -123,7 +123,7 @@ export async function viewRandomPost(
 
 		// No posts found
 		return { type: "none", duration: 0.5, success: false };
-	} catch (_error) {
+	} catch {
 		const elapsed = (Date.now() - startTime) / 1000;
 		return { type: "view_post", duration: elapsed, success: false };
 	}
@@ -191,7 +191,7 @@ export async function watchRandomReel(
 
 		// No reels found
 		return { type: "none", duration: 0.5, success: false };
-	} catch (_error) {
+	} catch {
 		const elapsed = (Date.now() - startTime) / 1000;
 		return { type: "watch_reel", duration: elapsed, success: false };
 	}
@@ -250,7 +250,7 @@ export async function likeRandomPost(
 		await microDelay(0.3, 0.8);
 
 		return { type: "none", duration: 1, success: false };
-	} catch (_error) {
+	} catch {
 		const elapsed = (Date.now() - startTime) / 1000;
 		return { type: "like_post", duration: elapsed, success: false };
 	}
@@ -312,7 +312,7 @@ export async function scrollProfileFeed(
 		);
 
 		return { type: "scroll_feed", duration: elapsed, success: true };
-	} catch (_error) {
+	} catch {
 		const elapsed = (Date.now() - startTime) / 1000;
 		return { type: "scroll_feed", duration: elapsed, success: false };
 	}
