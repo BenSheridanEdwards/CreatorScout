@@ -217,7 +217,6 @@ describe("linkExtraction", () => {
 			const result = await analyzeExternalLink(
 				mockPage,
 				"https://linktr.ee/testuser",
-				"testuser",
 			);
 
 			expect(result.isCreator).toBe(true);
@@ -276,7 +275,6 @@ describe("linkExtraction", () => {
 			const result = await analyzeExternalLink(
 				mockPage,
 				"https://link.me/testuser",
-				"testuser",
 			);
 
 			expect(result.isCreator).toBe(true);
@@ -329,7 +327,6 @@ describe("linkExtraction", () => {
 			const result = await analyzeExternalLink(
 				mockPage,
 				"https://linktr.ee/testuser",
-				"testuser",
 			);
 
 			// Without content warning gates, should have lower confidence

@@ -15,7 +15,7 @@
  */
 
 import { jest } from "@jest/globals";
-import { createPageMock, createPageWithDOM, INSTAGRAM_CREATOR_PROFILE_HTML } from "../../__test__/testUtils.ts";
+import { createPageMock } from "../../__test__/testUtils.ts";
 import { getProfileStats, parseCount } from "./getProfileStats.ts";
 
 // ═══════════════════════════════════════════════════════════════════════════

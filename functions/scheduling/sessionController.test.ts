@@ -19,7 +19,7 @@ const { SessionController } = await import("./sessionController.ts");
 
 describe("SessionController", () => {
 	let plan: SessionPlan;
-	let controller: SessionController;
+	let controller: InstanceType<typeof SessionController>;
 	let originalDateNow: () => number;
 
 	beforeEach(() => {

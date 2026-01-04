@@ -11,15 +11,15 @@
  */
 
 import type { Page } from "puppeteer";
+import { humanClick } from "../../navigation/humanInteraction/humanInteraction.ts";
+import { createLogger } from "../../shared/logger/logger.ts";
+import { sleep } from "../../timing/sleep/sleep.ts";
+import { getLinkFromBio } from "../getLinkFromBio/getLinkFromBio.ts";
+import { getStoryHighlights } from "../getStoryHighlights/getStoryHighlights.ts";
 import {
 	identifyProfileElements,
 	type ProfileElements,
 } from "../textArrayExtraction.ts";
-import { getLinkFromBio } from "../getLinkFromBio/getLinkFromBio.ts";
-import { getStoryHighlights } from "../getStoryHighlights/getStoryHighlights.ts";
-import { createLogger } from "../../shared/logger/logger.ts";
-import { humanClick } from "../../navigation/humanInteraction/humanInteraction.ts";
-import { sleep } from "../../timing/sleep/sleep.ts";
 
 const logger = createLogger(process.env.DEBUG_LOGS === "true");
 

@@ -135,7 +135,7 @@ describe("sessionPlanner", () => {
 			// Run multiple iterations to ensure variance is detected
 			// With randomization, it's very unlikely all iterations produce identical results
 			let foundVariance = false;
-			
+
 			for (let i = 0; i < 10; i++) {
 				const plans1 = planDailySessions(50, 0);
 				const plans2 = planDailySessions(50, 0);
@@ -148,7 +148,9 @@ describe("sessionPlanner", () => {
 				// Check weights (floats - more granular, less likely to collide)
 				const weights1 = plans1.map((p) => p.weight);
 				const weights2 = plans2.map((p) => p.weight);
-				const weightsSame = weights1.every((w, idx) => Math.abs(w - weights2[idx]) < 0.0001);
+				const weightsSame = weights1.every(
+					(w, idx) => Math.abs(w - weights2[idx]) < 0.0001,
+				);
 
 				// If either targets or weights differ, we found variance
 				if (!targetsSame || !weightsSame) {

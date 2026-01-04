@@ -23,13 +23,14 @@ jest.unstable_mockModule("../../timing/sleep/sleep.ts", () => ({
 	sleep: sleepMock,
 }));
 
-const humanClickMock = jest.fn<
-	(
-		page: Page,
-		handle: ElementHandle<Element>,
-		options?: { elementType?: string },
-	) => Promise<void>
->();
+const humanClickMock =
+	jest.fn<
+		(
+			page: Page,
+			handle: ElementHandle<Element>,
+			options?: { elementType?: string },
+		) => Promise<void>
+	>();
 const humanClickAtMock = jest.fn<() => Promise<void>>();
 const humanScrollMock = jest.fn<() => Promise<void>>();
 const humanWiggleMock = jest.fn<() => Promise<void>>();
@@ -260,9 +261,7 @@ describe("modalOperations", () => {
 				$$: jest
 					.fn<() => Promise<ElementHandle<Element>[]>>()
 					.mockResolvedValue([mockLinkElement1, mockLinkElement2]),
-				evaluate: jest
-					.fn<() => Promise<number>>()
-					.mockResolvedValue(1), // Username found at index 1
+				evaluate: jest.fn<() => Promise<number>>().mockResolvedValue(1), // Username found at index 1
 				url: jest
 					.fn<() => string>()
 					.mockReturnValueOnce("https://www.instagram.com/seeduser/")
@@ -296,9 +295,7 @@ describe("modalOperations", () => {
 				$$: jest
 					.fn<() => Promise<ElementHandle<Element>[]>>()
 					.mockResolvedValue([]),
-				evaluate: jest
-					.fn<() => Promise<number>>()
-					.mockResolvedValue(-1), // Username not found
+				evaluate: jest.fn<() => Promise<number>>().mockResolvedValue(-1), // Username not found
 			} as unknown as Page;
 
 			const result = await clickUsernameInModal(page, "nonexistent");

@@ -19,11 +19,11 @@ import { jest } from "@jest/globals";
 import type { ElementHandle, Page } from "puppeteer";
 import {
 	createPageMock,
-	createPageWithElementMock,
 	createPageWithDOM,
+	createPageWithElementMock,
 	INSTAGRAM_CREATOR_PROFILE_HTML,
-	INSTAGRAM_PROFILE_WITH_CREATOR_LINK_HTML,
 	INSTAGRAM_PROFILE_WITH_LINKTREE_HTML,
+	INSTAGRAM_PROFILE_WITH_CREATOR_LINK_HTML,
 } from "../../__test__/testUtils.ts";
 import { clickBioLink, getLinkFromBio } from "./getLinkFromBio.ts";
 

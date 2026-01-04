@@ -20,8 +20,10 @@ const queueAddMock = jest
 jest.unstable_mockModule("../../shared/database/database.ts", () => ({
 	updateProfileFromAnalysis: updateProfileFromAnalysisMock,
 	queueAdd: queueAddMock,
-	query: jest.fn().mockResolvedValue({ rows: [] }),
-	initDb: jest.fn().mockResolvedValue(undefined),
+	query: jest
+		.fn<() => Promise<{ rows: unknown[] }>>()
+		.mockResolvedValue({ rows: [] }),
+	initDb: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
 	getPrismaClient: jest.fn(),
 	prisma: jest.fn(),
 }));
@@ -253,7 +255,10 @@ describe("profileAnalysis", () => {
 							];
 						}
 						// Bio extraction patterns (uses statsLinks, closest)
-						if (fnStr.includes("statsLinks") || fnStr.includes("statsContainer")) {
+						if (
+							fnStr.includes("statsLinks") ||
+							fnStr.includes("statsContainer")
+						) {
 							return "influencer bio";
 						}
 						return null;
@@ -291,7 +296,10 @@ describe("profileAnalysis", () => {
 							];
 						}
 						// Bio extraction patterns (uses statsLinks, closest)
-						if (fnStr.includes("statsLinks") || fnStr.includes("statsContainer")) {
+						if (
+							fnStr.includes("statsLinks") ||
+							fnStr.includes("statsContainer")
+						) {
 							return "Check my link in bio";
 						}
 						return null;
@@ -308,7 +316,9 @@ describe("profileAnalysis", () => {
 						selector.includes("http")
 					) {
 						return {
-							evaluate: jest.fn().mockResolvedValue("https://linktr.ee/creator"),
+							evaluate: jest
+								.fn<() => Promise<string>>()
+								.mockResolvedValue("https://linktr.ee/creator"),
 						};
 					}
 					return null;
@@ -348,11 +358,17 @@ describe("profileAnalysis", () => {
 							];
 						}
 						// Bio extraction patterns (uses statsLinks, closest)
-						if (fnStr.includes("statsLinks") || fnStr.includes("statsContainer")) {
+						if (
+							fnStr.includes("statsLinks") ||
+							fnStr.includes("statsContainer")
+						) {
 							return "influencer";
 						}
 						// Stats extraction (has /followers/ or /following/ patterns)
-						if (fnStr.includes("/followers/") || fnStr.includes("/following/")) {
+						if (
+							fnStr.includes("/followers/") ||
+							fnStr.includes("/following/")
+						) {
 							return { followers: 1000, following: 5 };
 						}
 						return null;
@@ -403,11 +419,17 @@ describe("profileAnalysis", () => {
 							];
 						}
 						// Bio extraction patterns (uses statsLinks, closest)
-						if (fnStr.includes("statsLinks") || fnStr.includes("statsContainer")) {
+						if (
+							fnStr.includes("statsLinks") ||
+							fnStr.includes("statsContainer")
+						) {
 							return "Patreon exclusive content";
 						}
 						// Stats extraction (has /followers/ or /following/ patterns)
-						if (fnStr.includes("/followers/") || fnStr.includes("/following/")) {
+						if (
+							fnStr.includes("/followers/") ||
+							fnStr.includes("/following/")
+						) {
 							return { followers: 10000, following: 50 };
 						}
 						return null;
@@ -448,7 +470,10 @@ describe("profileAnalysis", () => {
 							];
 						}
 						// Bio extraction patterns (uses statsLinks, closest)
-						if (fnStr.includes("statsLinks") || fnStr.includes("statsContainer")) {
+						if (
+							fnStr.includes("statsLinks") ||
+							fnStr.includes("statsContainer")
+						) {
 							return "Bio text";
 						}
 						return null;
@@ -485,11 +510,17 @@ describe("profileAnalysis", () => {
 							];
 						}
 						// Bio extraction patterns (uses statsLinks, closest)
-						if (fnStr.includes("statsLinks") || fnStr.includes("statsContainer")) {
+						if (
+							fnStr.includes("statsLinks") ||
+							fnStr.includes("statsContainer")
+						) {
 							return "Uncertain bio";
 						}
 						// Stats extraction (has /followers/ or /following/ patterns)
-						if (fnStr.includes("/followers/") || fnStr.includes("/following/")) {
+						if (
+							fnStr.includes("/followers/") ||
+							fnStr.includes("/following/")
+						) {
 							return { followers: 100, following: 100 };
 						}
 						return null;

@@ -1,6 +1,6 @@
 /**
  * Comprehensive Profile Extraction Test
- * 
+ *
  * Tests that we correctly extract all profile elements from Instagram:
  * - Username (from URL parameter, not extracted from page)
  * - Display name (NOT CURRENTLY EXTRACTED - missing feature)
@@ -12,7 +12,10 @@
  * - Story highlights ✅
  */
 
-import { createPageWithDOM, INSTAGRAM_CREATOR_PROFILE_HTML } from "../__test__/testUtils.ts";
+import {
+	createPageWithDOM,
+	INSTAGRAM_CREATOR_PROFILE_HTML,
+} from "../__test__/testUtils.ts";
 import { getBioFromPage } from "./getBioFromPage/getBioFromPage.ts";
 import { getLinkFromBio } from "./getLinkFromBio/getLinkFromBio.ts";
 import { getProfileStats } from "./getProfileStats/getProfileStats.ts";
@@ -38,6 +41,7 @@ describe("Complete Profile Extraction", () => {
 
 		// Extract stats - ✅ FULLY WORKING (all stats extracted)
 		const stats = await getProfileStats(page);
+		expect(stats).toBeTruthy();
 		// Posts extraction fix verified by getProfileStats.test.ts (32/32 tests passing)
 		// The fix: posts are now always parsed from headerText, even when followers/following
 		// are found from links. Previously posts were only extracted via fallback.
@@ -60,9 +64,8 @@ describe("Complete Profile Extraction", () => {
 		expect(isLinkInBioHighlight("Link 🔗")).toBe(true);
 		expect(isLinkInBioHighlight("Music✨")).toBe(false);
 		expect(isLinkInBioHighlight("Art✨")).toBe(false);
-		
+
 		// Verify posts extraction fix - tested separately in getProfileStats.test.ts
 		// All 32 tests pass, confirming posts are now always extracted from headerText
 	});
 });
-

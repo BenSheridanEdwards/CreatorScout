@@ -2,10 +2,16 @@ import { jest } from "@jest/globals";
 
 const createMockPrisma = () => ({
 	profileSession: {
-		create: jest.fn().mockResolvedValue({ sessionId: "s1" }),
-		updateMany: jest.fn().mockResolvedValue({ count: 1 }),
-		count: jest.fn().mockResolvedValue(0),
-		findMany: jest.fn().mockResolvedValue([{ durationMinutes: 10 }]),
+		create: jest
+			.fn<() => Promise<{ sessionId: string }>>()
+			.mockResolvedValue({ sessionId: "s1" }),
+		updateMany: jest
+			.fn<() => Promise<{ count: number }>>()
+			.mockResolvedValue({ count: 1 }),
+		count: jest.fn<() => Promise<number>>().mockResolvedValue(0),
+		findMany: jest
+			.fn<() => Promise<{ durationMinutes: number }[]>>()
+			.mockResolvedValue([{ durationMinutes: 10 }]),
 	},
 });
 

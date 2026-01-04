@@ -48,10 +48,10 @@ export async function getProfileStats(page: Page): Promise<ProfileStats> {
 		// Extract raw text data from page - keep evaluate simple to avoid __name issues
 		const rawData = await page.evaluate(() => {
 			const links = Array.from(document.querySelectorAll("a"));
-			
+
 			let followersText = "";
 			let followingText = "";
-			
+
 			for (const link of links) {
 				const href = link.getAttribute("href") || "";
 				const text = link.textContent?.trim() || "";
@@ -73,7 +73,7 @@ export async function getProfileStats(page: Page): Promise<ProfileStats> {
 		if (rawData.followersText) {
 			stats.followers = parseCount(rawData.followersText);
 		}
-		
+
 		if (rawData.followingText) {
 			stats.following = parseCount(rawData.followingText);
 		}
@@ -88,14 +88,18 @@ export async function getProfileStats(page: Page): Promise<ProfileStats> {
 
 		// Fallback: parse followers/following from header text if not found from links
 		if (!stats.followers || !stats.following) {
-			const followersMatch = headerText.match(/([\d,.]+)\s*([KMB])?\s*followers?/i);
-			const followingMatch = headerText.match(/([\d,.]+)\s*([KMB])?\s*following/i);
+			const followersMatch = headerText.match(
+				/([\d,.]+)\s*([KMB])?\s*followers?/i,
+			);
+			const followingMatch = headerText.match(
+				/([\d,.]+)\s*([KMB])?\s*following/i,
+			);
 
 			if (!stats.followers && followersMatch) {
 				const countStr = followersMatch[1] + (followersMatch[2] || "");
 				stats.followers = parseCount(countStr);
 			}
-			
+
 			if (!stats.following && followingMatch) {
 				const countStr = followingMatch[1] + (followingMatch[2] || "");
 				stats.following = parseCount(countStr);

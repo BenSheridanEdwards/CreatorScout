@@ -19,7 +19,10 @@
 
 import { jest } from "@jest/globals";
 import type { ElementHandle, Page } from "puppeteer";
-import { createPageWithDOM, INSTAGRAM_CREATOR_PROFILE_HTML } from "../../__test__/testUtils.ts";
+import {
+	createPageWithDOM,
+	INSTAGRAM_CREATOR_PROFILE_HTML,
+} from "../../__test__/testUtils.ts";
 import { getStoryHighlights } from "./getStoryHighlights.ts";
 
 describe("getStoryHighlights", () => {

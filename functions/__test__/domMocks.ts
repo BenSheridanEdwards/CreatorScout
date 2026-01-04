@@ -8,7 +8,7 @@
  */
 
 import { jest } from "@jest/globals";
-import type { Page, ElementHandle } from "puppeteer";
+import type { ElementHandle, Page } from "puppeteer";
 import { createPageMock } from "./testUtils.ts";
 
 /**

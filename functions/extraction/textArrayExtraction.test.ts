@@ -1,9 +1,9 @@
-import { describe, test, expect } from "@jest/globals";
+import { describe, expect, test } from "@jest/globals";
 import {
-	extractTextArrayFromHTML,
-	parseStatNumber,
-	identifyProfileElements,
 	extractProfileFromHTML,
+	extractTextArrayFromHTML,
+	identifyProfileElements,
+	parseStatNumber,
 } from "./textArrayExtraction.ts";
 
 describe("textArrayExtraction", () => {

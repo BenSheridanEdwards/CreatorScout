@@ -4,7 +4,7 @@
  */
 import { exec } from "node:child_process";
 import { promisify } from "node:util";
-import parser from "cron-parser";
+import { CronExpressionParser } from "cron-parser";
 
 const execAsync = promisify(exec);
 
@@ -84,7 +84,7 @@ export async function parseCrontab(): Promise<ScheduledRun[]> {
 
 				// Calculate next occurrence
 				try {
-					const interval = parser.parseExpression(cronPattern);
+					const interval = CronExpressionParser.parse(cronPattern);
 					const nextDate = interval.next().toDate();
 					const scheduledTime = nextDate.toISOString();
 

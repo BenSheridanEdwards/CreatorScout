@@ -40,7 +40,14 @@ export type LogPrefix =
 	| "LIMITS"
 	| "TEST"
 	| "RAMPUP"
-	| "SUMMARY";
+	| "SUMMARY"
+	| "DM_TEST"
+	| "SESSION_CONTROL"
+	| "SESSION_COMPLETE"
+	| "SESSION_PLAN"
+	| "LINK_ANALYSIS"
+	| "EXTRACTION"
+	| "PROXY_TEST";
 
 export interface Logger {
 	debug(prefix: LogPrefix, message: string, ...args: unknown[]): void;

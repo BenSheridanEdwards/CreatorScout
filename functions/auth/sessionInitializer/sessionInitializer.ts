@@ -303,23 +303,23 @@ export async function initializeInstagramSession(
 			"⚠️  Browser kept open for 3 minutes for manual inspection",
 		);
 		logger.info(
-			"SESSION", 
-			"💡 Please check the browser window - you may need to solve a CAPTCHA, complete verification, or inspect the issue"
+			"SESSION",
+			"💡 Please check the browser window - you may need to solve a CAPTCHA, complete verification, or inspect the issue",
 		);
-		
+
 		// Always wait 3 minutes before closing to allow manual intervention
 		const waitTimeMs = 3 * 60 * 1000; // 3 minutes
 		logger.info("SESSION", `⏳ Waiting 3 minutes before closing browser...`);
-		
+
 		await new Promise((resolve) => setTimeout(resolve, waitTimeMs));
-		
+
 		logger.info("SESSION", "⏰ 3 minute wait period ended, closing browser");
 		try {
 			await browser.close();
 		} catch (closeError) {
 			logger.error("SESSION", `Failed to close browser: ${closeError}`);
 		}
-		
+
 		throw error;
 	}
 }

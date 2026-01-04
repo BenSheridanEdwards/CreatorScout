@@ -134,7 +134,7 @@ export function identifyProfileElements(texts: string[]): ProfileElements {
 		"Requested",
 		"Download All",
 	];
-	const buttonIdx = texts.findIndex((t) => buttonPatterns.some((p) => t === p));
+	const buttonIdx = texts.findIndex((t) => buttonPatterns.includes(t));
 
 	// Username = first text item (almost always the username from h2)
 	// Skip obvious non-username items

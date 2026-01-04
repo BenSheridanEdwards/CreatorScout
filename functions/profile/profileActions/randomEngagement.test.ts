@@ -141,10 +141,14 @@ describe("randomEngagement - Pure Logic", () => {
 		});
 
 		it("should handle all same type", () => {
-			const actions = [
-				{ type: "none" as const, duration: 0.5, success: true },
-				{ type: "none" as const, duration: 0.6, success: true },
-				{ type: "none" as const, duration: 0.7, success: true },
+			const actions: Array<{
+				type: "none" | "view_post" | "watch_reel" | "like_post";
+				duration: number;
+				success: boolean;
+			}> = [
+				{ type: "none", duration: 0.5, success: true },
+				{ type: "none", duration: 0.6, success: true },
+				{ type: "none", duration: 0.7, success: true },
 			];
 
 			const stats = {

@@ -6,10 +6,10 @@
  */
 
 import type { Page } from "puppeteer";
+import { humanClick } from "../../navigation/humanInteraction/humanInteraction.ts";
 import { validateBioWithVision } from "../../profile/vision/vision.ts";
 import { createLogger } from "../../shared/logger/logger.ts";
 import { snapshot } from "../../shared/snapshot/snapshot.ts";
-import { humanClick } from "../../navigation/humanInteraction/humanInteraction.ts";
 import { sleep } from "../../timing/sleep/sleep.ts";
 import { identifyProfileElements } from "../textArrayExtraction.ts";
 

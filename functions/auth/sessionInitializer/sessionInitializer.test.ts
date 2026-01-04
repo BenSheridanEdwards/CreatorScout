@@ -108,17 +108,17 @@ describe.skip("sessionInitializer", () => {
 			profileLink: false,
 			createButton: false,
 			homeIcon: false,
-		navigation: true,
-		feed: false,
-		anyIndicator: true,
+			navigation: true,
+			feed: false,
+			anyIndicator: true,
+		});
 	});
-});
 
-afterEach(() => {
-	jest.restoreAllMocks();
-});
+	afterEach(() => {
+		jest.restoreAllMocks();
+	});
 
-describe("initializeInstagramSession", () => {
+	describe("initializeInstagramSession", () => {
 		it("should disable stealth patches when adsPowerProfileId is provided", async () => {
 			await initializeInstagramSession({ adsPowerProfileId: "profile-123" });
 			expect(createPageMock).toHaveBeenCalledWith(

@@ -13,13 +13,12 @@
  * Returns: Bio text string or null if not found
  */
 
-import * as fs from "node:fs";
 import { jest } from "@jest/globals";
 import type { ElementHandle, Page } from "puppeteer";
 import {
 	createPageMock,
-	createPageWithElementMock,
 	createPageWithDOM,
+	createPageWithElementMock,
 	INSTAGRAM_CREATOR_PROFILE_HTML,
 } from "../../__test__/testUtils.ts";
 
@@ -200,7 +199,9 @@ describe("getBioFromPage", () => {
 
 			// Should extract bio from header text fallback
 			expect(result).toBeTruthy();
-			expect(result).toContain("This is a long descriptive bio line without links");
+			expect(result).toContain(
+				"This is a long descriptive bio line without links",
+			);
 		});
 
 		test("returns bio from text array extraction", async () => {
