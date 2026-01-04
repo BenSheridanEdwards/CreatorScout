@@ -115,8 +115,19 @@ export interface VisionAnalysisResult {
 export async function analyzeLinktree(
 	imagePath: string,
 ): Promise<VisionAnalysisResult | null> {
-	const imageBuffer = readFileSync(imagePath);
-	const base64 = imageBuffer.toString("base64");
+	let imageBuffer: Buffer;
+	let base64: string;
+
+	try {
+		imageBuffer = readFileSync(imagePath);
+		base64 = imageBuffer.toString("base64");
+	} catch (error) {
+		// File doesn't exist or can't be read
+		if (process.env.NODE_ENV !== "test" && !process.env.JEST_WORKER_ID) {
+			console.error(`  Vision analysis failed: ${error}`);
+		}
+		return null;
+	}
 
 	try {
 		const response = await client.chat.completions.create({

@@ -28,6 +28,10 @@ describe("sessionPlanner", () => {
 		jest.clearAllMocks();
 	});
 
+	afterEach(() => {
+		jest.restoreAllMocks();
+	});
+
 	describe("getDailyVariance", () => {
 		it("should return variance within expected ranges", () => {
 			const variance = getDailyVariance();

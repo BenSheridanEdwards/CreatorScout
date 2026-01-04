@@ -33,7 +33,10 @@ import { createLogger } from "../../shared/logger/logger.ts";
 const logger = createLogger(process.env.DEBUG_LOGS === "true");
 
 import { recordActivity } from "../../shared/dashboard/dashboard.ts";
-import { queueAdd } from "../../shared/database/database.ts";
+import {
+	queueAdd,
+	updateProfileFromAnalysis,
+} from "../../shared/database/database.ts";
 import { snapshot } from "../../shared/snapshot/snapshot.ts";
 import { mediumDelay, shortDelay } from "../../timing/humanize/humanize.ts";
 import { sleep } from "../../timing/sleep/sleep.ts";
@@ -580,6 +583,21 @@ export async function analyzeProfileComprehensive(
 			"success",
 			`confidence: ${result.confidence}%`,
 		);
+	}
+
+	// Save analysis results to database
+	try {
+		await updateProfileFromAnalysis(username, {
+			bio: result.bio,
+			bioScore: result.bioScore,
+			confidence: result.confidence,
+			links: result.links,
+			stats: result.stats,
+		});
+		logger.debug("DATABASE", `Profile @${username} saved to database`);
+	} catch (dbError) {
+		logger.error("DATABASE", `Failed to save profile @${username}: ${dbError}`);
+		// Don't throw - analysis succeeded, just DB save failed
 	}
 
 	return result;

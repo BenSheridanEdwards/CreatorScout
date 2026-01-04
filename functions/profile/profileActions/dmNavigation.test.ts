@@ -102,6 +102,10 @@ describe("dmNavigation", () => {
 		humanTypeTextMock.mockResolvedValue(true);
 	});
 
+	afterEach(() => {
+		jest.restoreAllMocks();
+	});
+
 	describe("navigateToProfile", () => {
 		test("navigates to profile successfully", async () => {
 			// Create mock element with boundingBox for popup handler

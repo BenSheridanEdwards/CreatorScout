@@ -100,6 +100,10 @@ beforeEach(() => {
 	jest.clearAllMocks();
 });
 
+afterEach(() => {
+	jest.restoreAllMocks();
+});
+
 describe("database", () => {
 	// Use unique usernames per test to avoid conflicts
 	const getTestUsername = () =>

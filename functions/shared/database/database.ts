@@ -243,7 +243,10 @@ export async function markAsCreator(
 	});
 
 	// Auto-hide creators with 100k+ followers
-	const shouldHide = profile?.followers !== null && profile.followers >= 100000;
+	const shouldHide =
+		profile !== null &&
+		profile.followers !== null &&
+		profile.followers >= 100000;
 
 	await prisma.profile.update({
 		where: { username: u },
@@ -256,6 +259,70 @@ export async function markAsCreator(
 				hidden: true,
 				hiddenAt: new Date(),
 			}),
+		},
+	});
+}
+
+/**
+ * Update profile from comprehensive analysis results.
+ * Preserves manual override fields if they exist.
+ *
+ * @param username - Instagram username
+ * @param analysis - Comprehensive analysis result
+ */
+export async function updateProfileFromAnalysis(
+	username: string,
+	analysis: {
+		bio: string | null;
+		bioScore: number;
+		confidence: number;
+		links: string[];
+		stats: {
+			followers?: number;
+			following?: number;
+			ratio?: number;
+		} | null;
+	},
+): Promise<void> {
+	const prisma = getPrisma();
+	const normalizedUsername = username.toLowerCase().trim();
+	const now = new Date();
+
+	// Build engagement metrics from stats
+	const engagementMetrics = analysis.stats
+		? {
+				followers: analysis.stats.followers ?? null,
+				following: analysis.stats.following ?? null,
+				posts: null,
+				ratio: analysis.stats.ratio ?? null,
+			}
+		: undefined;
+
+	await prisma.profile.upsert({
+		where: { username: normalizedUsername },
+		create: {
+			username: normalizedUsername,
+			bioText: analysis.bio || null,
+			bioScore: analysis.bioScore,
+			confidence: analysis.confidence,
+			linkUrl: analysis.links?.[0] || null,
+			followers: analysis.stats?.followers ?? null,
+			engagementMetrics: engagementMetrics ?? Prisma.JsonNull,
+			visitedAt: now,
+			lastSeen: now,
+		},
+		update: {
+			bioText: analysis.bio || undefined,
+			bioScore: analysis.bioScore,
+			confidence: analysis.confidence,
+			linkUrl: analysis.links?.[0] || undefined,
+			followers: analysis.stats?.followers ?? undefined,
+			engagementMetrics:
+				engagementMetrics !== undefined ? engagementMetrics : undefined,
+			lastSeen: now,
+			// IMPORTANT: Manual override fields are preserved automatically
+			// because we don't include them in the update object
+			// Prisma will keep existing values for fields not specified
 		},
 	});
 }

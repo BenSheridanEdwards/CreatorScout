@@ -14,6 +14,10 @@ describe("utils", () => {
 		jest.clearAllMocks();
 	});
 
+	afterEach(() => {
+		jest.restoreAllMocks();
+	});
+
 	test("saveProof creates screenshots dir and captures with full page", async () => {
 		const path = await saveProof("user123", page);
 

@@ -41,6 +41,10 @@ describe("popupHandler", () => {
 		humanClickByTextMock.mockResolvedValue(false);
 	});
 
+	afterEach(() => {
+		jest.restoreAllMocks();
+	});
+
 	describe("handleInstagramPopups", () => {
 		test("dismisses messaging tab popup when found via evaluate", async () => {
 			const page = createPageMock({

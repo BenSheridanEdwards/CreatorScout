@@ -24,6 +24,8 @@
 		"reanalyze:no-vision": "tsx scripts/reanalyze_profiles.ts --profile test-account --skip-confirmed --skip-vision",
 		"reanalyze:limit": "tsx scripts/reanalyze_profiles.ts --profile test-account --limit 20",
 		"migrate:false-positives": "tsx scripts/migrate_false_positives.ts",
+		"manual:check": "tsx scripts/check_manual_creators.ts --profile test-account",
+		"manual:check:limit": "tsx scripts/check_manual_creators.ts --profile test-account --limit 10",
 		"manual:mark-creator": "tsx scripts/manual_override.ts mark-creator",
 		"manual:mark-not-creator": "tsx scripts/manual_override.ts mark-not-creator",
 		"manual:clear": "tsx scripts/manual_override.ts clear",

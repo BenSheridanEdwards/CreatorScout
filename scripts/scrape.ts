@@ -265,23 +265,7 @@ export async function processProfile(
 
 	if (!analysis.bio) {
 		logger.warn("ANALYSIS", `No bio found for @${username}`);
-		await markVisited(
-			username,
-			undefined,
-			undefined,
-			0,
-			undefined,
-			undefined,
-			analysis.stats?.followers ?? undefined,
-			analysis.stats
-				? {
-						followers: analysis.stats.followers ?? null,
-						following: analysis.stats.following ?? null,
-						posts: null, // Not available in ComprehensiveAnalysisResult
-						ratio: analysis.stats.ratio ?? null,
-					}
-				: null,
-		);
+		// Database already updated by analyzeProfileComprehensive
 		recordError("No bio found", `comprehensive_analysis_${username}`, username);
 		await logger.errorWithScreenshot(
 			"ERROR",
@@ -319,23 +303,7 @@ export async function processProfile(
 			"ANALYSIS",
 			`Quick reject: Low combined score (bio: ${quickScore}, analysis: ${analysis.confidence} < 20) and no links`,
 		);
-		await markVisited(
-			username,
-			undefined,
-			analysis.bio,
-			quickScore,
-			undefined,
-			analysis.confidence,
-			analysis.stats?.followers ?? undefined,
-			analysis.stats
-				? {
-						followers: analysis.stats.followers ?? null,
-						following: analysis.stats.following ?? null,
-						posts: null, // Not available in ComprehensiveAnalysisResult
-						ratio: analysis.stats.ratio ?? null,
-					}
-				: null,
-		);
+		// Database already updated by analyzeProfileComprehensive
 		cycleManager.recordProfileProcessed(username, false);
 
 		// Log quick reject summary
@@ -368,24 +336,7 @@ export async function processProfile(
 		);
 	}
 
-	// Mark as visited with bio and confidence score
-	await markVisited(
-		username,
-		undefined,
-		analysis.bio,
-		quickScore,
-		undefined,
-		analysis.confidence,
-		analysis.stats?.followers ?? undefined,
-		analysis.stats
-			? {
-					followers: analysis.stats.followers ?? null,
-					following: analysis.stats.following ?? null,
-					posts: null, // Not available in ComprehensiveAnalysisResult
-					ratio: analysis.stats.ratio ?? null,
-				}
-			: null,
-	);
+	// Database already updated by analyzeProfileComprehensive
 
 	try {
 		// Comprehensive analysis already includes advanced link detection
@@ -894,7 +845,10 @@ export async function processFollowingList(
 					allVisited = false;
 
 					// Try clicking directly on the username in the modal
-					logger.debug("NAVIGATION", `Clicking @${username} directly in modal...`);
+					logger.debug(
+						"NAVIGATION",
+						`Clicking @${username} directly in modal...`,
+					);
 					const clicked = await clickUsernameInModal(page, username);
 					if (!clicked) {
 						// Fallback: close modal and navigate via search
@@ -1228,9 +1182,11 @@ export async function runScrapeLoopWithoutDM(
  * Main scrape function - does the full automation flow
  * @param options - Configuration options
  */
-export async function scrape(options: { debug?: boolean; skipWarmup?: boolean } = {}): Promise<void> {
+export async function scrape(
+	options: { debug?: boolean; skipWarmup?: boolean } = {},
+): Promise<void> {
 	const { debug = false, skipWarmup = false } = options;
-	
+
 	logger.info(
 		"ACTION",
 		"🚀 Scout - Instagram Patreon Creator Discovery Agent",
@@ -1341,9 +1297,11 @@ export async function scrape(options: { debug?: boolean; skipWarmup?: boolean } 
  * This function discovers creators but doesn't send DMs - useful for passive discovery.
  * @param options - Configuration options
  */
-export async function scrapeWithoutDM(options: { debug?: boolean; skipWarmup?: boolean } = {}): Promise<void> {
+export async function scrapeWithoutDM(
+	options: { debug?: boolean; skipWarmup?: boolean } = {},
+): Promise<void> {
 	const { debug = false, skipWarmup = false } = options;
-	
+
 	logger.info(
 		"ACTION",
 		"🔍 Scout - Instagram Patreon Creator Discovery Agent (Discovery Mode - No DMs)",

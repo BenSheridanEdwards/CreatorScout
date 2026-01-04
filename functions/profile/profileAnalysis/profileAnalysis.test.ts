@@ -8,6 +8,24 @@ import { jest } from "@jest/globals";
 import type { Page } from "puppeteer";
 import { createPageMock } from "../../__test__/testUtils.ts";
 
+// Mock database module
+const updateProfileFromAnalysisMock = jest
+	.fn<() => Promise<void>>()
+	.mockResolvedValue(undefined);
+
+const queueAddMock = jest
+	.fn<() => Promise<void>>()
+	.mockResolvedValue(undefined);
+
+jest.unstable_mockModule("../../shared/database/database.ts", () => ({
+	updateProfileFromAnalysis: updateProfileFromAnalysisMock,
+	queueAdd: queueAddMock,
+	query: jest.fn().mockResolvedValue({ rows: [] }),
+	initDb: jest.fn().mockResolvedValue(undefined),
+	getPrismaClient: jest.fn(),
+	prisma: jest.fn(),
+}));
+
 // Only mock external API calls (vision API)
 const analyzeProfileMock = jest
 	.fn<
@@ -185,6 +203,10 @@ describe("profileAnalysis", () => {
 		]);
 	});
 
+	afterEach(() => {
+		jest.restoreAllMocks();
+	});
+
 	// ═══════════════════════════════════════════════════════════════════════════
 	// analyzeProfileBasic() - Lightweight Analysis
 	// ═══════════════════════════════════════════════════════════════════════════
@@ -293,6 +315,22 @@ describe("profileAnalysis", () => {
 			expect(result).toHaveProperty("highlights");
 			expect(result).toHaveProperty("indicators");
 			expect(result).toHaveProperty("confidence");
+
+			// Verify database was called
+			expect(updateProfileFromAnalysisMock).toHaveBeenCalledWith(
+				"user",
+				expect.objectContaining({
+					bio: null,
+					confidence: 0,
+					bioScore: 0,
+					links: expect.arrayContaining(["https://linktr.ee/user"]),
+					stats: expect.objectContaining({
+						followers: undefined,
+						following: undefined,
+						ratio: undefined,
+					}),
+				}),
+			);
 		});
 
 		test("includes indicators from multiple signal sources", async () => {

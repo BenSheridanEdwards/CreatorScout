@@ -212,7 +212,7 @@ function extractReferencedProfiles(
 	return [...new Set(profiles)];
 }
 
-function extractLinks(text: string): string[] {
+export function extractLinks(text: string): string[] {
 	const linkPatterns = [
 		/linktr\.ee\/\w+/gi,
 		/beacons\.ai\/\w+/gi,

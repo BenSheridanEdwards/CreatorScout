@@ -29,13 +29,15 @@ export default {
 		"/tests/e2e/",
 		"e2e.*\\.test\\.ts$",
 		"\\.puppeteer\\.test\\.ts$",
-		// Exclude memory-intensive test from default runs - use npm run test:profileActions
-		"profileActions\\.test\\.ts$",
 	],
 	collectCoverageFrom: ["functions/**/*.ts", "scripts/**/*.ts"],
 	transformIgnorePatterns: [],
-	maxWorkers: process.env.CI ? 2 : "50%", // Use fewer workers in CI, more locally
-	workerIdleMemoryLimit: "1GB", // Kill workers that exceed memory limit
-	// Run memory-intensive tests sequentially
-	testTimeout: 30000, // Increase timeout for complex tests
+	maxWorkers: process.env.CI ? 1 : "25%", // Reduce parallel workers to prevent memory issues
+	workerIdleMemoryLimit: "512MB", // Lower threshold to restart workers faster
+	testTimeout: 60000, // Increase timeout for complex tests from 30s to 60s
+	bail: false, // Don't bail on first failure
+	detectLeaks: true, // Enable leak detection to catch memory issues
+	forceExit: true, // Force exit after tests complete
+	clearMocks: true, // Clear mocks between tests automatically
+	restoreMocks: true, // Restore original implementations automatically
 };

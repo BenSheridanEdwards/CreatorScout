@@ -305,11 +305,15 @@ describe.skip("scrape.ts", () => {
 			recordVisionApiCall: jest.fn(),
 			recordDMSent: jest.fn(),
 			recordFollowCompleted: jest.fn(),
-			recordError: jest.fn(),
-		};
-	});
+		recordError: jest.fn(),
+	};
+});
 
-	describe("loadSeeds", () => {
+afterEach(() => {
+	jest.restoreAllMocks();
+});
+
+describe("loadSeeds", () => {
 		it("loads seeds from default seeds.txt file", async () => {
 			const { loadSeeds } = await import("./scrape.ts");
 

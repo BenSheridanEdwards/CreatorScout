@@ -84,24 +84,7 @@ async function evaluateProfile(
 
 		console.log(`\n✅ Analysis complete!`);
 
-		// Save to database
-		await markVisited(
-			username,
-			undefined, // displayName - not available in ComprehensiveAnalysisResult
-			analysis.bio || undefined,
-			analysis.bioScore,
-			analysis.links?.[0] || undefined,
-			analysis.confidence,
-			analysis.stats?.followers ?? undefined,
-			analysis.stats
-				? {
-						followers: analysis.stats.followers ?? null,
-						following: analysis.stats.following ?? null,
-						posts: null, // Not available in ComprehensiveAnalysisResult
-						ratio: analysis.stats.ratio ?? null,
-					}
-				: null,
-		);
+		// Database already updated by analyzeProfileComprehensive
 
 		if (analysis.isCreator) {
 			await markAsCreator(username, analysis.confidence);

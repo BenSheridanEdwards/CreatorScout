@@ -51,24 +51,7 @@ async function evaluateProfile(username: string) {
 		console.log(`🔬 Analyzing profile...`);
 		const analysis = await analyzeProfileComprehensive(page, username);
 
-		// Mark as visited in database
-		await markVisited(
-			username,
-			undefined,
-			analysis.bio || undefined,
-			analysis.bioScore,
-			analysis.links?.[0] || undefined,
-			analysis.confidence,
-			analysis.stats?.followers ?? undefined,
-			analysis.stats
-				? {
-						followers: analysis.stats.followers ?? null,
-						following: analysis.stats.following ?? null,
-						posts: null, // Not available in ComprehensiveAnalysisResult
-						ratio: analysis.stats.ratio ?? null,
-					}
-				: null,
-		);
+		// Database already updated by analyzeProfileComprehensive
 
 		// Mark as creator if confidence is high enough
 		if (analysis.isCreator) {

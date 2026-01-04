@@ -52,6 +52,10 @@ describe("modalOperations", () => {
 		jest.clearAllMocks();
 	});
 
+	afterEach(() => {
+		jest.restoreAllMocks();
+	});
+
 	// ═══════════════════════════════════════════════════════════════════════════
 	// openFollowingModal() - Open the Following List Modal
 	// ═══════════════════════════════════════════════════════════════════════════

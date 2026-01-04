@@ -173,6 +173,10 @@ describe("profileNavigation", () => {
 		humanTypeTextMock.mockResolvedValue(true);
 	});
 
+	afterEach(() => {
+		jest.restoreAllMocks();
+	});
+
 	// ═══════════════════════════════════════════════════════════════════════════
 	// navigateToProfile() - Navigate to Instagram Profile
 	// ═══════════════════════════════════════════════════════════════════════════

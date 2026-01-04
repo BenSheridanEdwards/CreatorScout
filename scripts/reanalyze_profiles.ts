@@ -70,38 +70,6 @@ async function getVisitedProfiles(): Promise<ProfileRecord[]> {
 	}));
 }
 
-async function updateProfileAnalysis(
-	username: string,
-	isCreator: boolean,
-	confidence: number,
-	bioText: string | null,
-	linkUrl: string | null,
-) {
-	const prisma = getPrismaClient();
-
-	// Check if profile has manual override
-	const existing = await prisma.profile.findUnique({
-		where: { username },
-		select: { manualOverride: true, manuallyMarkedCreator: true },
-	});
-
-	// If manual override exists, respect it
-	const finalIsCreator = existing?.manualOverride
-		? (existing.manuallyMarkedCreator ?? isCreator)
-		: isCreator;
-
-	await prisma.profile.update({
-		where: { username },
-		data: {
-			isCreator: finalIsCreator,
-			confidence,
-			bioText: bioText || undefined,
-			linkUrl: linkUrl || undefined,
-			lastSeen: new Date(),
-		},
-	});
-}
-
 async function reanalyzeProfiles() {
 	console.log(chalk.blue("🔄 Re-analyzing Visited Profiles"));
 	console.log(chalk.gray("━".repeat(60)));
@@ -207,19 +175,10 @@ async function reanalyzeProfiles() {
 				// Navigate to profile
 				await navigateToProfile(page, profile.username, "search");
 
-				// Run comprehensive analysis
+				// Run comprehensive analysis (automatically saves to database)
 				const analysis = await analyzeProfileComprehensive(
 					page,
 					profile.username,
-				);
-
-				// Update database
-				await updateProfileAnalysis(
-					profile.username,
-					analysis.isCreator,
-					analysis.confidence,
-					analysis.bio || null,
-					analysis.links[0] || null,
 				);
 
 				// Track stats

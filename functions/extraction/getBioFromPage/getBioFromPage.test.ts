@@ -42,6 +42,10 @@ describe("getBioFromPage", () => {
 		process.env = { ...originalEnv, CI: "true" };
 	});
 
+	afterEach(() => {
+		jest.restoreAllMocks();
+	});
+
 	afterAll(() => {
 		process.env = originalEnv;
 	});

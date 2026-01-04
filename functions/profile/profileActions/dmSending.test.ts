@@ -66,11 +66,15 @@ describe("dmSending", () => {
 			indicators: [],
 			is_dm_thread: true,
 			message_visible: true,
-			error_detected: false,
-		});
+		error_detected: false,
 	});
+});
 
-	describe("sendMessage", () => {
+afterEach(() => {
+	jest.restoreAllMocks();
+});
+
+describe("sendMessage", () => {
 		test("sends message using first selector", async () => {
 			const clickable = {
 				click: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),

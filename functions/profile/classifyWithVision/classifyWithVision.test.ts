@@ -24,6 +24,10 @@ describe("classifyWithVision", () => {
 		jest.clearAllMocks();
 	});
 
+	afterEach(() => {
+		jest.restoreAllMocks();
+	});
+
 	test("handles vision error gracefully", async () => {
 		isConfirmedCreatorMock.mockRejectedValue(new Error("boom"));
 
