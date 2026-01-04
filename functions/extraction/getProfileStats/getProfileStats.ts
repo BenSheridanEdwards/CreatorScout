@@ -78,13 +78,18 @@ export async function getProfileStats(page: Page): Promise<ProfileStats> {
 			stats.following = parseCount(rawData.followingText);
 		}
 
-		// Fallback: parse from header text
+		// Always parse posts from header text (even if followers/following were found from links)
+		const headerText = rawData.headerText;
+		const postsMatch = headerText.match(/([\d,.]+)\s*([KMB])?\s*posts?/i);
+		if (postsMatch) {
+			const countStr = postsMatch[1] + (postsMatch[2] || "");
+			stats.posts = parseCount(countStr);
+		}
+
+		// Fallback: parse followers/following from header text if not found from links
 		if (!stats.followers || !stats.following) {
-			const headerText = rawData.headerText;
-			
 			const followersMatch = headerText.match(/([\d,.]+)\s*([KMB])?\s*followers?/i);
 			const followingMatch = headerText.match(/([\d,.]+)\s*([KMB])?\s*following/i);
-			const postsMatch = headerText.match(/([\d,.]+)\s*([KMB])?\s*posts?/i);
 
 			if (!stats.followers && followersMatch) {
 				const countStr = followersMatch[1] + (followersMatch[2] || "");
@@ -94,11 +99,6 @@ export async function getProfileStats(page: Page): Promise<ProfileStats> {
 			if (!stats.following && followingMatch) {
 				const countStr = followingMatch[1] + (followingMatch[2] || "");
 				stats.following = parseCount(countStr);
-			}
-			
-			if (postsMatch) {
-				const countStr = postsMatch[1] + (postsMatch[2] || "");
-				stats.posts = parseCount(countStr);
 			}
 
 			// Check for 0 following specifically

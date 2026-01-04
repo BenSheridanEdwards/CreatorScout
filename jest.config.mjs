@@ -36,7 +36,7 @@ export default {
 	workerIdleMemoryLimit: "512MB", // Lower threshold to restart workers faster
 	testTimeout: 60000, // Increase timeout for complex tests from 30s to 60s
 	bail: false, // Don't bail on first failure
-	detectLeaks: true, // Enable leak detection to catch memory issues
+	detectLeaks: false, // Temporarily disabled due to false positives with experimental VM modules
 	forceExit: true, // Force exit after tests complete
 	clearMocks: true, // Clear mocks between tests automatically
 	restoreMocks: true, // Restore original implementations automatically

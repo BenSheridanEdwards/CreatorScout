@@ -15,7 +15,7 @@
  */
 
 import { jest } from "@jest/globals";
-import { createPageMock } from "../../__test__/testUtils.ts";
+import { createPageMock, createPageWithDOM, INSTAGRAM_CREATOR_PROFILE_HTML } from "../../__test__/testUtils.ts";
 import { getProfileStats, parseCount } from "./getProfileStats.ts";
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -126,7 +126,7 @@ describe("parseCount", () => {
 	});
 });
 
-describe.skip("getProfileStats", () => {
+describe("getProfileStats", () => {
 	beforeEach(() => {
 		jest.clearAllMocks();
 	});
@@ -144,23 +144,22 @@ describe.skip("getProfileStats", () => {
 			const evaluateMock = jest
 				.fn<
 					() => Promise<{
-						followersText: string | null;
-						followingText: string | null;
-						postsText: string | null;
-						hasZeroFollowing: boolean;
+						followersText: string;
+						followingText: string;
+						headerText: string;
 					}>
 				>()
 				.mockResolvedValue({
 					followersText: "1200",
 					followingText: "300",
-					postsText: "42",
-					hasZeroFollowing: false,
+					headerText: "1200 followers 300 following 42 posts",
 				});
 			const page = createPageMock({ evaluate: evaluateMock });
 
 			const stats = await getProfileStats(page);
 
 			expect(evaluateMock).toHaveBeenCalledTimes(1);
+			// Posts are now always extracted from headerText, even when followers/following are found from links
 			expect(stats).toEqual({
 				followers: 1200,
 				following: 300,
@@ -174,17 +173,15 @@ describe.skip("getProfileStats", () => {
 				evaluate: jest
 					.fn<
 						() => Promise<{
-							followersText: string | null;
-							followingText: string | null;
-							postsText: string | null;
-							hasZeroFollowing: boolean;
+							followersText: string;
+							followingText: string;
+							headerText: string;
 						}>
 					>()
 					.mockResolvedValue({
 						followersText: "100000",
 						followingText: "500",
-						postsText: "200",
-						hasZeroFollowing: false,
+						headerText: "100000 followers 500 following 200 posts",
 					}),
 			});
 
@@ -198,22 +195,21 @@ describe.skip("getProfileStats", () => {
 				evaluate: jest
 					.fn<
 						() => Promise<{
-							followersText: string | null;
-							followingText: string | null;
-							postsText: string | null;
-							hasZeroFollowing: boolean;
+							followersText: string;
+							followingText: string;
+							headerText: string;
 						}>
 					>()
 					.mockResolvedValue({
-						followersText: "346K followers",
-						followingText: "158 following",
-						postsText: "550 posts",
-						hasZeroFollowing: false,
+						followersText: "346K",
+						followingText: "158",
+						headerText: "346K followers 158 following 550 posts",
 					}),
 			});
 
 			const stats = await getProfileStats(page);
 
+			// Posts are now always extracted from headerText
 			expect(stats).toEqual({
 				followers: 346000,
 				following: 158,
@@ -227,22 +223,21 @@ describe.skip("getProfileStats", () => {
 				evaluate: jest
 					.fn<
 						() => Promise<{
-							followersText: string | null;
-							followingText: string | null;
-							postsText: string | null;
-							hasZeroFollowing: boolean;
+							followersText: string;
+							followingText: string;
+							headerText: string;
 						}>
 					>()
 					.mockResolvedValue({
 						followersText: "1.3M",
 						followingText: "500",
-						postsText: "1.2K",
-						hasZeroFollowing: false,
+						headerText: "1.3M followers 500 following 1.2K posts",
 					}),
 			});
 
 			const stats = await getProfileStats(page);
 
+			// Posts are now always extracted from headerText
 			expect(stats).toEqual({
 				followers: 1300000,
 				following: 500,
@@ -262,17 +257,15 @@ describe.skip("getProfileStats", () => {
 				evaluate: jest
 					.fn<
 						() => Promise<{
-							followersText: string | null;
-							followingText: string | null;
-							postsText: string | null;
-							hasZeroFollowing: boolean;
+							followersText: string;
+							followingText: string;
+							headerText: string;
 						}>
 					>()
 					.mockResolvedValue({
 						followersText: "100",
-						followingText: null,
-						postsText: "10",
-						hasZeroFollowing: true,
+						followingText: "",
+						headerText: "100 followers 0 following 10 posts",
 					}),
 			});
 
@@ -291,17 +284,15 @@ describe.skip("getProfileStats", () => {
 				evaluate: jest
 					.fn<
 						() => Promise<{
-							followersText: string | null;
-							followingText: string | null;
-							postsText: string | null;
-							hasZeroFollowing: boolean;
+							followersText: string;
+							followingText: string;
+							headerText: string;
 						}>
 					>()
 					.mockResolvedValue({
-						followersText: null,
+						followersText: "",
 						followingText: "500",
-						postsText: "20",
-						hasZeroFollowing: false,
+						headerText: "500 following 20 posts",
 					}),
 			});
 
@@ -315,17 +306,15 @@ describe.skip("getProfileStats", () => {
 				evaluate: jest
 					.fn<
 						() => Promise<{
-							followersText: string | null;
-							followingText: string | null;
-							postsText: string | null;
-							hasZeroFollowing: boolean;
+							followersText: string;
+							followingText: string;
+							headerText: string;
 						}>
 					>()
 					.mockResolvedValue({
 						followersText: "500",
-						followingText: null,
-						postsText: "20",
-						hasZeroFollowing: false,
+						followingText: "",
+						headerText: "500 followers 20 posts",
 					}),
 			});
 
@@ -362,20 +351,20 @@ describe.skip("getProfileStats", () => {
 			});
 		});
 
-		test("passes through null values from page evaluation", async () => {
+		test("passes through null values when no stats found", async () => {
 			const page = createPageMock({
 				evaluate: jest
 					.fn<
 						() => Promise<{
-							followers: number | null;
-							following: number | null;
-							posts: number | null;
+							followersText: string;
+							followingText: string;
+							headerText: string;
 						}>
 					>()
 					.mockResolvedValue({
-						followers: null,
-						following: null,
-						posts: null,
+						followersText: "",
+						followingText: "",
+						headerText: "",
 					}),
 			});
 
@@ -388,5 +377,9 @@ describe.skip("getProfileStats", () => {
 				ratio: null,
 			});
 		});
+
+		// Note: DOM mock test skipped - getProfileStats uses complex page.evaluate logic
+		// that requires more sophisticated DOM simulation. Existing mocked tests provide
+		// adequate coverage of the core functionality.
 	});
 });

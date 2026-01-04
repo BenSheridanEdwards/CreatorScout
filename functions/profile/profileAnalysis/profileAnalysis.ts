@@ -39,7 +39,6 @@ import {
 } from "../../shared/database/database.ts";
 import { snapshot } from "../../shared/snapshot/snapshot.ts";
 import { mediumDelay, shortDelay } from "../../timing/humanize/humanize.ts";
-import { sleep } from "../../timing/sleep/sleep.ts";
 import { findKeywords, isLikelyCreator } from "../bioMatcher/bioMatcher.ts";
 import { isConfirmedCreator } from "../vision/vision.ts";
 

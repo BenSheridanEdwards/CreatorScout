@@ -20,6 +20,10 @@ import type { ElementHandle, Page } from "puppeteer";
 import {
 	createPageMock,
 	createPageWithElementMock,
+	createPageWithDOM,
+	INSTAGRAM_CREATOR_PROFILE_HTML,
+	INSTAGRAM_PROFILE_WITH_CREATOR_LINK_HTML,
+	INSTAGRAM_PROFILE_WITH_LINKTREE_HTML,
 } from "../../__test__/testUtils.ts";
 import { clickBioLink, getLinkFromBio } from "./getLinkFromBio.ts";
 
@@ -77,6 +81,29 @@ describe("getLinkFromBio", () => {
 			const result = await getLinkFromBio(page);
 
 			expect(result).toBe("https://linktr.ee/username");
+		});
+
+		test("extracts bio link from real Instagram DOM structure", async () => {
+			const page = createPageWithDOM(INSTAGRAM_CREATOR_PROFILE_HTML);
+			const link = await getLinkFromBio(page);
+
+			// Should extract the Instagram redirect link
+			expect(link).toBeTruthy();
+			expect(link).toContain("l.instagram.com");
+		});
+
+		test("extracts creator link from DOM", async () => {
+			const page = createPageWithDOM(INSTAGRAM_PROFILE_WITH_CREATOR_LINK_HTML);
+			const link = await getLinkFromBio(page);
+
+			expect(link).toBe("https://patreon.com/creator");
+		});
+
+		test("extracts Linktree link from DOM", async () => {
+			const page = createPageWithDOM(INSTAGRAM_PROFILE_WITH_LINKTREE_HTML);
+			const link = await getLinkFromBio(page);
+
+			expect(link).toBe("https://linktr.ee/username");
 		});
 	});
 

@@ -9,12 +9,24 @@ import type { Page } from "puppeteer";
  * Creates a minimal Puppeteer page mock with commonly used methods
  */
 export const createPageMock = (overrides: Record<string, unknown> = {}) => {
+	// Smart evaluate mock that handles TreeWalker patterns for text array extraction
+	const smartEvaluateMock = jest.fn((fn: () => unknown) => {
+		if (typeof fn === "function") {
+			const fnStr = fn.toString();
+			// Return empty array for TreeWalker-based text extraction
+			if (fnStr.includes("TreeWalker") || fnStr.includes("SHOW_TEXT")) {
+				return Promise.resolve([]);
+			}
+		}
+		return Promise.resolve(undefined);
+	});
+
 	const baseMock = {
 		$: jest.fn<Page["$"]>().mockResolvedValue(null),
 		$$: jest.fn<Page["$$"]>().mockResolvedValue([]),
 		$eval: jest.fn<Page["$eval"]>().mockResolvedValue(null),
 		$$eval: jest.fn<Page["$$eval"]>().mockResolvedValue([]),
-		evaluate: jest.fn<Page["evaluate"]>().mockResolvedValue(undefined),
+		evaluate: smartEvaluateMock as unknown as jest.Mocked<Page["evaluate"]>,
 		evaluateHandle: jest.fn<Page["evaluateHandle"]>(),
 		waitForSelector: jest
 			.fn<Page["waitForSelector"]>()
@@ -194,3 +206,14 @@ export const testData = {
 	urls: ["https://instagram.com/testuser", "https://example.com"],
 	credentials: { username: "test@example.com", password: "testpass123" },
 };
+
+/**
+ * Re-export DOM mock utilities for convenience
+ */
+export {
+	createPageWithDOM,
+	INSTAGRAM_CREATOR_PROFILE_HTML,
+	INSTAGRAM_PROFILE_NO_BIO_HTML,
+	INSTAGRAM_PROFILE_WITH_CREATOR_LINK_HTML,
+	INSTAGRAM_PROFILE_WITH_LINKTREE_HTML,
+} from "./domMocks.ts";

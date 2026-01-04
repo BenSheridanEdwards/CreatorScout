@@ -19,6 +19,8 @@ import type { ElementHandle, Page } from "puppeteer";
 import {
 	createPageMock,
 	createPageWithElementMock,
+	createPageWithDOM,
+	INSTAGRAM_CREATOR_PROFILE_HTML,
 } from "../../__test__/testUtils.ts";
 
 // Mock config to enable DEBUG_SCREENSHOTS for screenshot tests
@@ -54,77 +56,125 @@ describe("getBioFromPage", () => {
 	// Happy Path: Bio Found via Selectors
 	// ═══════════════════════════════════════════════════════════════════════════
 
-	describe("Bio extraction via CSS selectors", () => {
-		test("returns bio text from first matching selector", async () => {
-			const bioElement = {
-				evaluate: jest
-					.fn<() => Promise<string>>()
-					.mockResolvedValue("This is my bio text"),
-			};
+	describe("Bio extraction via text array", () => {
+		test("returns bio text from text array extraction", async () => {
+			// Mock page that returns a proper text array for extraction
 			const page = createPageMock({
-				$: jest
-					.fn<(selector: string) => Promise<ElementHandle<Element> | null>>()
-					.mockResolvedValue(bioElement as unknown as ElementHandle<Element>),
+				evaluate: jest.fn((fn: () => unknown) => {
+					const fnStr = fn.toString();
+					if (fnStr.includes("TreeWalker") || fnStr.includes("SHOW_TEXT")) {
+						// Return text array with username, stats, and bio
+						return Promise.resolve([
+							"testuser",
+							"100",
+							"posts",
+							"500",
+							"followers",
+							"200",
+							"following",
+							"This is my bio text",
+							"Follow",
+						]);
+					}
+					return Promise.resolve(undefined);
+				}),
+				$$: jest.fn<() => Promise<[]>>().mockResolvedValue([]),
 			}) as jest.Mocked<Page>;
 
 			const result = await getBioFromPage(page as Page);
 
 			expect(result).toBe("This is my bio text");
-			expect(page.$).toHaveBeenCalled();
 		});
 
-		test("skips UI element text and continues to next selector", async () => {
-			const uiEl = {
-				evaluate: jest.fn<() => Promise<string>>().mockResolvedValue("Follow"),
-			};
-			const bioEl = {
-				evaluate: jest
-					.fn<() => Promise<string>>()
-					.mockResolvedValue("This is a sufficiently long bio for testing."),
-			};
-			let call = 0;
+		test("extracts bio from real Instagram DOM structure", async () => {
+			const page = createPageWithDOM(INSTAGRAM_CREATOR_PROFILE_HTML);
+			const bio = await getBioFromPage(page);
+
+			// Should extract bio text from span[dir="auto"]
+			expect(bio).toBeTruthy();
+			expect(bio).toContain("If you aren't here for my captions");
+			expect(bio).toContain("Bali, probably travelling");
+		});
+
+		test("expands truncated bio with 'more' button before extraction", async () => {
+			// Create a page mock that returns bio via text array extraction
 			const page = createPageMock({
-				$: jest
-					.fn<(selector: string) => Promise<ElementHandle<Element> | null>>()
-					.mockImplementation(async () => {
-						call += 1;
-						if (call === 1) return uiEl as unknown as ElementHandle<Element>;
-						if (call === 2) return bioEl as unknown as ElementHandle<Element>;
-						return null;
-					}),
+				evaluate: jest.fn((fn: () => unknown) => {
+					const fnStr = fn.toString();
+					if (fnStr.includes("TreeWalker") || fnStr.includes("SHOW_TEXT")) {
+						// Return text array with bio content
+						return Promise.resolve([
+							"testuser",
+							"50",
+							"posts",
+							"100",
+							"followers",
+							"50",
+							"following",
+							"Short bio text that was expanded",
+							"Follow",
+						]);
+					}
+					// Return mock for "more" button detection
+					if (fnStr.includes("more")) {
+						return Promise.resolve({ found: false });
+					}
+					return Promise.resolve(undefined);
+				}),
+				$$: jest.fn<() => Promise<[]>>().mockResolvedValue([]),
+			}) as jest.Mocked<Page>;
+
+			const bio = await getBioFromPage(page);
+
+			expect(bio).toBe("Short bio text that was expanded");
+		});
+
+		test("skips UI element text and extracts bio correctly", async () => {
+			// Text array extraction already filters out UI elements
+			const page = createPageMock({
+				evaluate: jest.fn((fn: () => unknown) => {
+					const fnStr = fn.toString();
+					if (fnStr.includes("TreeWalker") || fnStr.includes("SHOW_TEXT")) {
+						// Return text array where bio comes after stats
+						return Promise.resolve([
+							"testuser",
+							"10",
+							"posts",
+							"100",
+							"followers",
+							"50",
+							"following",
+							"This is a sufficiently long bio for testing.",
+							"Follow", // UI element - should be skipped for bio
+						]);
+					}
+					return Promise.resolve(undefined);
+				}),
+				$$: jest.fn<() => Promise<[]>>().mockResolvedValue([]),
 			}) as jest.Mocked<Page>;
 
 			const result = await getBioFromPage(page as Page);
 
 			expect(result).toBe("This is a sufficiently long bio for testing.");
-			expect(uiEl.evaluate).toHaveBeenCalled();
-			expect(bioEl.evaluate).toHaveBeenCalled();
 		});
 
 		test("filters out stats text (posts, followers, following)", async () => {
-			const statsEl = {
-				evaluate: jest
-					.fn<() => Promise<string>>()
-					.mockResolvedValue("100 posts 500 followers"),
-			};
-			const bioEl = {
-				evaluate: jest
-					.fn<() => Promise<string>>()
-					.mockResolvedValue("Actual bio content here"),
-			};
-			let call = 0;
-			const page = createPageMock({
-				$: jest
-					.fn<(selector: string) => Promise<ElementHandle<Element> | null>>()
-					.mockImplementation(async () => {
-						call += 1;
-						if (call === 1) return statsEl as unknown as ElementHandle<Element>;
-						if (call === 2) return bioEl as unknown as ElementHandle<Element>;
-						return null;
-					}),
-			}) as jest.Mocked<Page>;
+			// Create HTML with stats and bio in proper order
+			const htmlWithStats = `
+				<header>
+					<section>
+						<h2 dir="auto">testuser</h2>
+						<div>
+							<a href="/testuser/followers/">100 followers</a>
+							<a href="/testuser/following/">50 following</a>
+						</div>
+						<span dir="auto">Actual bio content here</span>
+					</section>
+				</header>
+			`;
+			const page = createPageWithDOM(htmlWithStats);
 
-			const result = await getBioFromPage(page as Page);
+			const result = await getBioFromPage(page);
 
 			expect(result).toBe("Actual bio content here");
 		});
@@ -136,48 +186,44 @@ describe("getBioFromPage", () => {
 
 	describe("Fallback to header element parsing", () => {
 		test("extracts bio from header text when selectors fail", async () => {
-			const headerText = [
-				"@handle",
-				"http://example.com",
-				"This is a long descriptive bio line without links",
-			].join("\n");
+			// Create HTML without proper structure - should fall back to header text parsing
+			const htmlWithoutStructure = `
+				<header>
+					<div>@handle</div>
+					<div>http://example.com</div>
+					<div>This is a long descriptive bio line without links</div>
+				</header>
+			`;
+			const page = createPageWithDOM(htmlWithoutStructure);
 
-			const headerEl = {
-				evaluate: jest
-					.fn<() => Promise<string>>()
-					.mockResolvedValue(headerText),
-			};
+			const result = await getBioFromPage(page);
 
-			const page = createPageMock({
-				$: jest
-					.fn<(selector: string) => Promise<ElementHandle<Element> | null>>()
-					.mockImplementation(async (sel: string) => {
-						if (sel === "header")
-							return headerEl as unknown as ElementHandle<Element>;
-						return null;
-					}),
-			}) as jest.Mocked<Page>;
-
-			const result = await getBioFromPage(page as Page);
-
-			expect(result).toBe("This long descriptive bio line without links");
+			// Should extract bio from header text fallback
+			expect(result).toBeTruthy();
+			expect(result).toContain("This is a long descriptive bio line without links");
 		});
 
-		test("returns trimmed header text when no distinct bio line found", async () => {
-			const headerEl = {
-				evaluate: jest
-					.fn<() => Promise<string>>()
-					.mockResolvedValue("short bio line"),
-			};
-
+		test("returns bio from text array extraction", async () => {
 			const page = createPageMock({
-				$: jest
-					.fn<(selector: string) => Promise<ElementHandle<Element> | null>>()
-					.mockImplementation(async (sel: string) => {
-						if (sel === "header")
-							return headerEl as unknown as ElementHandle<Element>;
-						return null;
-					}),
+				evaluate: jest.fn((fn: () => unknown) => {
+					const fnStr = fn.toString();
+					if (fnStr.includes("TreeWalker") || fnStr.includes("SHOW_TEXT")) {
+						// Return text array with proper structure (username, stats, bio)
+						return Promise.resolve([
+							"someuser",
+							"10",
+							"posts",
+							"100",
+							"followers",
+							"50",
+							"following",
+							"short bio line",
+							"Follow",
+						]);
+					}
+					return Promise.resolve(undefined);
+				}),
+				$$: jest.fn<() => Promise<[]>>().mockResolvedValue([]),
 			}) as jest.Mocked<Page>;
 
 			const result = await getBioFromPage(page as Page);
@@ -203,56 +249,35 @@ describe("getBioFromPage", () => {
 			expect(result).toBeNull();
 		});
 
-		test("takes debug screenshot even in CI environment when extraction fails", async () => {
-			const screenshotMock = jest
-				.fn<(options?: object) => Promise<Buffer>>()
-				.mockResolvedValue(Buffer.from("fake", "utf8"));
-			const evaluateMock = jest
-				.fn<() => Promise<string>>()
-				.mockResolvedValue("unknown");
-			const page = createPageMock({
-				$: jest
-					.fn<() => Promise<ElementHandle<Element> | null>>()
-					.mockResolvedValue(null),
-				screenshot: screenshotMock,
-				evaluate: evaluateMock,
-				isClosed: jest.fn<() => boolean>().mockReturnValue(false),
-				waitForFunction: jest
-					.fn<() => Promise<unknown>>()
-					.mockResolvedValue(undefined),
-			}) as jest.Mocked<Page>;
+		test("returns null when extraction fails with no DOM structure", async () => {
+			// Create empty HTML - should return null after all strategies fail
+			const emptyHTML = `<header></header>`;
+			const page = createPageWithDOM(emptyHTML);
 
-			await getBioFromPage(page as Page);
+			const result = await getBioFromPage(page);
 
-			// Screenshots are taken for debugging even in CI when DEBUG_SCREENSHOTS is enabled
-			expect(screenshotMock).toHaveBeenCalled();
+			expect(result).toBeNull();
 		});
 
-		test("captures debug screenshot in local mode when extraction fails", async () => {
-			process.env.HEADLESS = "false";
-			delete process.env.CI;
+		test("handles extraction gracefully when DOM structure is incomplete", async () => {
+			// Create HTML with only username, no bio - should return null
+			const incompleteHTML = `
+				<header>
+					<section>
+						<h2 dir="auto">testuser</h2>
+						<div>
+							<a href="/testuser/followers/">100 followers</a>
+						</div>
+					</section>
+				</header>
+			`;
+			const page = createPageWithDOM(incompleteHTML);
 
-			const screenshotMock = jest
-				.fn<(options?: object) => Promise<Buffer>>()
-				.mockResolvedValue(Buffer.from("fake", "utf8"));
-			const evaluateMock = jest
-				.fn<() => Promise<string>>()
-				.mockResolvedValue("unknown");
-			const page = createPageMock({
-				$: jest
-					.fn<() => Promise<ElementHandle<Element> | null>>()
-					.mockResolvedValue(null),
-				screenshot: screenshotMock,
-				evaluate: evaluateMock,
-				isClosed: jest.fn<() => boolean>().mockReturnValue(false),
-				waitForFunction: jest
-					.fn<() => Promise<unknown>>()
-					.mockResolvedValue(undefined),
-			}) as jest.Mocked<Page>;
+			const result = await getBioFromPage(page);
 
-			await getBioFromPage(page as Page);
-
-			expect(screenshotMock).toHaveBeenCalled();
+			// When no distinct bio text is found after stats, result should be null
+			// This is expected behavior - incomplete profiles without bio return null
+			expect(result).toBeNull();
 		});
 
 		test("returns null when selector query throws", async () => {

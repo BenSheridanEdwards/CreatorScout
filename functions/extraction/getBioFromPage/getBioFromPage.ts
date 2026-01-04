@@ -1,7 +1,17 @@
+/**
+ * Bio extraction from Instagram profile page
+ *
+ * Uses the text array approach for robust extraction that works
+ * regardless of Instagram's CSS class changes.
+ */
+
 import type { Page } from "puppeteer";
 import { validateBioWithVision } from "../../profile/vision/vision.ts";
 import { createLogger } from "../../shared/logger/logger.ts";
 import { snapshot } from "../../shared/snapshot/snapshot.ts";
+import { humanClick } from "../../navigation/humanInteraction/humanInteraction.ts";
+import { sleep } from "../../timing/sleep/sleep.ts";
+import { identifyProfileElements } from "../textArrayExtraction.ts";
 
 const logger = createLogger(process.env.DEBUG_LOGS === "true");
 
@@ -15,12 +25,8 @@ export async function validateBioExtraction(
 	username: string,
 ): Promise<{ valid: boolean; correctedBio: string | null }> {
 	try {
-		// Try to take screenshot for validation
-		// Note: Screenshots on Instagram are disabled by default to avoid detection
-		// This will return empty string if DEBUG_SCREENSHOTS=false
 		const screenshotPath = await snapshot(page, `bio_validation_${username}`);
 		if (!screenshotPath) {
-			// Screenshots disabled - skip validation, assume extraction is valid
 			return { valid: true, correctedBio: null };
 		}
 		const visionResult = await validateBioWithVision(screenshotPath);
@@ -30,7 +36,6 @@ export async function validateBioExtraction(
 				const visionBioLength = visionResult.bio_text.length;
 				const extractedLength = extractedBio?.length || 0;
 
-				// If vision found significantly more content, flag as bug
 				if (visionBioLength > extractedLength + 20) {
 					logger.error(
 						"ERROR",
@@ -44,8 +49,6 @@ export async function validateBioExtraction(
 					return { valid: false, correctedBio: visionResult.bio_text };
 				}
 			}
-
-			// Bio extraction matches vision
 			return { valid: true, correctedBio: null };
 		}
 	} catch (e) {
@@ -56,259 +59,140 @@ export async function validateBioExtraction(
 }
 
 /**
- * Clean up extracted bio by removing Instagram UI text that may have been captured
+ * Check if bio is truncated and has a "more" button, then click it to expand
  */
-function cleanBioText(bio: string): string {
-	let cleaned = bio;
-
-	// Remove "Followed X, Y, and Z" pattern (Instagram mutual follows UI)
-	cleaned = cleaned.replace(
-		/\s*Followed\s+[\w._]+(?:,\s*[\w._]+)*(?:,?\s*and\s+[\w._]+)?\.?\.?\.?\s*/gi,
-		" ",
-	);
-
-	// Remove standalone "Followed by X" text
-	cleaned = cleaned.replace(/\s*Followed by\s+[\w._]+\s*/gi, " ");
-
-	// Clean up multiple spaces
-	cleaned = cleaned.replace(/\s+/g, " ").trim();
-
-	return cleaned;
-}
-
-export async function getBioFromPage(page: Page): Promise<string | null> {
-	const selectors = [
-		// More robust selectors that don't rely on changing CSS classes
-		'header section div span[dir="auto"]', // Most specific bio selector
-		'header section span[dir="auto"]',
-		'div[dir="auto"] span[dir="auto"]',
-		'header span[dir="auto"]',
-		'section span[dir="auto"]',
-		// Legacy selectors for backwards compatibility
-		"header section > div.-vDIg > span",
-		"header section span:not([class])",
-		'div[class*="biography"]',
-		"section > div > span",
-		"header section h1 + span",
-		"header section h1 + div span",
-		// Lower priority selectors (avoid highlight titles)
-		// 'header section div[role="presentation"] span', // This finds highlight titles
-		// Additional selectors that might work
-		"header section span",
-		"header span",
-		'div[dir="auto"] span',
-	];
-
-	for (let i = 0; i < selectors.length; i++) {
-		const sel = selectors[i];
-		try {
-			const el = await page.$(sel);
-			if (el) {
-				const txt = await el.evaluate(
-					(node: Element) => (node as HTMLElement).innerText as string,
-				);
-				const trimmed = txt?.trim();
-
-				// Collect bio-like content from spans (allow up to 300 chars for longer bios)
-				if (trimmed && trimmed.length > 1 && trimmed.length < 300) {
-					// Quick reject: stats and UI elements
-					const isUIText =
-						trimmed.includes("Follow") ||
-						trimmed.includes("Followed") ||
-						trimmed.includes("Message") ||
-						trimmed.includes("Options") ||
-						trimmed.match(/^\d/) ||
-						trimmed.includes("posts") ||
-						trimmed.includes("followers") ||
-						trimmed.includes("following") ||
-						trimmed === "Links";
-
-					if (!isUIText) {
-						// Found bio content - try to enhance from parent
-						try {
-							const parentText = await el.evaluate((node: Element) => {
-								const parent = node.parentElement;
-								if (parent) {
-									const spans = parent.querySelectorAll('span[dir="auto"]');
-									let combined = "";
-									spans.forEach((span) => {
-										const text = (span as HTMLElement).innerText?.trim();
-										if (text && text.length > 1 && text.length < 50) {
-											combined += (combined ? " " : "") + text;
-										}
-									});
-									return combined || null;
-								}
-								return null;
-							});
-
-							if (
-								parentText &&
-								parentText.length > trimmed.length &&
-								parentText.length < 200
-							) {
-								return cleanBioText(parentText);
-							}
-						} catch (e) {
-							// Continue with original text
-						}
-
-						return cleanBioText(trimmed);
-					}
-				}
-			}
-		} catch (_e) {}
-	}
-
-	// Fallback: parse from header text
-
-	// Fallback: get all text from header and try to extract bio
+async function expandBioIfTruncated(page: Page): Promise<boolean> {
 	try {
-		const header = await page.$("header");
-		if (header) {
-			const txt = await header.evaluate(
-				(node) => (node as HTMLElement).innerText,
+		const moreButtonInfo = await page.evaluate(() => {
+			const buttons = Array.from(
+				document.querySelectorAll(
+					'header section div[role="button"][tabindex="0"]',
+				),
 			);
-			if (txt) {
-				// Try to find the bio text (usually after username, before links)
-				const lines = txt
-					.split("\n")
-					.filter((line: string) => line.trim().length > 3);
 
-				// Fallback: Extract bio content from header text more intelligently
-				// Normalize the header text and split into words
-				const headerText = txt.replace(/\n+/g, " ").trim();
-				const words = headerText.split(/\s+/);
+			for (const btn of buttons) {
+				const text = (btn.textContent || "").trim().toLowerCase();
+				if (text === "more") {
+					const parentSpan = btn.closest('span[dir="auto"]');
+					if (parentSpan) {
+						const parentText = (parentSpan.textContent || "").toLowerCase();
+						const parentHTML = parentSpan.innerHTML || "";
 
-				// Find bio-like sequences in the header
-				const bioParts: string[] = [];
-				let currentSequence = "";
-				let inBioSequence = false;
-
-				for (let i = 0; i < words.length; i++) {
-					const word = words[i];
-
-					// Skip UI elements and stats
-					if (
-						word === "Follow" ||
-						word === "Followed" || // Instagram mutual follows UI text
-						word === "Message" ||
-						word === "Options" ||
-						word === "Links" ||
-						word.includes("posts") ||
-						word.includes("followers") ||
-						word.includes("following") ||
-						word.match(/^\d+k?$/) ||
-						word === "lanahyummy"
-					) {
-						// Skip username
-						if (currentSequence.trim()) {
-							bioParts.push(currentSequence.trim());
-							currentSequence = "";
+						if (
+							(parentHTML.includes("...") || parentText.includes("...")) &&
+							!parentText.includes("followers") &&
+							!parentText.includes("following") &&
+							!parentText.includes("posts") &&
+							!parentText.includes("highlight") &&
+							parentText.length > 10
+						) {
+							return { found: true };
 						}
-						inBioSequence = false;
-						continue;
-					}
-
-					// Collect bio-like words
-					if (
-						word.length > 2 &&
-						word.length < 50 &&
-						!word.startsWith("http") &&
-						!word.match(/^@\w+$/)
-					) {
-						// Skip simple @ mentions
-						currentSequence += (currentSequence ? " " : "") + word;
-						inBioSequence = true;
-					} else if (inBioSequence && word.includes("@") && word.length < 30) {
-						// Include @ mentions that are part of bio
-						currentSequence += " " + word;
 					}
 				}
-
-				if (currentSequence.trim()) {
-					bioParts.push(currentSequence.trim());
-				}
-
-				// Filter and combine bio parts
-				const validBioParts = bioParts.filter(
-					(part) =>
-						part.length > 3 &&
-						part.length < 150 &&
-						(part.includes(" ") || part.includes("@")), // Must have spaces or @ to be bio-like
-				);
-
-				if (validBioParts.length > 0) {
-					const combinedBio = cleanBioText(validBioParts.join(" ").trim());
-					if (combinedBio.length > 5) {
-						return combinedBio;
-					}
-				}
-				return cleanBioText(txt.trim()) || null;
 			}
-		}
-	} catch (_e) {
-		// Fallback failed
-	}
-
-	// Take screenshot and validate with vision when bio extraction fails
-	// Note: Screenshots on Instagram are disabled by default to avoid detection
-	try {
-		const username = await page.evaluate(() => {
-			const urlParts = window.location.pathname.split("/").filter(Boolean);
-			return urlParts[0] || "unknown";
+			return { found: false };
 		});
 
-		const screenshotPath = await snapshot(
-			page,
-			`bio_extraction_failed_${username}`,
-		);
-
-		// Skip vision validation if screenshot was disabled
-		if (!screenshotPath) {
-			logger.info(
-				"ANALYSIS",
-				`Bio extraction returned null for @${username} (vision validation skipped - screenshots disabled)`,
-			);
-			return null;
+		if (!moreButtonInfo.found) {
+			return false;
 		}
 
-		logger.warn(
-			"ANALYSIS",
-			`Bio extraction failed for @${username} - validating with vision...`,
+		const buttons = await page.$$(
+			'header section div[role="button"][tabindex="0"]',
 		);
+		for (const btn of buttons) {
+			const text = await btn.evaluate((el) =>
+				(el.textContent || "").trim().toLowerCase(),
+			);
+			if (text === "more") {
+				const isInBioArea = await btn.evaluate((el) => {
+					const parentSpan = el.closest('span[dir="auto"]');
+					if (!parentSpan) return false;
 
-		// Use vision to check if a bio is actually visible
-		const visionResult = await validateBioWithVision(screenshotPath);
+					const parentText = (parentSpan.textContent || "").toLowerCase();
+					const parentHTML = parentSpan.innerHTML || "";
 
-		if (visionResult) {
-			if (visionResult.bio_visible && visionResult.bio_text) {
-				// Vision sees a bio but we couldn't extract it - this is a bug!
-				logger.error(
-					"ERROR",
-					`🚨 BIO EXTRACTION BUG: Vision found bio but extraction failed!`,
-				);
-				logger.error("ERROR", `Username: @${username}`);
-				logger.error("ERROR", `Vision found: "${visionResult.bio_text}"`);
-				logger.error("ERROR", `Screenshot: ${screenshotPath}`);
+					return (
+						(parentHTML.includes("...") || parentText.includes("...")) &&
+						!parentText.includes("followers") &&
+						!parentText.includes("following") &&
+						!parentText.includes("posts") &&
+						!parentText.includes("highlight") &&
+						parentText.length > 10
+					);
+				});
 
-				// Return what vision found so we don't miss the bio entirely
-				return visionResult.bio_text;
-			} else {
-				logger.info(
-					"ANALYSIS",
-					`Vision confirms no bio for @${username}: ${visionResult.reason}`,
-				);
+				if (isInBioArea) {
+					logger.debug(
+						"PROFILE",
+						"Found truncated bio with 'more' button, expanding...",
+					);
+					await humanClick(page, btn, { elementType: "button" });
+					await sleep(800 + Math.random() * 400);
+					return true;
+				}
 			}
-		} else {
-			logger.warn(
-				"ANALYSIS",
-				"Vision validation failed, cannot confirm bio status",
-			);
 		}
-	} catch (e) {
-		logger.error("ERROR", `Failed to validate bio with vision: ${e}`);
+
+		return false;
+	} catch (error) {
+		logger.warn("PROFILE", `Failed to expand truncated bio: ${error}`);
+		return false;
+	}
+}
+
+/**
+ * Extract all visible text from header in DOM order
+ */
+async function extractTextArrayFromPage(page: Page): Promise<string[]> {
+	return page.evaluate(() => {
+		const header = document.querySelector("header");
+		if (!header) return [];
+
+		const texts: string[] = [];
+		const walker = document.createTreeWalker(header, NodeFilter.SHOW_TEXT, {
+			acceptNode: (node) => {
+				const parent = node.parentElement;
+				if (!parent) return NodeFilter.FILTER_REJECT;
+				const tag = parent.tagName.toLowerCase();
+				if (tag === "script" || tag === "style" || tag === "svg") {
+					return NodeFilter.FILTER_REJECT;
+				}
+				return NodeFilter.FILTER_ACCEPT;
+			},
+		});
+
+		while (walker.nextNode()) {
+			const text = walker.currentNode.textContent?.trim();
+			if (text && text.length > 0) {
+				texts.push(text);
+			}
+		}
+
+		return texts;
+	});
+}
+
+/**
+ * Extract bio from Instagram profile page
+ *
+ * Uses text array approach - extracts all text from header in order,
+ * then identifies bio by position (after stats, before buttons).
+ */
+export async function getBioFromPage(page: Page): Promise<string | null> {
+	// First, check if bio is truncated and expand it
+	await expandBioIfTruncated(page);
+
+	// Extract all text from header
+	const texts = await extractTextArrayFromPage(page);
+
+	if (texts.length === 0) {
+		return null;
 	}
 
-	return null;
+	// Use the pure function to identify profile elements
+	const profile = identifyProfileElements(texts);
+
+	return profile.bio;
 }

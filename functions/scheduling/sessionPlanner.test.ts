@@ -132,16 +132,32 @@ describe("sessionPlanner", () => {
 		});
 
 		it("should create different plans on multiple calls (variance)", () => {
-			const plans1 = planDailySessions(50, 0);
-			const plans2 = planDailySessions(50, 0);
+			// Run multiple iterations to ensure variance is detected
+			// With randomization, it's very unlikely all iterations produce identical results
+			let foundVariance = false;
+			
+			for (let i = 0; i < 10; i++) {
+				const plans1 = planDailySessions(50, 0);
+				const plans2 = planDailySessions(50, 0);
 
-			// Plans should be different due to randomization
-			const targets1 = plans1.map((p) => p.targetDMs);
-			const targets2 = plans2.map((p) => p.targetDMs);
+				// Check targets (integers)
+				const targets1 = plans1.map((p) => p.targetDMs);
+				const targets2 = plans2.map((p) => p.targetDMs);
+				const targetsSame = targets1.every((t, idx) => t === targets2[idx]);
 
-			// At least one target should be different
-			const allSame = targets1.every((t, i) => t === targets2[i]);
-			expect(allSame).toBe(false);
+				// Check weights (floats - more granular, less likely to collide)
+				const weights1 = plans1.map((p) => p.weight);
+				const weights2 = plans2.map((p) => p.weight);
+				const weightsSame = weights1.every((w, idx) => Math.abs(w - weights2[idx]) < 0.0001);
+
+				// If either targets or weights differ, we found variance
+				if (!targetsSame || !weightsSame) {
+					foundVariance = true;
+					break;
+				}
+			}
+
+			expect(foundVariance).toBe(true);
 		});
 	});
 

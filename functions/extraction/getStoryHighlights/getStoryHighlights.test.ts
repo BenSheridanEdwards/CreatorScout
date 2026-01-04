@@ -19,6 +19,7 @@
 
 import { jest } from "@jest/globals";
 import type { ElementHandle, Page } from "puppeteer";
+import { createPageWithDOM, INSTAGRAM_CREATOR_PROFILE_HTML } from "../../__test__/testUtils.ts";
 import { getStoryHighlights } from "./getStoryHighlights.ts";
 
 describe("getStoryHighlights", () => {
@@ -181,6 +182,36 @@ describe("getStoryHighlights", () => {
 			expect(highlights.length).toBe(3);
 			expect(highlights[0].title).toBe("Highlight 1");
 			expect(highlights[2].title).toBe("Highlight 3");
+		});
+	});
+
+	// ═══════════════════════════════════════════════════════════════════════════
+	// Real DOM Structure Tests
+	// ═══════════════════════════════════════════════════════════════════════════
+
+	describe("Extraction from real Instagram DOM structure", () => {
+		test("extracts highlights from real Instagram profile HTML", async () => {
+			const page = createPageWithDOM(INSTAGRAM_CREATOR_PROFILE_HTML);
+			const highlights = await getStoryHighlights(page);
+
+			expect(highlights.length).toBe(3);
+			expect(highlights.map((h) => h.title)).toEqual([
+				"Link 🔗",
+				"Music✨",
+				"Art✨",
+			]);
+			expect(highlights[0].coverImageUrl).toBeTruthy();
+		});
+
+		test("extracts highlight titles correctly with emojis", async () => {
+			const page = createPageWithDOM(INSTAGRAM_CREATOR_PROFILE_HTML);
+			const highlights = await getStoryHighlights(page);
+
+			// Verify emojis are preserved in titles
+			expect(highlights[0].title).toContain("OF");
+			expect(highlights[0].title).toContain("🤍");
+			expect(highlights[1].title).toContain("Music");
+			expect(highlights[1].title).toContain("✨");
 		});
 	});
 });

@@ -232,20 +232,33 @@ describe("profileAnalysis", () => {
 
 		test("extracts bio and calculates score when bio found", async () => {
 			const page = pageMock();
-			// Mock bio extraction
+			// Mock bio extraction - detect function patterns instead of executing
 			page.evaluate = jest
 				.fn<(fn: unknown, ...args: unknown[]) => Promise<unknown>>()
 				.mockImplementation(async (fn: unknown) => {
 					if (typeof fn === "function") {
-						const result = await (fn as () => unknown)();
-						// Return bio text
-						if (typeof result === "string" && result.includes("span")) {
+						const fnStr = fn.toString();
+						// TreeWalker pattern for text array extraction
+						if (fnStr.includes("TreeWalker") || fnStr.includes("SHOW_TEXT")) {
+							return [
+								"testuser",
+								"10",
+								"posts",
+								"500",
+								"followers",
+								"200",
+								"following",
+								"influencer bio",
+								"Follow",
+							];
+						}
+						// Bio extraction patterns (uses statsLinks, closest)
+						if (fnStr.includes("statsLinks") || fnStr.includes("statsContainer")) {
 							return "influencer bio";
 						}
-						// Return empty for other queries
-						return "";
+						return null;
 					}
-					return "";
+					return null;
 				}) as unknown as Page["evaluate"];
 
 			const result = await analyzeProfileBasic(page, "user");
@@ -257,23 +270,49 @@ describe("profileAnalysis", () => {
 
 		test("extracts link from bio for additional context", async () => {
 			const page = pageMock();
+			// Mock evaluate - detect function patterns instead of executing
 			page.evaluate = jest
 				.fn<(fn: unknown, ...args: unknown[]) => Promise<unknown>>()
 				.mockImplementation(async (fn: unknown) => {
 					if (typeof fn === "function") {
-						const result = await (fn as () => unknown)();
-						// Return link for link extraction
-						if (typeof result === "string" && result.includes("a")) {
-							return "https://linktr.ee/creator";
+						const fnStr = fn.toString();
+						// TreeWalker pattern for text array extraction
+						if (fnStr.includes("TreeWalker") || fnStr.includes("SHOW_TEXT")) {
+							return [
+								"testuser",
+								"10",
+								"posts",
+								"500",
+								"followers",
+								"200",
+								"following",
+								"Check my link in bio",
+								"Follow",
+							];
 						}
-						// Return bio text
-						if (typeof result === "string" && result.includes("span")) {
+						// Bio extraction patterns (uses statsLinks, closest)
+						if (fnStr.includes("statsLinks") || fnStr.includes("statsContainer")) {
 							return "Check my link in bio";
 						}
-						return "";
+						return null;
 					}
-					return "";
+					return null;
 				}) as unknown as Page["evaluate"];
+			// Mock $ for link extraction
+			page.$ = jest
+				.fn<(selector: string) => Promise<unknown>>()
+				.mockImplementation(async (selector: string) => {
+					if (
+						selector.includes("nofollow") ||
+						selector.includes("_blank") ||
+						selector.includes("http")
+					) {
+						return {
+							evaluate: jest.fn().mockResolvedValue("https://linktr.ee/creator"),
+						};
+					}
+					return null;
+				}) as unknown as Page["$"];
 
 			const result = await analyzeProfileBasic(page, "user");
 
@@ -288,22 +327,37 @@ describe("profileAnalysis", () => {
 	describe("analyzeProfileComprehensive()", () => {
 		test("aggregates signals from bio, links, stats, and highlights", async () => {
 			const page = pageMock();
+			// Mock evaluate - detect function patterns instead of executing
 			page.evaluate = jest
 				.fn<(fn: unknown, ...args: unknown[]) => Promise<unknown>>()
 				.mockImplementation(async (fn: unknown) => {
 					if (typeof fn === "function") {
-						const result = await (fn as () => unknown)();
-						// Return bio
-						if (typeof result === "string" && result.includes("span")) {
+						const fnStr = fn.toString();
+						// TreeWalker pattern for text array extraction
+						if (fnStr.includes("TreeWalker") || fnStr.includes("SHOW_TEXT")) {
+							return [
+								"testuser",
+								"10",
+								"posts",
+								"1000",
+								"followers",
+								"5",
+								"following",
+								"influencer",
+								"Follow",
+							];
+						}
+						// Bio extraction patterns (uses statsLinks, closest)
+						if (fnStr.includes("statsLinks") || fnStr.includes("statsContainer")) {
 							return "influencer";
 						}
-						// Return stats
-						if (typeof result === "object" && result !== null) {
+						// Stats extraction (has /followers/ or /following/ patterns)
+						if (fnStr.includes("/followers/") || fnStr.includes("/following/")) {
 							return { followers: 1000, following: 5 };
 						}
-						return "";
+						return null;
 					}
-					return "";
+					return null;
 				}) as unknown as Page["evaluate"];
 
 			const result = await analyzeProfileComprehensive(page, "user");
@@ -316,41 +370,49 @@ describe("profileAnalysis", () => {
 			expect(result).toHaveProperty("indicators");
 			expect(result).toHaveProperty("confidence");
 
-			// Verify database was called
+			// Verify database was called with extracted data
 			expect(updateProfileFromAnalysisMock).toHaveBeenCalledWith(
 				"user",
 				expect.objectContaining({
-					bio: null,
-					confidence: 0,
-					bioScore: 0,
+					bio: "influencer",
 					links: expect.arrayContaining(["https://linktr.ee/user"]),
-					stats: expect.objectContaining({
-						followers: undefined,
-						following: undefined,
-						ratio: undefined,
-					}),
 				}),
 			);
 		});
 
 		test("includes indicators from multiple signal sources", async () => {
 			const page = pageMock();
+			// Mock evaluate - detect function patterns instead of executing
 			page.evaluate = jest
 				.fn<(fn: unknown, ...args: unknown[]) => Promise<unknown>>()
 				.mockImplementation(async (fn: unknown) => {
 					if (typeof fn === "function") {
-						const result = await (fn as () => unknown)();
-						// Return bio with creator keywords
-						if (typeof result === "string" && result.includes("span")) {
+						const fnStr = fn.toString();
+						// TreeWalker pattern for text array extraction
+						if (fnStr.includes("TreeWalker") || fnStr.includes("SHOW_TEXT")) {
+							return [
+								"testuser",
+								"100",
+								"posts",
+								"10000",
+								"followers",
+								"50",
+								"following",
+								"Patreon exclusive content",
+								"Follow",
+							];
+						}
+						// Bio extraction patterns (uses statsLinks, closest)
+						if (fnStr.includes("statsLinks") || fnStr.includes("statsContainer")) {
 							return "Patreon exclusive content";
 						}
-						// Return stats
-						if (typeof result === "object" && result !== null) {
+						// Stats extraction (has /followers/ or /following/ patterns)
+						if (fnStr.includes("/followers/") || fnStr.includes("/following/")) {
 							return { followers: 10000, following: 50 };
 						}
-						return "";
+						return null;
 					}
-					return "";
+					return null;
 				}) as unknown as Page["evaluate"];
 
 			const result = await analyzeProfileComprehensive(page, "user");
@@ -365,17 +427,33 @@ describe("profileAnalysis", () => {
 				.mockResolvedValue(
 					'<html><body><a href="https://patreon.com/user">Patreon</a></body></html>',
 				);
+			// Mock evaluate - detect function patterns instead of executing
 			page.evaluate = jest
 				.fn<(fn: unknown, ...args: unknown[]) => Promise<unknown>>()
 				.mockImplementation(async (fn: unknown) => {
 					if (typeof fn === "function") {
-						const result = await (fn as () => unknown)();
-						if (typeof result === "string" && result.includes("span")) {
+						const fnStr = fn.toString();
+						// TreeWalker pattern for text array extraction
+						if (fnStr.includes("TreeWalker") || fnStr.includes("SHOW_TEXT")) {
+							return [
+								"testuser",
+								"50",
+								"posts",
+								"1000",
+								"followers",
+								"100",
+								"following",
+								"Bio text",
+								"Follow",
+							];
+						}
+						// Bio extraction patterns (uses statsLinks, closest)
+						if (fnStr.includes("statsLinks") || fnStr.includes("statsContainer")) {
 							return "Bio text";
 						}
-						return "";
+						return null;
 					}
-					return "";
+					return null;
 				}) as unknown as Page["evaluate"];
 
 			const result = await analyzeProfileComprehensive(page, "user");
@@ -386,20 +464,37 @@ describe("profileAnalysis", () => {
 
 		test("uses vision analysis when confidence is uncertain", async () => {
 			const page = pageMock();
+			// Mock evaluate - detect function patterns instead of executing
 			page.evaluate = jest
 				.fn<(fn: unknown, ...args: unknown[]) => Promise<unknown>>()
 				.mockImplementation(async (fn: unknown) => {
 					if (typeof fn === "function") {
-						const result = await (fn as () => unknown)();
-						if (typeof result === "string" && result.includes("span")) {
+						const fnStr = fn.toString();
+						// TreeWalker pattern for text array extraction
+						if (fnStr.includes("TreeWalker") || fnStr.includes("SHOW_TEXT")) {
+							return [
+								"testuser",
+								"10",
+								"posts",
+								"100",
+								"followers",
+								"100",
+								"following",
+								"Uncertain bio",
+								"Follow",
+							];
+						}
+						// Bio extraction patterns (uses statsLinks, closest)
+						if (fnStr.includes("statsLinks") || fnStr.includes("statsContainer")) {
 							return "Uncertain bio";
 						}
-						if (typeof result === "object" && result !== null) {
+						// Stats extraction (has /followers/ or /following/ patterns)
+						if (fnStr.includes("/followers/") || fnStr.includes("/following/")) {
 							return { followers: 100, following: 100 };
 						}
-						return "";
+						return null;
 					}
-					return undefined;
+					return null;
 				}) as unknown as Page["evaluate"];
 
 			const result = await analyzeProfileComprehensive(page, "user");

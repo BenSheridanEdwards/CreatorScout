@@ -102,10 +102,22 @@ export function isLinkInBioHighlight(title: string): boolean {
 		/ko-fi/i,
 		/fanvue/i,
 		/loyalfans/i,
+		// "OF" abbreviation (common for Patreon)
+		/^of\s+/i, // link pattern
+		/\sof\s+/i, // "OF" as standalone word
 		// Link indicators (must have emoji or very specific)
 		/my\s*🔗/i,
 		/🔗\s*link/i,
 		/link\s*🔗/i,
+		// "its here 🔗" pattern - link emoji suggests premium content link
+		/its?\s+here\s*🔗/i,
+		/here\s*🔗/i,
+		// Chat/DM patterns suggesting direct messaging for premium content
+		/chat\s+w\s+me/i,
+		/chat\s+with\s+me/i,
+		/dm\s+me/i,
+		/message\s+me/i,
+		/telegram/i, // Telegram is commonly used for premium content
 		// Content indicators (must be specific)
 		/exclusive\s+content/i,
 		/premium\s+content/i,
