@@ -5,7 +5,7 @@
 import type { ElementHandle, Page } from "puppeteer";
 import { createLogger } from "../../shared/logger/logger.ts";
 
-const logger = createLogger(process.env.DEBUG_LOGS === "true");
+const logger = createLogger();
 
 export interface StoryHighlight {
 	title: string;

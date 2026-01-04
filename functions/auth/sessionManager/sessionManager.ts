@@ -15,7 +15,7 @@ import { createLogger } from "../../shared/logger/logger.ts";
 
 const SESSION_DIR = join(process.cwd(), ".sessions");
 const COOKIES_FILE = join(SESSION_DIR, "instagram_cookies.json");
-const logger = createLogger(process.env.DEBUG_LOGS === "true");
+const logger = createLogger();
 
 /**
  * Ensure session directory exists

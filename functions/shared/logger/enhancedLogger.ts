@@ -73,8 +73,8 @@ class EnhancedLoggerImpl implements EnhancedLogger {
 	private timers: Map<string, number> = new Map();
 	private fileBuffer: string[] = [];
 
-	constructor(debug: boolean = false) {
-		this.baseLogger = createLogger(debug);
+	constructor() {
+		this.baseLogger = createLogger();
 		this.logsDir = join(process.cwd(), "logs");
 
 		// Ensure logs directory exists
@@ -85,7 +85,6 @@ class EnhancedLoggerImpl implements EnhancedLogger {
 		// Log startup
 		this.logToFile("SYSTEM", "INFO", "Enhanced Logger initialized", {
 			timestamp: new Date().toISOString(),
-			debug,
 			logsDir: this.logsDir,
 		});
 	}
@@ -107,7 +106,7 @@ class EnhancedLoggerImpl implements EnhancedLogger {
 		};
 
 		const logLine = `[${timestamp}] ${level} [${prefix}] ${message}`;
-		const fullLog = data ? `${logLine} ${JSON.stringify(data)}` : logLine;
+		const _fullLog = data ? `${logLine} ${JSON.stringify(data)}` : logLine;
 
 		// Buffer for file writing (flush on cycle end or periodically)
 		this.fileBuffer.push(JSON.stringify(logEntry));
@@ -360,7 +359,7 @@ class EnhancedLoggerImpl implements EnhancedLogger {
 		const logFile = join(this.logsDir, `scout-${date}.log`);
 
 		try {
-			const logContent = this.fileBuffer.join("\n") + "\n";
+			const logContent = `${this.fileBuffer.join("\n")}\n`;
 			appendFileSync(logFile, logContent, "utf8");
 			this.fileBuffer = [];
 		} catch (error) {
@@ -385,6 +384,6 @@ class EnhancedLoggerImpl implements EnhancedLogger {
 /**
  * Create an enhanced logger instance
  */
-export function createEnhancedLogger(debug: boolean = false): EnhancedLogger {
-	return new EnhancedLoggerImpl(debug);
+export function createEnhancedLogger(): EnhancedLogger {
+	return new EnhancedLoggerImpl();
 }

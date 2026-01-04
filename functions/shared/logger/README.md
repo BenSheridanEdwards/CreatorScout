@@ -40,10 +40,10 @@ Replace your existing logger creation:
 
 ```typescript
 // Old way
-const logger = createLogger(debug);
+const logger = createLogger();
 
 // New way - enhanced logging
-const { logger, cycleManager, startCycle, endCycle, recordError } = createLoggerWithCycleTracking(debug);
+const { logger, cycleManager, startCycle, endCycle, recordError } = createLoggerWithCycleTracking();
 ```
 
 ## Components
@@ -140,10 +140,10 @@ See `scripts/scrapeWithLogging.ts` for a complete example of how to integrate th
 2. Replace logger creation:
    ```typescript
    // Before
-   const logger = createLogger(debug);
+   const logger = createLogger();
 
    // After
-   const { logger, cycleManager, startCycle, endCycle, recordError } = createLoggerWithCycleTracking(debug);
+   const { logger, cycleManager, startCycle, endCycle, recordError } = createLoggerWithCycleTracking();
    ```
 
 3. Add cycle management:

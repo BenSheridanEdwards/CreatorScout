@@ -17,7 +17,6 @@ import { humanScroll } from "../../navigation/humanInteraction/humanInteraction.
 import { createLogger } from "../../shared/logger/logger.ts";
 import {
 	humanClickElement,
-	mediumDelay,
 	microDelay,
 	shortDelay,
 } from "../../timing/humanize/humanize.ts";
@@ -69,7 +68,7 @@ export async function performRandomEngagement(
 		// 15% - Scroll feed
 		logger.debug("ENGAGEMENT", `@${username}: Scrolling feed`);
 		return await scrollProfileFeed(page, username);
-	} catch (error) {
+	} catch (_error) {
 		logger.debug(
 			"ENGAGEMENT",
 			`@${username}: Engagement failed (natural timeout)`,
@@ -124,7 +123,7 @@ export async function viewRandomPost(
 
 		// No posts found
 		return { type: "none", duration: 0.5, success: false };
-	} catch (error) {
+	} catch (_error) {
 		const elapsed = (Date.now() - startTime) / 1000;
 		return { type: "view_post", duration: elapsed, success: false };
 	}
@@ -144,7 +143,7 @@ export async function watchRandomReel(
 		const reelSelectors = [
 			'a[href*="/reels/"]', // Reels tab
 			'svg[aria-label*="Reel"]', // Reel icon
-			'a[href*="' + username + '"] svg[aria-label="Reel"]', // Profile reel icon
+			`a[href*="${username}"] svg[aria-label="Reel"]`, // Profile reel icon
 		];
 
 		for (const selector of reelSelectors) {
@@ -192,7 +191,7 @@ export async function watchRandomReel(
 
 		// No reels found
 		return { type: "none", duration: 0.5, success: false };
-	} catch (error) {
+	} catch (_error) {
 		const elapsed = (Date.now() - startTime) / 1000;
 		return { type: "watch_reel", duration: elapsed, success: false };
 	}
@@ -251,7 +250,7 @@ export async function likeRandomPost(
 		await microDelay(0.3, 0.8);
 
 		return { type: "none", duration: 1, success: false };
-	} catch (error) {
+	} catch (_error) {
 		const elapsed = (Date.now() - startTime) / 1000;
 		return { type: "like_post", duration: elapsed, success: false };
 	}
@@ -313,7 +312,7 @@ export async function scrollProfileFeed(
 		);
 
 		return { type: "scroll_feed", duration: elapsed, success: true };
-	} catch (error) {
+	} catch (_error) {
 		const elapsed = (Date.now() - startTime) / 1000;
 		return { type: "scroll_feed", duration: elapsed, success: false };
 	}

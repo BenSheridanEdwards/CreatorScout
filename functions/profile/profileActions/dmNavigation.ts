@@ -18,7 +18,7 @@ import { handleInstagramPopups } from "./popupHandler.ts";
 let logger: ReturnType<typeof createLogger> | null = null;
 function getLogger() {
 	if (!logger) {
-		logger = createLogger(process.env.DEBUG_LOGS === "true");
+		logger = createLogger();
 	}
 	return logger;
 }

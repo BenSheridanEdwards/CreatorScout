@@ -20,7 +20,6 @@ import {
 } from "../config/config.ts";
 import { createLogger } from "../logger/logger.ts";
 import {
-	calculateProfileAge,
 	getRemainingActions,
 	hasReachedLimit,
 	type ProfileConfig,

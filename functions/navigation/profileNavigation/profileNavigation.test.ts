@@ -20,7 +20,6 @@
 
 import { jest } from "@jest/globals";
 import type { Page } from "puppeteer";
-import { createLogger } from "../../shared/logger/logger.ts";
 
 const loginMock =
 	jest.fn<

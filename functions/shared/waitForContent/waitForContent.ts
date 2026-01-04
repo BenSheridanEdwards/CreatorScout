@@ -2,7 +2,7 @@ import type { Page } from "puppeteer";
 import { humanClick } from "../../navigation/humanInteraction/humanInteraction.ts";
 import { createLogger } from "../logger/logger.ts";
 
-const logger = createLogger(process.env.DEBUG_LOGS === "true");
+const logger = createLogger();
 
 /**
  * Dismiss cookie banner if present using human-like clicking

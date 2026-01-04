@@ -45,7 +45,7 @@ describe("sessionPlanner", () => {
 
 		it("should have higher minimum energy on weekends", () => {
 			// Mock Date to return a Saturday (day 6)
-			const originalGetDay = Date.prototype.getDay;
+			const _originalGetDay = Date.prototype.getDay;
 			jest.spyOn(Date.prototype, "getDay").mockReturnValue(6);
 
 			const variance = getDailyVariance();
@@ -216,7 +216,7 @@ describe("sessionPlanner", () => {
 			expect(time).toMatch(/^\d{2}:\d{2}$/);
 
 			// Should be morning time (7-9 AM)
-			const hour = Number.parseInt(time.split(":")[0]);
+			const hour = Number.parseInt(time.split(":")[0], 10);
 			expect(hour).toBeGreaterThanOrEqual(7);
 			expect(hour).toBeLessThanOrEqual(9);
 		});
@@ -227,7 +227,7 @@ describe("sessionPlanner", () => {
 			expect(time).toMatch(/^\d{2}:\d{2}$/);
 
 			// Should be afternoon time (2-4 PM)
-			const hour = Number.parseInt(time.split(":")[0]);
+			const hour = Number.parseInt(time.split(":")[0], 10);
 			expect(hour).toBeGreaterThanOrEqual(14);
 			expect(hour).toBeLessThanOrEqual(16);
 		});
@@ -238,7 +238,7 @@ describe("sessionPlanner", () => {
 			expect(time).toMatch(/^\d{2}:\d{2}$/);
 
 			// Should be evening time (7-9 PM)
-			const hour = Number.parseInt(time.split(":")[0]);
+			const hour = Number.parseInt(time.split(":")[0], 10);
 			expect(hour).toBeGreaterThanOrEqual(19);
 			expect(hour).toBeLessThanOrEqual(21);
 		});

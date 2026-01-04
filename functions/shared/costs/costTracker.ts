@@ -77,20 +77,19 @@ export class CostTracker {
 		sessionMinutes: 0,
 		profilesActive: 0,
 	};
-
-	private startDate = new Date();
+	private startDate: Date = new Date();
 
 	/**
 	 * Record proxy bandwidth usage
 	 */
-	recordProxyUsage(profileId: string, bytes: number): void {
+	recordProxyUsage(_profileId: string, bytes: number): void {
 		this.usageStats.proxyBandwidthBytes += bytes;
 	}
 
 	/**
 	 * Record Vision API call
 	 */
-	recordApiCall(service: string, cost: number): void {
+	recordApiCall(service: string, _cost: number): void {
 		if (service === "vision") {
 			this.usageStats.visionApiCalls++;
 		}
@@ -272,7 +271,9 @@ export function printCostBreakdown(): void {
 
 		if (projection.recommendations.length > 0) {
 			console.log("   Recommendations:");
-			projection.recommendations.forEach((r) => console.log(`   • ${r}`));
+			for (const r of projection.recommendations) {
+				console.log(`   • ${r}`);
+			}
 			console.log("");
 		}
 	};

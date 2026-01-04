@@ -13,7 +13,7 @@ import { snapshot } from "../../shared/snapshot/snapshot.ts";
 import { sleep } from "../../timing/sleep/sleep.ts";
 import { identifyProfileElements } from "../textArrayExtraction.ts";
 
-const logger = createLogger(process.env.DEBUG_LOGS === "true");
+const logger = createLogger();
 
 /**
  * Validate an extracted bio with vision to ensure we didn't miss content.

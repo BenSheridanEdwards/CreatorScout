@@ -37,7 +37,7 @@ export class LoggingIntegration {
 
 	constructor(config: Partial<LoggingConfig> = {}) {
 		this.config = { ...defaultConfig, ...config };
-		this.logger = createEnhancedLogger(this.config.debug);
+		this.logger = createEnhancedLogger();
 		this.cycleManager = new CycleManager(this.logger);
 	}
 

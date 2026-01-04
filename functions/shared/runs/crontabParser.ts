@@ -74,7 +74,7 @@ export async function parseCrontab(): Promise<ScheduledRun[]> {
 			);
 
 			if (scheduleMatch) {
-				const [, cronPattern, projectPath, profileId, sessionType] =
+				const [, cronPattern, _projectPath, profileId, sessionType] =
 					scheduleMatch;
 
 				// Validate session type

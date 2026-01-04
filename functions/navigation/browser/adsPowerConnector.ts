@@ -104,7 +104,7 @@ function getApiHeaders(): Record<string, string> {
 
 	const apiKey = getApiKey();
 	if (apiKey) {
-		headers["Authorization"] = `Bearer ${apiKey}`;
+		headers.Authorization = `Bearer ${apiKey}`;
 	}
 
 	return headers;

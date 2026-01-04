@@ -24,7 +24,7 @@ export type Credentials = {
 	password: string;
 };
 
-const logger = createLogger(process.env.DEBUG_LOGS === "true");
+const logger = createLogger();
 
 const IS_TEST =
 	process.env.NODE_ENV === "test" || process.env.JEST_WORKER_ID !== undefined;

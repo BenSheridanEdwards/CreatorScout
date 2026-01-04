@@ -39,8 +39,8 @@ describe("scheduler", () => {
 		const s = new SessionScheduler();
 		const start = new Date("2025-01-01T09:00:00Z");
 		const map = s.staggerProfiles(["a", "b", "c"], start, 5);
-		expect(map.get("a")!.getTime()).toBe(start.getTime());
-		expect(map.get("b")!.getTime()).toBe(start.getTime() + 5 * 60 * 1000);
+		expect(map.get("a")?.getTime()).toBe(start.getTime());
+		expect(map.get("b")?.getTime()).toBe(start.getTime() + 5 * 60 * 1000);
 	});
 
 	it("scheduleSession creates a session record", async () => {

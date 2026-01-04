@@ -72,12 +72,6 @@ export interface Logger {
 }
 
 class LoggerImpl implements Logger {
-	// Debug flag kept for backward compatibility but no longer used
-	// Instagram can't see our server logs, so there's no reason to hide anything
-	constructor(_debug: boolean = false) {
-		// No-op: all logs always show
-	}
-
 	private slugifyForPath(input: string, maxLen: number = 80): string {
 		// Lowercase, replace non-word characters with dashes, collapse repeats, trim
 		const base = input.toLowerCase().replace(/[^a-z0-9]+/g, "-");
@@ -179,10 +173,9 @@ class LoggerImpl implements Logger {
 
 /**
  * Create a logger instance
- * @param debug - If true, logs will be output. If false, all logs are silenced.
  */
-export function createLogger(debug: boolean = false): Logger {
-	return new LoggerImpl(debug);
+export function createLogger(): Logger {
+	return new LoggerImpl();
 }
 
 export {

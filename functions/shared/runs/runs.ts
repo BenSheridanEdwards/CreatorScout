@@ -3,9 +3,9 @@
  * Tracks each script execution with screenshots, logs, and metrics
  */
 
-import { existsSync } from "fs";
-import { mkdir, readdir, readFile, writeFile } from "fs/promises";
-import { join } from "path";
+import { existsSync } from "node:fs";
+import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
+import { join } from "node:path";
 
 export interface ErrorLog {
 	timestamp: string;

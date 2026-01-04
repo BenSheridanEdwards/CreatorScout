@@ -236,7 +236,7 @@ function getRecentActivity(): DashboardMetrics["recentActivity"] {
  */
 export function formatDashboard(dashboard: DashboardMetrics): string {
 	let output = "📊 Scout Dashboard\n";
-	output += "═".repeat(50) + "\n\n";
+	output += `${"═".repeat(50)}\n\n`;
 
 	// Current Status
 	output += "🔴 CURRENT STATUS\n";

@@ -30,7 +30,7 @@ import {
 } from "../../shared/config/config.ts";
 import { createLogger } from "../../shared/logger/logger.ts";
 
-const logger = createLogger(process.env.DEBUG_LOGS === "true");
+const logger = createLogger();
 
 import { recordActivity } from "../../shared/dashboard/dashboard.ts";
 import {
@@ -97,7 +97,7 @@ export async function analyzeProfileBasic(
 	if (scoreData.referencedProfiles && scoreData.referencedProfiles.length > 0) {
 		logger.info(
 			"ANALYSIS",
-			`📎 Bio references other profiles: ${scoreData.referencedProfiles.map((p) => "@" + p).join(", ")}`,
+			`📎 Bio references other profiles: ${scoreData.referencedProfiles.map((p) => `@${p}`).join(", ")}`,
 		);
 
 		for (const refProfile of scoreData.referencedProfiles) {
@@ -178,7 +178,7 @@ export async function analyzeProfileComprehensive(
 		if (bioScore.referencedProfiles && bioScore.referencedProfiles.length > 0) {
 			logger.info(
 				"ANALYSIS",
-				`📎 Bio references other profiles: ${bioScore.referencedProfiles.map((p) => "@" + p).join(", ")}`,
+				`📎 Bio references other profiles: ${bioScore.referencedProfiles.map((p) => `@${p}`).join(", ")}`,
 			);
 
 			for (const refProfile of bioScore.referencedProfiles) {

@@ -12,7 +12,7 @@ describe("randomEngagement - Pure Logic", () => {
 	describe("shouldEngageOnProfile logic", () => {
 		// Test the probabilistic decision making
 		it("should have lower engagement rate for low scores", () => {
-			const lowScore = 15;
+			const _lowScore = 15;
 			const results: boolean[] = [];
 
 			// Simulate the logic: score < 20 → 10% chance

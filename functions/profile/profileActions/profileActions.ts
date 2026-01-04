@@ -6,7 +6,6 @@ import {
 	extractFollowingUsernames,
 	openFollowingModal,
 } from "../../navigation/modalOperations/modalOperations.ts";
-import { executeWithCircuitBreaker } from "../../shared/circuitBreaker/circuitBreaker.ts";
 import { recordActivity } from "../../shared/dashboard/dashboard.ts";
 import {
 	markDmSent,
@@ -17,7 +16,6 @@ import {
 import { createLogger } from "../../shared/logger/logger.ts";
 import { saveScreenshot, snapshot } from "../../shared/snapshot/snapshot.ts";
 import { mediumDelay, shortDelay } from "../../timing/humanize/humanize.ts";
-import { sleep } from "../../timing/sleep/sleep.ts";
 import { findMessageInput, typeMessage } from "./dmInput.ts";
 import {
 	clickMessageButton,
@@ -34,7 +32,7 @@ import {
 	verifyFollowSucceeded,
 } from "./follow.ts";
 
-const logger = createLogger(process.env.DEBUG_LOGS === "true");
+const logger = createLogger();
 
 /**
  * Check if a DM thread is empty (no previous messages).

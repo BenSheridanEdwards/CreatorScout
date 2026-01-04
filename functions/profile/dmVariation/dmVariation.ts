@@ -54,7 +54,7 @@ function pickRandom<T>(arr: T[]): T {
 /**
  * Pick N random unique items from an array
  */
-function pickRandomN<T>(arr: T[], n: number): T[] {
+function _pickRandomN<T>(arr: T[], n: number): T[] {
 	const shuffled = [...arr].sort(() => Math.random() - 0.5);
 	return shuffled.slice(0, Math.min(n, arr.length));
 }
@@ -102,7 +102,7 @@ function capitalize(str: string): string {
  * Add random emoji with 60% chance
  * DISABLED - emojis removed from DM generation
  */
-function maybeAddEmoji(text: string, emojis: string[]): string {
+function maybeAddEmoji(text: string, _emojis: string[]): string {
 	// Emojis disabled - return text unchanged
 	return text;
 }
@@ -257,7 +257,6 @@ export function generateDM(
 			return generateMediumDM();
 		case "pitch":
 			return generateFullPitchDM();
-		case "cold":
 		default:
 			return generateShortDM();
 	}

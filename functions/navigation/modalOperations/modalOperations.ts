@@ -3,7 +3,6 @@
  */
 import type { Page } from "puppeteer";
 import { microDelay, shortDelay } from "../../timing/humanize/humanize.ts";
-import { sleep } from "../../timing/sleep/sleep.ts";
 import {
 	humanClick,
 	humanClickAt,

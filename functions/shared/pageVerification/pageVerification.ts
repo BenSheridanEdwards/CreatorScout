@@ -3,7 +3,7 @@ import { humanClick } from "../../navigation/humanInteraction/humanInteraction.t
 import { createLogger } from "../logger/logger.ts";
 import { waitForInstagramContent } from "../waitForContent/waitForContent.ts";
 
-const logger = createLogger(process.env.DEBUG_LOGS === "true");
+const logger = createLogger();
 
 /**
  * Verify that the Instagram homepage is fully loaded by checking for key content elements
@@ -112,7 +112,7 @@ export async function verifyProfilePageLoaded(
 			const hasProfileImage =
 				document.querySelector('img[alt*="profile picture"]') !== null ||
 				document.querySelector('img[alt*="Profile picture"]') !== null ||
-				document.querySelector('img[alt*="' + targetUsername + '"]') !== null;
+				document.querySelector(`img[alt*="${targetUsername}"]`) !== null;
 
 			const hasBio =
 				document.querySelector('div[dir="auto"]') !== null ||

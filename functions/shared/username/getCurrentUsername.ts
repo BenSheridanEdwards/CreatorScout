@@ -18,12 +18,11 @@ export async function getCurrentUsername(page: Page): Promise<string | null> {
 			const links = Array.from(document.querySelectorAll("a[href*='/']"));
 			for (const link of links) {
 				const href = link.getAttribute("href");
-				if (href && href.match(/^\/[^/]+\/$/)) {
+				if (href?.match(/^\/[^/]+\/$/)) {
 					// Profile links are typically /username/
 					const match = href.match(/^\/([^/]+)\/$/);
 					if (
-						match &&
-						match[1] &&
+						match?.[1] &&
 						match[1] !== "explore" &&
 						match[1] !== "direct" &&
 						match[1] !== "accounts"
@@ -76,7 +75,7 @@ export async function getCurrentUsername(page: Page): Promise<string | null> {
 					const href = parent.getAttribute("href");
 					if (href) {
 						const match = href.match(/^\/([^/]+)\/$/);
-						if (match && match[1]) {
+						if (match?.[1]) {
 							return match[1];
 						}
 					}

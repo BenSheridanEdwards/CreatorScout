@@ -107,8 +107,6 @@ export class InstagramCircuitBreaker {
 
 			case CircuitState.HALF_OPEN:
 				return true;
-
-			case CircuitState.OPEN:
 			default:
 				return true;
 		}

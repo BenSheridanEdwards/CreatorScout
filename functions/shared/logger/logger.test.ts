@@ -7,14 +7,14 @@ jest.mock("../snapshot/snapshot.ts", () => ({
 }));
 
 describe("logger", () => {
-	test("respects debug flag", () => {
-		const logger = createLogger(false);
+	test("creates logger instance", () => {
+		const logger = createLogger();
 		expect(logger).toBeTruthy();
 		logger.debug("ACTION", "msg");
 	});
 
 	test("errorWithScreenshot resolves", async () => {
-		const logger = createLogger(true);
+		const logger = createLogger();
 		const page = {
 			screenshot: jest
 				.fn<() => Promise<Buffer | string>>()

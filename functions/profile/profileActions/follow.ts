@@ -8,7 +8,7 @@ import { createLogger } from "../../shared/logger/logger.ts";
 import { shortDelay } from "../../timing/humanize/humanize.ts";
 import { sleep } from "../../timing/sleep/sleep.ts";
 
-const logger = createLogger(process.env.DEBUG_LOGS === "true");
+const logger = createLogger();
 
 /**
  * Follow state types

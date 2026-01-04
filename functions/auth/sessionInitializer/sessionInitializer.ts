@@ -127,8 +127,8 @@ export async function initializeInstagramSession(
 		profileId,
 	} = options;
 
-	// 1. Create logger with consistent config
-	const logger = createLogger(debug || process.env.DEBUG_LOGS === "true");
+	// 1. Create logger
+	const logger = createLogger();
 	logger.info("SESSION", "🚀 Initializing Instagram session...");
 
 	if (profileId) {

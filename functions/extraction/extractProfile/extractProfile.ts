@@ -21,7 +21,7 @@ import {
 	type ProfileElements,
 } from "../textArrayExtraction.ts";
 
-const logger = createLogger(process.env.DEBUG_LOGS === "true");
+const logger = createLogger();
 
 export interface ProfileExtraction {
 	username: string | null;
