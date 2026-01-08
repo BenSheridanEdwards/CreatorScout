@@ -285,6 +285,18 @@ export async function analyzeProfileComprehensive(
 		// Save current URL to return to profile
 		const profileUrl = page.url();
 
+		// Screenshot BEFORE clicking link - proof of profile state (shows link exists)
+		// Useful if landing page requires auth - we have proof they're behind paywall
+		const preClickScreenshot = await snapshot(
+			page,
+			`profile_before_link_${username}`,
+			true, // force: true - functional screenshot for evidence
+		);
+		if (preClickScreenshot) {
+			result.screenshots.push(preClickScreenshot);
+			logger.debug("ANALYSIS", `📸 Pre-click screenshot: ${preClickScreenshot}`);
+		}
+
 		// First, try to click the bio link like a user would
 		console.log(`[ANALYSIS] Attempting to click bio link for @${username}...`);
 		const clickResult = await clickBioLink(page);

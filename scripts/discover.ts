@@ -159,6 +159,12 @@ async function main() {
 	const cycleId = startCycle("batch_discovery", finalQueueSize * 10);
 	console.log(`🔄 Started cycle: ${cycleId}`);
 
+	// Reset queue add counter for this cycle (prevents network explosion)
+	const { resetQueueAddCounter } = await import(
+		"../functions/profile/profileActions/profileActions.ts"
+	);
+	resetQueueAddCounter();
+
 	// Initialize session with AdsPower
 	// Note: AdsPower doesn't support headless mode well - use Xvfb on Linux for invisible browser
 	const { browser, page, logger } = await initializeInstagramSession({

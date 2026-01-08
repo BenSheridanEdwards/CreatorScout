@@ -416,15 +416,16 @@ export async function clickUsernameInModal(
 
 /**
  * Scroll the following modal to load more profiles.
+ * Returns the new scroll height for flatline detection.
  */
 export async function scrollFollowingModal(
 	page: Page,
 	scrollAmount: number = 600,
-): Promise<void> {
+): Promise<{ scrolled: boolean; scrollHeight: number }> {
 	try {
-		await page.evaluate((amount) => {
+		const result = await page.evaluate((amount) => {
 			const dialog = document.querySelector('div[role="dialog"]');
-			if (!dialog) return;
+			if (!dialog) return { scrolled: false, scrollHeight: 0 };
 
 			// Find scrollable container within dialog
 			const scrollable =
@@ -434,12 +435,22 @@ export async function scrollFollowingModal(
 
 			// Try to scroll it
 			if (scrollable && "scrollTop" in scrollable) {
-				(scrollable as HTMLElement).scrollTop += amount;
+				const el = scrollable as HTMLElement;
+				const beforeScroll = el.scrollTop;
+				el.scrollTop += amount;
+				const afterScroll = el.scrollTop;
+				return {
+					scrolled: afterScroll > beforeScroll,
+					scrollHeight: el.scrollHeight,
+				};
 			}
+			return { scrolled: false, scrollHeight: 0 };
 		}, scrollAmount);
 		await microDelay(0.2, 0.5);
+		return result;
 	} catch (e) {
 		console.log(`[MODAL] Could not scroll modal: ${e}`);
+		return { scrolled: false, scrollHeight: 0 };
 	}
 }
 

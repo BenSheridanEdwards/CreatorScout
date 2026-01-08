@@ -53,6 +53,7 @@ export async function checkDmThreadEmpty(page: Page): Promise<boolean> {
 
 /**
  * Send a DM to a user by navigating to their profile and clicking Message.
+ * Enforces DM velocity limiting to prevent burst flagging.
  * @param page - Puppeteer page instance
  * @param username - Instagram username to message
  * @param skipNavigation - If true, assumes already on the user's profile (default: false)
@@ -63,6 +64,24 @@ export async function sendDMToUser(
 	skipNavigation: boolean = false,
 ): Promise<boolean> {
 	try {
+		const { MIN_SECONDS_BETWEEN_DMS } = await import(
+			"../../shared/config/config.ts"
+		);
+		const { sleep } = await import("../../timing/sleep/sleep.ts");
+
+		// DM velocity check: wait if last DM was too recent
+		if (lastDmSentAt !== null) {
+			const secondsSinceLastDm = (Date.now() - lastDmSentAt) / 1000;
+			if (secondsSinceLastDm < MIN_SECONDS_BETWEEN_DMS) {
+				const waitTime = MIN_SECONDS_BETWEEN_DMS - secondsSinceLastDm;
+				logger.info(
+					"DM",
+					`⏳ DM velocity limit: waiting ${Math.ceil(waitTime)}s before next DM (last was ${Math.floor(secondsSinceLastDm)}s ago)`,
+				);
+				await sleep(waitTime * 1000);
+			}
+		}
+
 		// Navigate to profile (skip if already on profile)
 		if (!skipNavigation) {
 			await navigateToProfile(page, username);
@@ -127,6 +146,9 @@ export async function sendDMToUser(
 		const currentUsername = await getCurrentUsername(page);
 
 		await markDmSent(username, proofPath, currentUsername || undefined);
+
+		// Update last DM timestamp for velocity limiting
+		lastDmSentAt = Date.now();
 
 		logger.info("ACTION", `DM sent to @${username}`);
 		recordActivity("dm_sent", username, "success");
@@ -324,8 +346,25 @@ export async function followUserAccount(
 	}
 }
 
+// Track queue additions per cycle to prevent explosion
+let queueAddsThisCycle = 0;
+
+// Track last DM time for velocity limiting
+let lastDmSentAt: number | null = null;
+
+/** Reset queue add counter (call at start of each cycle) */
+export function resetQueueAddCounter(): void {
+	queueAddsThisCycle = 0;
+}
+
+/** Get current queue add count for this cycle */
+export function getQueueAddCount(): number {
+	return queueAddsThisCycle;
+}
+
 /**
  * Add a user's following list to the queue.
+ * Respects MAX_QUEUE_ADDS_PER_CYCLE soft cap to prevent network explosion.
  * Note: username parameter is kept for API consistency but not used directly.
  */
 export async function addFollowingToQueue(
@@ -334,6 +373,19 @@ export async function addFollowingToQueue(
 	source: string,
 	batchSize: number = 20,
 ): Promise<number> {
+	const { MAX_QUEUE_ADDS_PER_CYCLE } = await import(
+		"../../shared/config/config.ts"
+	);
+
+	// Check if we've hit the soft cap
+	if (queueAddsThisCycle >= MAX_QUEUE_ADDS_PER_CYCLE) {
+		logger.info(
+			"QUEUE",
+			`⚠️ Soft cap reached (${queueAddsThisCycle}/${MAX_QUEUE_ADDS_PER_CYCLE}) - skipping queue expansion`,
+		);
+		return 0;
+	}
+
 	const followingOpened = await openFollowingModal(page);
 	if (!followingOpened) {
 		return 0;
@@ -344,9 +396,19 @@ export async function addFollowingToQueue(
 
 	// Use the source which includes the username
 	for (const followingUsername of followingUsernames) {
+		// Respect soft cap mid-loop
+		if (queueAddsThisCycle >= MAX_QUEUE_ADDS_PER_CYCLE) {
+			logger.info(
+				"QUEUE",
+				`⚠️ Soft cap hit mid-expansion (${queueAddsThisCycle}/${MAX_QUEUE_ADDS_PER_CYCLE})`,
+			);
+			break;
+		}
+
 		if (!(await wasVisited(followingUsername))) {
 			await queueAdd(followingUsername, 50, source);
 			added++;
+			queueAddsThisCycle++;
 		}
 	}
 

@@ -809,6 +809,8 @@ export async function processFollowingList(
 	let consecutiveAllVisited = 0;
 	const maxConsecutiveAllVisited = 3;
 	let lastExtractedUsernames: string[] | null = null; // Track last extraction to detect stuck modal
+	let lastScrollHeight = 0; // Track DOM height for flatline detection
+	let scrollHeightFlatlineCount = 0; // Only break if flatlines twice
 
 	while (consecutiveAllVisited < maxConsecutiveAllVisited && checkContinue()) {
 		try {
@@ -948,13 +950,35 @@ export async function processFollowingList(
 					);
 				} else {
 					lastExtractedUsernames = [...usernames];
-					await scrollFollowingModal(page, 500);
+					const scrollResult = await scrollFollowingModal(page, 500);
 					scrollIndex += 500;
 					await updateScrollIndex(seedUsername, scrollIndex);
+
+					// Track DOM height for flatline detection
+					// IG lazy-loads slow—only quit if height flatlines TWICE
+					if (scrollResult.scrollHeight === lastScrollHeight) {
+						scrollHeightFlatlineCount++;
+						logger.debug(
+							"NAVIGATION",
+							`📏 DOM height unchanged (${scrollResult.scrollHeight}px) - flatline ${scrollHeightFlatlineCount}/2`,
+						);
+						if (scrollHeightFlatlineCount >= 2) {
+							logger.warn(
+								"NAVIGATION",
+								`📏 DOM height flatlined twice - end of following list for @${seedUsername}`,
+							);
+							break;
+						}
+					} else {
+						scrollHeightFlatlineCount = 0; // Reset on height change
+						lastScrollHeight = scrollResult.scrollHeight;
+					}
+
 					await shortDelay(1, 2);
 				}
 			} else {
 				consecutiveAllVisited = 0;
+				scrollHeightFlatlineCount = 0; // Reset on successful processing
 				lastExtractedUsernames = [...usernames];
 				// Processed new profiles, continue with next batch
 			}
