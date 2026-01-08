@@ -159,8 +159,19 @@ export async function watchRandomReel(
 					setTimeout(resolve, watchDuration * 1000),
 				);
 
-				// Go back to profile
+				// Go back to profile—wait for URL to confirm we're back
+				// (goBack can flake if Instagram shoves a modal)
 				await page.goBack();
+				try {
+					await page.waitForFunction(
+						(user: string) => window.location.href.includes(`/${user}`),
+						{ timeout: 5000 },
+						username,
+					);
+				} catch {
+					// Timeout—might be stuck, press Escape to close any modal
+					await page.keyboard.press("Escape");
+				}
 				await shortDelay(0.5, 1);
 
 				const elapsed = (Date.now() - startTime) / 1000;
@@ -182,7 +193,17 @@ export async function watchRandomReel(
 			const watchDuration = 5 + Math.random() * 7;
 			await new Promise((resolve) => setTimeout(resolve, watchDuration * 1000));
 
+			// Go back with modal fallback
 			await page.goBack();
+			try {
+				await page.waitForFunction(
+					(user: string) => window.location.href.includes(`/${user}`),
+					{ timeout: 5000 },
+					username,
+				);
+			} catch {
+				await page.keyboard.press("Escape");
+			}
 			await shortDelay(0.5, 1);
 
 			const elapsed = (Date.now() - startTime) / 1000;
@@ -229,10 +250,11 @@ export async function likeRandomPost(
 			if (likeButton) {
 				// Click like
 				await humanClickElement(page, selector);
-				await microDelay(0.5, 1);
 
-				// Brief pause to see the like animation
-				await new Promise((resolve) => setTimeout(resolve, 1000));
+				// Wait for like animation + network lag (heart fills on hover/click)
+				// 1.5-2s gives DOM time to react—humans blink, bots don't
+				const likeDelay = 1500 + Math.random() * 500;
+				await new Promise((resolve) => setTimeout(resolve, likeDelay));
 
 				// Close post
 				await page.keyboard.press("Escape");
@@ -286,10 +308,25 @@ export async function scrollProfileFeed(
 	const startTime = Date.now();
 
 	try {
+		// Start from random offset—feels like "oh, they started lower down"
+		const startOffset = Math.random() * 0.3; // 0-30% of viewport
+		if (startOffset > 0.1) {
+			const initialScroll = await page.evaluate(
+				(offset: number) => window.innerHeight * offset,
+				startOffset,
+			);
+			await humanScroll(page, { deltaY: initialScroll });
+			await microDelay(0.2, 0.5);
+		}
+
 		// Random number of scrolls (1-3)
 		const scrollCount = 1 + Math.floor(Math.random() * 3);
+		let actualScrolls = 0;
 
 		for (let i = 0; i < scrollCount; i++) {
+			// Check height before scroll
+			const heightBefore = await page.evaluate(() => window.scrollY);
+
 			const scrollAmount = 200 + Math.random() * 300; // 200-500px
 			await humanScroll(page, { deltaY: scrollAmount });
 
@@ -297,6 +334,14 @@ export async function scrollProfileFeed(
 			await new Promise((resolve) =>
 				setTimeout(resolve, 500 + Math.random() * 1000),
 			);
+
+			// Check if scroll actually moved (detect feed end)
+			const heightAfter = await page.evaluate(() => window.scrollY);
+			if (Math.abs(heightAfter - heightBefore) < 10) {
+				// Feed ended—no point scrolling ghosts
+				break;
+			}
+			actualScrolls++;
 		}
 
 		// Scroll back up a bit (more natural behavior)
@@ -308,7 +353,7 @@ export async function scrollProfileFeed(
 		const elapsed = (Date.now() - startTime) / 1000;
 		logger.debug(
 			"ENGAGEMENT",
-			`@${username}: Scrolled feed ${scrollCount}x for ${elapsed.toFixed(1)}s`,
+			`@${username}: Scrolled feed ${actualScrolls}x for ${elapsed.toFixed(1)}s`,
 		);
 
 		return { type: "scroll_feed", duration: elapsed, success: true };
