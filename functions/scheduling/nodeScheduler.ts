@@ -16,15 +16,8 @@
 
 import { getPrismaClient } from "../shared/database/database.ts";
 import { createLogger } from "../shared/logger/logger.ts";
-import {
-	getActiveProfiles,
-	type ProfileConfig,
-} from "../shared/profiles/profileManager.ts";
-import {
-	SESSION_DURATION_MAX,
-	SESSION_DURATION_MIN,
-	SESSIONS_PER_DAY,
-} from "../shared/config/config.ts";
+import { getActiveProfiles } from "../shared/profiles/profileManager.ts";
+import type { ProfileConfig } from "../shared/profiles/profileConfig.ts";
 
 const logger = createLogger();
 
@@ -47,6 +40,7 @@ export interface ScheduledJob {
 	lastAttemptAt?: Date;
 	completedAt?: Date;
 	error?: string;
+	_dirty?: boolean; // Internal: only persist when true
 }
 
 export interface SchedulerConfig {
@@ -54,8 +48,10 @@ export interface SchedulerConfig {
 	enabled: boolean;
 	maxRetries: number;
 	retryDelayMinutes: number;
+	retryJitterMinutes: number; // Random jitter to avoid robotic patterns
 	catchUpMissedSessions: boolean;
 	proxyWarmupMinutes: number; // Time before session to establish proxy
+	checkIntervalMinutes: number; // How often to poll for due jobs
 }
 
 const DEFAULT_CONFIG: SchedulerConfig = {
@@ -63,8 +59,10 @@ const DEFAULT_CONFIG: SchedulerConfig = {
 	enabled: true,
 	maxRetries: 2,
 	retryDelayMinutes: 30,
+	retryJitterMinutes: 5, // Add 0-5 min random jitter on retries
 	catchUpMissedSessions: true,
 	proxyWarmupMinutes: 2,
+	checkIntervalMinutes: 5, // Poll every 5 min, not every minute
 };
 
 /**
@@ -104,15 +102,19 @@ export class NodeScheduler {
 			await this.checkMissedSessions();
 		}
 
-		// Start the check loop (every minute)
+		// Start the check loop (configurable, default 5 min)
+		const intervalMs = this.config.checkIntervalMinutes * 60 * 1000;
 		this.checkInterval = setInterval(() => {
 			void this.checkAndRunJobs();
-		}, 60 * 1000);
+		}, intervalMs);
 
 		// Run initial check
 		await this.checkAndRunJobs();
 
-		logger.info("SCHEDULER", "Scheduler started successfully");
+		logger.info(
+			"SCHEDULER",
+			`Scheduler started (polling every ${this.config.checkIntervalMinutes} min)`
+		);
 	}
 
 	/**
@@ -159,17 +161,12 @@ export class NodeScheduler {
 
 	/**
 	 * Generate schedule for a single profile
+	 * Schedules all 3 sessions (morning, afternoon, evening) per profile
 	 */
 	private async generateProfileSchedule(profile: ProfileConfig, date: Date): Promise<void> {
 		const sessionTypes: SessionType[] = ["morning", "afternoon", "evening"];
 
 		for (const sessionType of sessionTypes) {
-			// Check if session is enabled for this profile
-			const sessionConfig = profile.sessions?.[sessionType];
-			if (sessionConfig && !sessionConfig.enabled) {
-				continue;
-			}
-
 			// Check if we already have this job scheduled
 			const existingJob = this.jobQueue.find(
 				(j) =>
@@ -191,10 +188,11 @@ export class NodeScheduler {
 				scheduledTime,
 				status: "pending",
 				attempts: 0,
+				_dirty: true, // New job, needs persisting
 			};
 
 			this.jobQueue.push(job);
-			await this.persistJob(job);
+			await this.flushDirtyJob(job);
 		}
 	}
 
@@ -277,11 +275,13 @@ export class NodeScheduler {
 	private async runJob(job: ScheduledJob): Promise<void> {
 		logger.info("SCHEDULER", `Running job ${job.id} (attempt ${job.attempts + 1})`);
 
+		const prevStatus = job.status;
 		job.status = "running";
 		job.attempts++;
 		job.lastAttemptAt = new Date();
+		job._dirty = prevStatus !== "running"; // Only dirty if status changed
 		this.runningJobs.set(job.id, job);
-		await this.persistJob(job);
+		await this.flushDirtyJob(job);
 
 		try {
 			// Import and run the smart session runner
@@ -296,31 +296,34 @@ export class NodeScheduler {
 			// Success
 			job.status = "completed";
 			job.completedAt = new Date();
+			job._dirty = true;
 			logger.info("SCHEDULER", `✓ Job ${job.id} completed successfully`);
 		} catch (error) {
 			const errorMessage = error instanceof Error ? error.message : String(error);
 			logger.error("SCHEDULER", `✗ Job ${job.id} failed: ${errorMessage}`);
 
 			if (job.attempts < this.config.maxRetries + 1) {
-				// Schedule retry
+				// Schedule retry with jitter to avoid hammering same proxy/IP
+				const jitter = Math.random() * this.config.retryJitterMinutes;
+				const delayMs = (this.config.retryDelayMinutes + jitter) * 60 * 1000;
 				job.status = "pending";
-				job.scheduledTime = new Date(
-					Date.now() + this.config.retryDelayMinutes * 60 * 1000
-				);
+				job.scheduledTime = new Date(Date.now() + delayMs);
 				job.error = errorMessage;
+				job._dirty = true;
 				logger.info(
 					"SCHEDULER",
-					`Scheduling retry for ${job.id} at ${job.scheduledTime.toISOString()}`
+					`Scheduling retry for ${job.id} at ${job.scheduledTime.toISOString()} (+${jitter.toFixed(1)}min jitter)`
 				);
 			} else {
 				// Max retries exceeded
 				job.status = "failed";
 				job.error = errorMessage;
+				job._dirty = true;
 				logger.error("SCHEDULER", `Job ${job.id} failed after ${job.attempts} attempts`);
 			}
 		} finally {
 			this.runningJobs.delete(job.id);
-			await this.persistJob(job);
+			await this.flushDirtyJob(job);
 		}
 	}
 
@@ -349,7 +352,8 @@ export class NodeScheduler {
 		for (let i = 0; i < missedJobs.length; i++) {
 			const job = missedJobs[i];
 			job.scheduledTime = new Date(now.getTime() + i * 10 * 60 * 1000);
-			await this.persistJob(job);
+			job._dirty = true;
+			await this.flushDirtyJob(job);
 			logger.info(
 				"SCHEDULER",
 				`Rescheduled missed job ${job.id} to ${job.scheduledTime.toISOString()}`
@@ -384,11 +388,22 @@ export class NodeScheduler {
 	}
 
 	/**
-	 * Persist job state to database
+	 * Flush job to database only if dirty
+	 */
+	private async flushDirtyJob(job: ScheduledJob): Promise<void> {
+		if (!job._dirty) return;
+		await this.persistJob(job);
+		job._dirty = false;
+	}
+
+	/**
+	 * Persist job state to database (internal, use flushDirtyJob for efficiency)
+	 * Note: Requires `npx prisma migrate deploy` to create ScheduledJob table
 	 */
 	private async persistJob(job: ScheduledJob): Promise<void> {
 		try {
 			const prisma = getPrismaClient();
+			// @ts-expect-error - ScheduledJob table created by migration
 			await prisma.scheduledJob.upsert({
 				where: { id: job.id },
 				update: {
@@ -411,14 +426,14 @@ export class NodeScheduler {
 					error: job.error,
 				},
 			});
-		} catch (error) {
-			// Table might not exist yet - that's ok, we'll create it
-			logger.debug("SCHEDULER", `Could not persist job: ${error}`);
+		} catch {
+			logger.warn("SCHEDULER", "DB write failed—run: npx prisma migrate deploy");
 		}
 	}
 
 	/**
 	 * Load persisted jobs from database
+	 * Note: Requires `npx prisma migrate deploy` to create ScheduledJob table
 	 */
 	private async loadPersistedJobs(): Promise<void> {
 		try {
@@ -426,6 +441,7 @@ export class NodeScheduler {
 			const today = this.getDateInTimezone();
 			today.setHours(0, 0, 0, 0);
 
+			// @ts-expect-error - ScheduledJob table created by migration
 			const jobs = await prisma.scheduledJob.findMany({
 				where: {
 					scheduledTime: { gte: today },
@@ -455,9 +471,8 @@ export class NodeScheduler {
 			}
 
 			logger.info("SCHEDULER", `Loaded ${jobs.length} persisted jobs`);
-		} catch (error) {
-			// Table might not exist - that's ok
-			logger.debug("SCHEDULER", `Could not load persisted jobs: ${error}`);
+		} catch {
+			logger.warn("SCHEDULER", "DB read failed—run: npx prisma migrate deploy");
 		}
 	}
 
@@ -515,7 +530,14 @@ export class NodeScheduler {
 			scheduledTime: new Date(),
 			status: "pending",
 			attempts: 0,
+			_dirty: true,
 		};
+
+		// Log override so we know why a job fired outside normal schedule
+		logger.warn(
+			"SCHEDULER",
+			`⚡ Forced job ${job.id} - manual override at ${new Date().toISOString()}`
+		);
 
 		this.jobQueue.push(job);
 		await this.runJob(job);

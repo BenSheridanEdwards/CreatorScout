@@ -47,8 +47,8 @@ export type LogPrefix =
 	| "SESSION_PLAN"
 	| "LINK_ANALYSIS"
 	| "EXTRACTION"
-	| "PROXY_TEST";
-
+	| "PROXY_TEST" 
+	| "STARTUP";
 export interface Logger {
 	debug(prefix: LogPrefix, message: string, ...args: unknown[]): void;
 	info(prefix: LogPrefix, message: string, ...args: unknown[]): void;
