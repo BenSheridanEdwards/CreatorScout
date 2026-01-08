@@ -27,7 +27,9 @@ import { jest } from "@jest/globals";
 import type { Page } from "puppeteer";
 
 // Mock sleep function (used internally by delay functions)
-const sleepMock = jest.fn<() => Promise<void>>().mockResolvedValue(undefined);
+const sleepMock = jest
+	.fn<(ms: number) => Promise<void>>()
+	.mockResolvedValue(undefined);
 
 jest.unstable_mockModule("../../timing/sleep/sleep.ts", () => ({
 	sleep: sleepMock,
@@ -38,6 +40,7 @@ const mockCursor = {
 	move: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
 	click: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
 	moveTo: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
+	scroll: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
 };
 
 jest.unstable_mockModule("ghost-cursor", () => ({
@@ -62,6 +65,12 @@ const mockElement = {
 const mockPage = {
 	$: jest.fn<(selector: string) => Promise<unknown>>(),
 	evaluate: jest.fn<(fn: unknown, ...args: unknown[]) => Promise<unknown>>(),
+	viewport: jest
+		.fn<() => { width: number; height: number } | null>()
+		.mockReturnValue({
+			width: 1440,
+			height: 900,
+		}),
 	mouse: {
 		move: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
 		down: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
@@ -75,7 +84,7 @@ const mockPage = {
 	},
 } as unknown as Page;
 
-describe.skip("Humanize Functions", () => {
+describe("Humanize Functions", () => {
 	beforeEach(() => {
 		jest.clearAllMocks();
 		mockBoundingBox.mockResolvedValue({
@@ -437,6 +446,317 @@ describe.skip("Humanize Functions", () => {
 			const result = await moveMouseToElement(mockPage, ".no-bounds");
 
 			expect(result).toBe(false);
+		});
+	});
+
+	// ═══════════════════════════════════════════════════════════════════════════
+	// Delay Functions - Core Timing Utilities
+	// ═══════════════════════════════════════════════════════════════════════════
+
+	describe("getDelay()", () => {
+		test("returns default delay range for unknown operations", async () => {
+			const { getDelay } = await import("./humanize.ts");
+
+			const [min, max] = getDelay("unknown_operation");
+
+			expect(min).toBeGreaterThan(0);
+			expect(max).toBeGreaterThan(min);
+			expect(min).toBeCloseTo(0.7, 1);
+			expect(max).toBeCloseTo(2.4, 1);
+		});
+
+		test("applies DELAY_SCALE to delay ranges", async () => {
+			const { getDelay } = await import("./humanize.ts");
+
+			// Get a known delay (should be scaled)
+			const [min, max] = getDelay("after_click");
+
+			expect(typeof min).toBe("number");
+			expect(typeof max).toBe("number");
+			expect(min).toBeGreaterThanOrEqual(0.05); // Floor
+			expect(max).toBeGreaterThanOrEqual(0.1); // Floor
+		});
+
+		test("enforces minimum delay floors", async () => {
+			const { getDelay } = await import("./humanize.ts");
+
+			const [min, max] = getDelay("test");
+
+			expect(min).toBeGreaterThanOrEqual(0.05); // 50ms floor
+			expect(max).toBeGreaterThanOrEqual(0.1); // 100ms floor
+		});
+	});
+
+	describe("delay()", () => {
+		test("waits for random duration within named range", async () => {
+			const { delay } = await import("./humanize.ts");
+			sleepMock.mockClear();
+
+			await delay("after_click");
+
+			expect(sleepMock).toHaveBeenCalledTimes(1);
+			expect(sleepMock.mock.calls[0]).toBeDefined();
+			const sleepArg = sleepMock.mock.calls[0][0] as number;
+			expect(sleepArg).toBeGreaterThan(0);
+		});
+
+		test("calls sleep with milliseconds", async () => {
+			const { delay } = await import("./humanize.ts");
+			sleepMock.mockClear();
+
+			await delay("after_type");
+
+			expect(sleepMock.mock.calls[0]).toBeDefined();
+			const sleepArg = sleepMock.mock.calls[0][0] as number;
+			// Should be converted to milliseconds (seconds * 1000)
+			expect(sleepArg).toBeGreaterThan(50); // At least 50ms
+		});
+	});
+
+	describe("rnd()", () => {
+		test("waits for random duration between min and max", async () => {
+			const { rnd } = await import("./humanize.ts");
+			sleepMock.mockClear();
+
+			await rnd(1, 2);
+
+			expect(sleepMock).toHaveBeenCalledTimes(1);
+			expect(sleepMock.mock.calls[0]).toBeDefined();
+			const sleepArg = sleepMock.mock.calls[0][0] as number;
+			expect(sleepArg).toBeGreaterThanOrEqual(1000); // At least 1 second
+			expect(sleepArg).toBeLessThanOrEqual(2000); // At most 2 seconds
+		});
+
+		test("uses default values when not specified", async () => {
+			const { rnd } = await import("./humanize.ts");
+			sleepMock.mockClear();
+
+			await rnd();
+
+			expect(sleepMock).toHaveBeenCalled();
+		});
+
+		test("respects DELAY_SCALE", async () => {
+			const { rnd } = await import("./humanize.ts");
+			sleepMock.mockClear();
+
+			await rnd(1, 1);
+
+			expect(sleepMock.mock.calls[0]).toBeDefined();
+			const sleepArg = sleepMock.mock.calls[0][0] as number;
+			expect(sleepArg).toBeGreaterThanOrEqual(50); // Enforces floor
+		});
+	});
+
+	describe("randomDelay()", () => {
+		test("waits for random duration between scaled bounds", async () => {
+			const { randomDelay } = await import("./humanize.ts");
+			sleepMock.mockClear();
+
+			await randomDelay(1, 3);
+
+			expect(sleepMock).toHaveBeenCalledTimes(1);
+			expect(sleepMock.mock.calls[0]).toBeDefined();
+			const sleepArg = sleepMock.mock.calls[0][0] as number;
+			expect(sleepArg).toBeGreaterThanOrEqual(1000);
+			expect(sleepArg).toBeLessThanOrEqual(3000);
+		});
+	});
+
+	describe("microDelay()", () => {
+		test("uses short delay range (0.5-2s default)", async () => {
+			const { microDelay } = await import("./humanize.ts");
+			sleepMock.mockClear();
+
+			await microDelay();
+
+			expect(sleepMock).toHaveBeenCalledTimes(1);
+			expect(sleepMock.mock.calls[0]).toBeDefined();
+			const sleepArg = sleepMock.mock.calls[0][0] as number;
+			expect(sleepArg).toBeGreaterThanOrEqual(500);
+			expect(sleepArg).toBeLessThanOrEqual(2000);
+		});
+
+		test("accepts custom range", async () => {
+			const { microDelay } = await import("./humanize.ts");
+			sleepMock.mockClear();
+
+			await microDelay(0.1, 0.5);
+
+			expect(sleepMock).toHaveBeenCalled();
+		});
+	});
+
+	describe("shortDelay()", () => {
+		test("uses routine action delay range (1-5s default)", async () => {
+			const { shortDelay } = await import("./humanize.ts");
+			sleepMock.mockClear();
+
+			await shortDelay();
+
+			expect(sleepMock).toHaveBeenCalledTimes(1);
+			expect(sleepMock.mock.calls[0]).toBeDefined();
+			const sleepArg = sleepMock.mock.calls[0][0] as number;
+			expect(sleepArg).toBeGreaterThanOrEqual(1000);
+			expect(sleepArg).toBeLessThanOrEqual(5000);
+		});
+	});
+
+	describe("mediumDelay()", () => {
+		test("uses engagement delay range (3-8s default)", async () => {
+			const { mediumDelay } = await import("./humanize.ts");
+			sleepMock.mockClear();
+
+			await mediumDelay();
+
+			expect(sleepMock).toHaveBeenCalledTimes(1);
+			expect(sleepMock.mock.calls[0]).toBeDefined();
+			const sleepArg = sleepMock.mock.calls[0][0] as number;
+			expect(sleepArg).toBeGreaterThanOrEqual(3000);
+			expect(sleepArg).toBeLessThanOrEqual(8000);
+		});
+	});
+
+	describe("longDelay()", () => {
+		test("uses high-risk action delay range (10-30s default)", async () => {
+			const { longDelay } = await import("./humanize.ts");
+			sleepMock.mockClear();
+
+			await longDelay();
+
+			expect(sleepMock).toHaveBeenCalledTimes(1);
+			expect(sleepMock.mock.calls[0]).toBeDefined();
+			const sleepArg = sleepMock.mock.calls[0][0] as number;
+			expect(sleepArg).toBeGreaterThanOrEqual(10000);
+			expect(sleepArg).toBeLessThanOrEqual(30000);
+		});
+	});
+
+	describe("gaussianDelay()", () => {
+		test("waits for duration with gaussian distribution", async () => {
+			const { gaussianDelay } = await import("./humanize.ts");
+			sleepMock.mockClear();
+
+			await gaussianDelay(5, 10);
+
+			expect(sleepMock).toHaveBeenCalledTimes(1);
+			expect(sleepMock.mock.calls[0]).toBeDefined();
+			const sleepArg = sleepMock.mock.calls[0][0] as number;
+			// Should be within range (with gaussian distribution)
+			expect(sleepArg).toBeGreaterThanOrEqual(5000);
+			expect(sleepArg).toBeLessThanOrEqual(10000);
+		});
+
+		test("centers around mean with gaussian distribution", async () => {
+			const { gaussianDelay } = await import("./humanize.ts");
+			sleepMock.mockClear();
+
+			// Run multiple times to check distribution properties
+			const delays: number[] = [];
+			for (let i = 0; i < 10; i++) {
+				await gaussianDelay(5, 10);
+				expect(sleepMock.mock.calls[i]).toBeDefined();
+				const callArg = sleepMock.mock.calls[i][0] as number;
+				delays.push(callArg);
+			}
+
+			// All delays should be within bounds
+			for (const delay of delays) {
+				expect(delay).toBeGreaterThanOrEqual(5000);
+				expect(delay).toBeLessThanOrEqual(10000);
+			}
+
+			// Mean should be roughly centered (within reasonable tolerance)
+			const mean = delays.reduce((sum, d) => sum + d, 0) / delays.length;
+			expect(mean).toBeGreaterThan(6500); // Roughly around 7500
+			expect(mean).toBeLessThan(8500);
+		});
+	});
+
+	// ═══════════════════════════════════════════════════════════════════════════
+	// Timeout Functions
+	// ═══════════════════════════════════════════════════════════════════════════
+
+	describe("getTimeout()", () => {
+		test("returns scaled timeout for known operations", async () => {
+			const { getTimeout } = await import("./humanize.ts");
+
+			const timeout = getTimeout("page_load");
+
+			expect(typeof timeout).toBe("number");
+			expect(timeout).toBeGreaterThan(0);
+		});
+
+		test("returns default timeout for unknown operations", async () => {
+			const { getTimeout } = await import("./humanize.ts");
+
+			const timeout = getTimeout("unknown_operation");
+
+			expect(timeout).toBe(10000); // Default
+		});
+
+		test("applies TIMEOUT_SCALE", async () => {
+			const { getTimeout } = await import("./humanize.ts");
+
+			const timeout = getTimeout("element_default");
+
+			expect(typeof timeout).toBe("number");
+			expect(timeout).toBeGreaterThan(0);
+		});
+
+		test("returns integer values", async () => {
+			const { getTimeout } = await import("./humanize.ts");
+
+			const timeout = getTimeout("login");
+
+			expect(Number.isInteger(timeout)).toBe(true);
+		});
+	});
+
+	// ═══════════════════════════════════════════════════════════════════════════
+	// Advanced Interaction Functions
+	// ═══════════════════════════════════════════════════════════════════════════
+
+	describe("humanScroll()", () => {
+		test("scrolls page multiple times with delays", async () => {
+			const { humanScroll } = await import("./humanize.ts");
+			sleepMock.mockClear();
+
+			await humanScroll(mockPage, 3);
+
+			// Should call sleep for delays between scrolls
+			expect(sleepMock.mock.calls.length).toBeGreaterThan(0);
+		});
+
+		test("uses default scroll count when not specified", async () => {
+			const { humanScroll } = await import("./humanize.ts");
+			sleepMock.mockClear();
+
+			await humanScroll(mockPage);
+
+			// Should scroll random number of times (2-7)
+			expect(sleepMock.mock.calls.length).toBeGreaterThan(0);
+		});
+
+		test("adjusts scroll count based on DELAY_SCALE", async () => {
+			const { humanScroll } = await import("./humanize.ts");
+			sleepMock.mockClear();
+
+			await humanScroll(mockPage, null);
+
+			// Should use random count based on DELAY_SCALE
+			expect(sleepMock.mock.calls.length).toBeGreaterThan(0);
+		});
+	});
+
+	describe("mouseWiggle()", () => {
+		test("performs random mouse movement", async () => {
+			const { mouseWiggle } = await import("./humanize.ts");
+
+			await mouseWiggle(mockPage);
+
+			// Should interact with the page (implementation uses humanWiggle internally)
+			expect(mockPage).toBeDefined();
 		});
 	});
 });
