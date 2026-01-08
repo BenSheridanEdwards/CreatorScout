@@ -230,8 +230,8 @@ export const NEW_BURNER_PERIOD_DAYS = 7;
 // SESSION CONFIGURATION
 // ═══════════════════════════════════════════════════════════════════════════════
 
-export const SESSION_DURATION_MIN = 15; // minutes
-export const SESSION_DURATION_MAX = 20;
+export const SESSION_DURATION_MIN = 25; // minutes - real users binge
+export const SESSION_DURATION_MAX = 36; // randomized, never same beat
 export const SESSIONS_PER_DAY = 3;
 export const SESSION_STAGGER_MINUTES = 5; // Between profiles
 export const TOTAL_SESSION_TIME_PER_DAY = 45; // minutes per account
@@ -264,4 +264,4 @@ export const VISION_MODEL_FALLBACK = "openai/gpt-4o-mini"; // Reliable paid fall
 export const CONFIDENCE_THRESHOLD = 70;
 export const MAX_DMS_PER_DAY = 120;
 export const DM_MESSAGE =
-	"Hey beautiful, loved your vibe — just followed you on OF too if you're there"; // change it
+	"I've got some bad news for you"; // change it

@@ -63,8 +63,17 @@ const { createLoggerWithCycleTracking } = await import(
 );
 const { getDelay } = await import("../functions/timing/humanize/humanize.ts");
 const { sleep } = await import("../functions/timing/sleep/sleep.ts");
-const { MAX_DMS_PER_DAY, PRIORITIZE_QUEUE_OVER_SEEDS, SESSION_DURATION_MAX } =
-	await import("../functions/shared/config/config.ts");
+const {
+	MAX_DMS_PER_DAY,
+	PRIORITIZE_QUEUE_OVER_SEEDS,
+	SESSION_DURATION_MIN,
+	SESSION_DURATION_MAX,
+} = await import("../functions/shared/config/config.ts");
+
+// Randomize session duration - never the same beat (that's what bots don't do)
+const SESSION_DURATION =
+	SESSION_DURATION_MIN +
+	Math.floor(Math.random() * (SESSION_DURATION_MAX - SESSION_DURATION_MIN + 1));
 
 async function main() {
 	console.log("🚀 Starting Instagram Creator Discovery...");
@@ -89,7 +98,7 @@ async function main() {
 		);
 	}
 	console.log(
-		`⏱️  Session duration limit: ${SESSION_DURATION_MAX} minutes (safety feature to prevent account flagging)`,
+		`⏱️  Session duration: ${SESSION_DURATION} minutes (randomized ${SESSION_DURATION_MIN}-${SESSION_DURATION_MAX})`,
 	);
 	console.log("");
 
@@ -198,14 +207,14 @@ async function main() {
 
 		// Session duration limit to prevent running all night
 		const sessionStartTime = Date.now();
-		const maxSessionDurationMs = SESSION_DURATION_MAX * 60 * 1000; // Convert minutes to ms
+		const maxSessionDurationMs = SESSION_DURATION * 60 * 1000; // Convert minutes to ms
 
 		while ((!sendDMs || dmsSent < MAX_DMS_PER_DAY) && shouldContinue()) {
 			// Check session duration limit
 			if (Date.now() - sessionStartTime >= maxSessionDurationMs) {
 				logger.info(
 					"LIMIT",
-					`✅ Reached maximum session duration (${SESSION_DURATION_MAX} minutes) - stopping to prevent account flagging`,
+					`✅ Reached session duration (${SESSION_DURATION} minutes) - stopping naturally`,
 				);
 				break;
 			}
