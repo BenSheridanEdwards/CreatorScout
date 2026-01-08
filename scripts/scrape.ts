@@ -75,6 +75,7 @@ import {
 	mouseWiggle,
 	shortDelay,
 } from "../functions/timing/humanize/humanize.ts";
+import { humanScroll } from "../functions/navigation/humanInteraction/humanInteraction.ts";
 import { sleep } from "../functions/timing/sleep/sleep.ts";
 
 // NOTE: Database init is async; we run it inside the main entrypoints.
@@ -190,6 +191,10 @@ export async function processProfile(
 		const status = await navigateToProfileAndCheck(page, username, {
 			timeout: 15000,
 		});
+
+		// Silent scroll-check: IG sometimes serves half-rendered stub on fast clicks
+		// This nudge wakes the DOM before bio analysis
+		await humanScroll(page, { deltaY: 200, delay: 300 });
 
 		// Add mouse wiggling for human-like behavior
 		await mouseWiggle(page);
@@ -636,6 +641,7 @@ export async function processProfile(
 		logger.info("SUMMARY", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 		logger.info("SUMMARY", `📊 Profile Analysis Complete: @${username}`);
 		logger.info("SUMMARY", "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+		logger.info("SUMMARY", `🌳 Discovery Depth: ${discoveryDepth} ${discoveryDepth === 0 ? "(seed)" : discoveryDepth === 1 ? "(1st gen)" : `(${discoveryDepth}th gen)`}`);
 		logger.info("SUMMARY", `📊 Bio Score: ${quickScore}%`);
 		logger.info("SUMMARY", `🎯 Confidence: ${confidence}%`);
 		logger.info(
@@ -1326,6 +1332,13 @@ export async function scrapeWithoutDM(
 ): Promise<void> {
 	const { debug = false, skipWarmup = false } = options;
 
+	// Clear entry log for CLI users
+	console.log("");
+	console.log("═══════════════════════════════════════════════════════════");
+	console.log("  🔍 DISCOVERY MODE ACTIVE — NO DMs WILL FIRE");
+	console.log("═══════════════════════════════════════════════════════════");
+	console.log("");
+
 	logger.info(
 		"ACTION",
 		"🔍 Scout - Instagram Patreon Creator Discovery Agent (Discovery Mode - No DMs)",
@@ -1398,6 +1411,13 @@ export async function scrapeWithoutDM(
 		endCycle("COMPLETED", "Discovery session completed");
 		await browser.close();
 		logger.info("ACTION", "🔍 Discovery session completed successfully");
+
+		// Clear exit log for CLI users
+		console.log("");
+		console.log("═══════════════════════════════════════════════════════════");
+		console.log("  ✅ DISCOVERY MODE COMPLETE — 0 DMs SENT (as intended)");
+		console.log("═══════════════════════════════════════════════════════════");
+		console.log("");
 	} catch (err) {
 		const errorMessage = err instanceof Error ? err.message : String(err);
 		const error = err instanceof Error ? err : new Error(String(err));
