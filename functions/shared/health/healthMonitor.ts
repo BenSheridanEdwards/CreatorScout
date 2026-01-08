@@ -1,0 +1,353 @@
+/**
+ * Health Monitor
+ *
+ * Monitors system health and provides alerting for:
+ * - Missed sessions
+ * - Failed jobs
+ * - High proxy usage
+ * - Database connectivity
+ * - API errors
+ *
+ * Can send alerts via webhook (Discord, Slack, etc.)
+ */
+
+import { getPrismaClient } from "../database/database.ts";
+import { createLogger } from "../logger/logger.ts";
+import { getNodeScheduler } from "../../scheduling/nodeScheduler.ts";
+import { estimateMonthlyProxyCost, getTodayProxyUsage } from "../proxy/proxyOptimizer.ts";
+
+const logger = createLogger();
+
+export interface HealthStatus {
+	healthy: boolean;
+	timestamp: string;
+	uptime: number;
+	checks: {
+		database: CheckResult;
+		scheduler: CheckResult;
+		sessions: CheckResult;
+		proxy: CheckResult;
+	};
+	alerts: Alert[];
+}
+
+export interface CheckResult {
+	status: "ok" | "warning" | "error";
+	message: string;
+	details?: Record<string, unknown>;
+}
+
+export interface Alert {
+	level: "info" | "warning" | "error";
+	message: string;
+	timestamp: string;
+}
+
+// Track startup time for uptime calculation
+const startupTime = Date.now();
+
+// Alert history (in-memory, cleared on restart)
+const alertHistory: Alert[] = [];
+
+/**
+ * Perform a health check
+ */
+export async function checkHealth(): Promise<HealthStatus> {
+	const alerts: Alert[] = [];
+
+	// Check database
+	const dbCheck = await checkDatabase();
+	if (dbCheck.status === "error") {
+		alerts.push({
+			level: "error",
+			message: `Database error: ${dbCheck.message}`,
+			timestamp: new Date().toISOString(),
+		});
+	}
+
+	// Check scheduler
+	const schedulerCheck = checkScheduler();
+	if (schedulerCheck.status === "error") {
+		alerts.push({
+			level: "error",
+			message: `Scheduler error: ${schedulerCheck.message}`,
+			timestamp: new Date().toISOString(),
+		});
+	}
+
+	// Check sessions
+	const sessionCheck = await checkSessions();
+	if (sessionCheck.status === "warning" || sessionCheck.status === "error") {
+		alerts.push({
+			level: sessionCheck.status === "error" ? "error" : "warning",
+			message: sessionCheck.message,
+			timestamp: new Date().toISOString(),
+		});
+	}
+
+	// Check proxy usage
+	const proxyCheck = await checkProxyUsage();
+	if (proxyCheck.status === "warning") {
+		alerts.push({
+			level: "warning",
+			message: proxyCheck.message,
+			timestamp: new Date().toISOString(),
+		});
+	}
+
+	// Store new alerts
+	for (const alert of alerts) {
+		alertHistory.push(alert);
+	}
+
+	// Keep only last 100 alerts
+	while (alertHistory.length > 100) {
+		alertHistory.shift();
+	}
+
+	const healthy =
+		dbCheck.status === "ok" &&
+		schedulerCheck.status === "ok" &&
+		sessionCheck.status !== "error";
+
+	return {
+		healthy,
+		timestamp: new Date().toISOString(),
+		uptime: Math.floor((Date.now() - startupTime) / 1000),
+		checks: {
+			database: dbCheck,
+			scheduler: schedulerCheck,
+			sessions: sessionCheck,
+			proxy: proxyCheck,
+		},
+		alerts,
+	};
+}
+
+/**
+ * Check database connectivity
+ */
+async function checkDatabase(): Promise<CheckResult> {
+	try {
+		const prisma = getPrismaClient();
+		await prisma.$queryRaw`SELECT 1`;
+		return {
+			status: "ok",
+			message: "Database connected",
+		};
+	} catch (error) {
+		return {
+			status: "error",
+			message: `Database connection failed: ${error}`,
+		};
+	}
+}
+
+/**
+ * Check scheduler status
+ */
+function checkScheduler(): CheckResult {
+	try {
+		const scheduler = getNodeScheduler();
+		const status = scheduler.getStatus();
+
+		if (!status.isRunning) {
+			return {
+				status: "error",
+				message: "Scheduler is not running",
+				details: status,
+			};
+		}
+
+		return {
+			status: "ok",
+			message: `Scheduler running: ${status.pendingJobs} pending, ${status.completedToday} completed today`,
+			details: status,
+		};
+	} catch {
+		return {
+			status: "warning",
+			message: "Scheduler not initialized",
+		};
+	}
+}
+
+/**
+ * Check session health
+ */
+async function checkSessions(): Promise<CheckResult> {
+	try {
+		const prisma = getPrismaClient();
+		const now = new Date();
+		const today = new Date(now);
+		today.setHours(0, 0, 0, 0);
+
+		// Check for failed jobs today
+		const failedJobs = await prisma.scheduledJob.count({
+			where: {
+				scheduledTime: { gte: today },
+				status: "failed",
+			},
+		});
+
+		if (failedJobs > 0) {
+			return {
+				status: "warning",
+				message: `${failedJobs} session(s) failed today`,
+				details: { failedJobs },
+			};
+		}
+
+		// Check hours since last completed session
+		const lastSession = await prisma.scheduledJob.findFirst({
+			where: { status: "completed" },
+			orderBy: { completedAt: "desc" },
+		});
+
+		if (lastSession?.completedAt) {
+			const hoursSinceLastSession =
+				(now.getTime() - lastSession.completedAt.getTime()) / (60 * 60 * 1000);
+
+			if (hoursSinceLastSession > 8) {
+				return {
+					status: "warning",
+					message: `No sessions completed in ${hoursSinceLastSession.toFixed(1)} hours`,
+					details: { hoursSinceLastSession, lastSession: lastSession.completedAt },
+				};
+			}
+		}
+
+		// Check completed sessions today
+		const completedToday = await prisma.scheduledJob.count({
+			where: {
+				scheduledTime: { gte: today },
+				status: "completed",
+			},
+		});
+
+		return {
+			status: "ok",
+			message: `${completedToday} session(s) completed today`,
+			details: { completedToday, failedJobs },
+		};
+	} catch (error) {
+		return {
+			status: "error",
+			message: `Failed to check sessions: ${error}`,
+		};
+	}
+}
+
+/**
+ * Check proxy usage
+ */
+async function checkProxyUsage(): Promise<CheckResult> {
+	try {
+		const today = await getTodayProxyUsage();
+		const monthly = await estimateMonthlyProxyCost();
+
+		// Warn if projected monthly cost exceeds $50
+		if (monthly.projectedCost > 50) {
+			return {
+				status: "warning",
+				message: `High proxy usage: projected $${monthly.projectedCost.toFixed(2)}/month`,
+				details: {
+					todayMB: today.totalMB,
+					projectedMonthMB: monthly.projectedMonthMB,
+					projectedCost: monthly.projectedCost,
+				},
+			};
+		}
+
+		return {
+			status: "ok",
+			message: `Proxy usage: ${today.totalMB.toFixed(1)}MB today, ~$${monthly.projectedCost.toFixed(2)}/month`,
+			details: {
+				todayMB: today.totalMB,
+				projectedMonthMB: monthly.projectedMonthMB,
+				projectedCost: monthly.projectedCost,
+			},
+		};
+	} catch {
+		return {
+			status: "ok",
+			message: "Proxy usage tracking not available",
+		};
+	}
+}
+
+/**
+ * Get recent alerts
+ */
+export function getRecentAlerts(limit = 20): Alert[] {
+	return alertHistory.slice(-limit);
+}
+
+/**
+ * Send alert to webhook (Discord, Slack, etc.)
+ */
+export async function sendWebhookAlert(
+	webhookUrl: string,
+	alert: Alert
+): Promise<boolean> {
+	try {
+		const color = alert.level === "error" ? 0xff0000 : alert.level === "warning" ? 0xffaa00 : 0x00ff00;
+		const emoji = alert.level === "error" ? "🚨" : alert.level === "warning" ? "⚠️" : "ℹ️";
+
+		// Discord webhook format
+		const payload = {
+			embeds: [
+				{
+					title: `${emoji} Scout Alert`,
+					description: alert.message,
+					color,
+					timestamp: alert.timestamp,
+					footer: {
+						text: `Level: ${alert.level.toUpperCase()}`,
+					},
+				},
+			],
+		};
+
+		const response = await fetch(webhookUrl, {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify(payload),
+		});
+
+		return response.ok;
+	} catch (error) {
+		logger.error("HEALTH", `Failed to send webhook alert: ${error}`);
+		return false;
+	}
+}
+
+/**
+ * Start health monitoring loop
+ */
+export function startHealthMonitoring(
+	intervalMinutes = 5,
+	webhookUrl?: string
+): NodeJS.Timeout {
+	logger.info("HEALTH", `Starting health monitoring (every ${intervalMinutes} min)`);
+
+	const interval = setInterval(async () => {
+		const health = await checkHealth();
+
+		// Log status
+		if (health.healthy) {
+			logger.debug("HEALTH", "Health check passed");
+		} else {
+			logger.warn("HEALTH", `Health check failed: ${health.alerts.length} alerts`);
+		}
+
+		// Send alerts to webhook if configured
+		if (webhookUrl && health.alerts.length > 0) {
+			for (const alert of health.alerts) {
+				await sendWebhookAlert(webhookUrl, alert);
+			}
+		}
+	}, intervalMinutes * 60 * 1000);
+
+	return interval;
+}

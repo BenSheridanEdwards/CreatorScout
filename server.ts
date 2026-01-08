@@ -203,6 +203,52 @@ async function handleApi(
 		return;
 	}
 
+	// Detailed health check endpoint
+	if (req.method === "GET" && url.pathname === "/api/health/detailed") {
+		try {
+			const { checkHealth, getRecentAlerts } = await import(
+				"./functions/shared/health/healthMonitor.ts"
+			);
+			const health = await checkHealth();
+			const alerts = getRecentAlerts(10);
+			sendJson(res, health.healthy ? 200 : 503, { ...health, recentAlerts: alerts });
+		} catch (error) {
+			sendJson(res, 503, { healthy: false, error: String(error) });
+		}
+		return;
+	}
+
+	// Scheduler status endpoint
+	if (req.method === "GET" && url.pathname === "/api/scheduler/status") {
+		try {
+			const { getNodeScheduler } = await import(
+				"./functions/scheduling/nodeScheduler.ts"
+			);
+			const scheduler = getNodeScheduler();
+			const status = scheduler.getStatus();
+			const todayJobs = scheduler.getTodayJobs();
+			sendJson(res, 200, { ...status, todayJobs });
+		} catch (error) {
+			sendJson(res, 500, { error: "Scheduler not initialized", details: String(error) });
+		}
+		return;
+	}
+
+	// Proxy usage endpoint
+	if (req.method === "GET" && url.pathname === "/api/proxy/usage") {
+		try {
+			const { getTodayProxyUsage, estimateMonthlyProxyCost } = await import(
+				"./functions/shared/proxy/proxyOptimizer.ts"
+			);
+			const today = await getTodayProxyUsage();
+			const monthly = await estimateMonthlyProxyCost();
+			sendJson(res, 200, { today, monthly });
+		} catch (error) {
+			sendJson(res, 500, { error: "Failed to get proxy usage", details: String(error) });
+		}
+		return;
+	}
+
 	if (req.method === "GET" && url.pathname === "/api/stats") {
 		try {
 			const prisma = getPrismaClient();

@@ -56,7 +56,10 @@
 		"test:reel": "tsx scripts/test_watch_reel.ts",
 		"profiles:list": "tsx scripts/list_profiles.ts",
 		"adspower:list": "tsx scripts/list_adspower_profiles.ts",
-		"cookies:clear": "tsx scripts/clear_cookies.ts"
+		"cookies:clear": "tsx scripts/clear_cookies.ts",
+		"start:production": "tsx scripts/deploy/start.ts",
+		"scheduler:start": "tsx -e \"import { startScheduler } from './functions/scheduling/nodeScheduler.ts'; startScheduler().then(() => console.log('Scheduler started'))\"",
+		"proxy:usage": "tsx -e \"import { getTodayProxyUsage, estimateMonthlyProxyCost } from './functions/shared/proxy/proxyOptimizer.ts'; Promise.all([getTodayProxyUsage(), estimateMonthlyProxyCost()]).then(([t,m]) => console.log('Today:', t, 'Monthly:', m))\""
 	},
 	"dependencies": {
 		"@prisma/adapter-pg": "^7.1.0",

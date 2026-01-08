@@ -1,0 +1,74 @@
+# Scout Docker Compose Configuration
+# ===================================
+#
+# Usage:
+#   docker-compose up -d              # Start all services
+#   docker-compose logs -f scout      # View logs
+#   docker-compose down               # Stop all services
+#
+# For production, copy .env.example to .env and fill in your values.
+
+version: "3.8"
+
+services:
+  scout:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: scout
+    restart: unless-stopped
+    ports:
+      - "${PORT:-4000}:4000"
+    environment:
+      - NODE_ENV=production
+      - PORT=4000
+      - DATABASE_URL=${DATABASE_URL}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - DECODO_USERNAME=${DECODO_USERNAME}
+      - DECODO_PASSWORD=${DECODO_PASSWORD}
+      - DECODO_HOST=${DECODO_HOST:-dc.decodo.com}
+      - DECODO_PORT=${DECODO_PORT:-10000}
+      - ADSPOWER_API_KEY=${ADSPOWER_API_KEY}
+      - SCHEDULER_ENABLED=${SCHEDULER_ENABLED:-true}
+      - SCHEDULER_TIMEZONE=${SCHEDULER_TIMEZONE:-Europe/London}
+    volumes:
+      # Persist data directories
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - ./screenshots:/app/screenshots
+      - ./runs:/app/runs
+      # SQLite database (if using SQLite)
+      - ./scout.db:/app/scout.db
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Optional: PostgreSQL database (recommended for production)
+  # Uncomment if you want to use PostgreSQL instead of SQLite
+  #
+  # postgres:
+  #   image: postgres:16-alpine
+  #   container_name: scout-db
+  #   restart: unless-stopped
+  #   environment:
+  #     - POSTGRES_USER=scout
+  #     - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-scout_secure_password}
+  #     - POSTGRES_DB=scout
+  #   volumes:
+  #     - postgres_data:/var/lib/postgresql/data
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "pg_isready -U scout"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
+
+# volumes:
+#   postgres_data:

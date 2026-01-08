@@ -139,3 +139,43 @@ model ProfileSession {
   @@index([profileId, startedAt], map: "idx_profile_session")
   @@map("profile_sessions")
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// NODE SCHEDULER - Persistent job storage
+// ═══════════════════════════════════════════════════════════════════════════════
+
+model ScheduledJob {
+  id            String    @id
+  profileId     String    @map("profile_id")
+  sessionType   String    @map("session_type") // 'morning' | 'afternoon' | 'evening'
+  scheduledTime DateTime  @map("scheduled_time") @db.Timestamptz(6)
+  status        String    @default("pending") // 'pending' | 'running' | 'completed' | 'failed' | 'skipped'
+  attempts      Int       @default(0)
+  lastAttemptAt DateTime? @map("last_attempt_at") @db.Timestamptz(6)
+  completedAt   DateTime? @map("completed_at") @db.Timestamptz(6)
+  error         String?
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([scheduledTime, status], map: "idx_scheduled_job_time_status")
+  @@index([profileId, scheduledTime], map: "idx_scheduled_job_profile")
+  @@map("scheduled_jobs")
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PROXY BANDWIDTH TRACKING
+// ═══════════════════════════════════════════════════════════════════════════════
+
+model ProxyUsage {
+  id              String   @id @default(uuid())
+  date            DateTime @db.Date
+  profileId       String   @map("profile_id")
+  sessionId       String?  @map("session_id")
+  requestCount    Int      @default(0) @map("request_count")
+  estimatedMB     Decimal  @default(0) @map("estimated_mb") @db.Decimal(10, 2)
+  stickySessionId String?  @map("sticky_session_id")
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@unique([date, profileId, sessionId])
+  @@index([date], map: "idx_proxy_usage_date")
+  @@map("proxy_usage")
+}

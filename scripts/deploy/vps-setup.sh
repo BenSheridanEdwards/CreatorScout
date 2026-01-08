@@ -1,221 +1,206 @@
 #!/bin/bash
-# ═══════════════════════════════════════════════════════════════════════════════
+
 # Scout VPS Setup Script
-# ═══════════════════════════════════════════════════════════════════════════════
+# ======================
 #
-# This script sets up a fresh Ubuntu VPS for running Scout with GoLogin.
-# Tested on DigitalOcean droplets (8GB RAM / 4 vCPU recommended)
+# This script sets up a fresh Ubuntu 22.04+ VPS for running Scout.
 #
-# Usage: curl -fsSL https://raw.githubusercontent.com/your-repo/scout/main/scripts/deploy/vps-setup.sh | sudo bash
-# Or: sudo bash scripts/deploy/vps-setup.sh
+# Usage:
+#   curl -fsSL https://raw.githubusercontent.com/your-repo/scout/main/scripts/deploy/vps-setup.sh | bash
 #
-# ═══════════════════════════════════════════════════════════════════════════════
+# Or run locally:
+#   ./scripts/deploy/vps-setup.sh
+#
+# Prerequisites:
+#   - Ubuntu 22.04 LTS or newer
+#   - Root or sudo access
+#   - At least 2GB RAM, 20GB disk
 
 set -e
 
-echo "═══════════════════════════════════════════════════════════════════════════════"
-echo "🚀 Scout VPS Setup Script"
-echo "═══════════════════════════════════════════════════════════════════════════════"
+echo "═══════════════════════════════════════════════════════════"
+echo "  Scout VPS Setup Script"
+echo "═══════════════════════════════════════════════════════════"
+echo ""
 
 # Check if running as root
 if [ "$EUID" -ne 0 ]; then
-  echo "Please run as root (sudo)"
-  exit 1
+    echo "⚠️  Please run as root or with sudo"
+    exit 1
 fi
 
-# Configuration
-NODE_VERSION="20"
-SCOUT_USER="scout"
-SCOUT_DIR="/opt/scout"
-ORBITA_PORT="9222"
-
-echo ""
-echo "📦 Step 1: Update system packages..."
-echo "───────────────────────────────────────────────────────────────────────────────"
+# Update system
+echo "📦 Updating system packages..."
 apt-get update && apt-get upgrade -y
 
-echo ""
-echo "📦 Step 2: Install essential packages..."
-echo "───────────────────────────────────────────────────────────────────────────────"
+# Install required packages
+echo "📦 Installing dependencies..."
 apt-get install -y \
-  curl \
-  wget \
-  git \
-  build-essential \
-  ca-certificates \
-  gnupg \
-  lsb-release \
-  unzip \
-  htop \
-  ufw \
-  fail2ban
+    curl \
+    wget \
+    git \
+    build-essential \
+    ca-certificates \
+    gnupg \
+    lsb-release \
+    ufw \
+    fail2ban
 
-echo ""
-echo "📦 Step 3: Install Node.js ${NODE_VERSION}..."
-echo "───────────────────────────────────────────────────────────────────────────────"
-curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | bash -
+# Install Node.js 20 LTS
+echo "📦 Installing Node.js 20..."
+curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
 apt-get install -y nodejs
 
-# Verify Node.js installation
-node --version
-npm --version
+# Verify Node installation
+echo "✓ Node.js version: $(node --version)"
+echo "✓ npm version: $(npm --version)"
 
-echo ""
-echo "📦 Step 4: Install PM2 globally..."
-echo "───────────────────────────────────────────────────────────────────────────────"
+# Install Docker (optional but recommended)
+echo "📦 Installing Docker..."
+curl -fsSL https://get.docker.com | sh
+
+# Install Docker Compose
+echo "📦 Installing Docker Compose..."
+DOCKER_COMPOSE_VERSION="v2.24.0"
+curl -SL "https://github.com/docker/compose/releases/download/${DOCKER_COMPOSE_VERSION}/docker-compose-linux-$(uname -m)" -o /usr/local/bin/docker-compose
+chmod +x /usr/local/bin/docker-compose
+
+# Install Chromium and dependencies for headless browser
+echo "📦 Installing Chromium dependencies..."
+apt-get install -y \
+    chromium-browser \
+    chromium-chromedriver \
+    fonts-liberation \
+    fonts-ipafont-gothic \
+    fonts-wqy-zenhei \
+    fonts-thai-tlwg \
+    fonts-kacst \
+    fonts-freefont-ttf \
+    libxss1 \
+    libgbm1 \
+    libnss3 \
+    libatk1.0-0 \
+    libatk-bridge2.0-0 \
+    libcups2 \
+    libdrm2 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxrandr2 \
+    libpango-1.0-0 \
+    libcairo2 \
+    libasound2 \
+    xvfb
+
+# Install PM2 for process management
+echo "📦 Installing PM2..."
 npm install -g pm2
-pm2 startup systemd -u ${SCOUT_USER} --hp /home/${SCOUT_USER}
 
-echo ""
-echo "📦 Step 5: Install tsx globally..."
-echo "───────────────────────────────────────────────────────────────────────────────"
+# Install tsx for TypeScript execution
+echo "📦 Installing tsx..."
 npm install -g tsx
 
-echo ""
-echo "👤 Step 6: Create scout user..."
-echo "───────────────────────────────────────────────────────────────────────────────"
-if ! id "${SCOUT_USER}" &>/dev/null; then
-  useradd -m -s /bin/bash ${SCOUT_USER}
-  echo "Created user: ${SCOUT_USER}"
-else
-  echo "User ${SCOUT_USER} already exists"
+# Create scout user
+echo "👤 Creating scout user..."
+if ! id "scout" &>/dev/null; then
+    useradd -m -s /bin/bash scout
+    usermod -aG docker scout
 fi
 
-echo ""
-echo "📁 Step 7: Create application directory..."
-echo "───────────────────────────────────────────────────────────────────────────────"
-mkdir -p ${SCOUT_DIR}
-mkdir -p ${SCOUT_DIR}/logs
-chown -R ${SCOUT_USER}:${SCOUT_USER} ${SCOUT_DIR}
-
-echo ""
-echo "🔥 Step 8: Configure firewall..."
-echo "───────────────────────────────────────────────────────────────────────────────"
+# Set up UFW firewall
+echo "🔒 Configuring firewall..."
 ufw default deny incoming
 ufw default allow outgoing
 ufw allow ssh
-ufw allow ${ORBITA_PORT}/tcp  # Orbita debugging port (only from localhost ideally)
+ufw allow 4000/tcp  # Scout API
 ufw --force enable
-ufw status
 
-echo ""
-echo "🔐 Step 9: Configure fail2ban..."
-echo "───────────────────────────────────────────────────────────────────────────────"
+# Set up fail2ban
+echo "🔒 Configuring fail2ban..."
 systemctl enable fail2ban
 systemctl start fail2ban
 
-echo ""
-echo "📦 Step 10: Install GoLogin Orbita dependencies..."
-echo "───────────────────────────────────────────────────────────────────────────────"
-# Install dependencies needed for headless Chrome/Orbita
-apt-get install -y \
-  libnss3 \
-  libatk1.0-0 \
-  libatk-bridge2.0-0 \
-  libcups2 \
-  libdrm2 \
-  libxkbcommon0 \
-  libxcomposite1 \
-  libxdamage1 \
-  libxfixes3 \
-  libxrandr2 \
-  libgbm1 \
-  libasound2 \
-  libpango-1.0-0 \
-  libpangocairo-1.0-0 \
-  libcairo2 \
-  libatspi2.0-0 \
-  libgtk-3-0 \
-  fonts-liberation \
-  xdg-utils \
-  xvfb
+# Set timezone (adjust as needed)
+echo "🕐 Setting timezone to Europe/London..."
+timedatectl set-timezone Europe/London
 
-echo ""
-echo "📦 Step 11: Create GoLogin Orbita start script..."
-echo "───────────────────────────────────────────────────────────────────────────────"
-cat > /usr/local/bin/start-orbita.sh << 'EOF'
-#!/bin/bash
-# Start GoLogin Orbita browser
-# This script should be run as the scout user
+# Create Scout directories
+echo "📁 Creating Scout directories..."
+mkdir -p /opt/scout
+chown scout:scout /opt/scout
 
-ORBITA_PATH="${HOME}/.gologin/browser/orbita"
-PORT=${1:-9222}
-
-if [ ! -f "${ORBITA_PATH}/orbita" ]; then
-  echo "Orbita not found. Please install GoLogin first."
-  echo "Download from: https://gologin.com/download"
-  exit 1
-fi
-
-# Start Orbita in headless mode with remote debugging
-xvfb-run -a ${ORBITA_PATH}/orbita \
-  --no-sandbox \
-  --disable-setuid-sandbox \
-  --disable-dev-shm-usage \
-  --disable-gpu \
-  --headless \
-  --remote-debugging-port=${PORT} \
-  --remote-debugging-address=0.0.0.0
-EOF
-chmod +x /usr/local/bin/start-orbita.sh
-
-echo ""
-echo "📦 Step 12: Create systemd service for Scout..."
-echo "───────────────────────────────────────────────────────────────────────────────"
-cat > /etc/systemd/system/scout.service << EOF
+# Create systemd service for Scout
+echo "⚙️  Creating systemd service..."
+cat > /etc/systemd/system/scout.service << 'EOF'
 [Unit]
 Description=Scout Instagram Automation
 After=network.target
 
 [Service]
 Type=simple
-User=${SCOUT_USER}
-WorkingDirectory=${SCOUT_DIR}
-ExecStart=/usr/bin/pm2 start ecosystem.config.js
-ExecReload=/usr/bin/pm2 reload all
-ExecStop=/usr/bin/pm2 stop all
-Restart=on-failure
+User=scout
+WorkingDirectory=/opt/scout
+ExecStart=/usr/bin/node --loader tsx scripts/deploy/start.ts
+Restart=always
 RestartSec=10
+StandardOutput=append:/opt/scout/logs/scout.log
+StandardError=append:/opt/scout/logs/scout.log
+
+# Environment
+Environment=NODE_ENV=production
+Environment=PORT=4000
+EnvironmentFile=/opt/scout/.env
+
+# Security
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/scout
 
 [Install]
 WantedBy=multi-user.target
 EOF
+
 systemctl daemon-reload
 
 echo ""
-echo "═══════════════════════════════════════════════════════════════════════════════"
-echo "✅ VPS Setup Complete!"
-echo "═══════════════════════════════════════════════════════════════════════════════"
+echo "═══════════════════════════════════════════════════════════"
+echo "  ✓ VPS Setup Complete!"
+echo "═══════════════════════════════════════════════════════════"
 echo ""
 echo "Next steps:"
 echo ""
 echo "1. Clone your Scout repository:"
-echo "   sudo -u ${SCOUT_USER} git clone <your-repo> ${SCOUT_DIR}"
+echo "   su - scout"
+echo "   cd /opt/scout"
+echo "   git clone https://github.com/your-repo/scout.git ."
 echo ""
 echo "2. Install dependencies:"
-echo "   cd ${SCOUT_DIR} && npm install"
+echo "   npm install"
+echo "   npx prisma generate"
 echo ""
-echo "3. Configure environment:"
-echo "   cp .env.example .env && nano .env"
+echo "3. Create your .env file:"
+echo "   cp .env.example .env"
+echo "   nano .env  # Fill in your credentials"
 echo ""
-echo "4. Download and install GoLogin Orbita:"
-echo "   - Download from: https://gologin.com/download"
-echo "   - Extract to: /home/${SCOUT_USER}/.gologin/browser/orbita"
+echo "4. Run database migrations:"
+echo "   npx prisma migrate deploy"
 echo ""
 echo "5. Start Scout:"
+echo "   # Using systemd (recommended):"
+echo "   sudo systemctl enable scout"
+echo "   sudo systemctl start scout"
+echo ""
+echo "   # Or using PM2:"
 echo "   pm2 start ecosystem.config.js"
 echo "   pm2 save"
+echo "   pm2 startup"
 echo ""
-echo "6. Set up cron jobs:"
-echo "   crontab -e"
-echo "   # Paste contents from scripts/cron/crontab.example"
+echo "6. Check status:"
+echo "   sudo systemctl status scout"
+echo "   # or: pm2 status"
 echo ""
-echo "═══════════════════════════════════════════════════════════════════════════════"
-
-
-
-
-
-
-
-
+echo "7. View logs:"
+echo "   sudo journalctl -u scout -f"
+echo "   # or: pm2 logs scout"
+echo ""
+echo "═══════════════════════════════════════════════════════════"
