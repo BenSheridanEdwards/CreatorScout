@@ -54,6 +54,9 @@ COPY prisma ./prisma/
 # Install dependencies
 RUN npm ci --only=production && npm cache clean --force
 
+# Install tsx for runtime TypeScript support
+RUN npm install tsx
+
 # Generate Prisma client
 RUN npx prisma generate
 
@@ -78,4 +81,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
 ENTRYPOINT ["/usr/bin/dumb-init", "--"]
 
 # Default command: start the scheduler and API server
-CMD ["node", "--loader", "tsx", "scripts/deploy/start.ts"]
+CMD ["node", "--import", "tsx/esm", "scripts/deploy/start.ts"]
