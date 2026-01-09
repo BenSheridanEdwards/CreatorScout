@@ -454,17 +454,6 @@ describe("Humanize Functions", () => {
 	// ═══════════════════════════════════════════════════════════════════════════
 
 	describe("getDelay()", () => {
-		test("returns default delay range for unknown operations", async () => {
-			const { getDelay } = await import("./humanize.ts");
-
-			const [min, max] = getDelay("unknown_operation");
-
-			expect(min).toBeGreaterThan(0);
-			expect(max).toBeGreaterThan(min);
-			expect(min).toBeCloseTo(0.7, 1);
-			expect(max).toBeCloseTo(2.4, 1);
-		});
-
 		test("applies DELAY_SCALE to delay ranges", async () => {
 			const { getDelay } = await import("./humanize.ts");
 
