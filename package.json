@@ -55,6 +55,9 @@
 		"test:like": "tsx scripts/test_like_post.ts",
 		"test:reel": "tsx scripts/test_watch_reel.ts",
 		"profiles:list": "tsx scripts/list_profiles.ts",
+		"profiles:sync": "tsx scripts/sync_profiles.ts",
+		"profiles:sync:dry": "tsx scripts/sync_profiles.ts --dry-run",
+		"profiles:sync:force": "tsx scripts/sync_profiles.ts --force",
 		"adspower:list": "tsx scripts/list_adspower_profiles.ts",
 		"cookies:clear": "tsx scripts/clear_cookies.ts",
 		"start:production": "tsx scripts/deploy/start.ts",
@@ -71,6 +74,7 @@
 		"pg": "^8.16.3",
 		"prisma": "^7.1.0",
 		"puppeteer": "^22.13.1",
+		"tsx": "^4.21.0",
 		"uuid": "^9.0.1"
 	},
 	"devDependencies": {
@@ -84,7 +88,6 @@
 		"jest": "^30.2.0",
 		"jsdom": "^27.4.0",
 		"ts-jest": "^29.4.6",
-		"tsx": "^4.21.0",
 		"typescript": "^5.9.3"
 	}
 }
