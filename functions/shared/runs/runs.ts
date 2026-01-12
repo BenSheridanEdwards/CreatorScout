@@ -60,6 +60,9 @@ export interface RunMetadata {
 	};
 	errorLogs?: ErrorLog[];
 	creatorsFoundList?: CreatorFound[];
+	// Session executor metrics
+	dmsSent?: number;
+	profilesChecked?: number;
 }
 
 const RUNS_DIR = join(process.cwd(), "runs");

@@ -47,6 +47,9 @@ export interface RunMetadata {
 	errors: number;
 	screenshots: string[];
 	finalScreenshot?: string;
+	// Session executor metrics
+	dmsSent?: number;
+	profilesChecked?: number;
 	errorMessage?: string;
 	scheduledTime?: string; // ISO timestamp for scheduled runs
 	issues?: RunIssue[]; // Detected problems
