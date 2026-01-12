@@ -99,13 +99,15 @@ async function navigateToProfileViaSearch(
 	}
 
 	// Find and click the search icon/input
+	// IMPORTANT: Prioritize actual search elements over explore link
+	// On modern Instagram, the search icon opens a search panel directly
 	const searchSelectors = [
-		'a[href="/explore/"]',
-		'input[placeholder*="Search"]',
-		'input[aria-label*="Search"]',
-		'svg[aria-label="Search"]',
-		'a[aria-label="Search"]',
-		'div[role="link"][href="/explore/"]',
+		'svg[aria-label="Search"]',           // Search icon in sidebar (primary)
+		'a[aria-label="Search"]',             // Search link
+		'input[placeholder*="Search"]',       // Direct search input
+		'input[aria-label*="Search"]',        // Search input by aria-label
+		'a[href="/explore/"]',                // Explore page (last resort - opens different page)
+		'div[role="link"][href="/explore/"]', // Explore link variant
 	];
 
 	let searchClicked = false;
