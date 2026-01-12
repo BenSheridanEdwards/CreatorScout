@@ -1,5 +1,5 @@
 import type { Page } from "puppeteer";
-import { humanScrollTo } from "../../navigation/humanInteraction/humanInteraction.ts";
+import { humanScroll } from "../../navigation/humanInteraction/humanInteraction.ts";
 import { CONFIDENCE_THRESHOLD } from "../../shared/config/config.ts";
 import { mediumDelay, microDelay } from "../../timing/humanize/humanize.ts";
 
@@ -296,12 +296,16 @@ export async function analyzeExternalLink(
 		console.log(`[LINK_ANALYSIS] 🔎 Analyzing page content at: ${finalUrl}`);
 
 		// Scroll the page to load all content (especially for aggregator platforms)
+		// Use humanScroll with fixed distances to avoid infinite scroll loops
 		try {
-			// Scroll to bottom using ghost-cursor
-			await humanScrollTo(page, "bottom");
-			await microDelay(0.3, 0.6);
-			// Scroll back to top to capture everything
-			await humanScrollTo(page, "top");
+			// Scroll down 3 times to load lazy content
+			for (let i = 0; i < 3; i++) {
+				await humanScroll(page, { deltaY: 500 });
+				await microDelay(0.2, 0.4);
+			}
+
+			// Scroll back up
+			await humanScroll(page, { deltaY: -1500 });
 			await microDelay(0.2, 0.4);
 		} catch (scrollError) {
 			console.log(
