@@ -426,9 +426,9 @@ export async function analyzeProfileComprehensive(
 					`📝 Text analysis: ${linkAnalysis.confidence}% | Creator: ${linkAnalysis.isCreator ? "YES" : "NO"} | ${linkAnalysis.reason || "no reason"}`,
 				);
 
-				// Take screenshot of link page
+				// Take screenshot of link page (use workingPage which may be a new tab)
 				const linkScreenshot = await snapshot(
-					page,
+					linkAnalysis.workingPage,
 					`link_analysis_${username}`,
 					true,
 				);
@@ -542,7 +542,20 @@ export async function analyzeProfileComprehensive(
 				result.errors?.push(`Link analysis failed: ${error}`);
 			}
 
-			// Navigate back to the profile
+			// Close any extra tabs that were opened during link analysis
+			const allPages = await page.browser().pages();
+			for (const p of allPages) {
+				if (p !== page && !p.url().includes("instagram.com")) {
+					try {
+						await p.close();
+					} catch {
+						// Ignore close errors
+					}
+				}
+			}
+
+			// Bring original page back to front and navigate back to profile
+			await page.bringToFront();
 			await page.goto(profileUrl, {
 				waitUntil: "networkidle2",
 				timeout: 15000,
@@ -603,9 +616,9 @@ export async function analyzeProfileComprehensive(
 						result.indicators.push(...linkAnalysis.indicators);
 						result.reason = linkAnalysis.reason;
 
-						// Take screenshot of the link page
+						// Take screenshot of the link page (use workingPage for consistency)
 						const linkScreenshot = await snapshot(
-							page,
+							linkAnalysis.workingPage,
 							`link_analysis_${username}`,
 							true,
 						);

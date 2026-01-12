@@ -194,18 +194,57 @@ export async function analyzeExternalLink(
 	confidence: number;
 	reason: string;
 	indicators: string[];
+	workingPage: Page; // The page that was actually analyzed (may differ from input page)
 }> {
-	const result = {
+	let workingPage: Page = page; // The page we'll actually analyze
+
+	const result: {
+		isCreator: boolean;
+		confidence: number;
+		reason: string;
+		indicators: string[];
+		workingPage: Page;
+	} = {
 		isCreator: false,
 		confidence: 0,
 		reason: "",
 		indicators: [] as string[],
+		workingPage: page, // Will be updated if we find/use a different page
 	};
 
 	let isAggregator = false; // Track if it's an aggregator for later use
 
 	try {
-		const currentUrl = page.url();
+		// First, check if there's a new tab with an external URL
+		// This happens when clickBioLink opens a link in a new tab
+		const browser = page.browser();
+		const pages = await browser.pages();
+
+		if (pages.length > 1) {
+			// Find a page with an external (non-Instagram) URL
+			const externalPage = pages.find((p) => {
+				const url = p.url();
+				return (
+					url.includes("http") &&
+					!url.includes("instagram.com") &&
+					!url.startsWith("devtools://") &&
+					!url.startsWith("chrome://") &&
+					!url.startsWith("chrome-extension://") &&
+					url !== "about:blank"
+				);
+			});
+
+			if (externalPage) {
+				console.log(
+					`[LINK_ANALYSIS] Found external tab: ${externalPage.url()}`,
+				);
+				workingPage = externalPage;
+				result.workingPage = workingPage; // Update result to reflect actual page used
+				await workingPage.bringToFront();
+			}
+		}
+
+		const currentUrl = workingPage.url();
 
 		// Check if we're already on an external page (not Instagram)
 		// This happens when clickBioLink was used before calling this function
@@ -223,8 +262,11 @@ export async function analyzeExternalLink(
 		} else {
 			// Navigate to the external link
 			console.log(`[LINK_ANALYSIS] Navigating to: ${linkUrl}`);
-			await page.goto(linkUrl, { waitUntil: "networkidle2", timeout: 15000 });
-			finalUrl = page.url();
+			await workingPage.goto(linkUrl, {
+				waitUntil: "networkidle2",
+				timeout: 15000,
+			});
+			finalUrl = workingPage.url();
 			// Wait for page to fully load before doing any checks
 			console.log(`[LINK_ANALYSIS] Waiting for page to fully load...`);
 			await mediumDelay(2, 4);
@@ -379,7 +421,7 @@ export async function analyzeExternalLink(
 		};
 
 		// Extract and analyze page content for keywords and creator indicators
-		const pageContent = await page.evaluate(() => {
+		const pageContent = await workingPage.evaluate(() => {
 			// Check for content warning gates (Linktree "Sensitive Content", link.me "Mature Content", etc.)
 			const bodyText = document.body.textContent?.toLowerCase() || "";
 

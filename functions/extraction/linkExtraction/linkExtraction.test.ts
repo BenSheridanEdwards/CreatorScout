@@ -170,7 +170,7 @@ describe("linkExtraction", () => {
 
 	describe("analyzeExternalLink() - Content Warning Gates", () => {
 		test("detects Linktree creator signal as definitive creator signal (100% confidence)", async () => {
-			const mockPage = {
+			const mockPage: Record<string, unknown> = {
 				url: jest
 					.fn<() => string>()
 					.mockReturnValue("https://linktr.ee/testuser"),
@@ -212,10 +212,14 @@ describe("linkExtraction", () => {
 						hasMatureContentGate: false,
 						creatorPatterns: [],
 					}),
-			} as unknown as Page;
+			};
+			// Add browser() method that returns a mock browser with pages()
+			mockPage.browser = () => ({
+				pages: () => Promise.resolve([mockPage]),
+			});
 
 			const result = await analyzeExternalLink(
-				mockPage,
+				mockPage as unknown as Page,
 				"https://linktr.ee/testuser",
 			);
 
@@ -228,7 +232,7 @@ describe("linkExtraction", () => {
 		});
 
 		test("detects link.me creator signal as definitive creator signal (100% confidence)", async () => {
-			const mockPage = {
+			const mockPage: Record<string, unknown> = {
 				url: jest
 					.fn<() => string>()
 					.mockReturnValue("https://link.me/testuser"),
@@ -270,10 +274,14 @@ describe("linkExtraction", () => {
 						hasMatureContentGate: true,
 						creatorPatterns: [],
 					}),
-			} as unknown as Page;
+			};
+			// Add browser() method that returns a mock browser with pages()
+			mockPage.browser = () => ({
+				pages: () => Promise.resolve([mockPage]),
+			});
 
 			const result = await analyzeExternalLink(
-				mockPage,
+				mockPage as unknown as Page,
 				"https://link.me/testuser",
 			);
 
@@ -286,7 +294,7 @@ describe("linkExtraction", () => {
 		});
 
 		test("returns lower confidence when no content warning gates present", async () => {
-			const mockPage = {
+			const mockPage: Record<string, unknown> = {
 				url: jest
 					.fn<() => string>()
 					.mockReturnValue("https://linktr.ee/testuser"),
@@ -322,10 +330,14 @@ describe("linkExtraction", () => {
 						hasMatureContentGate: false,
 						creatorPatterns: [],
 					}),
-			} as unknown as Page;
+			};
+			// Add browser() method that returns a mock browser with pages()
+			mockPage.browser = () => ({
+				pages: () => Promise.resolve([mockPage]),
+			});
 
 			const result = await analyzeExternalLink(
-				mockPage,
+				mockPage as unknown as Page,
 				"https://linktr.ee/testuser",
 			);
 

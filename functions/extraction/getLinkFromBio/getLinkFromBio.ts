@@ -232,8 +232,9 @@ export async function clickBioLink(page: Page): Promise<{
 				const newUrl = newPage.url();
 				console.log(`[BIO_LINK] Link opened in new tab: ${newUrl}`);
 
-				// Close the new tab - analyzeExternalLink will navigate if needed
-				await newPage.close();
+				// Switch to the new tab instead of closing it
+				// This way analyzeExternalLink won't need to navigate again
+				await newPage.bringToFront();
 
 				if (newUrl && !newUrl.includes("instagram.com")) {
 					return { success: true, finalUrl: newUrl };
@@ -282,7 +283,9 @@ export async function clickBioLink(page: Page): Promise<{
 				await shortDelay(0.5, 1);
 				const tabUrl = newTabAfter.url();
 				console.log(`[BIO_LINK] Coordinate click opened new tab: ${tabUrl}`);
-				await newTabAfter.close();
+
+				// Switch to the new tab instead of closing it
+				await newTabAfter.bringToFront();
 
 				if (tabUrl && !tabUrl.includes("instagram.com")) {
 					return { success: true, finalUrl: tabUrl };
