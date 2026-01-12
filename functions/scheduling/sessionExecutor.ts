@@ -278,7 +278,15 @@ export async function runSmartSessionDirect(
 			logger.info("SESSION", `Processing seed: @${seed} (queue: ${queueSize})`);
 
 			try {
-				await processFollowingList(seed, page, metricsTracker, !dryRun);
+				// Pass controller.shouldContinue as the checkContinue function
+				// This avoids needing cycle tracking from scrape.ts
+				await processFollowingList(
+					seed,
+					page,
+					metricsTracker,
+					!dryRun,
+					() => controller.shouldContinue(),
+				);
 
 				// Update controller stats
 				const currentDMs =
