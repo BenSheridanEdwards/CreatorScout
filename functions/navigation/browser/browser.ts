@@ -199,91 +199,31 @@ export async function createPage(
 	await page.setViewport(viewport);
 	await page.setUserAgent(userAgent);
 
-	// Set up console logging to capture errors and warnings
-	page.on("console", (msg) => {
-		const type = msg.type();
-		const text = msg.text();
-
-		const ignoredPatterns = [
-			"Permissions-Policy header",
-			"GroupMarkerNotSet",
-			"Automatic fallback to software WebGL",
-		];
-
-		const shouldIgnore = ignoredPatterns.some((pattern) =>
-			text.includes(pattern),
-		);
-
-		if ((type === "error" || type === "warn") && !shouldIgnore) {
-			console.log(`[Browser Console ${type.toUpperCase()}]: ${text}`);
-		}
-	});
-
-	// Capture page errors
-	page.on("pageerror", (error) => {
-		const errorMessage = error?.message || String(error) || "Unknown error";
-
-		const ignoredErrors = ["__name is not defined", "is not defined"];
-
-		const shouldIgnore = ignoredErrors.some((pattern) =>
-			errorMessage.includes(pattern),
-		);
-
-		if (!shouldIgnore) {
-			console.log(`[Page Error]: ${errorMessage}`);
-		}
-	});
-
-	// Capture failed requests
-	page.on("requestfailed", (request) => {
-		const url = request.url();
-		const errorText = request.failure()?.errorText || "Unknown error";
-
-		const ignoredPatterns = [
-			"images/assets_DO_NOT_HARDCODE",
-			".png",
-			".jpg",
-			".jpeg",
-			".gif",
-			".webp",
-			"favicon.ico",
-			"net::ERR_ABORTED",
-		];
-
-		const shouldIgnore = ignoredPatterns.some(
-			(pattern) => url.includes(pattern) || errorText.includes(pattern),
-		);
-
-		if (!shouldIgnore) {
-			console.log(`[Request Failed]: ${url} - ${errorText}`);
-		}
-	});
-
 	// Add small initial delay (helps avoid detection)
 	await new Promise((resolve) =>
 		setTimeout(resolve, 1000 + Math.random() * 2000),
 	);
 
 	// Apply minimal stealth for local browser only.
-	// AdsPower handles all stealth automatically, so disable via `applyStealth: false`.
+	// AdsPower handles all fingerprinting (headers, stealth, etc.) automatically.
 	if (applyStealth) {
 		await applyLocalBrowserStealth(page);
-	}
 
-	// Set extra HTTP headers
-	await page.setExtraHTTPHeaders({
-		"Accept-Encoding": "gzip, deflate, br, zstd",
-		"Accept-Language": "en-US,en;q=0.9",
-		"Sec-Ch-Ua":
-			'"Google Chrome";v="131", "Chromium";v="131", "Not_A Brand";v="24"',
-		"Sec-Ch-Ua-Mobile": "?0",
-		"Sec-Ch-Ua-Platform": '"macOS"',
-		"Sec-Ch-Ua-Platform-Version": '"14.4.0"',
-		"Sec-Fetch-Dest": "document",
-		"Sec-Fetch-Mode": "navigate",
-		"Sec-Fetch-Site": "none",
-		"Sec-Fetch-User": "?1",
-	});
+		// Set extra HTTP headers only for local browser - AdsPower handles this
+		await page.setExtraHTTPHeaders({
+			"Accept-Encoding": "gzip, deflate, br, zstd",
+			"Accept-Language": "en-US,en;q=0.9",
+			"Sec-Ch-Ua":
+				'"Google Chrome";v="131", "Chromium";v="131", "Not_A Brand";v="24"',
+			"Sec-Ch-Ua-Mobile": "?0",
+			"Sec-Ch-Ua-Platform": '"macOS"',
+			"Sec-Ch-Ua-Platform-Version": '"14.4.0"',
+			"Sec-Fetch-Dest": "document",
+			"Sec-Fetch-Mode": "navigate",
+			"Sec-Fetch-Site": "none",
+			"Sec-Fetch-User": "?1",
+		});
+	}
 
 	return page;
 }

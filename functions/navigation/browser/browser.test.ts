@@ -169,16 +169,7 @@ describe("browser", () => {
 			expect(mockSetUserAgent).toHaveBeenCalledWith(customUA);
 		});
 
-		it("sets up console and error event handlers", async () => {
-			await createPage(mockBrowser);
-
-			expect(mockOn).toHaveBeenCalledWith("console", expect.any(Function));
-			expect(mockOn).toHaveBeenCalledWith("pageerror", expect.any(Function));
-			expect(mockOn).toHaveBeenCalledWith(
-				"requestfailed",
-				expect.any(Function),
-			);
-		});
+		// Browser console/error logging handlers removed - too noisy and not actionable
 
 		it("applies stealth when applyStealth is true", async () => {
 			await createPage(mockBrowser, { applyStealth: true });

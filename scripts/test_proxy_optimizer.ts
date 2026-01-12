@@ -45,8 +45,11 @@ async function testProxyOptimizer() {
 
 		// Navigate to a few pages to test blocking
 		logger.info("SESSION", "📱 Navigating to Instagram feed...");
-		await page.goto("https://www.instagram.com/", { waitUntil: "networkidle2" });
-		await new Promise(r => setTimeout(r, 3000));
+		await page.goto("https://www.instagram.com/", { 
+			waitUntil: "domcontentloaded",
+			timeout: 30000 
+		});
+		await new Promise(r => setTimeout(r, 5000)); // Wait for dynamic content
 
 		// Check stats
 		const stats = proxyOptimizer.getStats();
@@ -58,8 +61,11 @@ async function testProxyOptimizer() {
 
 		// Navigate to explore
 		logger.info("SESSION", "📱 Navigating to Explore...");
-		await page.goto("https://www.instagram.com/explore/", { waitUntil: "networkidle2" });
-		await new Promise(r => setTimeout(r, 3000));
+		await page.goto("https://www.instagram.com/explore/", { 
+			waitUntil: "domcontentloaded",
+			timeout: 30000 
+		});
+		await new Promise(r => setTimeout(r, 5000)); // Wait for dynamic content
 
 		// Check stats again
 		const stats2 = proxyOptimizer.getStats();
@@ -98,6 +104,7 @@ async function testProxyOptimizer() {
 	}
 
 	logger.info("SESSION", "🎉 ProxyOptimizer test completed successfully!");
+	process.exit(0); // Force exit (DB connections may keep process alive)
 }
 
 testProxyOptimizer().catch((error) => {
