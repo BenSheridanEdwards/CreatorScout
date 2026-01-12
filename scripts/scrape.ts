@@ -28,7 +28,10 @@ import {
 	openFollowingModal,
 	scrollFollowingModal,
 } from "../functions/navigation/modalOperations/modalOperations.ts";
-import { navigateToProfileAndCheck } from "../functions/navigation/profileNavigation/profileNavigation.ts";
+import {
+	checkProfileStatus,
+	navigateToProfileAndCheck,
+} from "../functions/navigation/profileNavigation/profileNavigation.ts";
 import { calculateScore } from "../functions/profile/bioMatcher/bioMatcher.ts";
 import {
 	addFollowingToQueue,
@@ -139,6 +142,7 @@ export async function processProfile(
 	source: string,
 	metricsTracker?: MetricsTracker,
 	sendDM: boolean = true,
+	skipNavigation: boolean = false,
 ): Promise<void> {
 	// Start performance timer
 	const timer = startTimer(`Profile processing: @${username}`);
@@ -169,15 +173,17 @@ export async function processProfile(
 			return;
 		}
 
-		// Navigate to profile and check status
+		// Navigate to profile and check status (skip navigation if already there from modal click)
 		const [profileDelayMin, profileDelayMax] = getDelay("profile_load");
 		const profileDelay =
 			profileDelayMin + Math.random() * (profileDelayMax - profileDelayMin);
 		await sleep(profileDelay * 1000);
 
-		const status = await navigateToProfileAndCheck(page, username, {
-			timeout: 15000,
-		});
+		const status = skipNavigation
+			? await checkProfileStatus(page)
+			: await navigateToProfileAndCheck(page, username, {
+					timeout: 15000,
+				});
 
 		// Silent scroll-check: IG sometimes serves half-rendered stub on fast clicks
 		// This nudge wakes the DOM before bio analysis
@@ -787,7 +793,7 @@ export async function processFollowingList(
 		// ═══════════════════════════════════════════════════════════════════════
 		let batchProcessed = 0;
 
-		// Process first profile
+		// Process first profile (skip navigation if we successfully clicked in modal)
 		try {
 			await processProfile(
 				firstUsername,
@@ -795,6 +801,7 @@ export async function processFollowingList(
 				`following_of_${seedUsername}`,
 				metricsTracker,
 				sendDM,
+				clicked, // skipNavigation - we already navigated via modal click
 			);
 			batchProcessed++;
 			totalProcessed++;
