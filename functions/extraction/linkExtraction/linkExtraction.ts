@@ -41,6 +41,18 @@ const CREATOR_PLATFORMS = [
 	"justforfans.com",
 	"patreon.com",
 	"subscribestar.com",
+	"fanfix.io",
+	"hidden.com",
+	"pornhub.com",
+	"xvideos.com",
+	"clips4sale.com",
+	"modelhub.com",
+	"iwantclips.com",
+	"extralunchmoney.com",
+	"admireme.vip",
+	"unlockd.me",
+	"mym.fans",
+	"frisk.chat",
 ];
 
 const AGGREGATOR_DOMAINS = [
@@ -55,8 +67,11 @@ const AGGREGATOR_DOMAINS = [
 
 const CREATOR_KEYWORDS = [
 	"patreon",
+	"ko-fi",
 	"fanvue",
+	"fanfix",
 	"loyal fans",
+	"loyalfans",
 	"manyvids",
 	"justforfans",
 	"subscribe",
@@ -74,6 +89,10 @@ const CREATOR_KEYWORDS = [
 	"private account",
 	"get access",
 	"limited time",
+	"hidden content",
+	"my hidden",
+	"wishlist",
+	"amazon wishlist",
 	"my content",
 	"chat with me",
 	"content",
@@ -402,10 +421,11 @@ export async function analyzeExternalLink(
 				.filter((alt): alt is string => Boolean(alt))
 				.map((alt) => alt.toLowerCase());
 
-			// Look for social media icons by src patterns
+			// Look for social media icons by src patterns (case-insensitive)
 			const socialIcons = Array.from(images)
 				.filter((img) => {
-					const src = img.getAttribute("src") || "";
+					const src = (img.getAttribute("src") || "").toLowerCase();
+					const alt = (img.getAttribute("alt") || "").toLowerCase();
 					return (
 						src.includes("patreon") ||
 						src.includes("fanvue") ||
@@ -413,7 +433,18 @@ export async function analyzeExternalLink(
 						src.includes("manyvids") ||
 						src.includes("justforfans") ||
 						src.includes("patreon") ||
-						src.includes("subscribestar")
+						src.includes("subscribestar") ||
+						src.includes("ko-fi") ||
+						src.includes("fanfix") ||
+						src.includes("hidden") ||
+						src.includes("mym") ||
+						src.includes("frisk") ||
+						src.includes("admireme") ||
+						// Also check alt text for platform names
+						alt.includes("patreon") ||
+						alt.includes("ko-fi") ||
+						alt.includes("fanfix") ||
+						alt.includes("fanvue")
 					);
 				})
 				.map((img) => img.getAttribute("alt") || "social_icon");
@@ -489,10 +520,14 @@ export async function analyzeExternalLink(
 				"creator link",
 				"ko-fi",
 				"fanvue",
+				"fanfix",
 				"loyalfans",
 				"loyal fans",
 				"manyvids",
 				"justforfans",
+				"admireme",
+				"mym.fans",
+				"frisk.chat",
 				// Definitive content signals
 				"exclusive content",
 				"premium content",
@@ -510,6 +545,7 @@ export async function analyzeExternalLink(
 				"subscribe for",
 				"vip access",
 				"vip content",
+				"wishlist",
 				// Creator/dominant language patterns
 				"you belong to",
 				"belong to me",
@@ -550,10 +586,14 @@ export async function analyzeExternalLink(
 			"creator link",
 			"ko-fi",
 			"fanvue",
+			"fanfix",
 			"loyalfans",
 			"loyal fans",
 			"manyvids",
 			"justforfans",
+			"admireme",
+			"mym.fans",
+			"frisk.chat",
 			// Definitive content signals
 			"exclusive content",
 			"premium content",
@@ -571,6 +611,7 @@ export async function analyzeExternalLink(
 			"subscribe for",
 			"vip access",
 			"vip content",
+			"wishlist",
 			// Creator/dominant language patterns
 			"you belong to",
 			"belong to me",
@@ -678,6 +719,8 @@ export async function analyzeExternalLink(
 			{ text: "loyalfans", label: "LOYALFANS", reason: "loyalfans" },
 			{ text: "loyal fans", label: "LOYALFANS", reason: "loyalfans" },
 			{ text: "manyvids", label: "MANYVIDS", reason: "manyvids" },
+			{ text: "fanfix", label: "FANFIX", reason: "fanfix" },
+			{ text: "fan fix", label: "FANFIX", reason: "fanfix" },
 			{
 				text: "mature content",
 				label: "MATURE CONTENT",
@@ -803,12 +846,19 @@ export async function analyzeExternalLink(
 		// Look for social media platform indicators in image alts and icons
 		const platformIndicators = [
 			"patreon",
+			"ko-fi",
 			"fanvue",
+			"fanfix",
 			"loyal fans",
+			"loyalfans",
 			"manyvids",
 			"justforfans",
 			"patreon",
 			"subscribestar",
+			"hidden",
+			"mym",
+			"frisk",
+			"admireme",
 		];
 
 		const platformMatches = platformIndicators.filter(
@@ -837,8 +887,10 @@ export async function analyzeExternalLink(
 					"creator link",
 					"ko-fi",
 					"fanvue",
+					"fanfix",
 					"loyalfans",
 					"manyvids",
+					"justforfans",
 					"custom content",
 					"nsfw",
 					"exclusive",
@@ -847,6 +899,8 @@ export async function analyzeExternalLink(
 					"chat with me",
 					"you belong to",
 					"belong to me",
+					"hidden content",
+					"my hidden",
 					"mommy treatment",
 					"daddy treatment",
 				].includes(pattern),

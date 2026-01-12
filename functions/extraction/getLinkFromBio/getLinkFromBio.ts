@@ -227,6 +227,8 @@ export async function clickBioLink(page: Page): Promise<{
 			});
 
 			if (newPage) {
+				// Wait a moment for redirects to complete before getting URL
+				await shortDelay(0.5, 1);
 				const newUrl = newPage.url();
 				console.log(`[BIO_LINK] Link opened in new tab: ${newUrl}`);
 
@@ -239,7 +241,8 @@ export async function clickBioLink(page: Page): Promise<{
 						waitUntil: "networkidle2",
 						timeout: 15000,
 					});
-					return { success: true, finalUrl: page.url() };
+					// Return the URL we navigated to, not page.url() which might differ due to redirects
+					return { success: true, finalUrl: newUrl };
 				}
 			}
 		}
@@ -281,6 +284,8 @@ export async function clickBioLink(page: Page): Promise<{
 			});
 
 			if (newTabAfter) {
+				// Wait a moment for redirects to complete
+				await shortDelay(0.5, 1);
 				const tabUrl = newTabAfter.url();
 				console.log(`[BIO_LINK] Coordinate click opened new tab: ${tabUrl}`);
 				await newTabAfter.close();
@@ -290,7 +295,8 @@ export async function clickBioLink(page: Page): Promise<{
 						waitUntil: "networkidle2",
 						timeout: 15000,
 					});
-					return { success: true, finalUrl: page.url() };
+					// Return the URL we navigated to, not page.url() which might differ
+					return { success: true, finalUrl: tabUrl };
 				}
 			}
 		}
