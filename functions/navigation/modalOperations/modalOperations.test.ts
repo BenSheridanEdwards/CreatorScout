@@ -78,7 +78,7 @@ describe("modalOperations", () => {
 					.fn<() => Promise<ElementHandle<Element> | null>>()
 					.mockResolvedValueOnce(mockElement) // First selector finds element
 					.mockResolvedValueOnce(mockElement), // Modal check finds dialog
-				evaluate: jest.fn(),
+				evaluate: jest.fn().mockResolvedValue(5), // waitForModalContent returns user count
 			} as unknown as Page;
 
 			const ok = await openFollowingModal(page);
@@ -104,20 +104,16 @@ describe("modalOperations", () => {
 					.mockResolvedValueOnce(null)
 					.mockResolvedValueOnce(mockDialog), // Modal check succeeds
 				evaluate: jest
-					.fn<
-						() => Promise<{
-							found: boolean;
-							x: number;
-							y: number;
-							href: string;
-						}>
-					>()
-					.mockResolvedValue({
+					.fn()
+					// First call: fallback link finding
+					.mockResolvedValueOnce({
 						found: true,
 						x: 100,
 						y: 200,
 						href: "/testuser/following/",
-					}),
+					})
+					// Subsequent calls: waitForModalContent user count
+					.mockResolvedValue(5),
 			} as unknown as Page;
 
 			const ok = await openFollowingModal(page);

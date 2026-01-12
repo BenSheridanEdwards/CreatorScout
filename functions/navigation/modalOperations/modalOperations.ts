@@ -12,6 +12,65 @@ import {
 const logger = createLogger();
 
 /**
+ * Wait for modal content (user links) to load.
+ * Instagram modals open immediately but content loads async via API.
+ */
+async function waitForModalContent(
+	page: Page,
+	timeoutMs: number = 10000,
+): Promise<boolean> {
+	const startTime = Date.now();
+	const checkInterval = 500;
+
+	while (Date.now() - startTime < timeoutMs) {
+		try {
+			const userLinksCount = await page.evaluate(() => {
+				const dialog = document.querySelector('div[role="dialog"]');
+				if (!dialog) return 0;
+
+				const links = dialog.querySelectorAll('a[href^="/"]');
+				let count = 0;
+
+				for (const link of links) {
+					const href = link.getAttribute("href") || "";
+					const parts = href.split("/").filter(Boolean);
+					// Username links are single path segment
+					if (parts.length === 1) {
+						const name = parts[0].toLowerCase();
+						const systemPages = [
+							"explore",
+							"direct",
+							"accounts",
+							"stories",
+							"reels",
+							"p",
+							"tv",
+							"reel",
+						];
+						if (!systemPages.includes(name)) {
+							count++;
+						}
+					}
+				}
+				return count;
+			});
+
+			if (userLinksCount >= 1) {
+				logger.debug("MODAL", `Content loaded: ${userLinksCount} user links found`);
+				return true;
+			}
+		} catch {
+			// Retry
+		}
+
+		await new Promise((r) => setTimeout(r, checkInterval));
+	}
+
+	logger.warn("MODAL", `Content load timeout after ${timeoutMs}ms`);
+	return false;
+}
+
+/**
  * Open the "Following" modal for a profile.
  * Uses ghost-cursor for human-like clicking.
  */
@@ -66,8 +125,13 @@ export async function openFollowingModal(page: Page): Promise<boolean> {
 					.then((el) => el !== null);
 
 				if (modalOpened) {
-					logger.info("MODAL", "Following modal opened");
-					return true;
+					// Wait for content to load (usernames)
+					const contentLoaded = await waitForModalContent(page);
+					if (contentLoaded) {
+						logger.info("MODAL", "Following modal opened with content");
+						return true;
+					}
+					logger.warn("MODAL", "Modal opened but content didn't load");
 				}
 			}
 		} catch {
@@ -116,8 +180,13 @@ export async function openFollowingModal(page: Page): Promise<boolean> {
 				.then((el) => el !== null);
 
 			if (modalOpened) {
-				logger.info("MODAL", "Following modal opened");
-				return true;
+				// Wait for content to load (usernames)
+				const contentLoaded = await waitForModalContent(page);
+				if (contentLoaded) {
+					logger.info("MODAL", "Following modal opened with content");
+					return true;
+				}
+				logger.warn("MODAL", "Modal opened but content didn't load");
 			}
 		}
 	} catch {
