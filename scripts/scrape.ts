@@ -315,8 +315,9 @@ export async function processProfile(
 		return { wasCreator: false, hadEngagement };
 	}
 
-	// RANDOM ENGAGEMENT: Break bot patterns with natural actions
-	if (shouldEngageOnProfile(quickScore)) {
+	// RANDOM ENGAGEMENT: Only engage with confirmed creators
+	// Skip engagement on non-creator profiles to avoid wasting time and appearing bot-like
+	if (analysis.isCreator && shouldEngageOnProfile(quickScore)) {
 		const engagementResult = await performRandomEngagement(page, username);
 		// Track successful engagements (not "none" type and succeeded)
 		if (engagementResult.type !== "none" && engagementResult.success) {
