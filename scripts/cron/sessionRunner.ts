@@ -122,15 +122,15 @@ async function runSession(args: SessionArgs): Promise<void> {
 		browser = session.browser;
 		const page = session.page;
 
-		// Warm-up if needed
+		// Warm-up if needed (actions tracked for engagement ratio)
 		if (needsWarmup(profile.sessions.lastSessionAt)) {
 			logger.info("SESSION", "Performing warm-up...");
-			await warmUpProfile(page);
+			await warmUpProfile(page, undefined, engagementTracker);
+		} else {
+			// No warm-up needed, but still need initial engagement for ratio
+			logger.info("SESSION", "Performing initial engagement batch...");
+			await batchEngagements(page, engagementTracker);
 		}
-
-		// Initial engagement batch
-		logger.info("SESSION", "Performing initial engagement batch...");
-		await batchEngagements(page, engagementTracker);
 
 		// Main loop - run until session time expires
 		let actionsPerformed = 0;

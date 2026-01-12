@@ -164,10 +164,10 @@ async function runRampUpTest(args: RampUpArgs): Promise<RampUpResults> {
 	const engagementTracker = new EngagementTracker();
 
 	try {
-		// Warm-up
+		// Warm-up (actions tracked for engagement ratio)
 		logger.info("RAMPUP", "");
 		logger.info("RAMPUP", "🔥 Running warm-up...");
-		await warmUpProfile(page, 1);
+		await warmUpProfile(page, 1, engagementTracker);
 
 		// Ramp-up test: gradually increase actions
 		logger.info("RAMPUP", "");

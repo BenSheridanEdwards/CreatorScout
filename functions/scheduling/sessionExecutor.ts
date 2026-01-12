@@ -181,14 +181,10 @@ export async function runSmartSessionDirect(args: SessionExecutorArgs): Promise<
 
 		logger.info("SESSION", "✓ Session initialized");
 
-		// Warm-up (minimal to save bandwidth)
+		// Warm-up (actions tracked for engagement ratio)
 		logger.info("SESSION", "🔥 Quick warm-up...");
-		await warmUpProfile(page, 1.0); // Reduced warm-up
+		await warmUpProfile(page, 1.0, engagementTracker);
 		logger.info("SESSION", "✓ Warm-up complete");
-
-		// Initial engagement batch
-		logger.info("SESSION", "Performing initial engagement...");
-		await batchEngagements(page, engagementTracker, 8);
 
 		// Main discovery loop
 		logger.info("SESSION", `Starting discovery loop (target: ${plan.targetDMs} DMs)`);

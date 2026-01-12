@@ -151,14 +151,10 @@ async function runSmartSession(args: SessionArgs): Promise<void> {
 
 		logger.info("SESSION", "✓ Session initialized");
 
-		// Warm-up
+		// Warm-up (actions tracked for engagement ratio)
 		logger.info("SESSION", "🔥 Warming up profile...");
-		await warmUpProfile(page, 1.5);
+		await warmUpProfile(page, 1.5, engagementTracker);
 		logger.info("SESSION", "✓ Warm-up complete");
-
-		// Initial engagement batch
-		logger.info("SESSION", "Performing initial engagement...");
-		await batchEngagements(page, engagementTracker, 10);
 
 		// Main discovery loop with fuzzy target
 		logger.info(

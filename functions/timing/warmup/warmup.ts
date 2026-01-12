@@ -4,6 +4,10 @@
  * Quick 1-2 minute warm-up before starting outbound actions.
  * Makes the session look natural without wasting time.
  * Uses ghost-cursor for human-like interactions.
+ *
+ * When an EngagementTracker is provided, warm-up actions count toward
+ * the engagement ratio, eliminating the need for a separate initial
+ * engagement batch.
  */
 import type { Page } from "puppeteer";
 import {
@@ -11,6 +15,7 @@ import {
 	humanScroll,
 } from "../../navigation/humanInteraction/humanInteraction.ts";
 import { WARMUP_DURATION_MINUTES } from "../../shared/config/config.ts";
+import type { EngagementTracker } from "../../shared/engagement/engagementTracker.ts";
 import { createLogger } from "../../shared/logger/logger.ts";
 import { mediumDelay, microDelay, shortDelay } from "../humanize/humanize.ts";
 
@@ -34,11 +39,13 @@ export interface WarmupStats {
  *
  * @param page - Puppeteer page instance
  * @param durationMinutes - Target warm-up duration (default 1.5 min)
+ * @param tracker - Optional engagement tracker to record actions (eliminates need for separate initial engagement)
  * @returns Warm-up statistics
  */
 export async function warmUpProfile(
 	page: Page,
 	durationMinutes: number = WARMUP_DURATION_MINUTES,
+	tracker?: EngagementTracker,
 ): Promise<WarmupStats> {
 	const startTime = Date.now();
 	const targetDuration = durationMinutes * 60 * 1000;
@@ -64,23 +71,24 @@ export async function warmUpProfile(
 		}
 
 		// Quick scroll sequence
-		stats.scrolls = await quickScrollFeed(page);
+		stats.scrolls = await quickScrollFeed(page, tracker);
 
 		// Check if we still have time
 		if (Date.now() - startTime < targetDuration * 0.6) {
 			// Try to like some posts
-			stats.likes = await likeVisiblePosts(page, 2);
+			stats.likes = await likeVisiblePosts(page, 2, tracker);
 		}
 
 		// Watch reels if we have time
 		if (Date.now() - startTime < targetDuration * 0.8) {
-			stats.reelsWatched = await watchReels(page, 2);
+			stats.reelsWatched = await watchReels(page, 2, tracker);
 		}
 
 		// Final scroll
 		if (Date.now() - startTime < targetDuration) {
 			await humanScroll(page);
 			stats.scrolls++;
+			tracker?.recordEngagement("scroll");
 		}
 	} catch (error) {
 		logger.warn(
@@ -102,7 +110,10 @@ export async function warmUpProfile(
 /**
  * Quick scroll through the feed
  */
-async function quickScrollFeed(page: Page): Promise<number> {
+async function quickScrollFeed(
+	page: Page,
+	tracker?: EngagementTracker,
+): Promise<number> {
 	let scrolls = 0;
 	const scrollCount = 2 + Math.floor(Math.random() * 2); // 2-3 scrolls
 
@@ -112,6 +123,7 @@ async function quickScrollFeed(page: Page): Promise<number> {
 
 		await humanScroll(page, { deltaY: distance });
 		scrolls++;
+		tracker?.recordEngagement("scroll");
 
 		// Short pause
 		await shortDelay(1, 2);
@@ -123,7 +135,11 @@ async function quickScrollFeed(page: Page): Promise<number> {
 /**
  * Like visible posts in the feed using human-like clicking
  */
-async function likeVisiblePosts(page: Page, maxLikes: number): Promise<number> {
+async function likeVisiblePosts(
+	page: Page,
+	maxLikes: number,
+	tracker?: EngagementTracker,
+): Promise<number> {
 	let liked = 0;
 
 	try {
@@ -137,6 +153,7 @@ async function likeVisiblePosts(page: Page, maxLikes: number): Promise<number> {
 				// Click the button with human-like behavior
 				await humanClick(page, button, { elementType: "button" });
 				liked++;
+				tracker?.recordEngagement("like");
 
 				// Quick delay between likes
 				await microDelay(0.5, 1.5);
@@ -154,7 +171,11 @@ async function likeVisiblePosts(page: Page, maxLikes: number): Promise<number> {
 /**
  * Watch a few reels
  */
-async function watchReels(page: Page, count: number): Promise<number> {
+async function watchReels(
+	page: Page,
+	count: number,
+	tracker?: EngagementTracker,
+): Promise<number> {
 	let watched = 0;
 
 	try {
@@ -172,6 +193,7 @@ async function watchReels(page: Page, count: number): Promise<number> {
 			// Watch for 3-8 seconds
 			await mediumDelay(3, 8);
 			watched++;
+			tracker?.recordEngagement("reel");
 
 			// Scroll to next reel
 			await page.keyboard.press("ArrowDown");
