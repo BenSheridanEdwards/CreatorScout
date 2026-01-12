@@ -201,7 +201,9 @@ export async function initializeInstagramSession(
 		await new Promise((r) => setTimeout(r, preNavDelay));
 
 		await page.goto("https://www.instagram.com/", {
-			waitUntil: "networkidle0",
+			// Use domcontentloaded instead of networkidle0 because blocking resources
+			// causes infinite retries that never settle to "idle"
+			waitUntil: "domcontentloaded",
 			timeout: 30000,
 		});
 		logger.info("SESSION", "✅ Navigation completed");

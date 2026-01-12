@@ -109,11 +109,11 @@ export class ProxyOptimizer {
 				this.stats.savedBytes += savedBytes;
 				this.stats.savedMB = this.stats.savedBytes / (1024 * 1024);
 
-				// Log summary every 100 blocked requests
-				if (this.stats.blockedCount % 100 === 0) {
+				// Log summary every 1000 blocked requests
+				if (this.stats.blockedCount % 1000 === 0) {
 					logger.info(
 						"PROXY",
-						`Blocked ${this.stats.blockedCount} requests (~${this.stats.savedMB.toFixed(1)}MB saved)`,
+						`📊 Used: ${this.stats.estimatedMB.toFixed(1)}MB | Saved: ${this.stats.savedMB.toFixed(1)}MB | Blocked: ${this.stats.blockedCount}`,
 					);
 				}
 
@@ -279,14 +279,15 @@ export class ProxyOptimizer {
 	 */
 	async finalize(): Promise<BandwidthStats> {
 		const stats = this.getStats();
+		const totalPotential = stats.estimatedMB + stats.savedMB;
+		const savingsPercent =
+			totalPotential > 0
+				? ((stats.savedMB / totalPotential) * 100).toFixed(0)
+				: "0";
 
 		logger.info(
 			"PROXY",
-			`Session bandwidth: ${stats.estimatedMB.toFixed(2)}MB (${stats.requestCount} requests)`,
-		);
-		logger.info(
-			"PROXY",
-			`Blocked: ${stats.blockedCount} requests, saved ~${stats.savedMB.toFixed(2)}MB`,
+			`📊 Session complete: Used ${stats.estimatedMB.toFixed(1)}MB | Saved ${stats.savedMB.toFixed(1)}MB (${savingsPercent}% reduction)`,
 		);
 
 		// Persist to database
