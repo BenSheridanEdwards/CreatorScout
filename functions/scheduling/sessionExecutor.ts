@@ -233,7 +233,7 @@ export async function runSmartSessionDirect(
 		// Initialize Instagram session (this is where proxy connects)
 		logger.info("SESSION", "Initializing Instagram session...");
 		const session = await initializeInstagramSession({
-			headless: true,
+			headless: false, // Visible browser for monitoring
 			adsPowerProfileId: profile.adsPowerProfileId,
 			profileId: profile.id,
 			debug: false, // Reduce screenshot overhead
