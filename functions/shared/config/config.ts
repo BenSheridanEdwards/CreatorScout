@@ -29,7 +29,7 @@ export const LOCAL_BROWSER = _flag("LOCAL_BROWSER", FAST_MODE);
 export const DEBUG_SCREENSHOTS = _flag("DEBUG_SCREENSHOTS", false);
 export const PRIORITIZE_QUEUE_OVER_SEEDS = _flag(
 	"PRIORITIZE_QUEUE_OVER_SEEDS",
-	false,
+	true,
 );
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -243,6 +243,9 @@ export const TOTAL_SESSION_TIME_PER_DAY = 45; // minutes per account
 // Soft cap: max new queue adds per cycle (prevents single-network crawl explosion)
 export const MAX_QUEUE_ADDS_PER_CYCLE = 25;
 
+// Batch size for processing following lists (extract this many, process, repeat)
+export const FOLLOWING_BATCH_SIZE = 30;
+
 // DM velocity: minimum seconds between DMs (prevents burst flagging)
 export const MIN_SECONDS_BETWEEN_DMS = 5 * 60; // 5 minutes
 
@@ -263,5 +266,4 @@ export const VISION_MODEL_FALLBACK = "openai/gpt-4o-mini"; // Reliable paid fall
 
 export const CONFIDENCE_THRESHOLD = 70;
 export const MAX_DMS_PER_DAY = 120;
-export const DM_MESSAGE =
-	"I've got some bad news for you"; // change it
+export const DM_MESSAGE = "I've got some bad news for you"; // change it

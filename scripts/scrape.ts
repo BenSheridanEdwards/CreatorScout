@@ -1,26 +1,26 @@
 /**
  * Scout - Instagram Patreon Creator Discovery Agent
  *
- * Flow:
- * 1. Go to seed profile → click Following → open modal
- * 2. Get <li> list items from following modal
- * 3. For each profile (batch of 10):
- *    - Skip if already visited
- *    - Click into profile, read bio
- *    - Keyword/emoji matching on bio (cheap)
+ * OPTIMIZED Flow (streamlined for efficiency):
+ * 1. Go to seed profile → click Following → open modal (ONCE)
+ * 2. Extract ALL unvisited usernames from modal (with scrolling)
+ * 3. Close modal (ONCE)
+ * 4. For each username (sequential, no returning to seed):
+ *    - Navigate directly to profile
+ *    - Analyze bio + keyword/emoji matching (cheap)
  *    - If promising: click linktree, screenshot, vision analysis (expensive)
- * 4. If confirmed creator:
+ * 5. If confirmed creator:
  *    - Check DM thread empty → send DM
  *    - Follow if not following
  *    - Mark in database
- *    - Click their Following → repeat process
- * 5. Pagination: if all 10 visited, scroll modal and get next batch
+ *    - Add their following to queue for later expansion
  */
 
 import { existsSync, readFileSync } from "node:fs";
 import type { Browser, Page } from "puppeteer";
 import { initializeInstagramSession } from "../functions/auth/sessionInitializer/sessionInitializer.ts";
 import { getProfileStats } from "../functions/extraction/getProfileStats/getProfileStats.ts";
+import { humanScroll } from "../functions/navigation/humanInteraction/humanInteraction.ts";
 import {
 	clickUsernameInModal,
 	extractFollowingUsernames,
@@ -47,11 +47,9 @@ import {
 	CONFIDENCE_THRESHOLD,
 	MAX_DMS_PER_DAY,
 } from "../functions/shared/config/config.ts";
-import { warmUpProfile } from "../functions/timing/warmup/warmup.ts";
 import {
 	getScrollIndex,
 	getStats,
-	initDb,
 	markAsCreator,
 	markVisited,
 	queueAdd,
@@ -75,8 +73,8 @@ import {
 	mouseWiggle,
 	shortDelay,
 } from "../functions/timing/humanize/humanize.ts";
-import { humanScroll } from "../functions/navigation/humanInteraction/humanInteraction.ts";
 import { sleep } from "../functions/timing/sleep/sleep.ts";
+import { warmUpProfile } from "../functions/timing/warmup/warmup.ts";
 
 // NOTE: Database init is async; we run it inside the main entrypoints.
 
@@ -493,6 +491,18 @@ export async function processProfile(
 
 /**
  * Process the following list of a seed profile.
+ *
+ * BATCHED FLOW (fully exhausts seed):
+ * 1. Navigate to seed profile
+ * 2. Open following modal
+ * 3. Extract a batch of unvisited usernames
+ * 4. Click first username (natural navigation), close modal
+ * 5. Process the batch
+ * 6. If more profiles exist, go back to seed and repeat from step 2
+ * 7. Continue until following list is exhausted (scroll flatline)
+ *
+ * This approach fully exhausts each seed's following list rather than
+ * artificially capping extraction and moving on.
  */
 export async function processFollowingList(
 	seedUsername: string,
@@ -501,208 +511,370 @@ export async function processFollowingList(
 	sendDM: boolean = true,
 	checkContinue: () => boolean = shouldContinue,
 ): Promise<void> {
-	// Navigate to seed profile
-	try {
-		const status = await navigateToProfileAndCheck(page, seedUsername, {
-			timeout: 15000,
-		});
+	const { closeModal } = await import(
+		"../functions/navigation/modalOperations/modalOperations.ts"
+	);
+	const { FOLLOWING_BATCH_SIZE } = await import(
+		"../functions/shared/config/config.ts"
+	);
 
-		if (status.notFound || status.isPrivate) {
-			cycleManager.recordWarning(
-				status.notFound ? "PROFILE_NOT_FOUND" : "PROFILE_PRIVATE",
-				`Seed profile is ${status.notFound ? "not found" : "private"}`,
-				seedUsername,
-			);
-			return;
-		}
-	} catch (err) {
-		const error = err instanceof Error ? err : new Error(String(err));
-		recordError(error, `seed_profile_load_${seedUsername}`, seedUsername);
-		return;
-	}
+	logger.info("PROFILE", `Processing following list of @${seedUsername}`);
 
-	// Check if profile has any following before trying to open modal
-	const stats = await getProfileStats(page);
-	if (stats.following === 0) {
-		cycleManager.recordWarning(
-			"PROFILE_NOT_FOUND",
-			"Profile has 0 following",
-			seedUsername,
-		);
-		return;
-	}
+	let totalProcessed = 0;
+	let followingListExhausted = false;
+	let batchNumber = 0;
 
-	// Open following modal
-	const modalOpened = await openFollowingModal(page);
-	if (!modalOpened) {
-		recordError(
-			"Modal opening failed",
-			`modal_open_${seedUsername}`,
-			seedUsername,
-		);
-		return;
-	}
+	// Keep processing batches until the following list is exhausted
+	while (!followingListExhausted && checkContinue()) {
+		batchNumber++;
+		logger.info("BATCH", `Starting batch #${batchNumber} for @${seedUsername}`);
 
-	// Check if the modal is empty (no people followed)
-	const isEmpty = await isFollowingModalEmpty(page);
-	if (isEmpty) {
-		cycleManager.recordWarning(
-			"PROFILE_NOT_FOUND",
-			"Following list is empty",
-			seedUsername,
-		);
-		// Close the modal before returning
-		await page.keyboard.press("Escape");
-		await shortDelay(0.5, 1);
-		return;
-	}
-
-	// Get current scroll index
-	let scrollIndex = await getScrollIndex(seedUsername);
-
-	// If we've scrolled before, scroll to that position
-	if (scrollIndex > 0) {
-		for (let i = 0; i < Math.floor(scrollIndex / 500); i++) {
-			await scrollFollowingModal(page, 500);
-		}
-		await shortDelay(1, 2);
-	}
-
-	let processedInBatch = 0;
-	const batchSize = 10;
-	let consecutiveAllVisited = 0;
-	const maxConsecutiveAllVisited = 3;
-	let lastExtractedUsernames: string[] | null = null; // Track last extraction to detect stuck modal
-	let lastScrollHeight = 0; // Track DOM height for flatline detection
-	let scrollHeightFlatlineCount = 0; // Only break if flatlines twice
-
-	while (consecutiveAllVisited < maxConsecutiveAllVisited && checkContinue()) {
+		// ═══════════════════════════════════════════════════════════════════════
+		// STEP 1: Navigate to seed profile
+		// ═══════════════════════════════════════════════════════════════════════
 		try {
-			// Extract usernames from modal
-			const usernames = await extractFollowingUsernames(page, batchSize);
+			logger.debug("NAVIGATION", `Navigating to seed profile @${seedUsername}`);
+			const status = await navigateToProfileAndCheck(page, seedUsername, {
+				timeout: 15000,
+			});
 
-			if (usernames.length === 0) {
-				break;
-			}
-
-			// Process each username
-			let allVisited = true;
-			for (const username of usernames) {
-				if (!(await wasVisited(username))) {
-					allVisited = false;
-
-					// Try clicking directly on the username in the modal
-					const clicked = await clickUsernameInModal(page, username);
-					if (!clicked) {
-						// Fallback: close modal and navigate via search
-						await page.keyboard.press("Escape");
-						await shortDelay(0.5, 1); // brief delay after modal close
-					}
-
-					try {
-						await processProfile(
-							username,
-							page,
-							`following_of_${seedUsername}`,
-							metricsTracker,
-							sendDM,
-						);
-						processedInBatch++;
-					} catch (profileError) {
-						const error =
-							profileError instanceof Error
-								? profileError
-								: new Error(String(profileError));
-						recordError(error, `profile_processing_${username}`, username);
-					}
-
-					// Re-open the following modal
-					const status = await navigateToProfileAndCheck(page, seedUsername, {
-						timeout: 15000,
-					});
-					if (!status.notFound && !status.isPrivate) {
-						await openFollowingModal(page);
-
-						// Scroll back to position if needed
-						if (scrollIndex > 0) {
-							for (let i = 0; i < Math.floor(scrollIndex / 500); i++) {
-								await scrollFollowingModal(page, 500);
-							}
-							await shortDelay(1, 2);
-						}
-					}
-				}
-			}
-
-			// If all in batch were already visited, scroll for more
-			if (allVisited) {
-				consecutiveAllVisited++;
-
-				// Check if we're getting the same usernames (stuck modal)
-				if (
-					lastExtractedUsernames &&
-					JSON.stringify(lastExtractedUsernames.sort()) ===
-						JSON.stringify(usernames.sort())
-				) {
-					consecutiveAllVisited = maxConsecutiveAllVisited; // Force exit
-				} else {
-					lastExtractedUsernames = [...usernames];
-					const scrollResult = await scrollFollowingModal(page, 500);
-					scrollIndex += 500;
-					await updateScrollIndex(seedUsername, scrollIndex);
-
-					// Track DOM height for flatline detection
-					// IG lazy-loads slow—only quit if height flatlines TWICE
-					if (scrollResult.scrollHeight === lastScrollHeight) {
-						scrollHeightFlatlineCount++;
-						if (scrollHeightFlatlineCount >= 2) {
-							break;
-						}
-					} else {
-						scrollHeightFlatlineCount = 0; // Reset on height change
-						lastScrollHeight = scrollResult.scrollHeight;
-					}
-
-					await shortDelay(1, 2);
-				}
-			} else {
-				consecutiveAllVisited = 0;
-				scrollHeightFlatlineCount = 0; // Reset on successful processing
-				lastExtractedUsernames = [...usernames];
-			}
-
-			// Safety: don't process too many in one go
-			if (processedInBatch >= 50) {
-				break;
+			if (status.notFound || status.isPrivate) {
+				const reason = status.notFound ? "not found" : "private";
+				logger.warn("PROFILE", `Seed profile @${seedUsername} is ${reason}`);
+				cycleManager.recordWarning(
+					status.notFound ? "PROFILE_NOT_FOUND" : "PROFILE_PRIVATE",
+					`Seed profile is ${reason}`,
+					seedUsername,
+				);
+				return;
 			}
 		} catch (err) {
 			const error = err instanceof Error ? err : new Error(String(err));
-			recordError(
-				error,
-				`following_batch_processing_${seedUsername}`,
-				seedUsername,
-			);
-			logger.error(
-				"ERROR",
-				`Batch processing failed for @${seedUsername}, stopping`,
-			);
+			recordError(error, `seed_profile_load_${seedUsername}`, seedUsername);
 			await logger.errorWithScreenshot(
 				"ERROR",
-				`Batch processing failed for @${seedUsername}: ${
+				`Failed to load seed profile @${seedUsername}: ${
 					err instanceof Error ? err.message : String(err)
 				}`,
 				page,
-				`batch_processing_failed_${seedUsername}`,
+				`seed_profile_load_${seedUsername}`,
 			);
+			return;
+		}
+
+		// Check if profile has any following (only on first batch)
+		if (batchNumber === 1) {
+			const stats = await getProfileStats(page);
+			if (stats.following === 0) {
+				logger.warn(
+					"PROFILE",
+					`@${seedUsername} has 0 following, skipping following list`,
+				);
+				cycleManager.recordWarning(
+					"PROFILE_NOT_FOUND",
+					"Profile has 0 following",
+					seedUsername,
+				);
+				return;
+			}
+			logger.debug(
+				"PROFILE",
+				`@${seedUsername} has ${stats.following} following, ${stats.followers} followers`,
+			);
+		}
+
+		// ═══════════════════════════════════════════════════════════════════════
+		// STEP 2: Open following modal
+		// ═══════════════════════════════════════════════════════════════════════
+		logger.debug("NAVIGATION", `Opening following modal for @${seedUsername}`);
+		const modalOpened = await openFollowingModal(page);
+		if (!modalOpened) {
+			recordError(
+				"Modal opening failed",
+				`modal_open_${seedUsername}`,
+				seedUsername,
+			);
+			await logger.errorWithScreenshot(
+				"ERROR",
+				`Could not open following modal for @${seedUsername}`,
+				page,
+				`modal_open_${seedUsername}`,
+			);
+			return;
+		}
+
+		// Check if the modal is empty (only on first batch)
+		if (batchNumber === 1) {
+			const isEmpty = await isFollowingModalEmpty(page);
+			if (isEmpty) {
+				logger.warn(
+					"PROFILE",
+					`@${seedUsername} has an empty following list, skipping seed`,
+				);
+				cycleManager.recordWarning(
+					"PROFILE_NOT_FOUND",
+					"Following list is empty",
+					seedUsername,
+				);
+				await closeModal(page);
+				return;
+			}
+		}
+
+		// ═══════════════════════════════════════════════════════════════════════
+		// STEP 3: Extract batch of unvisited usernames (with scrolling)
+		// ═══════════════════════════════════════════════════════════════════════
+		logger.info(
+			"EXTRACTION",
+			`Extracting batch #${batchNumber} from @${seedUsername}'s following list...`,
+		);
+
+		// Get current scroll index (resume from previous position)
+		let scrollIndex = await getScrollIndex(seedUsername);
+		if (scrollIndex > 0) {
+			logger.debug(
+				"NAVIGATION",
+				`Resuming from scroll position ${scrollIndex}...`,
+			);
+			for (let i = 0; i < Math.floor(scrollIndex / 500); i++) {
+				await scrollFollowingModal(page, 500);
+			}
+			await shortDelay(1, 2);
+		}
+
+		const batchUsernames: string[] = [];
+		const seenUsernames = new Set<string>();
+		let lastScrollHeight = 0;
+		let scrollHeightFlatlineCount = 0;
+		let consecutiveEmptyBatches = 0;
+		const maxConsecutiveEmptyBatches = 3;
+
+		// Extract until we have a full batch or hit end of list
+		while (
+			batchUsernames.length < FOLLOWING_BATCH_SIZE &&
+			consecutiveEmptyBatches < maxConsecutiveEmptyBatches &&
+			checkContinue()
+		) {
+			try {
+				// Extract usernames from current modal view
+				const extracted = await extractFollowingUsernames(page, 20);
+
+				if (extracted.length === 0) {
+					consecutiveEmptyBatches++;
+					logger.debug(
+						"EXTRACTION",
+						`Empty extraction (${consecutiveEmptyBatches}/${maxConsecutiveEmptyBatches})`,
+					);
+				} else {
+					consecutiveEmptyBatches = 0;
+
+					// Filter to only unvisited, unseen usernames
+					let newInExtraction = 0;
+					for (const username of extracted) {
+						if (!seenUsernames.has(username)) {
+							seenUsernames.add(username);
+							const visited = await wasVisited(username);
+							if (!visited) {
+								batchUsernames.push(username);
+								newInExtraction++;
+								if (batchUsernames.length >= FOLLOWING_BATCH_SIZE) {
+									break;
+								}
+							}
+						}
+					}
+
+					logger.debug(
+						"EXTRACTION",
+						`Extracted ${extracted.length}, ${newInExtraction} new unvisited (batch: ${batchUsernames.length}/${FOLLOWING_BATCH_SIZE})`,
+					);
+				}
+
+				// Check if we have a full batch
+				if (batchUsernames.length >= FOLLOWING_BATCH_SIZE) {
+					logger.info(
+						"EXTRACTION",
+						`Batch #${batchNumber} full (${FOLLOWING_BATCH_SIZE} profiles)`,
+					);
+					break;
+				}
+
+				// Scroll for more content
+				const scrollResult = await scrollFollowingModal(page, 500);
+				scrollIndex += 500;
+				await updateScrollIndex(seedUsername, scrollIndex);
+
+				// Check for scroll flatline (end of list)
+				if (scrollResult.scrollHeight === lastScrollHeight) {
+					scrollHeightFlatlineCount++;
+					logger.debug(
+						"NAVIGATION",
+						`Scroll height unchanged (${scrollHeightFlatlineCount}/2)`,
+					);
+					if (scrollHeightFlatlineCount >= 2) {
+						logger.info(
+							"EXTRACTION",
+							`End of following list reached for @${seedUsername}`,
+						);
+						followingListExhausted = true;
+						break;
+					}
+				} else {
+					scrollHeightFlatlineCount = 0;
+					lastScrollHeight = scrollResult.scrollHeight;
+				}
+
+				// Brief delay for content to load
+				await shortDelay(0.5, 1);
+
+				// Mouse wiggle periodically for human-like behavior
+				if (batchUsernames.length % 10 === 0 && batchUsernames.length > 0) {
+					await mouseWiggle(page);
+				}
+			} catch (err) {
+				const error = err instanceof Error ? err : new Error(String(err));
+				recordError(error, `extraction_${seedUsername}`, seedUsername);
+				logger.error(
+					"ERROR",
+					`Extraction error for @${seedUsername}: ${
+						err instanceof Error ? err.message : String(err)
+					}`,
+				);
+				followingListExhausted = true; // Stop on error
+				break;
+			}
+		}
+
+		// If no usernames extracted, we're done
+		if (batchUsernames.length === 0) {
+			logger.info(
+				"PROFILE",
+				`No more unvisited profiles in @${seedUsername}'s following list`,
+			);
+			await closeModal(page);
+			followingListExhausted = true;
 			break;
+		}
+
+		logger.info(
+			"EXTRACTION",
+			`Batch #${batchNumber}: ${batchUsernames.length} profiles to process`,
+		);
+
+		// ═══════════════════════════════════════════════════════════════════════
+		// STEP 4: Click first username in modal (natural navigation)
+		// ═══════════════════════════════════════════════════════════════════════
+		const firstUsername = batchUsernames[0];
+
+		logger.debug(
+			"NAVIGATION",
+			`Clicking @${firstUsername} in modal (natural flow)`,
+		);
+		const clicked = await clickUsernameInModal(page, firstUsername);
+
+		if (!clicked) {
+			logger.debug(
+				"NAVIGATION",
+				`Direct click failed for @${firstUsername}, closing modal`,
+			);
+			await shortDelay(0.5, 1);
+			await closeModal(page);
+		}
+
+		// ═══════════════════════════════════════════════════════════════════════
+		// STEP 5: Process the batch
+		// ═══════════════════════════════════════════════════════════════════════
+		let batchProcessed = 0;
+
+		// Process first profile
+		try {
+			await processProfile(
+				firstUsername,
+				page,
+				`following_of_${seedUsername}`,
+				metricsTracker,
+				sendDM,
+			);
+			batchProcessed++;
+			totalProcessed++;
+		} catch (profileError) {
+			const error =
+				profileError instanceof Error
+					? profileError
+					: new Error(String(profileError));
+			recordError(error, `profile_processing_${firstUsername}`, firstUsername);
+			logger.warn(
+				"ERROR",
+				`Failed to process @${firstUsername}, continuing...`,
+			);
+		}
+
+		// Process remaining profiles in batch (direct navigation)
+		for (const username of batchUsernames.slice(1)) {
+			if (!checkContinue()) {
+				logger.info(
+					"PROFILE",
+					`Processing interrupted at batch #${batchNumber}`,
+				);
+				return;
+			}
+
+			// Double-check not visited
+			if (await wasVisited(username)) {
+				logger.debug("PROFILE", `@${username} already visited, skipping`);
+				continue;
+			}
+
+			try {
+				await processProfile(
+					username,
+					page,
+					`following_of_${seedUsername}`,
+					metricsTracker,
+					sendDM,
+				);
+				batchProcessed++;
+				totalProcessed++;
+
+				if (totalProcessed % 10 === 0) {
+					logger.info(
+						"PROFILE",
+						`Progress: ${totalProcessed} profiles processed from @${seedUsername}`,
+					);
+				}
+			} catch (profileError) {
+				const error =
+					profileError instanceof Error
+						? profileError
+						: new Error(String(profileError));
+				recordError(error, `profile_processing_${username}`, username);
+				logger.warn("ERROR", `Failed to process @${username}, continuing...`);
+			}
+		}
+
+		logger.info(
+			"BATCH",
+			`Batch #${batchNumber} complete: ${batchProcessed}/${batchUsernames.length} processed`,
+		);
+
+		// If batch was smaller than FOLLOWING_BATCH_SIZE, we've likely exhausted the list
+		if (batchUsernames.length < FOLLOWING_BATCH_SIZE) {
+			logger.info(
+				"PROFILE",
+				`Batch was smaller than ${FOLLOWING_BATCH_SIZE}, following list likely exhausted`,
+			);
+			followingListExhausted = true;
 		}
 	}
 
 	logger.info(
 		"PROFILE",
-		`Finished processing following list of @${seedUsername}`,
+		`Finished processing @${seedUsername}'s following list`,
 	);
-	logger.info("PROFILE", `Processed ${processedInBatch} new profiles`);
+	logger.info(
+		"PROFILE",
+		`Total processed: ${totalProcessed} profiles in ${batchNumber} batch(es)`,
+	);
 }
 
 /**
