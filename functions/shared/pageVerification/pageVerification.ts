@@ -103,7 +103,11 @@ export async function verifyProfilePageLoaded(
 		// Check for multiple indicators that profile page is loaded
 		const indicators = await page.evaluate((targetUsername) => {
 			const url = window.location.href.toLowerCase();
-			const hasCorrectUrl = url.includes(`/${targetUsername}/`);
+			// Flexible URL check: /username/ OR /username? OR ending with /username
+			const hasCorrectUrl =
+				url.includes(`/${targetUsername}/`) ||
+				url.includes(`/${targetUsername}?`) ||
+				url.endsWith(`/${targetUsername}`);
 
 			const hasProfileHeader =
 				document.querySelector("header") !== null ||
