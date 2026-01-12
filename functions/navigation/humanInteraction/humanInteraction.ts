@@ -352,6 +352,7 @@ export async function humanScrollTo(
 
 /**
  * Scroll by a specific amount using ghost-cursor.
+ * Has built-in timeout protection to prevent hanging.
  */
 export async function humanScroll(
 	page: Page,
@@ -363,6 +364,8 @@ export async function humanScroll(
 		speed?: number;
 		/** Delay after scrolling */
 		delay?: number;
+		/** Timeout in ms (default 10s) */
+		timeout?: number;
 	} = {},
 ): Promise<void> {
 	const {
@@ -370,6 +373,7 @@ export async function humanScroll(
 		deltaX = 0,
 		speed = 50 + Math.random() * 50,
 		delay = 300 + Math.random() * 500,
+		timeout = 10000,
 	} = options;
 
 	const cursor = await getGhostCursor(page);
@@ -384,13 +388,33 @@ export async function humanScroll(
 	const targetX = currentScroll.x + deltaX;
 	const targetY = currentScroll.y + deltaY;
 
-	await cursor.scroll(
+	// Wrap scroll in timeout to prevent hanging
+	const scrollPromise = cursor.scroll(
 		{ x: targetX, y: targetY },
 		{
 			scrollSpeed: speed,
 			scrollDelay: delay,
 		},
 	);
+
+	const timeoutPromise = new Promise<void>((_, reject) =>
+		setTimeout(() => reject(new Error("Scroll timeout")), timeout)
+	);
+
+	try {
+		await Promise.race([scrollPromise, timeoutPromise]);
+	} catch (err) {
+		const errMsg = err instanceof Error ? err.message : String(err);
+		if (errMsg === "Scroll timeout") {
+			// Fallback: use simple page scroll when ghost-cursor hangs
+			await page.evaluate((dy) => {
+				window.scrollBy({ top: dy, behavior: "smooth" });
+			}, deltaY);
+			await sleep(delay);
+		} else {
+			throw err;
+		}
+	}
 }
 
 /**

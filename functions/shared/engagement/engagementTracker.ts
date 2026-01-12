@@ -198,43 +198,68 @@ export async function batchEngagements(
 	count: number = 10 + Math.floor(Math.random() * 6),
 ): Promise<number> {
 	let performed = 0;
+	const startTime = Date.now();
+	const maxDurationMs = 90 * 1000; // Max 90 seconds for batch (safety valve)
+	const actionTimeoutMs = 15 * 1000; // Max 15 seconds per action
 
 	logger.info("ENGAGEMENT", `Performing ${count} quick engagement actions...`);
 
 	for (let i = 0; i < count; i++) {
+		// Safety: bail if batch is taking too long
+		if (Date.now() - startTime > maxDurationMs) {
+			logger.warn("ENGAGEMENT", `Batch timeout after ${performed} actions (${Math.round((Date.now() - startTime) / 1000)}s)`);
+			break;
+		}
+
 		const actionType = Math.random();
 
 		try {
-			if (actionType < 0.6) {
-				// 60% scrolls (quickest)
-				const distance = 300 + Math.floor(Math.random() * 500);
-				await humanScroll(page, { deltaY: distance });
-				tracker.recordEngagement("scroll");
-				await microDelay(0.5, 1.5);
-			} else if (actionType < 0.9) {
-				// 30% likes
-				const liked = await tryLikePost(page);
-				if (liked) {
-					tracker.recordEngagement("like");
-				} else {
-					// Fall back to scroll
-					await humanScroll(page, { deltaY: 400 });
+			// Wrap each action in a timeout to prevent hangs
+			const actionPromise = (async () => {
+				if (actionType < 0.6) {
+					// 60% scrolls (quickest)
+					const distance = 300 + Math.floor(Math.random() * 500);
+					await humanScroll(page, { deltaY: distance });
 					tracker.recordEngagement("scroll");
+					await microDelay(0.5, 1.5);
+				} else if (actionType < 0.9) {
+					// 30% likes
+					const liked = await tryLikePost(page);
+					if (liked) {
+						tracker.recordEngagement("like");
+					} else {
+						// Fall back to scroll
+						await humanScroll(page, { deltaY: 400 });
+						tracker.recordEngagement("scroll");
+					}
+					await microDelay(0.5, 1.5);
+				} else {
+					// 10% view stories/reels
+					tracker.recordEngagement("view");
+					await mediumDelay(3, 6);
 				}
-				await microDelay(0.5, 1.5);
-			} else {
-				// 10% view stories/reels
-				tracker.recordEngagement("view");
-				await mediumDelay(3, 6);
-			}
+			})();
+
+			// Race action against timeout
+			await Promise.race([
+				actionPromise,
+				new Promise((_, reject) => 
+					setTimeout(() => reject(new Error("Action timeout")), actionTimeoutMs)
+				),
+			]);
 
 			performed++;
-		} catch {
-			// Continue on error
+		} catch (err) {
+			const errMsg = err instanceof Error ? err.message : String(err);
+			if (errMsg === "Action timeout") {
+				logger.warn("ENGAGEMENT", `Action ${i + 1} timed out, skipping`);
+			}
+			// Continue on error (but don't count as performed)
 		}
 	}
 
-	logger.info("ENGAGEMENT", `Completed ${performed} engagement actions`);
+	const duration = Math.round((Date.now() - startTime) / 1000);
+	logger.info("ENGAGEMENT", `Completed ${performed}/${count} engagement actions in ${duration}s`);
 	return performed;
 }
 
