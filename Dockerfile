@@ -2,24 +2,31 @@
 # ================================================
 #
 # Build: docker build -t scout:latest .
-# Run:   docker run -d --name scout -p 4000:4000 --env-file .env scout:latest
+# Run:   docker run -d --name scout -p 4000:4000 -p 5901:5901 --env-file .env scout:latest
 #
-# For headless Chrome support, this image includes all necessary dependencies.
+# Includes: VNC Server + AdsPower + Scout
 
-FROM node:20-slim
+FROM ubuntu:22.04
+
+# Prevent interactive prompts
+ENV DEBIAN_FRONTEND=noninteractive
 
 # Set working directory
 WORKDIR /app
 
-# Install system dependencies for Chromium/Puppeteer
+# Install system dependencies
 RUN apt-get update && apt-get install -y \
-    chromium \
-    chromium-sandbox \
-    fonts-ipafont-gothic \
-    fonts-wqy-zenhei \
-    fonts-thai-tlwg \
-    fonts-kacst \
-    fonts-freefont-ttf \
+    # Node.js
+    curl \
+    ca-certificates \
+    gnupg \
+    # VNC and display
+    tigervnc-standalone-server \
+    tigervnc-common \
+    dbus-x11 \
+    xfce4 \
+    xfce4-terminal \
+    # Chrome/Electron dependencies
     libxss1 \
     libgbm1 \
     libnss3 \
@@ -33,29 +40,44 @@ RUN apt-get update && apt-get install -y \
     libpango-1.0-0 \
     libcairo2 \
     libasound2 \
-    dumb-init \
-    curl \
-    ca-certificates \
+    libgtk-3-0 \
+    # Fonts
+    fonts-liberation \
+    fonts-ipafont-gothic \
+    fonts-wqy-zenhei \
+    # Utils
+    wget \
+    unzip \
+    supervisor \
     --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
-# Set Puppeteer to use installed Chromium
-ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
-ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
-ENV CHROME_BIN=/usr/bin/chromium
+# Install Node.js 20
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y nodejs \
+    && rm -rf /var/lib/apt/lists/*
 
-# Create non-root user for security
-RUN groupadd -r scout && useradd -r -g scout scout
+# Download and install AdsPower
+RUN wget -q "https://version.adspower.net/software/linux-x64-global/AdsPower-Global-7.12.29-x64.deb" -O /tmp/adspower.deb \
+    && dpkg -i /tmp/adspower.deb || apt-get install -f -y \
+    && rm /tmp/adspower.deb
 
-# Copy package files first for better layer caching
+# Set up VNC
+RUN mkdir -p /root/.vnc \
+    && echo "scoutpass" | vncpasswd -f > /root/.vnc/passwd \
+    && chmod 600 /root/.vnc/passwd
+
+# Create xstartup for VNC
+RUN echo '#!/bin/bash\nstartxfce4 &' > /root/.vnc/xstartup \
+    && chmod +x /root/.vnc/xstartup
+
+# Copy package files
 COPY package*.json ./
 COPY prisma ./prisma/
 
 # Install dependencies
-RUN npm ci --only=production && npm cache clean --force
-
-# Install tsx for runtime TypeScript support
-RUN npm install tsx
+RUN npm ci --only=production && npm cache clean --force \
+    && npm install tsx
 
 # Generate Prisma client
 RUN npx prisma generate
@@ -64,21 +86,45 @@ RUN npx prisma generate
 COPY . .
 
 # Create necessary directories
-RUN mkdir -p logs screenshots tmp data runs \
-    && chown -R scout:scout /app
+RUN mkdir -p logs screenshots tmp data runs
 
-# Switch to non-root user
-USER scout
+# Create supervisor config to manage all processes
+RUN cat > /etc/supervisor/conf.d/scout.conf << 'EOF'
+[supervisord]
+nodaemon=true
+user=root
 
-# Expose API port
-EXPOSE 4000
+[program:vnc]
+command=/usr/bin/vncserver :1 -geometry 1920x1080 -depth 24 -fg
+autorestart=true
+priority=10
+
+[program:adspower]
+command=/opt/AdsPower Global/adspower_global --no-sandbox
+environment=DISPLAY=":1"
+autorestart=true
+priority=20
+startsecs=10
+
+[program:scout]
+command=node --import tsx/esm scripts/deploy/start.ts
+directory=/app
+autorestart=true
+priority=30
+startsecs=15
+stdout_logfile=/app/logs/scout-stdout.log
+stderr_logfile=/app/logs/scout-stderr.log
+EOF
+
+# Environment
+ENV DISPLAY=:1
+
+# Expose ports
+EXPOSE 4000 5901
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD curl -f http://localhost:4000/api/health || exit 1
 
-# Use dumb-init to handle signals properly
-ENTRYPOINT ["/usr/bin/dumb-init", "--"]
-
-# Default command: start the scheduler and API server
-CMD ["node", "--import", "tsx/esm", "scripts/deploy/start.ts"]
+# Start everything via supervisor
+CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/supervisord.conf"]

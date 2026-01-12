@@ -319,11 +319,16 @@ export class NodeScheduler {
 			// Import and run the smart session runner
 			const { runSmartSessionDirect } = await import("./sessionExecutor.ts");
 
-			await runSmartSessionDirect({
+			const result = await runSmartSessionDirect({
 				profileId: job.profileId,
 				sessionType: job.sessionType,
 				dryRun: !sendDMs, // dryRun=true means no DMs (discovery only)
 			});
+
+			// Check if session actually succeeded (it returns success: false on error)
+			if (result && result.success === false) {
+				throw new Error(result.error || "Session failed");
+			}
 
 			// Success
 			job.status = "completed";

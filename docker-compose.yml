@@ -22,6 +22,7 @@ services:
         condition: service_healthy
     ports:
       - "${PORT:-4000}:4000"
+      - "5901:5901"  # VNC for AdsPower GUI access
     environment:
       - NODE_ENV=production
       - PORT=4000
@@ -33,6 +34,7 @@ services:
       - DECODO_HOST=${DECODO_HOST:-dc.decodo.com}
       - DECODO_PORT=${DECODO_PORT:-10000}
       - ADSPOWER_API_KEY=${ADSPOWER_API_KEY}
+      - ADSPOWER_API_URL=http://localhost:50325
       - SCHEDULER_ENABLED=${SCHEDULER_ENABLED:-true}
       - SCHEDULER_TIMEZONE=${SCHEDULER_TIMEZONE:-Europe/London}
     volumes:
