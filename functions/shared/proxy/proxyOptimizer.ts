@@ -42,13 +42,9 @@ const BLOCKED_DOMAINS = [
 	"appsflyer", // Attribution
 ];
 
-// Essential Instagram domains (never block)
-const ESSENTIAL_DOMAINS = [
-	"instagram.com",
-	"cdninstagram.com",
-	"fbcdn.net",
-	"i.instagram.com", // API
-];
+// Note: We don't block by domain anymore - we block by resource type and URL patterns
+// Instagram loads media via fetch requests from cdninstagram.com, so domain-based
+// allowlisting doesn't work. Instead we identify profile pics vs feed content by URL path.
 
 export interface BandwidthStats {
 	requestCount: number;
@@ -154,34 +150,84 @@ export class ProxyOptimizer {
 			return false;
 		}
 
+		// IMPORTANT: Only block resources from Instagram/Facebook domains
+		// We NEED to see images from external links (linktree, beacons, etc.) for creator analysis
+		const isInstagramDomain = this.isInstagramDomain(url);
+		if (!isInstagramDomain) {
+			return false; // Allow ALL external resources
+		}
+
 		// 1. Always block tracking/ad domains first
 		if (BLOCKED_DOMAINS.some((domain) => url.includes(domain))) {
 			return true;
 		}
 
-		// 2. Block tracking resources even from essential domains
+		// 2. Block tracking resources from Instagram
 		if (this.isTrackingResource(url)) {
 			return true;
 		}
 
-		// 3. Block heavy resource types (images, videos, fonts) - this is where we save bandwidth!
+		// 3. Check if this is a profile picture (small, needed for UI) - allow these
+		const isProfilePic =
+			url.includes("profile_pic") ||
+			url.includes("t51.2885-19") || // Instagram profile pic path
+			url.includes("150x150") ||
+			url.includes("s150x150") ||
+			url.includes("44x44") ||
+			url.includes("s44x44");
+		if (isProfilePic) {
+			return false;
+		}
+
+		// 4. Block heavy resource types (images, videos, fonts) from Instagram
 		if (BLOCKED_RESOURCE_TYPES.includes(resourceType)) {
-			// Allow small profile pictures (needed for UI)
-			const isProfilePic =
-				url.includes("profile_pic") ||
-				url.includes("150x150") ||
-				url.includes("s150x150") ||
-				url.includes("44x44") ||
-				url.includes("s44x44");
-			if (isProfilePic) {
-				return false;
-			}
-			// Block all other images, videos, media, fonts
 			return true;
 		}
 
-		// 4. Allow essential requests (documents, scripts, XHR, fetch) from Instagram
+		// 5. Block fetch requests that are loading Instagram media content
+		if (resourceType === "fetch" && this.isInstagramMediaUrl(url)) {
+			return true;
+		}
+
+		// 6. Allow essential requests (documents, scripts, API calls)
 		return false;
+	}
+
+	/**
+	 * Check if URL is from Instagram/Facebook CDN domains
+	 */
+	private isInstagramDomain(url: string): boolean {
+		return (
+			url.includes("instagram.com") ||
+			url.includes("cdninstagram.com") ||
+			url.includes("fbcdn.net") ||
+			url.includes("facebook.com")
+		);
+	}
+
+	/**
+	 * Check if URL is loading Instagram media content (images/videos loaded via fetch)
+	 */
+	private isInstagramMediaUrl(url: string): boolean {
+		// Only block if it's from Instagram CDN AND matches media patterns
+		if (!this.isInstagramDomain(url)) {
+			return false;
+		}
+
+		// Instagram CDN media patterns
+		return (
+			url.includes("/v/t51.") || // Images (feed, stories, etc.)
+			url.includes("/v/t2/") || // Video thumbnails/segments
+			url.includes("/v/t16/") || // Video content
+			url.includes("/o1/v/") || // Media content
+			url.includes(".jpg") ||
+			url.includes(".jpeg") ||
+			url.includes(".png") ||
+			url.includes(".webp") ||
+			url.includes(".mp4") ||
+			url.includes(".m4v") ||
+			url.includes(".heic")
+		);
 	}
 
 	/**
