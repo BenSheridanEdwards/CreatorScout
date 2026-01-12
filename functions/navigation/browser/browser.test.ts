@@ -1,250 +1,207 @@
-/**
- * Browser Helper Tests
- *
- * Updated for AdsPower-first flow:
- * - createBrowser() uses AdsPower when adsPowerProfileId is available and LOCAL_BROWSER is false
- * - createBrowser() launches local Puppeteer when LOCAL_BROWSER is true
- * - createPage() applies minimal stealth patches only when `applyStealth: true`
- */
-
-import { jest } from "@jest/globals";
+import { jest, describe, it, expect, beforeEach } from "@jest/globals";
 import type { Browser, Page } from "puppeteer";
 
-// Mock external dependencies BEFORE importing the module
-const mockLaunch = jest.fn<(options: object) => Promise<Browser>>();
-const mockGetUserDataDir = jest
-	.fn<() => string>()
-	.mockReturnValue("/tmp/test-data");
-const mockConfig = {
-	LOCAL_BROWSER: true,
-	DEBUG_SCREENSHOTS: false,
-	DECODO_HOST: "gate.decodo.net",
-	DECODO_PORT: 20011,
-	DECODO_USERNAME: undefined,
-	DECODO_PASSWORD: undefined,
-	DECODO_STICKY_SESSION_MIN: 20,
-	DECODO_STICKY_SESSION_MAX: 30,
-	SMARTPROXY_HOST: "gate.smartproxy.com",
-	SMARTPROXY_PORT: 7000,
-	SMARTPROXY_USERNAME: undefined,
-	SMARTPROXY_PASSWORD: undefined,
-	SMARTPROXY_STICKY_SESSION_MIN: 15,
-	SMARTPROXY_STICKY_SESSION_MAX: 30,
-};
+// Create typed mock functions
+const mockSetDefaultNavigationTimeout =
+	jest.fn<Page["setDefaultNavigationTimeout"]>();
+const mockSetDefaultTimeout = jest.fn<Page["setDefaultTimeout"]>();
+const mockSetViewport = jest
+	.fn<Page["setViewport"]>()
+	.mockResolvedValue(undefined);
+const mockSetUserAgent = jest
+	.fn<Page["setUserAgent"]>()
+	.mockResolvedValue(undefined);
+const mockSetExtraHTTPHeaders = jest
+	.fn<Page["setExtraHTTPHeaders"]>()
+	.mockResolvedValue(undefined);
+const mockOn = jest.fn<Page["on"]>();
+const mockEvaluateOnNewDocument = jest.fn(() => Promise.resolve());
+const mockPageClose = jest.fn<Page["close"]>().mockResolvedValue(undefined);
+
+const mockPage = {
+	setDefaultNavigationTimeout: mockSetDefaultNavigationTimeout,
+	setDefaultTimeout: mockSetDefaultTimeout,
+	setViewport: mockSetViewport,
+	setUserAgent: mockSetUserAgent,
+	setExtraHTTPHeaders: mockSetExtraHTTPHeaders,
+	on: mockOn,
+	evaluateOnNewDocument: mockEvaluateOnNewDocument,
+	close: mockPageClose,
+} as unknown as Page;
+
+const mockPages = jest.fn<Browser["pages"]>().mockResolvedValue([mockPage]);
+const mockNewPage = jest.fn<Browser["newPage"]>().mockResolvedValue(mockPage);
+const mockBrowserClose = jest
+	.fn<Browser["close"]>()
+	.mockResolvedValue(undefined);
+
+const mockBrowser = {
+	pages: mockPages,
+	newPage: mockNewPage,
+	close: mockBrowserClose,
+} as unknown as Browser;
+
+const mockLaunch = jest
+	.fn<() => Promise<Browser>>()
+	.mockResolvedValue(mockBrowser);
 
 jest.unstable_mockModule("puppeteer", () => ({
 	default: {
 		launch: mockLaunch,
 	},
 }));
+
 jest.unstable_mockModule("../../auth/sessionManager/sessionManager.ts", () => ({
-	getUserDataDir: mockGetUserDataDir,
+	getUserDataDir: jest.fn<() => string>().mockReturnValue("/tmp/test-session"),
 }));
-jest.unstable_mockModule("../../shared/config/config.ts", () => mockConfig);
-const mockConnectToAdsPower = jest
-	.fn<() => Promise<Browser>>()
-	.mockResolvedValue({
-		pages: jest.fn<() => Promise<Page[]>>().mockResolvedValue([]),
-	} as unknown as Browser);
+
+jest.unstable_mockModule("../../shared/config/config.ts", () => ({
+	LOCAL_BROWSER: false,
+}));
+
+jest.unstable_mockModule("../../shared/logger/logger.ts", () => ({
+	createLogger: jest.fn(() => ({
+		info: jest.fn(),
+		warn: jest.fn(),
+		error: jest.fn(),
+	})),
+}));
+
+jest.unstable_mockModule("../proxy/proxyManager.ts", () => ({
+	createStickyProxy: jest.fn().mockImplementation(() => {
+		throw new Error("No proxy credentials");
+	}),
+}));
 
 jest.unstable_mockModule("./adsPowerConnector.ts", () => ({
-	connectToAdsPowerProfile: mockConnectToAdsPower,
+	connectToAdsPowerProfile: jest.fn<() => Promise<Browser>>(),
 }));
 
-// Helper to import module after any config tweaks
-const loadBrowserModule = async () => {
-	jest.resetModules();
-	return await import("./browser.ts");
-};
+// Import after mocks
+const adsPowerModule = await import("./adsPowerConnector.ts");
+const { createBrowser, createPage, getUniqueUserDataDir } = await import(
+	"./browser.ts"
+);
 
-describe.skip("browser helpers", () => {
+const connectToAdsPowerProfileMock =
+	adsPowerModule.connectToAdsPowerProfile as jest.MockedFunction<
+		typeof adsPowerModule.connectToAdsPowerProfile
+	>;
+
+describe("browser", () => {
 	beforeEach(() => {
 		jest.clearAllMocks();
-		mockConfig.LOCAL_BROWSER = true;
-		process.env.LOCAL_BROWSER = "true";
+		process.env.LOCAL_BROWSER = "false";
+		// Reset mock implementations
+		mockPages.mockResolvedValue([mockPage]);
 	});
 
-	afterEach(() => {
-		jest.restoreAllMocks();
+	describe("getUniqueUserDataDir", () => {
+		it("returns a path containing the prefix", () => {
+			const dir = getUniqueUserDataDir("test");
+			expect(dir).toContain(".sessions");
+			expect(dir).toContain("test_");
+		});
+
+		it("returns unique paths on each call", () => {
+			const dir1 = getUniqueUserDataDir();
+			const dir2 = getUniqueUserDataDir();
+			expect(dir1).not.toBe(dir2);
+		});
 	});
 
-	// ═══════════════════════════════════════════════════════════════════════════
-	// createBrowser() - Local Mode
-	// ═══════════════════════════════════════════════════════════════════════════
+	describe("createBrowser", () => {
+		it("launches local puppeteer browser by default", async () => {
+			const browser = await createBrowser();
 
-	describe("createBrowser() - Local browser mode", () => {
-		test("launches local browser with standard arguments", async () => {
-			// Ensure LOCAL_BROWSER is set for this test
+			expect(mockLaunch).toHaveBeenCalled();
+			expect(browser).toBe(mockBrowser);
+		});
+
+		it("connects to AdsPower when profile ID is provided", async () => {
+			connectToAdsPowerProfileMock.mockResolvedValue(mockBrowser);
+
+			const browser = await createBrowser({
+				adsPowerProfileId: "test-profile",
+			});
+
+			expect(connectToAdsPowerProfileMock).toHaveBeenCalledWith(
+				"test-profile",
+				expect.objectContaining({ timeout: 30000 }),
+			);
+			expect(browser).toBe(mockBrowser);
+		});
+
+		it("uses local browser when LOCAL_BROWSER env is true", async () => {
 			process.env.LOCAL_BROWSER = "true";
-			const fakeBrowser = {
-				newPage: jest.fn<() => Promise<Page>>(),
-				pages: jest.fn<() => Promise<Page[]>>().mockResolvedValue([]),
-			} as unknown as Browser;
-			mockLaunch.mockResolvedValue(fakeBrowser);
-			const { createBrowser } = await loadBrowserModule();
 
-			await createBrowser({ headless: false, userDataDir: "/tmp/custom" });
+			await createBrowser({ adsPowerProfileId: "test-profile" });
 
-			expect(mockLaunch).toHaveBeenCalledWith({
-				headless: false,
-				args: [
-					"--no-sandbox",
-					"--disable-dev-shm-usage",
-					"--disable-features=VizDisplayCompositor",
-					"--disable-blink-features=AutomationControlled",
-					"--disable-features=IsolateOrigins,site-per-process",
-					"--disable-web-security",
-					"--disable-features=BlockInsecurePrivateNetworkRequests",
-				],
-				userDataDir: "/tmp/custom",
-			});
-		});
-
-		test("uses persistent user data directory from sessionManager when not specified", async () => {
-			const fakeBrowser = {
-				newPage: jest.fn<() => Promise<Page>>(),
-				pages: jest.fn<() => Promise<Page[]>>().mockResolvedValue([]),
-			} as unknown as Browser;
-			mockLaunch.mockResolvedValue(fakeBrowser);
-			const { createBrowser } = await loadBrowserModule();
-
-			await createBrowser();
-
-			expect(mockGetUserDataDir).toHaveBeenCalled();
-			expect(mockLaunch).toHaveBeenCalledWith(
-				expect.objectContaining({ userDataDir: "/tmp/test-data" }),
-			);
-		});
-
-		test("uses custom user data directory when explicitly provided", async () => {
-			const fakeBrowser = {
-				newPage: jest.fn<() => Promise<Page>>(),
-				pages: jest.fn<() => Promise<Page[]>>().mockResolvedValue([]),
-			} as unknown as Browser;
-			mockLaunch.mockResolvedValue(fakeBrowser);
-			const { createBrowser } = await loadBrowserModule();
-
-			await createBrowser({ userDataDir: "/tmp/custom" });
-
-			expect(mockLaunch).toHaveBeenCalledWith(
-				expect.objectContaining({ userDataDir: "/tmp/custom" }),
-			);
-		});
-	});
-
-	// ═══════════════════════════════════════════════════════════════════════════
-	// createBrowser() - AdsPower mode
-	// ═══════════════════════════════════════════════════════════════════════════
-
-	describe("createBrowser() - AdsPower mode", () => {
-		test("connects to AdsPower when adsPowerProfileId is provided and LOCAL_BROWSER is false", async () => {
-			mockConfig.LOCAL_BROWSER = false;
-			delete process.env.LOCAL_BROWSER;
-			const { createBrowser } = await loadBrowserModule();
-
-			await createBrowser({ adsPowerProfileId: "test-profile-123" });
-
-			expect(mockConnectToAdsPower).toHaveBeenCalledWith("test-profile-123", {
-				timeout: 30000,
-			});
-			expect(mockLaunch).not.toHaveBeenCalled();
-		});
-
-		test("falls back to local Puppeteer when no AdsPower profile ID is provided", async () => {
-			mockConfig.LOCAL_BROWSER = false;
-			delete process.env.LOCAL_BROWSER;
-			const fakeBrowser = {
-				newPage: jest.fn<() => Promise<Page>>(),
-				pages: jest.fn<() => Promise<Page[]>>().mockResolvedValue([]),
-			} as unknown as Browser;
-			mockLaunch.mockResolvedValue(fakeBrowser);
-			const { createBrowser } = await loadBrowserModule();
-
-			await createBrowser();
+			expect(connectToAdsPowerProfileMock).not.toHaveBeenCalled();
 			expect(mockLaunch).toHaveBeenCalled();
 		});
 	});
 
-	// ═══════════════════════════════════════════════════════════════════════════
-	// createPage() - Page Configuration
-	// ═══════════════════════════════════════════════════════════════════════════
+	describe("createPage", () => {
+		it("returns a page with configured timeouts", async () => {
+			const page = await createPage(mockBrowser);
 
-	describe("createPage() - Page creation and configuration", () => {
-		test("configures page with default timeouts and viewport", async () => {
-			const mockPage = {
-				setDefaultNavigationTimeout: jest.fn<(ms: number) => void>(),
-				setDefaultTimeout: jest.fn<(ms: number) => void>(),
-				setViewport: jest
-					.fn<() => Promise<void>>()
-					.mockResolvedValue(undefined),
-				setUserAgent: jest
-					.fn<() => Promise<void>>()
-					.mockResolvedValue(undefined),
-				setExtraHTTPHeaders: jest
-					.fn<() => Promise<void>>()
-					.mockResolvedValue(undefined),
-				evaluateOnNewDocument: jest
-					.fn<() => Promise<void>>()
-					.mockResolvedValue(undefined),
-				on: jest.fn<(event: string, handler: unknown) => void>(),
-			} as unknown as Page;
-			const mockBrowser = {
-				newPage: jest.fn<() => Promise<Page>>().mockResolvedValue(mockPage),
-				pages: jest.fn<() => Promise<Page[]>>().mockResolvedValue([mockPage]),
-			} as unknown as Browser;
-			const { createPage } = await loadBrowserModule();
-
-			await createPage(mockBrowser, { applyStealth: false });
-
-			expect(mockPage.setDefaultNavigationTimeout).toHaveBeenCalledWith(30000);
-			expect(mockPage.setDefaultTimeout).toHaveBeenCalledWith(15000);
-			expect(mockPage.setViewport).toHaveBeenCalledWith({
-				width: 1440,
-				height: 900,
-			});
-			expect(mockPage.setUserAgent).toHaveBeenCalled();
-			expect(mockPage.setExtraHTTPHeaders).toHaveBeenCalled();
+			expect(mockSetDefaultNavigationTimeout).toHaveBeenCalledWith(30000);
+			expect(mockSetDefaultTimeout).toHaveBeenCalledWith(15000);
+			expect(page).toBe(mockPage);
 		});
 
-		test("allows overriding default page configuration", async () => {
-			const mockPage = {
-				setDefaultNavigationTimeout: jest.fn<(ms: number) => void>(),
-				setDefaultTimeout: jest.fn<(ms: number) => void>(),
-				setViewport: jest
-					.fn<() => Promise<void>>()
-					.mockResolvedValue(undefined),
-				setUserAgent: jest
-					.fn<() => Promise<void>>()
-					.mockResolvedValue(undefined),
-				setExtraHTTPHeaders: jest
-					.fn<() => Promise<void>>()
-					.mockResolvedValue(undefined),
-				evaluateOnNewDocument: jest
-					.fn<() => Promise<void>>()
-					.mockResolvedValue(undefined),
-				on: jest.fn<(event: string, handler: unknown) => void>(),
-			} as unknown as Page;
-			const mockBrowser = {
-				newPage: jest.fn<() => Promise<Page>>().mockResolvedValue(mockPage),
-				pages: jest.fn<() => Promise<Page[]>>().mockResolvedValue([mockPage]),
-			} as unknown as Browser;
-			const { createPage } = await loadBrowserModule();
-
+		it("applies custom viewport dimensions", async () => {
 			await createPage(mockBrowser, {
-				defaultNavigationTimeout: 5000,
-				defaultTimeout: 4000,
-				viewport: { width: 800, height: 600 },
-				userAgent: "custom-agent",
-				applyStealth: false,
+				viewport: { width: 1920, height: 1080 },
 			});
 
-			expect(mockPage.setDefaultNavigationTimeout).toHaveBeenCalledWith(5000);
-			expect(mockPage.setDefaultTimeout).toHaveBeenCalledWith(4000);
-			expect(mockPage.setViewport).toHaveBeenCalledWith({
-				width: 800,
-				height: 600,
+			expect(mockSetViewport).toHaveBeenCalledWith({
+				width: 1920,
+				height: 1080,
 			});
-			expect(mockPage.setUserAgent).toHaveBeenCalledWith("custom-agent");
+		});
+
+		it("sets custom user agent when provided", async () => {
+			const customUA = "Custom User Agent";
+			await createPage(mockBrowser, { userAgent: customUA });
+
+			expect(mockSetUserAgent).toHaveBeenCalledWith(customUA);
+		});
+
+		it("sets up console and error event handlers", async () => {
+			await createPage(mockBrowser);
+
+			expect(mockOn).toHaveBeenCalledWith("console", expect.any(Function));
+			expect(mockOn).toHaveBeenCalledWith("pageerror", expect.any(Function));
+			expect(mockOn).toHaveBeenCalledWith(
+				"requestfailed",
+				expect.any(Function),
+			);
+		});
+
+		it("applies stealth when applyStealth is true", async () => {
+			await createPage(mockBrowser, { applyStealth: true });
+
+			expect(mockEvaluateOnNewDocument).toHaveBeenCalled();
+		});
+
+		it("skips stealth when applyStealth is false", async () => {
+			await createPage(mockBrowser, { applyStealth: false });
+
+			expect(mockEvaluateOnNewDocument).not.toHaveBeenCalled();
+		});
+
+		it("closes extra pages from previous sessions", async () => {
+			const extraPageClose = jest
+				.fn<Page["close"]>()
+				.mockResolvedValue(undefined);
+			const extraPage = { close: extraPageClose } as unknown as Page;
+			mockPages.mockResolvedValueOnce([mockPage, extraPage]);
+
+			await createPage(mockBrowser);
+
+			expect(extraPageClose).toHaveBeenCalled();
 		});
 	});
 });

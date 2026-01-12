@@ -1,689 +1,360 @@
-/**
- * Unit tests for profileActions.ts
- * Uses real implementations of internal files - only mocks external dependencies
- */
-import { jest } from "@jest/globals";
-import type { Page } from "puppeteer";
-import { createPageMock } from "../../__test__/testUtils.ts";
+import { jest, describe, it, expect, beforeEach } from "@jest/globals";
+import {
+	createPageMock,
+	createPageWithElementMock,
+} from "../../__test__/testUtils.ts";
 
-// Mock sleep function (used internally by delay functions) to avoid delays in tests
-const sleepMock = jest
-	.fn<(ms: number) => Promise<void>>()
-	.mockResolvedValue(undefined);
+// Mock dependencies with typed mock functions defined externally
+const mockOpenFollowingModal = jest.fn<() => Promise<boolean>>();
+const mockExtractFollowingUsernames = jest.fn<() => Promise<string[]>>();
+const mockRecordActivity = jest.fn();
+const mockMarkDmSent = jest.fn<() => Promise<void>>();
+const mockMarkFollowed = jest.fn<() => Promise<void>>();
+const mockQueueAdd = jest.fn<() => Promise<void>>();
+const mockWasVisited = jest.fn<() => Promise<boolean>>();
+const mockSaveScreenshot = jest.fn<() => Promise<string>>();
+const mockSnapshot = jest.fn<() => Promise<string>>();
+const mockMediumDelay = jest.fn<() => Promise<void>>();
+const mockShortDelay = jest.fn<() => Promise<void>>();
+const mockSleep = jest.fn<() => Promise<void>>();
+const mockFindMessageInput = jest.fn<() => Promise<string | null>>();
+const mockTypeMessage = jest.fn<() => Promise<boolean>>();
+const mockClickMessageButton = jest.fn<() => Promise<void>>();
+const mockFindMessageButton =
+	jest.fn<() => Promise<{ selector: string } | null>>();
+const mockNavigateToDmThread = jest.fn<() => Promise<void>>();
+const mockNavigateToProfile = jest.fn<() => Promise<void>>();
+const mockScrollToButtonIfNeeded = jest.fn();
+const mockSimulateNaturalBehavior = jest.fn<() => Promise<void>>();
+const mockSendMessage = jest.fn<() => Promise<boolean>>();
+const mockVerifyDmSent = jest.fn<() => Promise<{ proofPath: string }>>();
+const mockClickFollowButton = jest.fn<() => Promise<boolean>>();
+const mockDetectFollowState = jest.fn<() => Promise<string>>();
+const mockVerifyFollowSucceeded = jest.fn<() => Promise<string>>();
+const mockGetCurrentUsername = jest.fn<() => Promise<string | null>>();
 
-// Mock database functions to avoid actual database operations
-const markDmSentMock = jest
-	.fn<(username: string, proofPath?: string | null) => Promise<void>>()
-	.mockResolvedValue(undefined);
-const markFollowedMock = jest
-	.fn<(username: string) => Promise<void>>()
-	.mockResolvedValue(undefined);
-const queueAddMock = jest
-	.fn<(username: string, priority: number, source: string) => Promise<void>>()
-	.mockResolvedValue(undefined);
-const wasVisitedMock = jest
-	.fn<(username: string) => Promise<boolean>>()
-	.mockResolvedValue(false);
+jest.unstable_mockModule(
+	"../../navigation/modalOperations/modalOperations.ts",
+	() => ({
+		openFollowingModal: mockOpenFollowingModal,
+		extractFollowingUsernames: mockExtractFollowingUsernames,
+	}),
+);
 
-// Only mock external API calls (vision API)
-const analyzeDmProofMock = jest
-	.fn<
-		(imagePath: string) => Promise<{
-			dm_sent: boolean;
-			confidence: number;
-			reason: string;
-			indicators: string[];
-			is_dm_thread: boolean;
-			message_visible: boolean;
-			error_detected: boolean;
-		} | null>
-	>()
-	.mockResolvedValue({
-		dm_sent: true,
-		confidence: 90,
-		reason: "test",
-		indicators: [],
-		is_dm_thread: true,
-		message_visible: true,
-		error_detected: false,
-	});
-
-// Set up mocks before importing the module
-jest.unstable_mockModule("../../timing/sleep/sleep.ts", () => ({
-	sleep: sleepMock,
+jest.unstable_mockModule("../../shared/dashboard/dashboard.ts", () => ({
+	recordActivity: mockRecordActivity,
 }));
-
-// Mock query function - returns QueryResult with rows array
-const queryMock = jest
-	.fn<
-		<T = unknown>(sql: string, params?: unknown[]) => Promise<{ rows: T[] }>
-	>()
-	.mockResolvedValue({ rows: [] });
 
 jest.unstable_mockModule("../../shared/database/database.ts", () => ({
-	markDmSent: markDmSentMock,
-	markFollowed: markFollowedMock,
-	queueAdd: queueAddMock,
-	wasVisited: wasVisitedMock,
-	query: queryMock,
-	QueryResult: {} as { rows: unknown[] }, // Export the type if needed
+	markDmSent: mockMarkDmSent,
+	markFollowed: mockMarkFollowed,
+	queueAdd: mockQueueAdd,
+	wasVisited: mockWasVisited,
 }));
 
-jest.unstable_mockModule("../vision/analyzeDmProof.ts", () => ({
-	analyzeDmProof: analyzeDmProofMock,
+jest.unstable_mockModule("../../shared/logger/logger.ts", () => ({
+	createLogger: jest.fn(() => ({
+		info: jest.fn(),
+		warn: jest.fn(),
+		error: jest.fn(),
+	})),
 }));
 
-// Mock config for test values - include all exports that might be needed
+jest.unstable_mockModule("../../shared/snapshot/snapshot.ts", () => ({
+	saveScreenshot: mockSaveScreenshot,
+	snapshot: mockSnapshot,
+}));
+
+jest.unstable_mockModule("../../timing/humanize/humanize.ts", () => ({
+	mediumDelay: mockMediumDelay,
+	shortDelay: mockShortDelay,
+}));
+
 jest.unstable_mockModule("../../shared/config/config.ts", () => ({
-	DM_MESSAGE: "Hello!",
-	VISION_MODEL: "test-vision-model",
-	OPENROUTER_API_KEY: "test-openrouter-key",
-	DELAYS: {
-		after_navigate: [1.5, 3.5],
-		after_click: [0.2, 0.8],
-		after_type: [0.1, 0.4],
-		after_dm_type: [0.8, 1.8],
-		after_dm_send: [1.5, 3.5],
-		after_follow: [0.8, 1.8],
-		mouse_wiggle: [0.5, 1.8],
-		after_message_open: [1.8, 3.5],
-		after_popup_dismiss: [0.5, 1.8],
-		after_modal_open: [1.2, 2.8],
-		after_modal_close: [0.8, 1.8],
-		after_scroll: [0.3, 1.2],
-		after_scroll_batch: [1.5, 3.5],
-		after_linktree_click: [2.5, 4.5],
-		after_credentials: [1.2, 2.8],
-		after_login_submit: [3.5, 6.5],
-		after_go_back: [1.8, 3.2],
-		between_profiles: [1.5, 4.5],
-		between_seeds: [45, 150],
-		queue_empty: [180, 300],
-	},
-	DELAY_SCALE: 1.0,
-	SLEEP_SCALE: 1.0,
-	DELAY_SCALES: {
-		navigation: 1.0,
-		modal: 1.0,
-		input: 1.0,
-		action: 1.0,
-		pacing: 1.0,
-	},
-	DELAY_CATEGORIES: {},
-	TIMEOUT_SCALE: 1.0,
-	TIMEOUTS: {
-		page_load: 25000,
-		navigation: 15000,
-		element_default: 8000,
-		element_modal: 4000,
-		element_button: 2500,
-		element_input: 3500,
-		login: 12000,
-		dm_send: 8000,
-		follow: 2500,
-	},
-	FAST_MODE: false,
-	SKIP_VISION: false,
-	LOCAL_BROWSER: true,
-	DEBUG_SCREENSHOTS: false,
-	CONFIDENCE_THRESHOLD: 50,
-	MAX_DMS_PER_DAY: 120,
+	MIN_SECONDS_BETWEEN_DMS: 0,
+	MAX_QUEUE_ADDS_PER_CYCLE: 100,
 }));
 
-// Import after mocks are set up
+jest.unstable_mockModule("../../timing/sleep/sleep.ts", () => ({
+	sleep: mockSleep,
+}));
+
+jest.unstable_mockModule("./dmInput.ts", () => ({
+	findMessageInput: mockFindMessageInput,
+	typeMessage: mockTypeMessage,
+}));
+
+jest.unstable_mockModule("./dmNavigation.ts", () => ({
+	clickMessageButton: mockClickMessageButton,
+	findMessageButton: mockFindMessageButton,
+	navigateToDmThread: mockNavigateToDmThread,
+	navigateToProfile: mockNavigateToProfile,
+	scrollToButtonIfNeeded: mockScrollToButtonIfNeeded,
+	simulateNaturalBehavior: mockSimulateNaturalBehavior,
+}));
+
+jest.unstable_mockModule("./dmSending.ts", () => ({
+	sendMessage: mockSendMessage,
+	verifyDmSent: mockVerifyDmSent,
+}));
+
+jest.unstable_mockModule("./follow.ts", () => ({
+	clickFollowButton: mockClickFollowButton,
+	detectFollowState: mockDetectFollowState,
+	verifyFollowSucceeded: mockVerifyFollowSucceeded,
+}));
+
+jest.unstable_mockModule("../../shared/username/getCurrentUsername.ts", () => ({
+	getCurrentUsername: mockGetCurrentUsername,
+}));
+
+// Import after mocks
 const {
-	checkDmThreadEmpty,
 	sendDMToUser,
 	followUserAccount,
 	addFollowingToQueue,
+	checkDmThreadEmpty,
+	resetQueueAddCounter,
+	getQueueAddCount,
 } = await import("./profileActions.ts");
 
-describe.skip("profileActions", () => {
+describe("profileActions", () => {
 	beforeEach(() => {
 		jest.clearAllMocks();
-		sleepMock.mockResolvedValue(undefined);
-		markDmSentMock.mockResolvedValue(undefined);
-		markFollowedMock.mockResolvedValue(undefined);
-		queueAddMock.mockResolvedValue(undefined);
-		wasVisitedMock.mockResolvedValue(false);
-		analyzeDmProofMock.mockResolvedValue({
-			dm_sent: true,
-			confidence: 90,
-			reason: "test",
-			indicators: [],
-			is_dm_thread: true,
-			message_visible: true,
-			error_detected: false,
-		});
-	});
+		resetQueueAddCounter();
 
-	afterEach(() => {
-		// Aggressive cleanup to prevent memory leaks
-		jest.clearAllMocks();
-		jest.restoreAllMocks();
-		// Force garbage collection hint (if available)
-		if (global.gc) {
-			global.gc();
-		}
+		// Set default mock implementations
+		mockOpenFollowingModal.mockResolvedValue(true);
+		mockExtractFollowingUsernames.mockResolvedValue([]);
+		mockMarkDmSent.mockResolvedValue(undefined);
+		mockMarkFollowed.mockResolvedValue(undefined);
+		mockQueueAdd.mockResolvedValue(undefined);
+		mockWasVisited.mockResolvedValue(false);
+		mockSaveScreenshot.mockResolvedValue("/path/to/screenshot.png");
+		mockSnapshot.mockResolvedValue("/path/to/snapshot.png");
+		mockMediumDelay.mockResolvedValue(undefined);
+		mockShortDelay.mockResolvedValue(undefined);
+		mockSleep.mockResolvedValue(undefined);
+		mockFindMessageInput.mockResolvedValue("textarea");
+		mockTypeMessage.mockResolvedValue(true);
+		mockClickMessageButton.mockResolvedValue(undefined);
+		mockFindMessageButton.mockResolvedValue({ selector: "button" });
+		mockNavigateToDmThread.mockResolvedValue(undefined);
+		mockNavigateToProfile.mockResolvedValue(undefined);
+		mockScrollToButtonIfNeeded.mockImplementation((_, info) =>
+			Promise.resolve(info),
+		);
+		mockSimulateNaturalBehavior.mockResolvedValue(undefined);
+		mockSendMessage.mockResolvedValue(true);
+		mockVerifyDmSent.mockResolvedValue({ proofPath: "/proof.png" });
+		mockClickFollowButton.mockResolvedValue(true);
+		mockDetectFollowState.mockResolvedValue("can_follow");
+		mockVerifyFollowSucceeded.mockResolvedValue("following");
+		mockGetCurrentUsername.mockResolvedValue("testaccount");
 	});
 
 	describe("checkDmThreadEmpty", () => {
-		test("returns false when multiple nodes found", async () => {
+		it("returns true when thread has no messages", async () => {
 			const page = createPageMock({
-				$$: jest
-					.fn<() => Promise<Array<{ id: number }>>>()
-					.mockResolvedValueOnce([{ id: 1 }, { id: 2 }])
-					.mockResolvedValue([]),
+				$$: jest.fn(() => Promise.resolve([])),
 			});
-			const result = await checkDmThreadEmpty(page as unknown as Page);
+
+			const result = await checkDmThreadEmpty(page);
+			expect(result).toBe(true);
+		});
+
+		it("returns true when thread has only header element", async () => {
+			const page = createPageMock({
+				$$: jest.fn(() => Promise.resolve([{}])),
+			});
+
+			const result = await checkDmThreadEmpty(page);
+			expect(result).toBe(true);
+		});
+
+		it("returns false when thread has messages", async () => {
+			const page = createPageMock({
+				$$: jest.fn(() => Promise.resolve([{}, {}, {}])),
+			});
+
+			const result = await checkDmThreadEmpty(page);
 			expect(result).toBe(false);
-		});
-
-		test("returns true when no nodes", async () => {
-			const page = createPageMock({
-				$$: jest.fn<() => Promise<unknown[]>>().mockResolvedValue([]),
-			});
-			const result = await checkDmThreadEmpty(page as unknown as Page);
-			expect(result).toBe(true);
-		});
-
-		test("returns true when only one node (header)", async () => {
-			const page = createPageMock({
-				$$: jest
-					.fn<() => Promise<Array<{ id: number }>>>()
-					.mockResolvedValueOnce([{ id: 1 }])
-					.mockResolvedValue([]),
-			});
-			const result = await checkDmThreadEmpty(page as unknown as Page);
-			expect(result).toBe(true);
 		});
 	});
 
 	describe("sendDMToUser", () => {
-		test("sends DM when conversation is empty", async () => {
-			// Set up a test database URL to avoid connection errors
-			if (!process.env.DATABASE_URL) {
-				process.env.DATABASE_URL = "postgresql://test:test@localhost:5432/test";
-			}
+		it("navigates to profile and sends DM successfully", async () => {
+			const page = createPageWithElementMock();
+			(page.$$ as jest.Mock).mockImplementation(() => Promise.resolve([]));
 
-			const page = createPageMock({
-				$$: jest
-					.fn<(selector: string) => Promise<unknown[]>>()
-					.mockImplementation(async (selector: string) => {
-						// For checkDmThreadEmpty - return empty array
-						if (
-							selector.includes('role="row"') ||
-							selector.includes('role="listitem"') ||
-							selector.includes('data-scope="messages_table"')
-						) {
-							return [];
-						}
-						return [];
-					}),
-				goto: jest
-					.fn<(url: string, opts?: object) => Promise<void>>()
-					.mockResolvedValue(undefined),
-				url: jest
-					.fn<() => string>()
-					.mockReturnValue("https://www.instagram.com/direct/t/user123/"),
-				evaluate: jest
-					.fn<(fn: unknown, ...args: unknown[]) => Promise<unknown>>()
-					.mockImplementation(async (fn: unknown, ...args: unknown[]) => {
-						if (typeof fn === "function") {
-							try {
-								const result = await (fn as (...args: unknown[]) => unknown)(
-									...args,
-								);
-								// Handle different return types without inspecting function strings
-								// findMessageButton - return button info
-								if (
-									result &&
-									typeof result === "object" &&
-									"x" in result &&
-									"y" in result &&
-									"width" in result
-								) {
-									return {
-										x: 100,
-										y: 200,
-										width: 80,
-										height: 30,
-										isVisible: true,
-									};
-								}
-								// navigateToProfile - check URL (returns string from page.url())
-								if (typeof result === "string") {
-									return !result.includes("/accounts/login/");
-								}
-								// verifyDmSent - check URL (window.location.href)
-								if (
-									typeof result === "object" &&
-									result !== null &&
-									"includes" in result
-								) {
-									return true; // in DM thread
-								}
-								// typeMessage - check text present (returns boolean)
-								if (typeof result === "boolean") {
-									return true; // Text is present
-								}
-								// getElementCenter or mouse position - returns { x, y }
-								if (
-									result &&
-									typeof result === "object" &&
-									"x" in result &&
-									"y" in result
-								) {
-									return { x: 50, y: 50 };
-								}
-								return result;
-							} catch {
-								// If function throws, return appropriate defaults
-								// Mouse position check
-								if (args.length === 0) {
-									return { x: 100, y: 100 };
-								}
-								// typeMessage text check
-								if (args.length >= 2 && typeof args[1] === "string") {
-									return true;
-								}
-								return null;
-							}
-						}
-						return null;
-					}) as unknown as Page["evaluate"],
-				$: jest
-					.fn<(selector: string) => Promise<unknown>>()
-					.mockImplementation(async (selector: string) => {
-						// Return element for message input selectors
-						if (
-							selector.includes('role="textbox"') ||
-							selector.includes("contenteditable") ||
-							selector.includes("Message") ||
-							selector.includes("Send")
-						) {
-							return {
-								click: jest
-									.fn<() => Promise<void>>()
-									.mockResolvedValue(undefined),
-								boundingBox: jest
-									.fn<
-										() => Promise<{
-											x: number;
-											y: number;
-											width: number;
-											height: number;
-										} | null>
-									>()
-									.mockResolvedValue({ x: 0, y: 0, width: 100, height: 40 }),
-								textContent: "Hello!",
-							};
-						}
-						return null;
-					}) as unknown as Page["$"],
-				waitForSelector: jest
-					.fn<(selector: string, opts?: object) => Promise<unknown>>()
-					.mockImplementation(async (selector: string) => {
-						// Return element for message input selectors
-						if (
-							selector.includes('role="textbox"') ||
-							selector.includes("contenteditable") ||
-							selector.includes("Message")
-						) {
-							return {
-								click: jest
-									.fn<() => Promise<void>>()
-									.mockResolvedValue(undefined),
-								boundingBox: jest
-									.fn<
-										() => Promise<{
-											x: number;
-											y: number;
-											width: number;
-											height: number;
-										} | null>
-									>()
-									.mockResolvedValue({ x: 0, y: 0, width: 100, height: 40 }),
-								textContent: "Hello!",
-							};
-						}
-						return null;
-					}),
-				keyboard: {
-					press: jest
-						.fn<(key: string) => Promise<void>>()
-						.mockResolvedValue(undefined),
-					type: jest
-						.fn<(text: string, opts?: object) => Promise<void>>()
-						.mockResolvedValue(undefined),
-					down: jest
-						.fn<(key: string) => Promise<void>>()
-						.mockResolvedValue(undefined),
-					up: jest
-						.fn<(key: string) => Promise<void>>()
-						.mockResolvedValue(undefined),
-				},
-				mouse: {
-					move: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
-					down: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
-					up: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
-				},
-			});
+			const result = await sendDMToUser(page, "targetuser");
 
-			const ok = await sendDMToUser(page as unknown as Page, "user123");
-
-			expect(ok).toBe(true);
-			expect(page.goto).toHaveBeenCalled();
-			expect(markDmSentMock).toHaveBeenCalled();
-		}, 10000); // 10 second timeout
-
-		test("skips when conversation is not empty", async () => {
-			const page = createPageMock({
-				$$: jest
-					.fn<() => Promise<Array<{ id: number }>>>()
-					.mockResolvedValueOnce([{ id: 1 }, { id: 2 }]) // not empty
-					.mockResolvedValue([]),
-				goto: jest
-					.fn<(url: string, opts?: object) => Promise<void>>()
-					.mockResolvedValue(undefined),
-				url: jest
-					.fn<() => string>()
-					.mockReturnValue("https://www.instagram.com/direct/t/user123/"),
-				evaluate: jest
-					.fn<(fn: unknown, ...args: unknown[]) => Promise<unknown>>()
-					.mockImplementation(async (fn: unknown) => {
-						if (typeof fn === "function") {
-							const result = await (fn as () => unknown)();
-							if (
-								result &&
-								typeof result === "object" &&
-								"x" in result &&
-								"y" in result
-							) {
-								return {
-									x: 100,
-									y: 200,
-									width: 80,
-									height: 30,
-									isVisible: true,
-								};
-							}
-							if (typeof result === "string") {
-								return !result.includes("/accounts/login/");
-							}
-						}
-						return null;
-					}) as unknown as Page["evaluate"],
-				$: jest
-					.fn<(selector: string) => Promise<unknown>>()
-					.mockResolvedValue(null) as unknown as Page["$"],
-				mouse: {
-					move: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
-				},
-			});
-
-			const ok = await sendDMToUser(page as unknown as Page, "user123");
-
-			expect(ok).toBe(false);
+			expect(mockNavigateToProfile).toHaveBeenCalledWith(page, "targetuser");
+			expect(mockSendMessage).toHaveBeenCalled();
+			expect(mockMarkDmSent).toHaveBeenCalledWith(
+				"targetuser",
+				"/proof.png",
+				"testaccount",
+			);
+			expect(result).toBe(true);
 		});
 
-		test("handles errors gracefully", async () => {
+		it("skips navigation when skipNavigation is true", async () => {
+			const page = createPageWithElementMock();
+			(page.$$ as jest.Mock).mockImplementation(() => Promise.resolve([]));
+
+			await sendDMToUser(page, "targetuser", true);
+
+			expect(mockNavigateToProfile).not.toHaveBeenCalled();
+		});
+
+		it("returns false when message input not found", async () => {
+			const page = createPageWithElementMock();
+			(page.$$ as jest.Mock).mockImplementation(() => Promise.resolve([]));
+			mockFindMessageInput.mockImplementation(() => Promise.resolve(null));
+
+			const result = await sendDMToUser(page, "targetuser");
+
+			expect(result).toBe(false);
+		});
+
+		it("returns false when DM thread is not empty", async () => {
 			const page = createPageMock({
-				goto: jest
-					.fn<(url: string, opts?: object) => Promise<void>>()
-					.mockRejectedValue(new Error("Navigation failed")),
-				url: jest
-					.fn<() => string>()
-					.mockReturnValue("https://www.instagram.com/"),
+				$$: jest.fn(() => Promise.resolve([{}, {}, {}])),
 			});
 
-			const ok = await sendDMToUser(page as unknown as Page, "user123");
+			const result = await sendDMToUser(page, "targetuser");
 
-			expect(ok).toBe(false);
+			expect(mockSendMessage).not.toHaveBeenCalled();
+			expect(result).toBe(false);
 		});
 	});
 
 	describe("followUserAccount", () => {
-		test("follows user when button is found", async () => {
-			let evaluateCallCount = 0;
-			const mockButton = {
-				click: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
-				textContent: "Follow",
-				boundingBox: jest
-					.fn<
-						() => Promise<{
-							x: number;
-							y: number;
-							width: number;
-							height: number;
-						} | null>
-					>()
-					.mockResolvedValue({ x: 0, y: 0, width: 100, height: 40 }),
-				evaluate: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
-			};
-			const page = createPageMock({
-				goto: jest
-					.fn<(url: string, opts?: object) => Promise<void>>()
-					.mockResolvedValue(undefined),
-				$: jest
-					.fn<(selector: string) => Promise<typeof mockButton | null>>()
-					.mockResolvedValue(mockButton as unknown as typeof mockButton),
-				mouse: {
-					move: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
-					down: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
-					up: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
-				},
-				evaluate: jest
-					.fn<(fn: unknown) => Promise<unknown>>()
-					.mockImplementation(async (fn: unknown): Promise<unknown> => {
-						evaluateCallCount++;
-						if (typeof fn === "function") {
-							try {
-								const result = await (fn as () => unknown)();
-								// First call: check button state - returns { state: "can_follow", button: btn }
-								if (evaluateCallCount === 1) {
-									return { state: "can_follow", button: mockButton };
-								}
-								// Second call: check button state after click - returns "following" or "requested"
-								if (evaluateCallCount === 2) {
-									return "following"; // Button changed to "Following"
-								}
-								return result;
-							} catch {
-								// If function throws, return appropriate values
-								if (evaluateCallCount === 1)
-									return { state: "can_follow", button: mockButton };
-								return "following";
-							}
-						}
-						return { state: "not_found" };
-					}) as unknown as Page["evaluate"],
+		it("follows user successfully when not already following", async () => {
+			const page = createPageWithElementMock({
+				url: jest.fn(() => "https://instagram.com/targetuser/"),
 			});
 
-			const ok = await followUserAccount(page as unknown as Page, "user123");
+			const result = await followUserAccount(page, "targetuser");
 
-			expect(ok).toBe(true);
-			expect(page.goto).toHaveBeenCalledWith(
-				"https://www.instagram.com/user123/",
-				expect.objectContaining({
-					waitUntil: "networkidle2",
-					timeout: 15000,
-				}),
+			expect(mockNavigateToProfile).toHaveBeenCalledWith(page, "targetuser");
+			expect(mockDetectFollowState).toHaveBeenCalled();
+			expect(mockClickFollowButton).toHaveBeenCalled();
+			expect(mockVerifyFollowSucceeded).toHaveBeenCalled();
+			expect(mockMarkFollowed).toHaveBeenCalledWith("targetuser");
+			expect(result).toBe(true);
+		});
+
+		it("returns false when already following", async () => {
+			const page = createPageWithElementMock();
+			mockDetectFollowState.mockImplementation(() =>
+				Promise.resolve("already_following"),
 			);
-			expect(markFollowedMock).toHaveBeenCalledWith("user123");
+
+			const result = await followUserAccount(page, "targetuser");
+
+			expect(mockClickFollowButton).not.toHaveBeenCalled();
+			expect(result).toBe(false);
 		});
 
-		test("returns false when already following", async () => {
-			const page = createPageMock({
-				goto: jest
-					.fn<(url: string, opts?: object) => Promise<void>>()
-					.mockResolvedValue(undefined),
-				evaluate: jest
-					.fn<(fn: unknown) => Promise<unknown>>()
-					.mockResolvedValue({ state: "already_following" }), // button shows "Following"
-			});
+		it("returns false when follow request already sent", async () => {
+			const page = createPageWithElementMock();
+			mockDetectFollowState.mockImplementation(() =>
+				Promise.resolve("request_sent"),
+			);
 
-			const ok = await followUserAccount(page as unknown as Page, "user123");
+			const result = await followUserAccount(page, "targetuser");
 
-			expect(ok).toBe(false);
+			expect(mockClickFollowButton).not.toHaveBeenCalled();
+			expect(result).toBe(false);
 		});
 
-		test("returns false when follow request already sent", async () => {
-			const page = createPageMock({
-				goto: jest
-					.fn<(url: string, opts?: object) => Promise<void>>()
-					.mockResolvedValue(undefined),
-				evaluate: jest
-					.fn<(fn: unknown) => Promise<unknown>>()
-					.mockResolvedValue({ state: "request_sent" }), // button shows "Requested"
+		it("skips navigation when skipNavigation is true", async () => {
+			const page = createPageWithElementMock({
+				url: jest.fn(() => "https://instagram.com/targetuser/"),
 			});
 
-			const ok = await followUserAccount(page as unknown as Page, "user123");
+			await followUserAccount(page, "targetuser", true);
 
-			expect(ok).toBe(false);
-		});
-
-		test("returns false when button not found", async () => {
-			const page = createPageMock({
-				goto: jest
-					.fn<(url: string, opts?: object) => Promise<void>>()
-					.mockResolvedValue(undefined),
-				evaluate: jest
-					.fn<(fn: unknown) => Promise<unknown>>()
-					.mockResolvedValue("not_found"), // button not found
-			});
-
-			const ok = await followUserAccount(page as unknown as Page, "user123");
-
-			expect(ok).toBe(false);
-		});
-
-		test("handles errors gracefully", async () => {
-			const page = createPageMock({
-				goto: jest
-					.fn<(url: string, opts?: object) => Promise<void>>()
-					.mockRejectedValue(new Error("Navigation failed")),
-			});
-
-			const ok = await followUserAccount(page as unknown as Page, "user123");
-
-			expect(ok).toBe(false);
+			expect(mockNavigateToProfile).not.toHaveBeenCalled();
 		});
 	});
 
 	describe("addFollowingToQueue", () => {
-		test("adds new users to queue", async () => {
-			const page = createPageMock({
-				keyboard: {
-					press: jest
-						.fn<(key: string) => Promise<void>>()
-						.mockResolvedValue(undefined),
-				},
-				$: jest
-					.fn<(selector: string) => Promise<unknown>>()
-					.mockImplementation(async (selector: string) => {
-						// Return element for following modal
-						if (selector.includes("following") || selector.includes("modal")) {
-							return {
-								click: jest
-									.fn<() => Promise<void>>()
-									.mockResolvedValue(undefined),
-							};
-						}
-						return null;
-					}) as unknown as Page["$"],
-				$$: jest
-					.fn<(selector: string) => Promise<unknown[]>>()
-					.mockResolvedValue([
-						{ textContent: "user1" },
-						{ textContent: "user2" },
-					]),
-				evaluate: jest
-					.fn<(fn: unknown, ...args: unknown[]) => Promise<unknown>>()
-					.mockResolvedValue(["user1", "user2"]),
-			});
-
-			const added = await addFollowingToQueue(
-				page as unknown as Page,
-				"seeduser",
-				"source-tag",
-				5,
+		it("adds following users to queue", async () => {
+			const page = createPageMock();
+			mockOpenFollowingModal.mockImplementation(() => Promise.resolve(true));
+			mockExtractFollowingUsernames.mockImplementation(() =>
+				Promise.resolve(["user1", "user2", "user3"]),
 			);
 
-			// Should add users (actual count depends on database state)
-			expect(typeof added).toBe("number");
-			expect(added).toBeGreaterThanOrEqual(0);
+			const result = await addFollowingToQueue(page, "targetuser", "source");
+
+			expect(mockOpenFollowingModal).toHaveBeenCalledWith(page);
+			expect(mockExtractFollowingUsernames).toHaveBeenCalledWith(page, 20);
+			expect(mockQueueAdd).toHaveBeenCalledTimes(3);
+			expect(result).toBe(3);
 		});
 
-		test("skips already visited users", async () => {
-			wasVisitedMock.mockImplementation((u) => Promise.resolve(u === "user1")); // user1 already visited
-			const page = createPageMock({
-				keyboard: {
-					press: jest
-						.fn<(key: string) => Promise<void>>()
-						.mockResolvedValue(undefined),
-				},
-				waitForSelector: jest
-					.fn<(selector: string, opts?: object) => Promise<unknown>>()
-					.mockResolvedValue({}), // Modal found
-				$: jest
-					.fn<(selector: string) => Promise<unknown>>()
-					.mockImplementation(async (selector: string) => {
-						if (selector.includes("following") || selector.includes("modal")) {
-							return {
-								click: jest
-									.fn<() => Promise<void>>()
-									.mockResolvedValue(undefined),
-							};
-						}
-						return null;
-					}) as unknown as Page["$"],
-				$$: jest
-					.fn<(selector: string) => Promise<unknown[]>>()
-					.mockResolvedValue([
-						{
-							evaluate: jest
-								.fn<(fn: unknown) => Promise<string>>()
-								.mockResolvedValue("/user1/"),
-							textContent: "user1",
-						},
-						{
-							evaluate: jest
-								.fn<(fn: unknown) => Promise<string>>()
-								.mockResolvedValue("/user2/"),
-							textContent: "user2",
-						},
-					]),
-				evaluate: jest
-					.fn<(fn: unknown, ...args: unknown[]) => Promise<unknown>>()
-					.mockResolvedValue(["user1", "user2"]),
-			});
+		it("returns 0 when modal fails to open", async () => {
+			const page = createPageMock();
+			mockOpenFollowingModal.mockImplementation(() => Promise.resolve(false));
 
-			const added = await addFollowingToQueue(
-				page as unknown as Page,
-				"seed",
-				"source",
-			);
+			const result = await addFollowingToQueue(page, "targetuser", "source");
 
-			expect(added).toBe(1);
-			expect(queueAddMock).toHaveBeenCalledTimes(1);
-			expect(queueAddMock).toHaveBeenCalledWith("user2", 50, "source");
+			expect(mockExtractFollowingUsernames).not.toHaveBeenCalled();
+			expect(result).toBe(0);
 		});
 
-		test("returns 0 when modal fails to open", async () => {
-			const page = createPageMock({
-				$: jest
-					.fn<(selector: string) => Promise<unknown>>()
-					.mockResolvedValue(null) as unknown as Page["$"],
+		it("skips already visited users", async () => {
+			const page = createPageMock();
+			mockOpenFollowingModal.mockImplementation(() => Promise.resolve(true));
+			mockExtractFollowingUsernames.mockImplementation(() =>
+				Promise.resolve(["user1", "user2"]),
+			);
+			let wasVisitedCallCount = 0;
+			mockWasVisited.mockImplementation(() => {
+				wasVisitedCallCount++;
+				return Promise.resolve(wasVisitedCallCount === 1);
 			});
 
-			const added = await addFollowingToQueue(
-				page as unknown as Page,
-				"seed",
-				"source",
+			const result = await addFollowingToQueue(page, "targetuser", "source");
+
+			expect(mockQueueAdd).toHaveBeenCalledTimes(1);
+			expect(result).toBe(1);
+		});
+	});
+
+	describe("queue counter management", () => {
+		it("tracks queue adds across calls", async () => {
+			const page = createPageMock();
+			mockOpenFollowingModal.mockImplementation(() => Promise.resolve(true));
+			mockExtractFollowingUsernames.mockImplementation(() =>
+				Promise.resolve(["user1"]),
 			);
 
-			expect(added).toBe(0);
+			expect(getQueueAddCount()).toBe(0);
+
+			await addFollowingToQueue(page, "target", "source");
+			expect(getQueueAddCount()).toBe(1);
+
+			await addFollowingToQueue(page, "target", "source");
+			expect(getQueueAddCount()).toBe(2);
+		});
+
+		it("resets counter properly", async () => {
+			const page = createPageMock();
+			mockOpenFollowingModal.mockImplementation(() => Promise.resolve(true));
+			mockExtractFollowingUsernames.mockImplementation(() =>
+				Promise.resolve(["user1"]),
+			);
+
+			await addFollowingToQueue(page, "target", "source");
+			expect(getQueueAddCount()).toBe(1);
+
+			resetQueueAddCounter();
+			expect(getQueueAddCount()).toBe(0);
 		});
 	});
 });

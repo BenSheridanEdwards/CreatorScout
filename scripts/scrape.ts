@@ -345,6 +345,7 @@ export async function processProfile(
 				const { execSync } = await import("child_process");
 				execSync(
 					`osascript -e 'display notification "Creator found with ${confidence}% confidence" with title "Scout Discovery" subtitle "@${username}" sound name "Glass"'`,
+					{ stdio: "ignore" },
 				);
 			} catch {
 				// Ignore notification errors on non-macOS systems
