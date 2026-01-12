@@ -777,7 +777,6 @@ export async function analyzeLinkWithVision(
 			timeout: 15000,
 		});
 		// Wait for page to fully load before doing any checks
-		console.log(`[VISION] Waiting for page to fully load...`);
 		await mediumDelay(2, 4);
 
 		// Take screenshot (functional - always enabled for vision analysis)
