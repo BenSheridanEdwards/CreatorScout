@@ -41,8 +41,11 @@ const STRONG_SIGNALS: Array<{
 	{ pattern: "check my highlight", points: 35, label: "highlight_redirect" },
 	{ pattern: "check highlights", points: 35, label: "highlight_redirect" },
 	{ pattern: "in my highlights", points: 35, label: "highlight_redirect" },
+	{ pattern: "is in my highlights", points: 40, label: "highlight_redirect" },
 	{ pattern: "story highlights", points: 30, label: "highlight_redirect" },
 	{ pattern: "link in highlight", points: 35, label: "highlight_redirect" },
+	// "The X is in my highlights" pattern - emoji combo pointing to highlights
+	{ pattern: /the\s+.{1,10}\s+is in my highlight/i, points: 45, label: "emoji_highlight_redirect" },
 
 	// Explicit content markers
 	{ pattern: "xxx", points: 40, label: "explicit" },
@@ -159,6 +162,7 @@ const EMOJI_SCORES: Record<string, number> = {
 	"💜": 5,
 	"🤍": 5,
 	"💙": 5,
+	"🩵": 5, // light blue heart - common in creator bios
 	"💗": 5,
 	"💖": 5,
 	"✨": 5,
@@ -355,8 +359,11 @@ export function calculateScore(bio: string, username?: string): BioScoreResult {
 		m.includes("highlight"),
 	);
 	if (hasHighlightRedirect && emojiCount >= 2) {
-		score += 20;
-		reasons.push("COMBO: highlight redirect + emojis: +20");
+		score += 25;
+		reasons.push("COMBO: highlight redirect + emojis: +25");
+	} else if (hasHighlightRedirect && emojiCount >= 1) {
+		score += 15;
+		reasons.push("COMBO: highlight redirect + emoji: +15");
 	}
 
 	// "Yes I have one" / "I have one" + highlight redirect = DEFINITIVE creator signal

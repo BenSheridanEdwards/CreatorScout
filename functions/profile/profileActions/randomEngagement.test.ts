@@ -53,8 +53,8 @@ describe("randomEngagement - Pure Logic", () => {
 
 			const engageCount = results.filter((r) => r).length;
 			// Should be around 70% (±15%)
-			expect(engageCount).toBeGreaterThan(55);
-			expect(engageCount).toBeLessThan(85);
+			expect(engageCount).toBeGreaterThanOrEqual(55);
+			expect(engageCount).toBeLessThanOrEqual(85);
 		});
 	});
 

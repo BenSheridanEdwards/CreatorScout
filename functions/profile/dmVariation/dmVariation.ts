@@ -131,6 +131,9 @@ export function generateShortDM(): string {
 	// Apply word variations
 	message = applyWordVariations(message, lines.word_variations);
 
+	// Re-capitalize after word variations (in case first word was replaced)
+	message = capitalize(message);
+
 	// Maybe add emoji
 	message = maybeAddEmoji(message, lines.emojis);
 
@@ -159,6 +162,9 @@ export function generateMediumDM(): string {
 
 	// Apply word variations
 	message = applyWordVariations(message, lines.word_variations);
+
+	// Re-capitalize after word variations (in case first word was replaced)
+	message = capitalize(message);
 
 	// Maybe add emoji
 	message = maybeAddEmoji(message, lines.emojis);
@@ -190,6 +196,9 @@ export function generateFullPitchDM(): string {
 
 	// Apply word variations
 	message = applyWordVariations(message, lines.word_variations);
+
+	// Re-capitalize after word variations (in case first word was replaced)
+	message = capitalize(message);
 
 	// Maybe add emoji
 	message = maybeAddEmoji(message, lines.emojis);

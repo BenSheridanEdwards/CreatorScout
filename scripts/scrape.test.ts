@@ -123,10 +123,14 @@ const navigateToProfileAndCheckMock =
 			options?: { timeout?: number },
 		) => Promise<{ notFound: boolean; isPrivate: boolean }>
 	>();
+const checkProfileStatusMock = jest.fn<
+	(page: Page) => Promise<{ notFound: boolean; isPrivate: boolean; isAccessible: boolean }>
+>().mockResolvedValue({ notFound: false, isPrivate: false, isAccessible: true });
 jest.unstable_mockModule(
 	"../functions/navigation/profileNavigation/profileNavigation.ts",
 	() => ({
 		navigateToProfileAndCheck: navigateToProfileAndCheckMock,
+		checkProfileStatus: checkProfileStatusMock,
 	}),
 );
 
