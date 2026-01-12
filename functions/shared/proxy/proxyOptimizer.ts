@@ -101,21 +101,6 @@ export class ProxyOptimizer {
 			const url = request.url();
 			const resourceType = request.resourceType();
 
-			// Debug: Log image/media requests to see what's coming through
-			if (
-				resourceType === "image" ||
-				resourceType === "media" ||
-				url.includes(".jpg") ||
-				url.includes(".mp4") ||
-				url.includes(".webp")
-			) {
-				const shouldBlock = this.shouldBlockRequest(url, resourceType);
-				logger.debug(
-					"PROXY",
-					`[${resourceType}] ${shouldBlock ? "BLOCK" : "ALLOW"}: ${url.substring(0, 100)}...`,
-				);
-			}
-
 			// Check if should block
 			if (this.shouldBlockRequest(url, resourceType)) {
 				this.stats.blockedCount++;
@@ -123,6 +108,15 @@ export class ProxyOptimizer {
 				const savedBytes = this.estimateSavedBytes(resourceType);
 				this.stats.savedBytes += savedBytes;
 				this.stats.savedMB = this.stats.savedBytes / (1024 * 1024);
+
+				// Log summary every 100 blocked requests
+				if (this.stats.blockedCount % 100 === 0) {
+					logger.info(
+						"PROXY",
+						`Blocked ${this.stats.blockedCount} requests (~${this.stats.savedMB.toFixed(1)}MB saved)`,
+					);
+				}
+
 				request.abort();
 				return;
 			}
