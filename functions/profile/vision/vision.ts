@@ -10,10 +10,19 @@ import {
 	VISION_MODEL_FALLBACK,
 } from "../../shared/config/config.ts";
 
-const client = new OpenAI({
-	baseURL: "https://openrouter.ai/api/v1",
-	apiKey: OPENROUTER_API_KEY,
-});
+// Lazy-load the OpenAI client to avoid errors when OPENROUTER_API_KEY is not set
+// (e.g., in test environments that don't need vision functionality)
+let _client: OpenAI | null = null;
+
+function getClient(): OpenAI {
+	if (!_client) {
+		_client = new OpenAI({
+			baseURL: "https://openrouter.ai/api/v1",
+			apiKey: OPENROUTER_API_KEY,
+		});
+	}
+	return _client;
+}
 
 /**
  * Check if an error is a rate limit error (429)
@@ -135,7 +144,7 @@ export async function analyzeLinktree(
 	}
 
 	try {
-		const response = await client.chat.completions.create({
+		const response = await getClient().chat.completions.create({
 			model: VISION_MODEL,
 			messages: [
 				{
@@ -171,7 +180,7 @@ export async function analyzeLinktree(
 			}
 
 			try {
-				const response = await client.chat.completions.create({
+				const response = await getClient().chat.completions.create({
 					model: VISION_MODEL_FALLBACK,
 					messages: [
 						{
@@ -376,7 +385,7 @@ export async function validateBioWithVision(
 
 	// Try with primary model first
 	try {
-		const response = await client.chat.completions.create({
+		const response = await getClient().chat.completions.create({
 			model: VISION_MODEL,
 			messages: [
 				{
@@ -412,7 +421,7 @@ export async function validateBioWithVision(
 			}
 
 			try {
-				const response = await client.chat.completions.create({
+				const response = await getClient().chat.completions.create({
 					model: VISION_MODEL_FALLBACK,
 					messages: [
 						{
@@ -467,7 +476,7 @@ export async function analyzeProfile(
 	try {
 		const imageBuffer = readFileSync(imagePath);
 		const base64 = imageBuffer.toString("base64");
-		const response = await client.chat.completions.create({
+		const response = await getClient().chat.completions.create({
 			model: VISION_MODEL,
 			messages: [
 				{
@@ -520,7 +529,7 @@ export async function analyzeProfile(
 				const imageBuffer = readFileSync(imagePath);
 				const base64 = imageBuffer.toString("base64");
 
-				const response = await client.chat.completions.create({
+				const response = await getClient().chat.completions.create({
 					model: VISION_MODEL_FALLBACK,
 					messages: [
 						{
