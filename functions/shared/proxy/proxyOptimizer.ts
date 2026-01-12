@@ -23,11 +23,7 @@ const logger = createLogger();
 
 // Resources to block to save bandwidth
 // NOTE: Do NOT block "stylesheet" - it breaks Instagram's UI completely
-const BLOCKED_RESOURCE_TYPES = [
-	"image",
-	"media",
-	"font",
-];
+const BLOCKED_RESOURCE_TYPES = ["image", "media", "font"];
 
 // Domains to block (ads, analytics, tracking)
 const BLOCKED_DOMAINS = [
@@ -109,6 +105,21 @@ export class ProxyOptimizer {
 			const url = request.url();
 			const resourceType = request.resourceType();
 
+			// Debug: Log image/media requests to see what's coming through
+			if (
+				resourceType === "image" ||
+				resourceType === "media" ||
+				url.includes(".jpg") ||
+				url.includes(".mp4") ||
+				url.includes(".webp")
+			) {
+				const shouldBlock = this.shouldBlockRequest(url, resourceType);
+				logger.debug(
+					"PROXY",
+					`[${resourceType}] ${shouldBlock ? "BLOCK" : "ALLOW"}: ${url.substring(0, 100)}...`,
+				);
+			}
+
 			// Check if should block
 			if (this.shouldBlockRequest(url, resourceType)) {
 				this.stats.blockedCount++;
@@ -129,7 +140,10 @@ export class ProxyOptimizer {
 			request.continue();
 		});
 
-		logger.info("PROXY", `Optimizer attached (blocking: ${this.blockResources})`);
+		logger.info(
+			"PROXY",
+			`Optimizer attached (blocking: ${this.blockResources})`,
+		);
 	}
 
 	/**
@@ -228,11 +242,11 @@ export class ProxyOptimizer {
 
 		logger.info(
 			"PROXY",
-			`Session bandwidth: ${stats.estimatedMB.toFixed(2)}MB (${stats.requestCount} requests)`
+			`Session bandwidth: ${stats.estimatedMB.toFixed(2)}MB (${stats.requestCount} requests)`,
 		);
 		logger.info(
 			"PROXY",
-			`Blocked: ${stats.blockedCount} requests, saved ~${stats.savedMB.toFixed(2)}MB`
+			`Blocked: ${stats.blockedCount} requests, saved ~${stats.savedMB.toFixed(2)}MB`,
 		);
 
 		// Persist to database
@@ -260,7 +274,7 @@ export class ProxyOptimizer {
  */
 export async function getProxyUsageReport(
 	startDate: Date,
-	endDate: Date = new Date()
+	endDate: Date = new Date(),
 ): Promise<ProxyUsageReport> {
 	const prisma = getPrismaClient();
 
@@ -331,8 +345,17 @@ export async function estimateMonthlyProxyCost(): Promise<{
 }> {
 	const now = new Date();
 	const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-	const daysElapsed = Math.max(1, Math.floor((now.getTime() - firstOfMonth.getTime()) / (24 * 60 * 60 * 1000)));
-	const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+	const daysElapsed = Math.max(
+		1,
+		Math.floor(
+			(now.getTime() - firstOfMonth.getTime()) / (24 * 60 * 60 * 1000),
+		),
+	);
+	const daysInMonth = new Date(
+		now.getFullYear(),
+		now.getMonth() + 1,
+		0,
+	).getDate();
 
 	const report = await getProxyUsageReport(firstOfMonth);
 	const dailyAverageMB = report.totalMB / daysElapsed;
@@ -350,7 +373,10 @@ export async function estimateMonthlyProxyCost(): Promise<{
 /**
  * Create an optimizer with recommended settings for production
  */
-export function createProductionOptimizer(profileId: string, sessionId: string): ProxyOptimizer {
+export function createProductionOptimizer(
+	profileId: string,
+	sessionId: string,
+): ProxyOptimizer {
 	return new ProxyOptimizer({
 		profileId,
 		sessionId,
