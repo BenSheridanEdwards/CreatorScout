@@ -148,29 +148,47 @@ export async function analyzeProfileComprehensive(
 		reason: null,
 	};
 
+	// Track which steps completed for better error context
+	const completedSteps: string[] = [];
+	let currentStep = "init";
+
 	// Helper to check if error is a bundler __name error
 	const isBundlerError = (error: unknown): boolean => {
 		const msg = error instanceof Error ? error.message : String(error);
 		return msg.includes("__name") || msg.includes("is not defined");
 	};
 
+	// Wrap error with context about which step failed
+	const wrapError = (error: unknown, step: string): Error => {
+		const msg = error instanceof Error ? error.message : String(error);
+		const completed =
+			completedSteps.length > 0 ? completedSteps.join(" → ") : "none";
+		return new Error(`[${step}] ${msg} (completed: ${completed})`);
+	};
+
 	// Extract bio - wrap in try-catch for bundler errors
+	currentStep = "bio_extract";
 	try {
 		result.bio = await getBioFromPage(page);
+		completedSteps.push("bio");
+		if (result.bio) {
+			const bioPreview =
+				result.bio.length > 80
+					? `${result.bio.substring(0, 80)}...`
+					: result.bio;
+			logger.info("EXTRACTION", `Bio: "${bioPreview.replace(/\n/g, " ")}"`);
+		}
 	} catch (bioError) {
 		if (isBundlerError(bioError)) {
-			logger.warn(
-				"ANALYSIS",
-				`Bio extraction failed with bundler error: ${bioError}`,
-			);
-			result.errors?.push(`Bio extraction failed: ${bioError}`);
+			result.errors?.push(`bio_extract: bundler`);
 		} else {
-			throw bioError;
+			throw wrapError(bioError, currentStep);
 		}
 	}
 
 	// Validate bio extraction if it looks short or empty
 	if (!result.bio || result.bio.length < 30) {
+		currentStep = "bio_validate";
 		try {
 			const validation = await validateBioExtraction(
 				page,
@@ -178,18 +196,14 @@ export async function analyzeProfileComprehensive(
 				username,
 			);
 			if (!validation.valid && validation.correctedBio) {
-				logger.warn(
-					"ANALYSIS",
-					`Bio validation corrected: "${result.bio}" -> "${validation.correctedBio}"`,
-				);
 				result.bio = validation.correctedBio;
 			}
+			completedSteps.push("bio_validate");
 		} catch (valError) {
-			if (isBundlerError(valError)) {
-				logger.warn("ANALYSIS", `Bio validation failed: ${valError}`);
-			} else {
-				throw valError;
+			if (!isBundlerError(valError)) {
+				throw wrapError(valError, currentStep);
 			}
+			result.errors?.push(`bio_validate: bundler`);
 		}
 	}
 
@@ -204,43 +218,39 @@ export async function analyzeProfileComprehensive(
 			result.indicators.push(...bioScore.reasons);
 		}
 
+		// Log bio analysis result with confidence
+		logger.info(
+			"EXTRACTION",
+			`Bio score: ${bioScore.score}% | Likely creator: ${isLikely ? "YES" : "NO"} | Conf: ${result.confidence}%`,
+		);
+
 		// Queue referenced Instagram profiles for follow-up analysis
 		if (bioScore.referencedProfiles && bioScore.referencedProfiles.length > 0) {
-			logger.info(
-				"ANALYSIS",
-				`📎 Bio references other profiles: ${bioScore.referencedProfiles.map((p) => `@${p}`).join(", ")}`,
-			);
-
 			for (const refProfile of bioScore.referencedProfiles) {
 				try {
 					await queueAdd(refProfile, 15, "referenced_profile");
-					logger.info(
-						"ANALYSIS",
-						`  ➕ Added @${refProfile} to queue for analysis`,
-					);
-				} catch (error) {
-					logger.info(
-						"ANALYSIS",
-						`  ⚠️ Failed to queue @${refProfile}: ${error}`,
-					);
+				} catch {
+					// Failed to queue - continue
 				}
 			}
 		}
 	}
 
 	// Extract links - wrap in try-catch for bundler errors
+	currentStep = "link_extract";
 	let primary: string | null = null;
 	try {
 		primary = await getLinkFromBio(page);
+		completedSteps.push("links");
 	} catch (linkError) {
 		if (isBundlerError(linkError)) {
-			logger.warn("ANALYSIS", `Bio link extraction failed: ${linkError}`);
-			result.errors?.push(`Bio link extraction failed: ${linkError}`);
+			result.errors?.push(`link_extract: bundler`);
 		} else {
-			throw linkError;
+			throw wrapError(linkError, currentStep);
 		}
 	}
 
+	currentStep = "header_links";
 	let headerHrefs: string[] = [];
 	try {
 		headerHrefs = await page.$$eval(
@@ -250,19 +260,20 @@ export async function analyzeProfileComprehensive(
 		);
 	} catch (evalError) {
 		if (isBundlerError(evalError)) {
-			logger.warn(
-				"ANALYSIS",
-				`Header links extraction failed with bundler error: ${evalError}`,
-			);
-			result.errors?.push(`Header links extraction failed: ${evalError}`);
+			result.errors?.push(`header_links: bundler`);
 		} else {
-			throw evalError;
+			throw wrapError(evalError, currentStep);
 		}
 	}
 	const html = await page.content();
 	result.links = buildUniqueLinks(html, headerHrefs, primary);
 
+	if (result.links.length > 0) {
+		logger.info("EXTRACTION", `Links: ${result.links.length} found`);
+	}
+
 	// Profile stats (follower ratio) - wrap in try-catch for bundler errors
+	currentStep = "stats";
 	let stats: { followers?: number; following?: number; ratio?: number } = {};
 	try {
 		const rawStats = await getProfileStats(page);
@@ -271,12 +282,23 @@ export async function analyzeProfileComprehensive(
 			following: rawStats.following ?? undefined,
 			ratio: rawStats.ratio ?? undefined,
 		};
+		completedSteps.push("stats");
+
+		// Log stats
+		const followersStr =
+			stats.followers !== undefined
+				? `${stats.followers.toLocaleString()} followers`
+				: "? followers";
+		const followingStr =
+			stats.following !== undefined
+				? `${stats.following.toLocaleString()} following`
+				: "? following";
+		logger.info("EXTRACTION", `Stats: ${followersStr}, ${followingStr}`);
 	} catch (statsError) {
 		if (isBundlerError(statsError)) {
-			logger.warn("ANALYSIS", `Profile stats extraction failed: ${statsError}`);
-			result.errors?.push(`Profile stats extraction failed: ${statsError}`);
+			result.errors?.push(`stats: bundler`);
 		} else {
-			throw statsError;
+			throw wrapError(statsError, currentStep);
 		}
 	}
 
@@ -288,20 +310,16 @@ export async function analyzeProfileComprehensive(
 	}
 
 	// Story highlights analysis - wrap in try-catch for bundler errors
+	currentStep = "highlights";
 	let rawHighlights: Awaited<ReturnType<typeof getStoryHighlights>> = [];
 	try {
 		rawHighlights = await getStoryHighlights(page);
+		completedSteps.push("highlights");
 	} catch (highlightsError) {
 		if (isBundlerError(highlightsError)) {
-			logger.warn(
-				"ANALYSIS",
-				`Story highlights extraction failed: ${highlightsError}`,
-			);
-			result.errors?.push(
-				`Story highlights extraction failed: ${highlightsError}`,
-			);
+			result.errors?.push(`highlights: bundler`);
 		} else {
-			throw highlightsError;
+			throw wrapError(highlightsError, currentStep);
 		}
 	}
 
@@ -330,7 +348,7 @@ export async function analyzeProfileComprehensive(
 				result.indicators.push(`Link highlight: "${h.title}"`);
 			});
 
-			// Boost confidence if bio also mentions highlights (but not too much)
+			// Boost confidence if bio also mentions highlights
 			const bioMentionsHighlights =
 				result.bio &&
 				(result.bio.toLowerCase().includes("in my highlight") ||
@@ -338,15 +356,24 @@ export async function analyzeProfileComprehensive(
 					result.bio.toLowerCase().includes("what you're looking for is in"));
 
 			if (bioMentionsHighlights && linkHighlights.length > 0) {
-				// Bio directs to highlights + link names = medium-high signal (50%)
 				result.confidence = Math.max(result.confidence, 50);
 				result.indicators.push(
 					"Bio directs to highlights with link names",
 				);
 			} else {
-				// Link highlights alone = low-medium signal (30%)
 				result.confidence = Math.max(result.confidence, 30);
 			}
+		}
+
+		// Log highlights analysis
+		const linkCount = highlights.filter((h) =>
+			isLinkInBioHighlight(h.title),
+		).length;
+		if (linkCount > 0) {
+			logger.info(
+				"EXTRACTION",
+				`Highlights: ${highlights.length} total, ${linkCount} link | Conf: ${result.confidence}%`,
+			);
 		}
 	}
 
@@ -359,37 +386,31 @@ export async function analyzeProfileComprehensive(
 	if (externalLinks.length > 0) {
 		result.indicators.push("External links in profile");
 
-		// ALWAYS check links - they're the best indicator of a creator
-		logger.info(
-			"ANALYSIS",
-			`🔗 Found ${externalLinks.length} external link(s) - checking all regardless of bio score`,
-		);
-
 		// Save current URL to return to profile
 		const profileUrl = page.url();
 
 		// Screenshot BEFORE clicking link - proof of profile state (shows link exists)
-		// Useful if landing page requires auth - we have proof they're behind paywall
 		const preClickScreenshot = await snapshot(
 			page,
 			`profile_before_link_${username}`,
-			true, // force: true - functional screenshot for evidence
+			true,
 		);
 		if (preClickScreenshot) {
 			result.screenshots.push(preClickScreenshot);
-			logger.debug(
-				"ANALYSIS",
-				`📸 Pre-click screenshot: ${preClickScreenshot}`,
-			);
 		}
 
 		// First, try to click the bio link like a user would
-		console.log(`[ANALYSIS] Attempting to click bio link for @${username}...`);
 		const clickResult = await clickBioLink(page);
 
 		if (clickResult.success && clickResult.finalUrl) {
-			console.log(
-				`[ANALYSIS] Bio link clicked, now at: ${clickResult.finalUrl}`,
+			// Log the external link navigation
+			const linkDomain = new URL(clickResult.finalUrl).hostname.replace(
+				"www.",
+				"",
+			);
+			logger.info(
+				"LINK_ANALYSIS",
+				`🔗 Opened: ${linkDomain} | Conf so far: ${result.confidence}%`,
 			);
 
 			try {
@@ -399,24 +420,24 @@ export async function analyzeProfileComprehensive(
 					`link_analysis_${username}`,
 				);
 
-				// ALWAYS take screenshot of link page - best evidence for creator verification
-				// Do this BEFORE checking isCreator so vision can run even if text analysis missed it
+				// Log text analysis result
+				logger.info(
+					"LINK_ANALYSIS",
+					`📝 Text analysis: ${linkAnalysis.confidence}% | Creator: ${linkAnalysis.isCreator ? "YES" : "NO"} | ${linkAnalysis.reason || "no reason"}`,
+				);
+
+				// Take screenshot of link page
 				const linkScreenshot = await snapshot(
 					page,
 					`link_analysis_${username}`,
-					true, // force: true - functional screenshot for vision analysis
+					true,
 				);
 				if (linkScreenshot) {
 					result.screenshots.push(linkScreenshot);
-					logger.info("ANALYSIS", `📸 Screenshot saved: ${linkScreenshot}`);
-				} else {
-					logger.warn("ANALYSIS", `⚠️ Failed to take screenshot of link page`);
 				}
 
 				if (linkAnalysis.isCreator) {
 					// Combine link confidence with bio score
-					// If link confidence is LOW (30-50%) AND bio score is also LOW (<40),
-					// it's probably a generic content creator (fitness, gaming, etc.)
 					const bioScore = result.bioScore || 0;
 					let adjustedConfidence = linkAnalysis.confidence;
 
@@ -426,8 +447,9 @@ export async function analyzeProfileComprehensive(
 						result.indicators.push(
 							"⚠️ Weak combined signals (generic content creator, not influencer)",
 						);
-						console.log(
-							`[ANALYSIS] ⚠️ Low link confidence (${linkAnalysis.confidence}%) + low bio score (${bioScore}) = likely NOT influencer`,
+						logger.info(
+							"LINK_ANALYSIS",
+							`⚠️ Weak signals: link ${linkAnalysis.confidence}% + bio ${bioScore}% → adjusted to ${adjustedConfidence}%`,
 						);
 					} else if (linkAnalysis.confidence >= 70 || bioScore >= 60) {
 						// At least one strong signal - trust it
@@ -454,21 +476,22 @@ export async function analyzeProfileComprehensive(
 				}
 
 				// Vision analysis (only if text confidence is below threshold and SKIP_VISION is false)
-				// Run vision even if text analysis said isCreator=false - vision might catch what text missed
 				if (
 					!SKIP_VISION &&
 					linkScreenshot &&
 					linkAnalysis.confidence < VISION_SKIP_THRESHOLD
 				) {
-					console.log(
-						`[VISION] Text confidence ${linkAnalysis.confidence}% < ${VISION_SKIP_THRESHOLD}%, running vision analysis...`,
+					logger.info(
+						"VISION",
+						`🤖 Running AI vision (text conf ${linkAnalysis.confidence}% < ${VISION_SKIP_THRESHOLD}% threshold)...`,
 					);
 					try {
 						const [isCreatorVision, visionData] =
 							await isConfirmedCreator(linkScreenshot);
+						const visionConfidence = visionData?.confidence || 0;
+
 						if (isCreatorVision && visionData) {
 							// Vision found creator - use vision confidence if higher than text
-							const visionConfidence = visionData.confidence || 0;
 							if (visionConfidence > linkAnalysis.confidence) {
 								result.confidence = Math.max(
 									result.confidence,
@@ -482,60 +505,71 @@ export async function analyzeProfileComprehensive(
 									result.indicators.push(...visionData.indicators);
 								}
 								result.reason = `vision_${visionData.reason || "confirmed"}`;
-								console.log(
-									`[VISION] Vision confirmed creator with ${visionConfidence}% confidence`,
+								logger.info(
+									"VISION",
+									`✅ Vision: ${visionConfidence}% | Creator: YES | ${visionData.reason || "confirmed"}`,
 								);
 							} else {
 								result.indicators.push(
 									`Vision analysis: ${visionConfidence}% (text analysis was ${linkAnalysis.confidence}%)`,
 								);
+								logger.info(
+									"VISION",
+									`🤷 Vision: ${visionConfidence}% (not higher than text ${linkAnalysis.confidence}%)`,
+								);
 							}
 						} else {
-							console.log(
-								`[VISION] Vision did not confirm creator (confidence: ${visionData?.confidence || 0}%)`,
-							);
 							result.indicators.push(`Vision analysis did not confirm creator`);
+							logger.info(
+								"VISION",
+								`❌ Vision: ${visionConfidence}% | Creator: NO`,
+							);
 						}
 					} catch (visionError) {
-						console.log(`[VISION] Vision analysis error: ${visionError}`);
+						logger.warn("VISION", `Vision failed: ${visionError}`);
 						result.errors?.push(`Vision analysis failed: ${visionError}`);
 					}
-				} else {
-					// Log why vision didn't run
-					if (SKIP_VISION) {
-						console.log(`[VISION] Skipping vision - SKIP_VISION is enabled`);
-					} else if (!linkScreenshot) {
-						console.log(
-							`[VISION] Skipping vision - screenshot was not taken (linkScreenshot is null)`,
-						);
-					} else if (linkAnalysis.confidence >= VISION_SKIP_THRESHOLD) {
-						console.log(
-							`[VISION] Skipping vision - text confidence ${linkAnalysis.confidence}% >= ${VISION_SKIP_THRESHOLD}% threshold`,
-						);
-					}
+				} else if (
+					!SKIP_VISION &&
+					linkAnalysis.confidence >= VISION_SKIP_THRESHOLD
+				) {
+					logger.info(
+						"VISION",
+						`⏭️ Skipped (text conf ${linkAnalysis.confidence}% >= ${VISION_SKIP_THRESHOLD}% threshold)`,
+					);
 				}
 			} catch (error) {
 				result.errors?.push(`Link analysis failed: ${error}`);
 			}
 
 			// Navigate back to the profile
-			console.log(`[ANALYSIS] Navigating back to profile...`);
 			await page.goto(profileUrl, {
 				waitUntil: "networkidle2",
 				timeout: 15000,
 			});
 			await shortDelay(1, 2);
 		} else {
-			console.log(`[ANALYSIS] Could not click bio link: ${clickResult.error}`);
-
 			// Fallback: analyze each external link by navigating directly
+			logger.info(
+				"LINK_ANALYSIS",
+				`Bio link click failed, trying direct navigation...`,
+			);
+
 			for (const linkUrl of externalLinks) {
-				if (!linkUrl || result.confidence >= CONFIDENCE_THRESHOLD) break; // Stop if we already have high confidence
+				if (!linkUrl || result.confidence >= CONFIDENCE_THRESHOLD) break;
 
 				try {
+					const linkDomain = new URL(linkUrl).hostname.replace("www.", "");
+					logger.info("LINK_ANALYSIS", `🔗 Navigating to: ${linkDomain}`);
+
 					const linkAnalysis = await executeWithCircuitBreaker(
 						() => analyzeExternalLink(page, linkUrl),
 						`link_analysis_${username}`,
+					);
+
+					logger.info(
+						"LINK_ANALYSIS",
+						`📝 Text analysis: ${linkAnalysis.confidence}% | Creator: ${linkAnalysis.isCreator ? "YES" : "NO"}`,
 					);
 
 					if (linkAnalysis.isCreator) {
@@ -548,8 +582,9 @@ export async function analyzeProfileComprehensive(
 							result.indicators.push(
 								"⚠️ Weak combined signals (generic content creator)",
 							);
-							console.log(
-								`[ANALYSIS] ⚠️ Low link confidence (${linkAnalysis.confidence}%) + low bio score (${bioScore}) = likely NOT influencer`,
+							logger.info(
+								"LINK_ANALYSIS",
+								`⚠️ Weak signals: link ${linkAnalysis.confidence}% + bio ${bioScore}% → ${adjustedConfidence}%`,
 							);
 						} else if (linkAnalysis.confidence >= 70 || bioScore >= 60) {
 							result.isCreator = true;
@@ -568,31 +603,32 @@ export async function analyzeProfileComprehensive(
 						result.indicators.push(...linkAnalysis.indicators);
 						result.reason = linkAnalysis.reason;
 
-						// Take screenshot of the link page for records (functional - always enabled)
+						// Take screenshot of the link page
 						const linkScreenshot = await snapshot(
 							page,
 							`link_analysis_${username}`,
-							true, // force: true - functional screenshot for vision analysis
+							true,
 						);
 						if (linkScreenshot) {
 							result.screenshots.push(linkScreenshot);
 						}
 
-						// Vision analysis (only if text confidence is below threshold and SKIP_VISION is false)
+						// Vision analysis (only if text confidence is below threshold)
 						if (
 							!SKIP_VISION &&
 							linkScreenshot &&
 							linkAnalysis.confidence < VISION_SKIP_THRESHOLD
 						) {
-							console.log(
-								`[VISION] Text confidence ${linkAnalysis.confidence}% < ${VISION_SKIP_THRESHOLD}%, running vision analysis...`,
+							logger.info(
+								"VISION",
+								`🤖 Running AI vision (text conf ${linkAnalysis.confidence}% < threshold)...`,
 							);
 							try {
 								const [isCreatorVision, visionData] =
 									await isConfirmedCreator(linkScreenshot);
+								const visionConfidence = visionData?.confidence || 0;
+
 								if (isCreatorVision && visionData) {
-									// Vision found creator - use vision confidence if higher than text
-									const visionConfidence = visionData.confidence || 0;
 									if (visionConfidence > linkAnalysis.confidence) {
 										result.confidence = Math.max(
 											result.confidence,
@@ -606,29 +642,36 @@ export async function analyzeProfileComprehensive(
 											result.indicators.push(...visionData.indicators);
 										}
 										result.reason = `vision_${visionData.reason || "confirmed"}`;
-										console.log(
-											`[VISION] Vision confirmed creator with ${visionConfidence}% confidence`,
+										logger.info(
+											"VISION",
+											`✅ Vision: ${visionConfidence}% | Creator: YES`,
 										);
 									} else {
 										result.indicators.push(
 											`Vision analysis: ${visionConfidence}% (text analysis was ${linkAnalysis.confidence}%)`,
 										);
+										logger.info(
+											"VISION",
+											`🤷 Vision: ${visionConfidence}% (not higher than text)`,
+										);
 									}
 								} else {
-									console.log(
-										`[VISION] Vision did not confirm creator (confidence: ${visionData?.confidence || 0}%)`,
-									);
 									result.indicators.push(
 										`Vision analysis did not confirm creator`,
 									);
+									logger.info(
+										"VISION",
+										`❌ Vision: ${visionConfidence}% | Creator: NO`,
+									);
 								}
 							} catch (visionError) {
-								console.log(`[VISION] Vision analysis error: ${visionError}`);
+								logger.warn("VISION", `Vision failed: ${visionError}`);
 								result.errors?.push(`Vision analysis failed: ${visionError}`);
 							}
 						} else if (linkAnalysis.confidence >= VISION_SKIP_THRESHOLD) {
-							console.log(
-								`[VISION] Skipping vision - text confidence ${linkAnalysis.confidence}% >= ${VISION_SKIP_THRESHOLD}% threshold`,
+							logger.info(
+								"VISION",
+								`⏭️ Skipped (text conf ${linkAnalysis.confidence}% >= threshold)`,
 							);
 						}
 					}
@@ -691,10 +734,20 @@ export async function analyzeProfileComprehensive(
 			links: result.links,
 			stats: result.stats,
 		});
-		logger.debug("DATABASE", `Profile @${username} saved to database`);
 	} catch (dbError) {
 		logger.error("DATABASE", `Failed to save profile @${username}: ${dbError}`);
 		// Don't throw - analysis succeeded, just DB save failed
+	}
+
+	// Log any bundler errors that occurred (non-fatal)
+	if (result.errors && result.errors.length > 0) {
+		const bundlerErrors = result.errors.filter((e) => e.includes("bundler"));
+		if (bundlerErrors.length > 0) {
+			logger.warn(
+				"ANALYSIS",
+				`@${username}: ${bundlerErrors.length} bundler issue(s) in: ${bundlerErrors.join(", ")} (OK: ${completedSteps.join(", ")})`,
+			);
+		}
 	}
 
 	return result;

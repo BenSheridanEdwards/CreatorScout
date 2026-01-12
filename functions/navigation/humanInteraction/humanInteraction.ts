@@ -23,20 +23,7 @@
 
 import { createCursor, type GhostCursor } from "ghost-cursor";
 import type { ElementHandle, Page } from "puppeteer";
-import { createLogger } from "../../shared/logger/logger.ts";
 import { sleep } from "../../timing/sleep/sleep.ts";
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// LOGGER
-// ═══════════════════════════════════════════════════════════════════════════════
-
-let logger: ReturnType<typeof createLogger> | null = null;
-function getLogger() {
-	if (!logger) {
-		logger = createLogger();
-	}
-	return logger;
-}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // GHOST CURSOR MANAGEMENT
@@ -138,8 +125,6 @@ export async function humanClick(
 		paddingPercentage = 30,
 	} = options;
 
-	getLogger().debug("ACTION", `humanClick: ${elementType} element`);
-
 	const cursor = await getGhostCursor(page);
 	const timing = getTimingForElement(elementType);
 
@@ -219,11 +204,6 @@ export async function humanClickSelector(
 		paddingPercentage = 30,
 	} = options;
 
-	getLogger().debug(
-		"ACTION",
-		`humanClickSelector: "${selector}" (${elementType})`,
-	);
-
 	// Wait for element
 	await page.waitForSelector(selector, { timeout: waitTimeout });
 
@@ -250,11 +230,6 @@ export async function humanClickAt(
 	options: Omit<HumanClickOptions, "scrollIntoView" | "paddingPercentage"> = {},
 ): Promise<void> {
 	const { elementType = "generic" } = options;
-
-	getLogger().debug(
-		"ACTION",
-		`humanClickAt: (${Math.round(x)}, ${Math.round(y)})`,
-	);
 
 	const cursor = await getGhostCursor(page);
 	const timing = getTimingForElement(elementType);
@@ -283,11 +258,6 @@ export async function humanClickByText(
 		throw new Error("Page is closed, cannot click elements");
 	}
 
-	getLogger().debug(
-		"ACTION",
-		`humanClickByText: searching for [${texts.join(", ")}]`,
-	);
-
 	for (const text of texts) {
 		try {
 			// Find element by text content
@@ -314,7 +284,6 @@ export async function humanClickByText(
 				);
 				const targetElement = elements[elementInfo.index];
 				if (targetElement) {
-					getLogger().debug("ACTION", `humanClickByText: found "${text}"`);
 					await humanClick(page, targetElement, {
 						elementType: "button",
 						...options,
@@ -374,8 +343,6 @@ export async function humanScrollTo(
 	direction: "top" | "bottom" | "left" | "right",
 	options: HumanScrollOptions = {},
 ): Promise<void> {
-	getLogger().debug("ACTION", `humanScrollTo: ${direction}`);
-
 	const cursor = await getGhostCursor(page);
 	await cursor.scrollTo(direction);
 	if (options.delay) {
@@ -404,11 +371,6 @@ export async function humanScroll(
 		speed = 50 + Math.random() * 50,
 		delay = 300 + Math.random() * 500,
 	} = options;
-
-	getLogger().debug(
-		"ACTION",
-		`humanScroll: deltaY=${Math.round(deltaY)}, deltaX=${Math.round(deltaX)}`,
-	);
 
 	const cursor = await getGhostCursor(page);
 
@@ -442,8 +404,6 @@ export async function humanScrollToElement(
 	const { speed = 50 + Math.random() * 50, delay = 200 + Math.random() * 300 } =
 		options;
 
-	getLogger().debug("ACTION", `humanScrollToElement: "${selector}"`);
-
 	const element = await page.$(selector);
 	if (!element) {
 		throw new Error(`Element not found: ${selector}`);
@@ -467,8 +427,6 @@ export async function humanScrollElementIntoView(
 ): Promise<void> {
 	const { speed = 50 + Math.random() * 50, delay = 200 + Math.random() * 300 } =
 		options;
-
-	getLogger().debug("ACTION", "humanScrollElementIntoView: element");
 
 	const cursor = await getGhostCursor(page);
 	await cursor.scrollIntoView(element, {
@@ -501,11 +459,6 @@ export async function humanMove(
 	target: { x: number; y: number },
 	options: HumanMoveOptions = {},
 ): Promise<void> {
-	getLogger().debug(
-		"ACTION",
-		`humanMove: (${Math.round(target.x)}, ${Math.round(target.y)})`,
-	);
-
 	const cursor = await getGhostCursor(page);
 	await cursor.moveTo(target, {
 		moveSpeed: options.moveSpeed,
@@ -523,8 +476,6 @@ export async function humanMoveToElement(
 	options: HumanMoveOptions & { paddingPercentage?: number } = {},
 ): Promise<void> {
 	const { paddingPercentage = 30, ...moveOptions } = options;
-
-	getLogger().debug("ACTION", `humanMoveToElement: "${selector}"`);
 
 	const cursor = await getGhostCursor(page);
 
@@ -546,8 +497,6 @@ export async function humanMoveToHandle(
 	element: ElementHandle,
 	options: HumanMoveOptions = {},
 ): Promise<void> {
-	getLogger().debug("ACTION", "humanMoveToHandle: element");
-
 	const box = await element.boundingBox();
 	if (!box) {
 		throw new Error("Cannot move to element: no bounding box");
@@ -564,8 +513,6 @@ export async function humanMoveToHandle(
  * Moves mouse to a random position using ghost-cursor.
  */
 export async function humanWiggle(page: Page): Promise<void> {
-	getLogger().debug("ACTION", "humanWiggle: random movement");
-
 	const viewport = page.viewport();
 	const maxX = viewport?.width ?? 1200;
 	const maxY = viewport?.height ?? 800;

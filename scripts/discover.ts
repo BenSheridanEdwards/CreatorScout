@@ -198,6 +198,7 @@ async function main() {
 		// Main discovery loop with optional DM sending
 		let dmsSent = 0;
 		let seedsProcessed = 0;
+		let profilesProcessedTotal = 0;
 		const stats = await getStats();
 		dmsSent = stats.dms_sent;
 
@@ -211,10 +212,14 @@ async function main() {
 
 		while ((!sendDMs || dmsSent < MAX_DMS_PER_DAY) && shouldContinue()) {
 			// Check session duration limit
-			if (Date.now() - sessionStartTime >= maxSessionDurationMs) {
+			const sessionElapsed = Date.now() - sessionStartTime;
+			const remainingMs = maxSessionDurationMs - sessionElapsed;
+			const remainingMin = Math.floor(remainingMs / 60000);
+			
+			if (remainingMs <= 0) {
 				logger.info(
 					"LIMIT",
-					`✅ Reached session duration (${SESSION_DURATION} minutes) - stopping naturally`,
+					`Session complete (${SESSION_DURATION} min)`,
 				);
 				break;
 			}
@@ -224,9 +229,6 @@ async function main() {
 			// If no non-seed items found and we're prioritizing queue, fall back to seeds
 			if (!target && PRIORITIZE_QUEUE_OVER_SEEDS) {
 				target = await queueNext(false);
-				if (target) {
-					logger.info("QUEUE", "No more queue items, falling back to seeds...");
-				}
 			}
 
 			if (!target) {
@@ -234,7 +236,7 @@ async function main() {
 				const waitTime = waitMin + Math.random() * (waitMax - waitMin);
 				logger.info(
 					"QUEUE",
-					`Queue empty - sleeping ${Math.floor(waitTime)}s...`,
+					`Queue empty - waiting ${Math.floor(waitTime)}s`,
 				);
 				await sleep(waitTime * 1000);
 				continue;
@@ -242,8 +244,7 @@ async function main() {
 
 			seedsProcessed++;
 			const currentQueue = await queueCount();
-			logger.info("QUEUE", `Queue: ${currentQueue} remaining`);
-			logger.info("SEED", `Processing seed #${seedsProcessed}: @${target}`);
+			logger.info("SEED", `Processing @${target} (queue: ${currentQueue}, ~${remainingMin} min left)`);
 
 			try {
 				// Process their following list with optional DM sending
@@ -298,25 +299,22 @@ async function main() {
 				}
 			}
 
-			// Print stats
+			// Print compact stats
 			const currentStats = await getStats();
-			if (sendDMs) {
-				logger.info(
-					"STATS",
-					`Progress: Visited ${currentStats.total_visited} | Creators: ${currentStats.confirmed_creators} | DMs: ${currentStats.dms_sent} | Queue: ${currentStats.queue_size}`,
-				);
-			} else {
-				logger.info(
-					"STATS",
-					`Progress: Visited ${currentStats.total_visited} | Creators: ${currentStats.confirmed_creators} | Queue: ${currentStats.queue_size}`,
-				);
-			}
-
 			dmsSent = currentStats.dms_sent;
+			
+			// Calculate throughput
+			const elapsedMin = (Date.now() - sessionStartTime) / 60000;
+			const throughput = elapsedMin > 0 ? (currentStats.total_visited / elapsedMin).toFixed(1) : "0";
+			
+			const statsLine = sendDMs
+				? `Visited: ${currentStats.total_visited} | Creators: ${currentStats.confirmed_creators} | DMs: ${currentStats.dms_sent} | Queue: ${currentStats.queue_size} | ${throughput}/min`
+				: `Visited: ${currentStats.total_visited} | Creators: ${currentStats.confirmed_creators} | Queue: ${currentStats.queue_size} | ${throughput}/min`;
+			logger.info("STATS", statsLine);
 
 			// Check if we've hit DM limit (only when sending DMs)
 			if (sendDMs && dmsSent >= MAX_DMS_PER_DAY) {
-				logger.info("LIMIT", `✅ Reached daily DM limit (${MAX_DMS_PER_DAY})`);
+				logger.info("LIMIT", `Daily DM limit reached (${MAX_DMS_PER_DAY})`);
 				break;
 			}
 
@@ -326,29 +324,20 @@ async function main() {
 				seedDelayMin + Math.random() * (seedDelayMax - seedDelayMin);
 
 			// Check if we'd exceed session duration after this wait
-			const sessionElapsed = Date.now() - sessionStartTime;
-			const remainingTime = maxSessionDurationMs - sessionElapsed;
-			if (remainingTime < seedWait * 1000 + 60000) {
-				// Less than 1 minute buffer after wait, stop now
-				logger.info(
-					"LIMIT",
-					`Approaching session duration limit - stopping gracefully`,
-				);
+			const currentSessionElapsed = Date.now() - sessionStartTime;
+			const currentRemainingTime = maxSessionDurationMs - currentSessionElapsed;
+			if (currentRemainingTime < seedWait * 1000 + 60000) {
+				logger.info("LIMIT", `Session ending gracefully`);
 				break;
 			}
 
-			logger.info(
-				"DELAY",
-				`Waiting ${Math.floor(seedWait)}s before next seed... (${Math.floor((maxSessionDurationMs - sessionElapsed) / 60000)} min remaining)`,
-			);
 			await sleep(seedWait * 1000);
 		}
 
-		logger.info("ACTION", "📊 Discovery loop completed");
-		logger.info("STATS", `Seeds processed: ${seedsProcessed}`);
-		if (sendDMs) {
-			logger.info("STATS", `DMs sent: ${dmsSent}`);
-		}
+		// Final summary
+		const finalElapsedMin = (Date.now() - sessionStartTime) / 60000;
+		const finalStats = await getStats();
+		logger.info("STATS", `Session complete: ${finalStats.total_visited} profiles in ${finalElapsedMin.toFixed(1)} min`);
 
 		// End metrics session
 		metricsTracker.endSession();

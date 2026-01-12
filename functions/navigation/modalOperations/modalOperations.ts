@@ -2,19 +2,20 @@
  * Instagram modal operations - following modal, username extraction, scrolling.
  */
 import type { Page } from "puppeteer";
+import { createLogger } from "../../shared/logger/logger.ts";
 import { microDelay, shortDelay } from "../../timing/humanize/humanize.ts";
 import {
 	humanClick,
 	humanClickAt,
 } from "../humanInteraction/humanInteraction.ts";
 
+const logger = createLogger();
+
 /**
  * Open the "Following" modal for a profile.
  * Uses ghost-cursor for human-like clicking.
  */
 export async function openFollowingModal(page: Page): Promise<boolean> {
-	console.log("[MODAL] Attempting to open following modal...");
-
 	// Wait for page to stabilize
 	await shortDelay(1, 2);
 
@@ -22,9 +23,6 @@ export async function openFollowingModal(page: Page): Promise<boolean> {
 	const currentUrl = page.url();
 	const usernameMatch = currentUrl.match(/instagram\.com\/([^/?]+)/);
 	const username = usernameMatch ? usernameMatch[1] : null;
-
-	console.log(`[MODAL] Current URL: ${currentUrl}`);
-	console.log(`[MODAL] Detected username: ${username}`);
 
 	// Build selector list - most specific first
 	const selectors: string[] = [];
@@ -39,7 +37,6 @@ export async function openFollowingModal(page: Page): Promise<boolean> {
 	// Try each selector with ghost-cursor click
 	for (const sel of selectors) {
 		try {
-			console.log(`[MODAL] Looking for selector: ${sel}`);
 			const handle = await page.$(sel);
 
 			if (handle) {
@@ -51,21 +48,15 @@ export async function openFollowingModal(page: Page): Promise<boolean> {
 					(el: Element) => el.textContent || "",
 				);
 
-				console.log(
-					`[MODAL] Found element - href: ${href}, text: ${text.trim()}`,
-				);
-
 				// Skip if it's a followers link
 				if (
 					href?.includes("/followers") ||
 					text.toLowerCase().includes("followers")
 				) {
-					console.log(`[MODAL] Skipping - this is a followers link`);
 					continue;
 				}
 
 				// Click with ghost-cursor
-				console.log(`[MODAL] Clicking with ghost-cursor...`);
 				await humanClick(page, handle, { elementType: "link" });
 				await shortDelay(1.5, 2.5);
 
@@ -75,19 +66,16 @@ export async function openFollowingModal(page: Page): Promise<boolean> {
 					.then((el) => el !== null);
 
 				if (modalOpened) {
-					console.log("[MODAL] Modal opened successfully!");
+					logger.info("MODAL", "Following modal opened");
 					return true;
 				}
-
-				console.log("[MODAL] Modal did not open, trying next selector...");
 			}
-		} catch (e) {
-			console.log(`[MODAL] Selector ${sel} failed: ${e}`);
+		} catch {
+			// Try next selector
 		}
 	}
 
 	// Fallback: Find by evaluating page content and click at coordinates
-	console.log("[MODAL] Trying coordinate-based click...");
 	try {
 		const linkInfo = await page.evaluate(() => {
 			const links = Array.from(document.querySelectorAll("a"));
@@ -116,13 +104,6 @@ export async function openFollowingModal(page: Page): Promise<boolean> {
 		});
 
 		if (linkInfo.found && linkInfo.x && linkInfo.y) {
-			console.log(
-				`[MODAL] Found following link via evaluate: ${linkInfo.href}`,
-			);
-			console.log(
-				`[MODAL] Clicking at coordinates: (${linkInfo.x}, ${linkInfo.y})`,
-			);
-
 			// Click at coordinates using ghost-cursor
 			await humanClickAt(page, linkInfo.x, linkInfo.y, {
 				elementType: "link",
@@ -135,16 +116,15 @@ export async function openFollowingModal(page: Page): Promise<boolean> {
 				.then((el) => el !== null);
 
 			if (modalOpened) {
-				console.log("[MODAL] Modal opened via coordinate click!");
+				logger.info("MODAL", "Following modal opened");
 				return true;
 			}
 		}
-	} catch (e) {
-		console.log(`[MODAL] Coordinate click failed: ${e}`);
+	} catch {
+		// Fallback failed
 	}
 
 	// Take debug screenshot on failure
-	console.log("[MODAL] All strategies failed, taking debug screenshot...");
 	try {
 		const { snapshot } = await import("../../shared/snapshot/snapshot.ts");
 		await snapshot(page, "modal_open_failed");
@@ -152,6 +132,7 @@ export async function openFollowingModal(page: Page): Promise<boolean> {
 		// Ignore
 	}
 
+	logger.warn("MODAL", "Failed to open following modal");
 	return false;
 }
 
@@ -207,9 +188,6 @@ export async function isFollowingModalEmpty(page: Page): Promise<boolean> {
 			return emptyIndicators.some(Boolean) || actualUserCount === 0;
 		});
 
-		if (isEmpty) {
-			console.log("[MODAL] Following modal is empty - no people followed");
-		}
 		return isEmpty;
 	} catch {
 		return false;
@@ -224,13 +202,9 @@ export async function extractFollowingUsernames(
 	page: Page,
 	batchSize: number = 10,
 ): Promise<string[]> {
-	console.log(`[MODAL] Extracting up to ${batchSize} usernames from modal...`);
-
 	try {
 		await page.waitForSelector('div[role="dialog"]', { timeout: 10000 });
-		console.log("[MODAL] Modal dialog found");
 	} catch {
-		console.log("[MODAL] No modal dialog found");
 		return [];
 	}
 
@@ -281,9 +255,9 @@ export async function extractFollowingUsernames(
 		return found;
 	}, batchSize);
 
-	console.log(
-		`[MODAL] Extracted ${usernames.length} usernames: ${usernames.join(", ")}`,
-	);
+	if (usernames.length > 0) {
+		logger.info("BATCH", `Extracted ${usernames.length} profiles from modal`);
+	}
 	return usernames;
 }
 
@@ -297,16 +271,11 @@ export async function clickUsernameInModal(
 	username: string,
 ): Promise<boolean> {
 	const targetUsername = username.toLowerCase().trim();
-	console.log(
-		`[MODAL] Attempting to click username @${targetUsername} in modal...`,
-	);
 
 	try {
 		// Ensure modal is open
 		await page.waitForSelector('div[role="dialog"]', { timeout: 5000 });
-		console.log("[MODAL] Modal dialog found");
 	} catch {
-		console.log("[MODAL] No modal dialog found");
 		return false;
 	}
 
@@ -343,7 +312,6 @@ export async function clickUsernameInModal(
 			}, targetUsername);
 
 			if (linkIndex === -1) {
-				console.log(`[MODAL] Username @${targetUsername} not found in modal`);
 				return false;
 			}
 
@@ -355,12 +323,10 @@ export async function clickUsernameInModal(
 		}
 
 		if (!linkHandle) {
-			console.log(`[MODAL] Username @${targetUsername} not found in modal`);
 			return false;
 		}
 
 		// Click with ghost-cursor for human-like behavior
-		console.log(`[MODAL] Clicking on @${targetUsername} link in modal...`);
 		await humanClick(page, linkHandle, { elementType: "link" });
 
 		// Wait for navigation to start
@@ -377,18 +343,12 @@ export async function clickUsernameInModal(
 				},
 				{ timeout: 3000 },
 			);
-			console.log(
-				`[MODAL] Modal closed, navigation to @${targetUsername} started`,
-			);
 			return true;
 		} catch {
 			// Modal might not close immediately, or navigation might be delayed
 			// Check if URL changed instead
 			const currentUrl = page.url();
 			if (currentUrl.includes(`/${targetUsername}/`)) {
-				console.log(
-					`[MODAL] Successfully navigated to @${targetUsername} profile`,
-				);
 				return true;
 			}
 
@@ -396,20 +356,12 @@ export async function clickUsernameInModal(
 			await shortDelay(1, 2);
 			const finalUrl = page.url();
 			if (finalUrl.includes(`/${targetUsername}/`)) {
-				console.log(
-					`[MODAL] Successfully navigated to @${targetUsername} profile (delayed)`,
-				);
 				return true;
 			}
 
-			console.log(
-				`[MODAL] Click succeeded but navigation not confirmed for @${targetUsername}`,
-			);
 			return false;
 		}
-	} catch (error) {
-		const errorMsg = error instanceof Error ? error.message : String(error);
-		console.log(`[MODAL] Failed to click @${targetUsername}: ${errorMsg}`);
+	} catch {
 		return false;
 	}
 }
@@ -448,8 +400,7 @@ export async function scrollFollowingModal(
 		}, scrollAmount);
 		await microDelay(0.2, 0.5);
 		return result;
-	} catch (e) {
-		console.log(`[MODAL] Could not scroll modal: ${e}`);
+	} catch {
 		return { scrolled: false, scrollHeight: 0 };
 	}
 }
