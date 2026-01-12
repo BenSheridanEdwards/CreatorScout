@@ -179,6 +179,7 @@ async function main() {
 	const { browser, page, logger } = await initializeInstagramSession({
 		headless: false,
 		debug,
+		profileId,
 		adsPowerProfileId: profileConfig?.adsPowerProfileId,
 		credentials: {
 			username: profileConfig?.username || "",
