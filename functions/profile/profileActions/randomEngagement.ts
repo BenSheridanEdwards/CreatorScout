@@ -13,13 +13,12 @@
  */
 
 import type { Page } from "puppeteer";
-import { humanScroll } from "../../navigation/humanInteraction/humanInteraction.ts";
-import { createLogger } from "../../shared/logger/logger.ts";
 import {
-	humanClickElement,
-	microDelay,
-	shortDelay,
-} from "../../timing/humanize/humanize.ts";
+	humanClick,
+	humanScroll,
+} from "../../navigation/humanInteraction/humanInteraction.ts";
+import { createLogger } from "../../shared/logger/logger.ts";
+import { microDelay, shortDelay } from "../../timing/humanize/humanize.ts";
 
 const logger = createLogger();
 
@@ -87,19 +86,49 @@ export async function viewRandomPost(
 	const startTime = Date.now();
 
 	try {
-		// Try to find first post image or video
+		// Try to find a clickable post in the grid
+		// Instagram profile posts are in a grid with links to /p/ or /reel/
 		const postSelectors = [
-			'article a[href*="/p/"]', // Post links
-			"article img", // Post images
-			'div[role="button"] img', // Grid images
+			'a[href*="/p/"]', // Post links (most reliable)
+			'a[href*="/reel/"]', // Reel links in grid
+			'article a[href*="/p/"]', // Post links within article
 		];
 
 		for (const selector of postSelectors) {
-			const post = await page.$(selector);
-			if (post) {
-				// Click to open post
-				await humanClickElement(page, selector);
-				await shortDelay(0.5, 1);
+			const posts = await page.$$(selector);
+			if (posts.length > 0) {
+				// Pick a random post from first 6 (visible grid)
+				const postIndex = Math.floor(Math.random() * Math.min(posts.length, 6));
+				const post = posts[postIndex];
+
+				// Get URL before click to verify navigation
+				const urlBefore = page.url();
+
+				// Click to open post using element handle
+				await humanClick(page, post, { elementType: "link" });
+
+				// Wait for post modal to open (URL should change or modal should appear)
+				try {
+					await page.waitForFunction(
+						(prevUrl: string) => {
+							// Check if URL changed OR if modal appeared
+							const urlChanged = window.location.href !== prevUrl;
+							const modalVisible =
+								document.querySelector('div[role="dialog"]') !== null ||
+								document.querySelector('article[role="presentation"]') !== null;
+							return urlChanged || modalVisible;
+						},
+						{ timeout: 3000 },
+						urlBefore,
+					);
+				} catch {
+					// Modal didn't open - click might have failed
+					logger.debug(
+						"ENGAGEMENT",
+						`@${username}: Post click didn't open modal`,
+					);
+					return { type: "view_post", duration: 1, success: false };
+				}
 
 				// View for 2-4 seconds
 				const viewDuration = 2 + Math.random() * 2;
@@ -107,7 +136,7 @@ export async function viewRandomPost(
 					setTimeout(resolve, viewDuration * 1000),
 				);
 
-				// Close post (Escape key)
+				// Close post (Escape key or go back)
 				await page.keyboard.press("Escape");
 				await microDelay(0.3, 0.8);
 
@@ -122,9 +151,11 @@ export async function viewRandomPost(
 		}
 
 		// No posts found
+		logger.debug("ENGAGEMENT", `@${username}: No posts found to view`);
 		return { type: "none", duration: 0.5, success: false };
-	} catch {
+	} catch (err) {
 		const elapsed = (Date.now() - startTime) / 1000;
+		logger.debug("ENGAGEMENT", `@${username}: Post view error: ${err}`);
 		return { type: "view_post", duration: elapsed, success: false };
 	}
 }
@@ -139,67 +170,92 @@ export async function watchRandomReel(
 	const startTime = Date.now();
 
 	try {
-		// Try to find reels tab or reel content
-		const reelSelectors = [
-			'a[href*="/reels/"]', // Reels tab
-			'svg[aria-label*="Reel"]', // Reel icon
-			`a[href*="${username}"] svg[aria-label="Reel"]`, // Profile reel icon
-		];
+		// First try: Click on a reel directly in the grid (most reliable)
+		const reelLinks = await page.$$('a[href*="/reel/"]');
+		if (reelLinks.length > 0) {
+			// Pick a random reel from first 6 visible
+			const reelIndex = Math.floor(
+				Math.random() * Math.min(reelLinks.length, 6),
+			);
+			const reel = reelLinks[reelIndex];
 
-		for (const selector of reelSelectors) {
-			const reelElement = await page.$(selector);
-			if (reelElement) {
-				// Click reels tab or reel
-				await humanClickElement(page, selector);
-				await shortDelay(1, 2);
+			const urlBefore = page.url();
 
-				// Watch for 5-12 seconds (partial view is natural)
-				const watchDuration = 5 + Math.random() * 7;
-				await new Promise((resolve) =>
-					setTimeout(resolve, watchDuration * 1000),
+			// Click the reel
+			await humanClick(page, reel, { elementType: "link" });
+
+			// Wait for reel to load (URL should change to /reel/)
+			try {
+				await page.waitForFunction(
+					() => window.location.href.includes("/reel/"),
+					{ timeout: 3000 },
 				);
-
-				// Go back to profile—wait for URL to confirm we're back
-				// (goBack can flake if Instagram shoves a modal)
-				await page.goBack();
-				try {
-					await page.waitForFunction(
-						(user: string) => window.location.href.includes(`/${user}`),
-						{ timeout: 5000 },
-						username,
-					);
-				} catch {
-					// Timeout—might be stuck, press Escape to close any modal
-					await page.keyboard.press("Escape");
-				}
-				await shortDelay(0.5, 1);
-
-				const elapsed = (Date.now() - startTime) / 1000;
-				logger.debug(
-					"ENGAGEMENT",
-					`@${username}: Watched reel for ${watchDuration.toFixed(1)}s`,
-				);
-
-				return { type: "watch_reel", duration: elapsed, success: true };
+			} catch {
+				logger.debug("ENGAGEMENT", `@${username}: Reel click didn't navigate`);
+				return { type: "watch_reel", duration: 1, success: false };
 			}
-		}
 
-		// No reels found - try clicking first reel in grid
-		const gridReel = await page.$('a[href*="/reel/"]');
-		if (gridReel) {
-			await humanClickElement(page, 'a[href*="/reel/"]');
-			await shortDelay(1, 2);
-
+			// Watch for 5-12 seconds (partial view is natural)
 			const watchDuration = 5 + Math.random() * 7;
 			await new Promise((resolve) => setTimeout(resolve, watchDuration * 1000));
 
-			// Go back with modal fallback
+			// Go back to profile
 			await page.goBack();
 			try {
 				await page.waitForFunction(
-					(user: string) => window.location.href.includes(`/${user}`),
+					(prevUrl: string) =>
+						!window.location.href.includes("/reel/") ||
+						window.location.href === prevUrl,
 					{ timeout: 5000 },
-					username,
+					urlBefore,
+				);
+			} catch {
+				// Timeout—might be stuck, press Escape
+				await page.keyboard.press("Escape");
+			}
+			await shortDelay(0.5, 1);
+
+			const elapsed = (Date.now() - startTime) / 1000;
+			logger.debug(
+				"ENGAGEMENT",
+				`@${username}: Watched reel for ${watchDuration.toFixed(1)}s`,
+			);
+
+			return { type: "watch_reel", duration: elapsed, success: true };
+		}
+
+		// Second try: Click the Reels tab if it exists
+		const reelsTab = await page.$('a[href*="/reels/"]');
+		if (reelsTab) {
+			const urlBefore = page.url();
+
+			await humanClick(page, reelsTab, { elementType: "link" });
+
+			// Wait for reels tab to load
+			try {
+				await page.waitForFunction(
+					() => window.location.href.includes("/reels/"),
+					{ timeout: 3000 },
+				);
+			} catch {
+				logger.debug(
+					"ENGAGEMENT",
+					`@${username}: Reels tab click didn't navigate`,
+				);
+				return { type: "watch_reel", duration: 1, success: false };
+			}
+
+			// Watch for 5-12 seconds
+			const watchDuration = 5 + Math.random() * 7;
+			await new Promise((resolve) => setTimeout(resolve, watchDuration * 1000));
+
+			// Go back
+			await page.goBack();
+			try {
+				await page.waitForFunction(
+					(prevUrl: string) => window.location.href === prevUrl,
+					{ timeout: 5000 },
+					urlBefore,
 				);
 			} catch {
 				await page.keyboard.press("Escape");
@@ -207,13 +263,20 @@ export async function watchRandomReel(
 			await shortDelay(0.5, 1);
 
 			const elapsed = (Date.now() - startTime) / 1000;
+			logger.debug(
+				"ENGAGEMENT",
+				`@${username}: Watched reels tab for ${watchDuration.toFixed(1)}s`,
+			);
+
 			return { type: "watch_reel", duration: elapsed, success: true };
 		}
 
 		// No reels found
+		logger.debug("ENGAGEMENT", `@${username}: No reels found to watch`);
 		return { type: "none", duration: 0.5, success: false };
-	} catch {
+	} catch (err) {
 		const elapsed = (Date.now() - startTime) / 1000;
+		logger.debug("ENGAGEMENT", `@${username}: Reel watch error: ${err}`);
 		return { type: "watch_reel", duration: elapsed, success: false };
 	}
 }
@@ -228,31 +291,59 @@ export async function likeRandomPost(
 	const startTime = Date.now();
 
 	try {
-		// First, open a post
-		const post = await page.$('article a[href*="/p/"]');
-		if (!post) {
+		// Find posts in the grid
+		const posts = await page.$$('a[href*="/p/"]');
+		if (posts.length === 0) {
+			logger.debug("ENGAGEMENT", `@${username}: No posts found to like`);
 			return { type: "none", duration: 0.5, success: false };
 		}
 
+		// Pick a random post from first 6 visible
+		const postIndex = Math.floor(Math.random() * Math.min(posts.length, 6));
+		const post = posts[postIndex];
+
+		const urlBefore = page.url();
+
 		// Click to open post
-		await humanClickElement(page, 'article a[href*="/p/"]');
+		await humanClick(page, post, { elementType: "link" });
+
+		// Wait for post modal to open
+		try {
+			await page.waitForFunction(
+				(prevUrl: string) => {
+					const urlChanged = window.location.href !== prevUrl;
+					const modalVisible =
+						document.querySelector('div[role="dialog"]') !== null ||
+						document.querySelector('article[role="presentation"]') !== null;
+					return urlChanged || modalVisible;
+				},
+				{ timeout: 3000 },
+				urlBefore,
+			);
+		} catch {
+			logger.debug(
+				"ENGAGEMENT",
+				`@${username}: Post modal didn't open for like`,
+			);
+			return { type: "like_post", duration: 1, success: false };
+		}
+
 		await shortDelay(0.5, 1);
 
-		// Find like button (heart icon)
+		// Find like button (heart icon) - try multiple selectors
 		const likeSelectors = [
 			'svg[aria-label="Like"]',
-			'button svg[aria-label="Like"]',
-			'span[role="button"] svg[aria-label="Like"]',
+			'span[class*="Like"] svg',
+			'div[role="button"] svg[aria-label="Like"]',
 		];
 
 		for (const selector of likeSelectors) {
 			const likeButton = await page.$(selector);
 			if (likeButton) {
-				// Click like
-				await humanClickElement(page, selector);
+				// Click like using element handle
+				await humanClick(page, likeButton, { elementType: "button" });
 
-				// Wait for like animation + network lag (heart fills on hover/click)
-				// 1.5-2s gives DOM time to react—humans blink, bots don't
+				// Wait for like animation
 				const likeDelay = 1500 + Math.random() * 500;
 				await new Promise((resolve) => setTimeout(resolve, likeDelay));
 
@@ -271,9 +362,11 @@ export async function likeRandomPost(
 		await page.keyboard.press("Escape");
 		await microDelay(0.3, 0.8);
 
+		logger.debug("ENGAGEMENT", `@${username}: Like button not found`);
 		return { type: "none", duration: 1, success: false };
-	} catch {
+	} catch (err) {
 		const elapsed = (Date.now() - startTime) / 1000;
+		logger.debug("ENGAGEMENT", `@${username}: Like error: ${err}`);
 		return { type: "like_post", duration: elapsed, success: false };
 	}
 }
