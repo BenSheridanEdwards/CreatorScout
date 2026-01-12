@@ -182,7 +182,14 @@ async function runSmartSession(args: SessionArgs): Promise<void> {
 
 			// Process following list
 			try {
-				await processFollowingList(seed, page, metricsTracker, !dryRun);
+				await processFollowingList(
+					seed,
+					page,
+					metricsTracker,
+					!dryRun,
+					() => controller.shouldContinue(),
+					(wasCreator) => controller.recordProfileChecked(wasCreator),
+				);
 
 				// Update controller stats (approximate - actual DMs tracked in processFollowingList)
 				const currentDMs = profile.counters.dmsToday;
@@ -192,11 +199,8 @@ async function runSmartSession(args: SessionArgs): Promise<void> {
 				while (controller.getStats().dmsSent < dmsThisSession) {
 					controller.recordDM();
 				}
-
-				controller.recordProfileChecked(true);
 			} catch (error) {
 				logger.error("SESSION", `Failed to process seed @${seed}: ${error}`);
-				controller.recordProfileChecked(false);
 			}
 
 			// Log progress

@@ -232,16 +232,10 @@ export async function clickBioLink(page: Page): Promise<{
 				const newUrl = newPage.url();
 				console.log(`[BIO_LINK] Link opened in new tab: ${newUrl}`);
 
-				// Close the new tab and navigate to the URL in main page
+				// Close the new tab - analyzeExternalLink will navigate if needed
 				await newPage.close();
 
-				// Navigate to the external URL
 				if (newUrl && !newUrl.includes("instagram.com")) {
-					await page.goto(newUrl, {
-						waitUntil: "networkidle2",
-						timeout: 15000,
-					});
-					// Return the URL we navigated to, not page.url() which might differ due to redirects
 					return { success: true, finalUrl: newUrl };
 				}
 			}
@@ -291,11 +285,6 @@ export async function clickBioLink(page: Page): Promise<{
 				await newTabAfter.close();
 
 				if (tabUrl && !tabUrl.includes("instagram.com")) {
-					await page.goto(tabUrl, {
-						waitUntil: "networkidle2",
-						timeout: 15000,
-					});
-					// Return the URL we navigated to, not page.url() which might differ
 					return { success: true, finalUrl: tabUrl };
 				}
 			}

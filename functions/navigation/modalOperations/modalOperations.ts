@@ -56,7 +56,10 @@ async function waitForModalContent(
 			});
 
 			if (userLinksCount >= 1) {
-				logger.debug("MODAL", `Content loaded: ${userLinksCount} user links found`);
+				logger.debug(
+					"MODAL",
+					`Content loaded: ${userLinksCount} user links found`,
+				);
 				return true;
 			}
 		} catch {

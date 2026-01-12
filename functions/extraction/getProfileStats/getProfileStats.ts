@@ -47,24 +47,34 @@ export async function getProfileStats(page: Page): Promise<ProfileStats> {
 	try {
 		// Extract raw text data from page - keep evaluate simple to avoid __name issues
 		const rawData = await page.evaluate(() => {
-			const links = Array.from(document.querySelectorAll("a"));
+			// IMPORTANT: Only search within the header to avoid picking up stats
+			// from "Suggested users" or other sections showing different profiles
+			const header = document.querySelector("header");
+			if (!header) {
+				return { followersText: "", followingText: "", headerText: "" };
+			}
+
+			const links = Array.from(header.querySelectorAll("a"));
 
 			let followersText = "";
 			let followingText = "";
 
+			// Take the FIRST match (the actual profile's stats), not the last
 			for (const link of links) {
 				const href = link.getAttribute("href") || "";
 				const text = link.textContent?.trim() || "";
-				if (href.includes("/followers") && !href.includes("/following")) {
+				if (
+					!followersText &&
+					href.includes("/followers") &&
+					!href.includes("/following")
+				) {
 					followersText = text;
-				} else if (href.includes("/following")) {
+				} else if (!followingText && href.includes("/following")) {
 					followingText = text;
 				}
 			}
 
-			// Get header text for fallback parsing
-			const header = document.querySelector("header");
-			const headerText = header?.textContent || "";
+			const headerText = header.textContent || "";
 
 			return { followersText, followingText, headerText };
 		});

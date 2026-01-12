@@ -280,8 +280,14 @@ export async function runSmartSessionDirect(
 			try {
 				// Pass controller.shouldContinue as the checkContinue function
 				// This avoids needing cycle tracking from scrape.ts
-				await processFollowingList(seed, page, metricsTracker, !dryRun, () =>
-					controller.shouldContinue(),
+				// Also pass a callback to track each profile processed
+				await processFollowingList(
+					seed,
+					page,
+					metricsTracker,
+					!dryRun,
+					() => controller.shouldContinue(),
+					(wasCreator) => controller.recordProfileChecked(wasCreator),
 				);
 
 				// Update controller stats
@@ -292,11 +298,8 @@ export async function runSmartSessionDirect(
 				while (controller.getStats().dmsSent < dmsThisSession) {
 					controller.recordDM();
 				}
-
-				controller.recordProfileChecked(true);
 			} catch (error) {
 				logger.error("SESSION", `Failed to process seed @${seed}: ${error}`);
-				controller.recordProfileChecked(false);
 			}
 
 			// Log progress
