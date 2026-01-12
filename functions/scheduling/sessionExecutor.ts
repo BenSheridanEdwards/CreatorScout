@@ -20,7 +20,8 @@ import {
 	recalculateSessions,
 	type SessionType,
 } from "./sessionPlanner.ts";
-import { queueCount, queueNext } from "../shared/database/database.ts";
+import { queueAdd, queueCount, queueNext } from "../shared/database/database.ts";
+import { existsSync, readFileSync } from "fs";
 import {
 	batchEngagements,
 	EngagementTracker,
@@ -35,6 +36,36 @@ import { createRun, updateRun } from "../shared/runs/runs.ts";
 import { warmUpProfile } from "../timing/warmup/warmup.ts";
 
 const logger = createLogger();
+
+/**
+ * Load seeds from file into queue
+ */
+async function loadSeedsFromFile(
+	filePath: string = "data/seeds.txt",
+): Promise<number> {
+	try {
+		if (!existsSync(filePath)) {
+			logger.debug("SEED", `Seeds file not found: ${filePath}`);
+			return 0;
+		}
+
+		const seedsContent = readFileSync(filePath, "utf-8");
+		const lines = seedsContent.split("\n");
+		let seedsLoaded = 0;
+
+		for (const line of lines) {
+			const username = line.trim().toLowerCase();
+			if (username && !username.startsWith("#")) {
+				await queueAdd(username, 100, "seed");
+				seedsLoaded++;
+			}
+		}
+
+		return seedsLoaded;
+	} catch {
+		return 0;
+	}
+}
 
 export interface SessionExecutorArgs {
 	profileId: string;
@@ -80,8 +111,17 @@ async function preValidateSession(profileId: string): Promise<{
 		};
 	}
 
+	// Load seeds from file if queue is empty
+	let queueSize = await queueCount();
+	if (queueSize === 0) {
+		const seedsLoaded = await loadSeedsFromFile();
+		if (seedsLoaded > 0) {
+			logger.info("SEED", `Loaded ${seedsLoaded} seeds from data/seeds.txt`);
+			queueSize = await queueCount();
+		}
+	}
+
 	// Check queue has seeds
-	const queueSize = await queueCount();
 	if (queueSize === 0) {
 		return { valid: false, reason: "Queue is empty - no seeds to process" };
 	}
