@@ -188,7 +188,12 @@ async function runSmartSession(args: SessionArgs): Promise<void> {
 					metricsTracker,
 					!dryRun,
 					() => controller.shouldContinue(),
-					(wasCreator) => controller.recordProfileChecked(wasCreator),
+					(result) => {
+						controller.recordProfileChecked(result.wasCreator);
+						if (result.hadEngagement) {
+							controller.recordEngagement();
+						}
+					},
 				);
 
 				// Update controller stats (approximate - actual DMs tracked in processFollowingList)
@@ -210,9 +215,8 @@ async function runSmartSession(args: SessionArgs): Promise<void> {
 				`Progress: ${stats.dmsSent}/${plan.targetDMs} DMs, ${stats.profilesChecked} profiles, ${stats.elapsedMinutes.toFixed(1)} min`,
 			);
 
-			// Record engagement actions
+			// Track DM for rate limiting (engagement now tracked per-profile via callback)
 			engagementTracker.recordOutbound("dm");
-			controller.recordEngagement();
 		}
 
 		// Session complete

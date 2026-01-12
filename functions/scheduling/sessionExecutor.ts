@@ -280,14 +280,19 @@ export async function runSmartSessionDirect(
 			try {
 				// Pass controller.shouldContinue as the checkContinue function
 				// This avoids needing cycle tracking from scrape.ts
-				// Also pass a callback to track each profile processed
+				// Also pass a callback to track each profile processed and engagements
 				await processFollowingList(
 					seed,
 					page,
 					metricsTracker,
 					!dryRun,
 					() => controller.shouldContinue(),
-					(wasCreator) => controller.recordProfileChecked(wasCreator),
+					(result) => {
+						controller.recordProfileChecked(result.wasCreator);
+						if (result.hadEngagement) {
+							controller.recordEngagement();
+						}
+					},
 				);
 
 				// Update controller stats
@@ -310,7 +315,7 @@ export async function runSmartSessionDirect(
 			);
 
 			engagementTracker.recordOutbound("dm");
-			controller.recordEngagement();
+			// Note: controller.recordEngagement() is now called per-profile via the callback
 		}
 
 		// Session complete

@@ -133,9 +133,14 @@ export async function loadSeeds(
 	}
 }
 
+export interface ProfileResult {
+	wasCreator: boolean;
+	hadEngagement: boolean;
+}
+
 /**
  * Process a single profile: visit, analyze, and take actions if creator.
- * Returns true if a confirmed creator was found (confidence >= threshold).
+ * Returns { wasCreator, hadEngagement } for accurate session tracking.
  */
 export async function processProfile(
 	username: string,
@@ -144,7 +149,7 @@ export async function processProfile(
 	metricsTracker?: MetricsTracker,
 	sendDM: boolean = true,
 	skipNavigation: boolean = false,
-): Promise<boolean> {
+): Promise<ProfileResult> {
 	// Start performance timer
 	const timer = startTimer(`Profile processing: @${username}`);
 
@@ -156,6 +161,7 @@ export async function processProfile(
 	let quickScore = 0;
 	let confidence = 0;
 	let confirmedCreator = false;
+	let hadEngagement = false;
 
 	// Parse discovery source to extract depth and source profile (moved outside try for finally block access)
 	const discoveryDepth = source.split("_").length - 1; // Count underscores as depth
@@ -171,7 +177,7 @@ export async function processProfile(
 				"Already visited",
 				username,
 			);
-			return false;
+			return { wasCreator: false, hadEngagement: false };
 		}
 
 		// Navigate to profile and check status (skip navigation if already there from modal click)
@@ -202,7 +208,7 @@ export async function processProfile(
 				"Profile not found",
 				username,
 			);
-			return false;
+			return { wasCreator: false, hadEngagement: false };
 		}
 
 		if (status.isPrivate) {
@@ -213,7 +219,7 @@ export async function processProfile(
 				"Profile is private",
 				username,
 			);
-			return false;
+			return { wasCreator: false, hadEngagement: false };
 		}
 	} catch (err) {
 		const errorMessage = err instanceof Error ? err.message : String(err);
@@ -232,7 +238,7 @@ export async function processProfile(
 			metricsTracker.recordError(username, "profile_load_failed", errorMessage);
 		}
 
-		return false;
+		return { wasCreator: false, hadEngagement: false };
 	}
 
 	// Comprehensive profile analysis with advanced link detection
@@ -247,7 +253,7 @@ export async function processProfile(
 		const isBundlerError =
 			errorMsg.includes("__name") || errorMsg.includes("is not defined");
 
-		const timeStr = (timer.end() / 1000).toFixed(1);
+		const timeStr = timer.end().toFixed(1);
 
 		if (isBundlerError) {
 			// Extract step context from wrapped error message: "[step] msg (completed: x → y)"
@@ -274,15 +280,15 @@ export async function processProfile(
 				`comprehensive_analysis_failed_${username}`,
 			);
 		}
-		return false;
+		return { wasCreator: false, hadEngagement: false };
 	}
 
 	if (!analysis.bio) {
 		// Database already updated by analyzeProfileComprehensive
 		recordError("No bio found", `comprehensive_analysis_${username}`, username);
-		const timeStr = (timer.end() / 1000).toFixed(1);
+		const timeStr = timer.end().toFixed(1);
 		logger.info("RESULT", `⚠️ @${username} | No bio found | Time: ${timeStr}s`);
-		return false;
+		return { wasCreator: false, hadEngagement: false };
 	}
 
 	// Quick bio scoring for smart filtering
@@ -301,17 +307,21 @@ export async function processProfile(
 		// Database already updated by analyzeProfileComprehensive
 		cycleManager.recordProfileProcessed(username, false);
 
-		const timeStr = (timer.end() / 1000).toFixed(1);
+		const timeStr = timer.end().toFixed(1);
 		logger.info(
 			"RESULT",
 			`❌ @${username} | Score: ${quickScore}% | Conf: ${analysis.confidence}% | Creator: NO | Time: ${timeStr}s`,
 		);
-		return false;
+		return { wasCreator: false, hadEngagement };
 	}
 
 	// RANDOM ENGAGEMENT: Break bot patterns with natural actions
 	if (shouldEngageOnProfile(quickScore)) {
-		await performRandomEngagement(page, username);
+		const engagementResult = await performRandomEngagement(page, username);
+		// Track successful engagements (not "none" type and succeeded)
+		if (engagementResult.type !== "none" && engagementResult.success) {
+			hadEngagement = true;
+		}
 	}
 
 	// Database already updated by analyzeProfileComprehensive
@@ -340,7 +350,7 @@ export async function processProfile(
 		// If not a creator or confidence is too low, skip
 		if (!confirmedCreator || confidence < CONFIDENCE_THRESHOLD) {
 			cycleManager.recordProfileProcessed(username, false);
-			return false;
+			return { wasCreator: false, hadEngagement };
 		}
 
 		// If confirmed creator, take actions
@@ -436,10 +446,10 @@ export async function processProfile(
 				recordError(error, `queue_expansion_${username}`, username);
 			}
 
-			return true; // Creator found with high confidence
+			return { wasCreator: true, hadEngagement }; // Creator found with high confidence
 		} else {
 			cycleManager.recordProfileProcessed(username, false);
-			return false;
+			return { wasCreator: false, hadEngagement };
 		}
 	} catch (err) {
 		const errorMessage = err instanceof Error ? err.message : String(err);
@@ -463,9 +473,9 @@ export async function processProfile(
 
 		throw err; // Re-throw to let caller handle
 	} finally {
-		// Get processing time
+		// Get processing time (timer.end() returns seconds)
 		const finalProcessingTime = timer.end();
-		const timeStr = (finalProcessingTime / 1000).toFixed(1);
+		const timeStr = finalProcessingTime.toFixed(1);
 
 		// Compact single-line result
 		const creatorStatus = confirmedCreator
@@ -521,7 +531,7 @@ export async function processFollowingList(
 	metricsTracker?: MetricsTracker,
 	sendDM: boolean = true,
 	checkContinue: () => boolean = shouldContinue,
-	onProfileProcessed?: (wasCreator: boolean) => void,
+	onProfileProcessed?: (result: ProfileResult) => void,
 ): Promise<void> {
 	const { closeModal } = await import(
 		"../functions/navigation/modalOperations/modalOperations.ts"
@@ -800,7 +810,7 @@ export async function processFollowingList(
 
 		// Process first profile (skip navigation if we successfully clicked in modal)
 		try {
-			const wasCreator = await processProfile(
+			const result = await processProfile(
 				firstUsername,
 				page,
 				`following_of_${seedUsername}`,
@@ -810,7 +820,7 @@ export async function processFollowingList(
 			);
 			batchProcessed++;
 			totalProcessed++;
-			onProfileProcessed?.(wasCreator);
+			onProfileProcessed?.(result);
 		} catch (profileError) {
 			const error =
 				profileError instanceof Error
@@ -821,7 +831,7 @@ export async function processFollowingList(
 				"ERROR",
 				`Failed to process @${firstUsername}, continuing...`,
 			);
-			onProfileProcessed?.(false);
+			onProfileProcessed?.({ wasCreator: false, hadEngagement: false });
 		}
 
 		// Process remaining profiles in batch (direct navigation)
@@ -841,7 +851,7 @@ export async function processFollowingList(
 			}
 
 			try {
-				const wasCreator = await processProfile(
+				const result = await processProfile(
 					username,
 					page,
 					`following_of_${seedUsername}`,
@@ -850,7 +860,7 @@ export async function processFollowingList(
 				);
 				batchProcessed++;
 				totalProcessed++;
-				onProfileProcessed?.(wasCreator);
+				onProfileProcessed?.(result);
 
 				if (totalProcessed % 10 === 0) {
 					logger.info(
@@ -865,7 +875,7 @@ export async function processFollowingList(
 						: new Error(String(profileError));
 				recordError(error, `profile_processing_${username}`, username);
 				logger.warn("ERROR", `Failed to process @${username}, continuing...`);
-				onProfileProcessed?.(false);
+				onProfileProcessed?.({ wasCreator: false, hadEngagement: false });
 			}
 		}
 
