@@ -167,15 +167,19 @@ export async function sendDMToUser(
  *
  * @param page - Puppeteer page instance
  * @param username - Instagram username to follow
+ * @param skipNavigation - If true, assumes already on the user's profile (default: false)
  * @returns True if successfully followed, false otherwise
  */
 export async function followUserAccount(
 	page: Page,
 	username: string,
+	skipNavigation: boolean = false,
 ): Promise<boolean> {
 	try {
 		// Navigate to profile using search-based navigation (more human-like)
-		await navigateToProfile(page, username);
+		if (!skipNavigation) {
+			await navigateToProfile(page, username);
+		}
 
 		await mediumDelay(1.5, 2.5); // Wait for page to fully load
 

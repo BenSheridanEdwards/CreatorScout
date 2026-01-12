@@ -350,24 +350,23 @@ export async function processProfile(
 				// Ignore notification errors on non-macOS systems
 			}
 
-			// Mark in database with optional screenshot
+			// Mark in database with proof screenshot
 			let proofPath = null;
 			try {
-				proofPath =
-					analysis.links && analysis.links.length > 0
-						? await snapshot(page, `creator_${username}`, true)
-						: null;
+				proofPath = await snapshot(page, `creator_${username}`, true);
 			} catch {
 				// Screenshot failed, continue without proof
 			}
 			await markAsCreator(username, confidence, proofPath);
 
 			// Send DM (if not already sent and DM sending is enabled)
+			let attemptedDm = false;
 			if (sendDM && !(await wasDmSent(username))) {
 				const [dmDelayMin, dmDelayMax] = getDelay("before_dm");
 				const dmWait = dmDelayMin + Math.random() * (dmDelayMax - dmDelayMin);
 				await sleep(dmWait * 1000);
 
+				attemptedDm = true;
 				try {
 					await sendDMToUser(page, username, true);
 					cycleManager.recordDMSent(username);
@@ -390,9 +389,10 @@ export async function processProfile(
 			}
 
 			// Follow (if not already following)
+			// Skip navigation if we didn't attempt DM (still on profile page)
 			if (!(await wasFollowed(username))) {
 				try {
-					await followUserAccount(page, username);
+					await followUserAccount(page, username, !attemptedDm);
 					cycleManager.recordFollowCompleted(username);
 					if (metricsTracker) {
 						metricsTracker.recordFollowCompleted();
