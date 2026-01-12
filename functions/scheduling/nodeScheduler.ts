@@ -88,7 +88,10 @@ export class NodeScheduler {
 			return;
 		}
 
-		logger.info("SCHEDULER", `Starting Node scheduler (TZ: ${this.config.timezone})`);
+		logger.info(
+			"SCHEDULER",
+			`Starting Node scheduler (TZ: ${this.config.timezone})`,
+		);
 		this.isRunning = true;
 
 		// Load persisted jobs from database
@@ -113,7 +116,7 @@ export class NodeScheduler {
 
 		logger.info(
 			"SCHEDULER",
-			`Scheduler started (polling every ${this.config.checkIntervalMinutes} min)`
+			`Scheduler started (polling every ${this.config.checkIntervalMinutes} min)`,
 		);
 	}
 
@@ -133,7 +136,10 @@ export class NodeScheduler {
 		const maxWait = 5 * 60 * 1000;
 		const startTime = Date.now();
 		while (this.runningJobs.size > 0 && Date.now() - startTime < maxWait) {
-			logger.info("SCHEDULER", `Waiting for ${this.runningJobs.size} running jobs to complete...`);
+			logger.info(
+				"SCHEDULER",
+				`Waiting for ${this.runningJobs.size} running jobs to complete...`,
+			);
 			await new Promise((r) => setTimeout(r, 10000));
 		}
 
@@ -147,23 +153,34 @@ export class NodeScheduler {
 		const profiles = await getActiveProfiles();
 		const today = this.getDateInTimezone();
 
-		logger.info("SCHEDULER", `Generating schedule for ${profiles.length} profiles`);
+		logger.info(
+			"SCHEDULER",
+			`Generating schedule for ${profiles.length} profiles`,
+		);
 
 		for (const profile of profiles) {
 			await this.generateProfileSchedule(profile, today);
 		}
 
 		// Sort queue by scheduled time
-		this.jobQueue.sort((a, b) => a.scheduledTime.getTime() - b.scheduledTime.getTime());
+		this.jobQueue.sort(
+			(a, b) => a.scheduledTime.getTime() - b.scheduledTime.getTime(),
+		);
 
-		logger.info("SCHEDULER", `Generated ${this.jobQueue.length} jobs for today`);
+		logger.info(
+			"SCHEDULER",
+			`Generated ${this.jobQueue.length} jobs for today`,
+		);
 	}
 
 	/**
 	 * Generate schedule for a single profile
 	 * Schedules all 3 sessions (morning, afternoon, evening) per profile
 	 */
-	private async generateProfileSchedule(profile: ProfileConfig, date: Date): Promise<void> {
+	private async generateProfileSchedule(
+		profile: ProfileConfig,
+		date: Date,
+	): Promise<void> {
 		const sessionTypes: SessionType[] = ["morning", "afternoon", "evening"];
 
 		for (const sessionType of sessionTypes) {
@@ -172,7 +189,7 @@ export class NodeScheduler {
 				(j) =>
 					j.profileId === profile.id &&
 					j.sessionType === sessionType &&
-					this.isSameDay(j.scheduledTime, date)
+					this.isSameDay(j.scheduledTime, date),
 			);
 
 			if (existingJob) {
@@ -180,7 +197,11 @@ export class NodeScheduler {
 			}
 
 			// Generate scheduled time with variance
-			const scheduledTime = this.calculateSessionTime(date, sessionType, profile.id);
+			const scheduledTime = this.calculateSessionTime(
+				date,
+				sessionType,
+				profile.id,
+			);
 			const job: ScheduledJob = {
 				id: `${profile.id}_${sessionType}_${date.toISOString().split("T")[0]}`,
 				profileId: profile.id,
@@ -199,7 +220,11 @@ export class NodeScheduler {
 	/**
 	 * Calculate session time with natural variance
 	 */
-	private calculateSessionTime(date: Date, sessionType: SessionType, profileId: string): Date {
+	private calculateSessionTime(
+		date: Date,
+		sessionType: SessionType,
+		profileId: string,
+	): Date {
 		const window = SESSION_WINDOWS[sessionType];
 
 		// Base hour from window
@@ -210,7 +235,9 @@ export class NodeScheduler {
 		const profileOffset = (profileHash % 12) * 5; // 0-55 minutes
 
 		// Add daily variance (±10 minutes)
-		const dayHash = this.hashString(date.toISOString().split("T")[0] + profileId);
+		const dayHash = this.hashString(
+			date.toISOString().split("T")[0] + profileId,
+		);
 		const dailyVariance = (dayHash % 21) - 10; // -10 to +10 minutes
 
 		const totalMinutes = profileOffset + dailyVariance;
@@ -247,19 +274,19 @@ export class NodeScheduler {
 			(job) =>
 				job.status === "pending" &&
 				job.scheduledTime <= now &&
-				job.attempts < this.config.maxRetries + 1
+				job.attempts < this.config.maxRetries + 1,
 		);
 
 		for (const job of jobsToRun) {
 			// Don't run if we already have a job running for this profile
 			const runningForProfile = Array.from(this.runningJobs.values()).find(
-				(j) => j.profileId === job.profileId
+				(j) => j.profileId === job.profileId,
 			);
 
 			if (runningForProfile) {
 				logger.debug(
 					"SCHEDULER",
-					`Skipping ${job.id} - profile ${job.profileId} already has a running job`
+					`Skipping ${job.id} - profile ${job.profileId} already has a running job`,
 				);
 				continue;
 			}
@@ -271,9 +298,14 @@ export class NodeScheduler {
 
 	/**
 	 * Run a scheduled job
+	 * @param sendDMs If true, send DMs to discovered creators (default: false = discovery only)
 	 */
-	private async runJob(job: ScheduledJob): Promise<void> {
-		logger.info("SCHEDULER", `Running job ${job.id} (attempt ${job.attempts + 1})`);
+	private async runJob(job: ScheduledJob, sendDMs = false): Promise<void> {
+		const mode = sendDMs ? " [with DMs]" : " [discovery-only]";
+		logger.info(
+			"SCHEDULER",
+			`Running job ${job.id}${mode} (attempt ${job.attempts + 1})`,
+		);
 
 		const prevStatus = job.status;
 		job.status = "running";
@@ -290,7 +322,7 @@ export class NodeScheduler {
 			await runSmartSessionDirect({
 				profileId: job.profileId,
 				sessionType: job.sessionType,
-				dryRun: false,
+				dryRun: !sendDMs, // dryRun=true means no DMs (discovery only)
 			});
 
 			// Success
@@ -299,7 +331,8 @@ export class NodeScheduler {
 			job._dirty = true;
 			logger.info("SCHEDULER", `✓ Job ${job.id} completed successfully`);
 		} catch (error) {
-			const errorMessage = error instanceof Error ? error.message : String(error);
+			const errorMessage =
+				error instanceof Error ? error.message : String(error);
 			logger.error("SCHEDULER", `✗ Job ${job.id} failed: ${errorMessage}`);
 
 			if (job.attempts < this.config.maxRetries + 1) {
@@ -312,14 +345,17 @@ export class NodeScheduler {
 				job._dirty = true;
 				logger.info(
 					"SCHEDULER",
-					`Scheduling retry for ${job.id} at ${job.scheduledTime.toISOString()} (+${jitter.toFixed(1)}min jitter)`
+					`Scheduling retry for ${job.id} at ${job.scheduledTime.toISOString()} (+${jitter.toFixed(1)}min jitter)`,
 				);
 			} else {
 				// Max retries exceeded
 				job.status = "failed";
 				job.error = errorMessage;
 				job._dirty = true;
-				logger.error("SCHEDULER", `Job ${job.id} failed after ${job.attempts} attempts`);
+				logger.error(
+					"SCHEDULER",
+					`Job ${job.id} failed after ${job.attempts} attempts`,
+				);
 			}
 		} finally {
 			this.runningJobs.delete(job.id);
@@ -339,14 +375,17 @@ export class NodeScheduler {
 			(job) =>
 				job.status === "pending" &&
 				job.scheduledTime < now &&
-				this.isSameDay(job.scheduledTime, today)
+				this.isSameDay(job.scheduledTime, today),
 		);
 
 		if (missedJobs.length === 0) {
 			return;
 		}
 
-		logger.info("SCHEDULER", `Found ${missedJobs.length} missed sessions to catch up`);
+		logger.info(
+			"SCHEDULER",
+			`Found ${missedJobs.length} missed sessions to catch up`,
+		);
 
 		// Stagger catch-up sessions by 10 minutes each
 		for (let i = 0; i < missedJobs.length; i++) {
@@ -356,7 +395,7 @@ export class NodeScheduler {
 			await this.flushDirtyJob(job);
 			logger.info(
 				"SCHEDULER",
-				`Rescheduled missed job ${job.id} to ${job.scheduledTime.toISOString()}`
+				`Rescheduled missed job ${job.id} to ${job.scheduledTime.toISOString()}`,
 			);
 		}
 	}
@@ -427,7 +466,10 @@ export class NodeScheduler {
 				},
 			});
 		} catch {
-			logger.warn("SCHEDULER", "DB write failed—run: npx prisma migrate deploy");
+			logger.warn(
+				"SCHEDULER",
+				"DB write failed—run: npx prisma migrate deploy",
+			);
 		}
 	}
 
@@ -488,16 +530,19 @@ export class NodeScheduler {
 		nextJob: ScheduledJob | null;
 	} {
 		const today = this.getDateInTimezone();
-		const todayJobs = this.jobQueue.filter((j) => this.isSameDay(j.scheduledTime, today));
+		const todayJobs = this.jobQueue.filter((j) =>
+			this.isSameDay(j.scheduledTime, today),
+		);
 
 		const pending = todayJobs.filter((j) => j.status === "pending");
 		const completed = todayJobs.filter((j) => j.status === "completed");
 		const failed = todayJobs.filter((j) => j.status === "failed");
 
 		// Find next pending job
-		const nextJob = pending.sort(
-			(a, b) => a.scheduledTime.getTime() - b.scheduledTime.getTime()
-		)[0] || null;
+		const nextJob =
+			pending.sort(
+				(a, b) => a.scheduledTime.getTime() - b.scheduledTime.getTime(),
+			)[0] || null;
 
 		return {
 			isRunning: this.isRunning,
@@ -521,8 +566,13 @@ export class NodeScheduler {
 
 	/**
 	 * Force run a specific job now (for testing/manual triggers)
+	 * @param sendDMs If true, send DMs to discovered creators (default: false = discovery only)
 	 */
-	async forceRunJob(profileId: string, sessionType: SessionType): Promise<void> {
+	async forceRunJob(
+		profileId: string,
+		sessionType: SessionType,
+		sendDMs = false,
+	): Promise<void> {
 		const job: ScheduledJob = {
 			id: `force_${profileId}_${sessionType}_${Date.now()}`,
 			profileId,
@@ -534,13 +584,14 @@ export class NodeScheduler {
 		};
 
 		// Log override so we know why a job fired outside normal schedule
+		const mode = sendDMs ? " [WITH DMs]" : " [DISCOVERY-ONLY]";
 		logger.warn(
 			"SCHEDULER",
-			`⚡ Forced job ${job.id} - manual override at ${new Date().toISOString()}`
+			`⚡ Forced job ${job.id}${mode} - manual override at ${new Date().toISOString()}`,
 		);
 
 		this.jobQueue.push(job);
-		await this.runJob(job);
+		await this.runJob(job, sendDMs);
 	}
 }
 
@@ -554,7 +605,9 @@ export function getNodeScheduler(): NodeScheduler {
 	return globalScheduler;
 }
 
-export async function startScheduler(config?: Partial<SchedulerConfig>): Promise<NodeScheduler> {
+export async function startScheduler(
+	config?: Partial<SchedulerConfig>,
+): Promise<NodeScheduler> {
 	const scheduler = new NodeScheduler(config);
 	await scheduler.start();
 	globalScheduler = scheduler;

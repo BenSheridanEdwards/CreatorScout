@@ -148,18 +148,48 @@ export async function analyzeProfileComprehensive(
 		reason: null,
 	};
 
-	// Extract bio
-	result.bio = await getBioFromPage(page);
+	// Helper to check if error is a bundler __name error
+	const isBundlerError = (error: unknown): boolean => {
+		const msg = error instanceof Error ? error.message : String(error);
+		return msg.includes("__name") || msg.includes("is not defined");
+	};
+
+	// Extract bio - wrap in try-catch for bundler errors
+	try {
+		result.bio = await getBioFromPage(page);
+	} catch (bioError) {
+		if (isBundlerError(bioError)) {
+			logger.warn(
+				"ANALYSIS",
+				`Bio extraction failed with bundler error: ${bioError}`,
+			);
+			result.errors?.push(`Bio extraction failed: ${bioError}`);
+		} else {
+			throw bioError;
+		}
+	}
 
 	// Validate bio extraction if it looks short or empty
 	if (!result.bio || result.bio.length < 30) {
-		const validation = await validateBioExtraction(page, result.bio, username);
-		if (!validation.valid && validation.correctedBio) {
-			logger.warn(
-				"ANALYSIS",
-				`Bio validation corrected: "${result.bio}" -> "${validation.correctedBio}"`,
+		try {
+			const validation = await validateBioExtraction(
+				page,
+				result.bio,
+				username,
 			);
-			result.bio = validation.correctedBio;
+			if (!validation.valid && validation.correctedBio) {
+				logger.warn(
+					"ANALYSIS",
+					`Bio validation corrected: "${result.bio}" -> "${validation.correctedBio}"`,
+				);
+				result.bio = validation.correctedBio;
+			}
+		} catch (valError) {
+			if (isBundlerError(valError)) {
+				logger.warn("ANALYSIS", `Bio validation failed: ${valError}`);
+			} else {
+				throw valError;
+			}
 		}
 	}
 
@@ -198,31 +228,84 @@ export async function analyzeProfileComprehensive(
 		}
 	}
 
-	// Extract links
-	const primary = await getLinkFromBio(page);
-	const headerHrefs = await page.$$eval(
-		"header a",
-		(els) => els.map((e) => e.getAttribute("href")).filter(Boolean) as string[],
-	);
+	// Extract links - wrap in try-catch for bundler errors
+	let primary: string | null = null;
+	try {
+		primary = await getLinkFromBio(page);
+	} catch (linkError) {
+		if (isBundlerError(linkError)) {
+			logger.warn("ANALYSIS", `Bio link extraction failed: ${linkError}`);
+			result.errors?.push(`Bio link extraction failed: ${linkError}`);
+		} else {
+			throw linkError;
+		}
+	}
+
+	let headerHrefs: string[] = [];
+	try {
+		headerHrefs = await page.$$eval(
+			"header a",
+			(els) =>
+				els.map((e) => e.getAttribute("href")).filter(Boolean) as string[],
+		);
+	} catch (evalError) {
+		if (isBundlerError(evalError)) {
+			logger.warn(
+				"ANALYSIS",
+				`Header links extraction failed with bundler error: ${evalError}`,
+			);
+			result.errors?.push(`Header links extraction failed: ${evalError}`);
+		} else {
+			throw evalError;
+		}
+	}
 	const html = await page.content();
 	result.links = buildUniqueLinks(html, headerHrefs, primary);
 
-	// Profile stats (follower ratio)
-	const stats = await getProfileStats(page);
+	// Profile stats (follower ratio) - wrap in try-catch for bundler errors
+	let stats: { followers?: number; following?: number; ratio?: number } = {};
+	try {
+		const rawStats = await getProfileStats(page);
+		stats = {
+			followers: rawStats.followers ?? undefined,
+			following: rawStats.following ?? undefined,
+			ratio: rawStats.ratio ?? undefined,
+		};
+	} catch (statsError) {
+		if (isBundlerError(statsError)) {
+			logger.warn("ANALYSIS", `Profile stats extraction failed: ${statsError}`);
+			result.errors?.push(`Profile stats extraction failed: ${statsError}`);
+		} else {
+			throw statsError;
+		}
+	}
 
-	result.stats = {
-		followers: stats.followers ?? undefined,
-		following: stats.following ?? undefined,
-		ratio: stats.ratio ?? undefined,
-	};
+	result.stats = stats;
 
 	if (stats.ratio && stats.ratio > 100) {
 		result.confidence = Math.max(result.confidence, 30);
 		result.indicators.push(`High follower ratio (${stats.ratio.toFixed(1)}x)`);
 	}
 
-	// Story highlights analysis
-	const highlights = await getStoryHighlights(page);
+	// Story highlights analysis - wrap in try-catch for bundler errors
+	let rawHighlights: Awaited<ReturnType<typeof getStoryHighlights>> = [];
+	try {
+		rawHighlights = await getStoryHighlights(page);
+	} catch (highlightsError) {
+		if (isBundlerError(highlightsError)) {
+			logger.warn(
+				"ANALYSIS",
+				`Story highlights extraction failed: ${highlightsError}`,
+			);
+			result.errors?.push(
+				`Story highlights extraction failed: ${highlightsError}`,
+			);
+		} else {
+			throw highlightsError;
+		}
+	}
+
+	const highlights = rawHighlights;
 	result.highlights = highlights.map((h) => ({
 		title: h.title,
 		coverUrl: h.coverImageUrl ?? undefined,
@@ -294,7 +377,10 @@ export async function analyzeProfileComprehensive(
 		);
 		if (preClickScreenshot) {
 			result.screenshots.push(preClickScreenshot);
-			logger.debug("ANALYSIS", `📸 Pre-click screenshot: ${preClickScreenshot}`);
+			logger.debug(
+				"ANALYSIS",
+				`📸 Pre-click screenshot: ${preClickScreenshot}`,
+			);
 		}
 
 		// First, try to click the bio link like a user would

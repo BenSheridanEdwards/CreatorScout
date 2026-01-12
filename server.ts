@@ -211,7 +211,10 @@ async function handleApi(
 			);
 			const health = await checkHealth();
 			const alerts = getRecentAlerts(10);
-			sendJson(res, health.healthy ? 200 : 503, { ...health, recentAlerts: alerts });
+			sendJson(res, health.healthy ? 200 : 503, {
+				...health,
+				recentAlerts: alerts,
+			});
 		} catch (error) {
 			sendJson(res, 503, { healthy: false, error: String(error) });
 		}
@@ -229,8 +232,59 @@ async function handleApi(
 			const todayJobs = scheduler.getTodayJobs();
 			sendJson(res, 200, { ...status, todayJobs });
 		} catch (error) {
-			sendJson(res, 500, { error: "Scheduler not initialized", details: String(error) });
+			sendJson(res, 500, {
+				error: "Scheduler not initialized",
+				details: String(error),
+			});
 		}
+		return;
+	}
+
+	// Trigger manual session endpoint
+	if (req.method === "POST" && url.pathname === "/api/scheduler/run") {
+		let body = "";
+		req.on("data", (chunk) => {
+			body += chunk;
+		});
+		req.on("end", async () => {
+			try {
+				const parsed = JSON.parse(body || "{}") as {
+					profileId?: string;
+					sessionType?: string;
+					sendDMs?: boolean; // If true, send DMs (default: false = discovery only)
+				};
+
+				if (!parsed.profileId) {
+					sendJson(res, 400, { error: "profileId required" });
+					return;
+				}
+
+				const sessionType = (parsed.sessionType || "morning") as
+					| "morning"
+					| "afternoon"
+					| "evening";
+				const sendDMs = parsed.sendDMs ?? false; // Default: discovery only (no DMs)
+
+				const { getNodeScheduler } = await import(
+					"./functions/scheduling/nodeScheduler.ts"
+				);
+				const scheduler = getNodeScheduler();
+
+				// Fire and forget - don't wait for session to complete
+				void scheduler.forceRunJob(parsed.profileId, sessionType, sendDMs);
+
+				const mode = sendDMs ? "with DMs" : "discovery-only";
+				sendJson(res, 200, {
+					success: true,
+					message: `Started ${sessionType} session for ${parsed.profileId} [${mode}]`,
+				});
+			} catch (error) {
+				sendJson(res, 500, {
+					error: "Failed to trigger session",
+					details: String(error),
+				});
+			}
+		});
 		return;
 	}
 
@@ -244,7 +298,10 @@ async function handleApi(
 			const monthly = await estimateMonthlyProxyCost();
 			sendJson(res, 200, { today, monthly });
 		} catch (error) {
-			sendJson(res, 500, { error: "Failed to get proxy usage", details: String(error) });
+			sendJson(res, 500, {
+				error: "Failed to get proxy usage",
+				details: String(error),
+			});
 		}
 		return;
 	}

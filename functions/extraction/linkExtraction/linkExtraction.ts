@@ -6,7 +6,7 @@ import { mediumDelay, microDelay } from "../../timing/humanize/humanize.ts";
 const INSTAGRAM_HOST = "instagram.com";
 
 const AGGREGATOR_REGEX =
-	/linktr\.ee|link\.me|beacons\.ai|allmylinks|linkin\.bio|bio\.link|stan\.store|fanhouse/i;
+	/linktr\.ee|link\.me|beacons\.ai|allmylinks|linkin\.bio|bio\.link|stan\.store|fanhouse|juicy\.bio|hoo\.be/i;
 
 const CREATOR_HOST_REGEX = /patreon\.com/i;
 
@@ -49,6 +49,8 @@ const AGGREGATOR_DOMAINS = [
 	"linkin.bio",
 	"allmylinks.com",
 	"beacons.ai",
+	"juicy.bio",
+	"hoo.be",
 ];
 
 const CREATOR_KEYWORDS = [
@@ -76,6 +78,11 @@ const CREATOR_KEYWORDS = [
 	"chat with me",
 	"content",
 	"account",
+	// Hidden/secret content patterns
+	"my hidden",
+	"my secret",
+	"hidden content",
+	"secret content",
 ];
 
 /**
@@ -450,6 +457,12 @@ export async function analyzeExternalLink(
 				const text = (el as HTMLElement).innerText?.toLowerCase() || "";
 				return (
 					text.includes("🥵") ||
+					text.includes("🌶") || // Chili pepper = "spicy" content
+					text.includes("🔥") || // Fire emoji often indicates premium content on link pages
+					text.includes("my hidden") || // "My Hidden" = hidden/private content
+					text.includes("hidden content") ||
+					text.includes("secret content") ||
+					text.includes("my secret") ||
 					(text.includes("hot") && text.includes("content")) ||
 					text.includes("chat with me") ||
 					text.includes("don't tell") ||
@@ -502,6 +515,11 @@ export async function analyzeExternalLink(
 				"belong to me",
 				"mommy treatment",
 				"daddy treatment",
+				// Hidden/secret content patterns (common on link pages)
+				"my hidden",
+				"hidden content",
+				"my secret",
+				"secret content",
 			];
 
 			return {
@@ -558,6 +576,11 @@ export async function analyzeExternalLink(
 			"belong to me",
 			"mommy treatment",
 			"daddy treatment",
+			// Hidden/secret content patterns (common on link pages)
+			"my hidden",
+			"hidden content",
+			"my secret",
+			"secret content",
 		];
 
 		const normalizedCreatorPatterns = creatorTextPatterns.filter((pattern) =>
@@ -685,6 +708,27 @@ export async function analyzeExternalLink(
 				text: "you belong to",
 				label: "CREATOR LANGUAGE",
 				reason: "link_promotional",
+			},
+			// Hidden/secret content patterns (common on link-in-bio pages)
+			{
+				text: "my hidden",
+				label: "HIDDEN CONTENT",
+				reason: "hidden_content",
+			},
+			{
+				text: "hidden content",
+				label: "HIDDEN CONTENT",
+				reason: "hidden_content",
+			},
+			{
+				text: "my secret",
+				label: "SECRET CONTENT",
+				reason: "secret_content",
+			},
+			{
+				text: "secret content",
+				label: "SECRET CONTENT",
+				reason: "secret_content",
 			},
 		];
 

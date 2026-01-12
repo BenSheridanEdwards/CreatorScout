@@ -48,17 +48,22 @@ Only mark as influencer if you see EXPLICIT adult platform links or content warn
 - Content warning gates: "Sensitive Content", "Mature Content Disclaimer", age verification
 - "Exclusive Content" or "Premium Content" WITH adult platform link
 - "Subscribe to see more" WITH adult platform link
+- Hidden/secret content buttons: "My Hidden", "Hidden Content", "My Secret", "Secret Content" = DEFINITIVE influencer signal
+- Chili pepper emoji button (🌶️) alone or as link = coded "spicy" premium content indicator
+- Buttons with emoji-only text like 🌶️ or "🔥" combined with creator profile pic = influencer
 
 **NOT ENOUGH ON THEIR OWN** (need adult platform link to confirm):
 - Link photos (could be fitness/fashion influencer)
 - "Content creator" label (applies to all influencers)
-- Emojis like 🔥💋🍑 (common for fashion/beauty too)
+- Emojis like 🔥💋🍑 in bio text (common for fashion/beauty too)
 - "DM for collabs" (standard influencer language)
 
 **DECISION LOGIC**:
 1. If page has adult platform links (Patreon, Ko-fi, etc.) → is_adult_creator = TRUE
-2. If page has ONLY shopping + social media links → is_adult_creator = FALSE
-3. If unsure and no adult platform visible → is_adult_creator = FALSE
+2. If page has "My Hidden", "My Secret", or similar hidden content buttons → is_adult_creator = TRUE
+3. If page has chili pepper emoji (🌶️) button especially with creator profile → is_adult_creator = TRUE  
+4. If page has ONLY shopping + social media links → is_adult_creator = FALSE
+5. If unsure and no adult platform visible → is_adult_creator = FALSE
 
 Return EXACTLY this JSON:
 {

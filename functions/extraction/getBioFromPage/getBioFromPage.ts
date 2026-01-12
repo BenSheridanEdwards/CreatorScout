@@ -146,32 +146,71 @@ async function expandBioIfTruncated(page: Page): Promise<boolean> {
  * Extract all visible text from header in DOM order
  */
 async function extractTextArrayFromPage(page: Page): Promise<string[]> {
-	return page.evaluate(() => {
-		const header = document.querySelector("header");
-		if (!header) return [];
+	try {
+		return await page.evaluate(() => {
+			const header = document.querySelector("header");
+			if (!header) return [];
 
-		const texts: string[] = [];
-		const walker = document.createTreeWalker(header, NodeFilter.SHOW_TEXT, {
-			acceptNode: (node) => {
-				const parent = node.parentElement;
-				if (!parent) return NodeFilter.FILTER_REJECT;
-				const tag = parent.tagName.toLowerCase();
-				if (tag === "script" || tag === "style" || tag === "svg") {
-					return NodeFilter.FILTER_REJECT;
+			const texts: string[] = [];
+			// Use TreeWalker with inline filter to avoid bundler __name issues
+			const walker = document.createTreeWalker(header, NodeFilter.SHOW_TEXT, {
+				acceptNode: (node: Node) => {
+					const parent = (node as ChildNode).parentElement;
+					if (!parent) return NodeFilter.FILTER_REJECT;
+					const tag = parent.tagName.toLowerCase();
+					if (tag === "script" || tag === "style" || tag === "svg") {
+						return NodeFilter.FILTER_REJECT;
+					}
+					return NodeFilter.FILTER_ACCEPT;
+				},
+			});
+
+			while (walker.nextNode()) {
+				const text = walker.currentNode.textContent?.trim();
+				if (text && text.length > 0) {
+					texts.push(text);
 				}
-				return NodeFilter.FILTER_ACCEPT;
-			},
-		});
-
-		while (walker.nextNode()) {
-			const text = walker.currentNode.textContent?.trim();
-			if (text && text.length > 0) {
-				texts.push(text);
 			}
-		}
 
-		return texts;
-	});
+			return texts;
+		});
+	} catch (error) {
+		// Fallback: If TreeWalker approach fails (e.g., __name bundler issue),
+		// use a simpler querySelectorAll approach
+		const errorMsg = error instanceof Error ? error.message : String(error);
+		if (errorMsg.includes("__name") || errorMsg.includes("is not defined")) {
+			logger.warn(
+				"PROFILE",
+				`TreeWalker extraction failed with bundler error, using fallback: ${errorMsg}`,
+			);
+			return await page.evaluate(() => {
+				const header = document.querySelector("header");
+				if (!header) return [];
+
+				// Simpler approach: get all text-containing elements
+				const elements = header.querySelectorAll("span, div, h1, h2, a, p");
+				const texts: string[] = [];
+				const seen = new Set<string>();
+
+				for (const el of elements) {
+					// Skip elements with many children (containers)
+					if (el.children.length > 3) continue;
+					// Skip script, style, svg
+					const tag = el.tagName.toLowerCase();
+					if (tag === "script" || tag === "style" || tag === "svg") continue;
+
+					const text = el.textContent?.trim();
+					if (text && text.length > 0 && !seen.has(text)) {
+						seen.add(text);
+						texts.push(text);
+					}
+				}
+
+				return texts;
+			});
+		}
+		throw error;
+	}
 }
 
 /**

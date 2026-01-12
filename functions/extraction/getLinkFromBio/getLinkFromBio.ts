@@ -25,6 +25,8 @@ export async function getLinkFromBio(page: Page): Promise<string | null> {
 		'header a[href*="bio.link"]',
 		'header a[href*="stan.store"]',
 		'header a[href*="fanhouse"]',
+		'header a[href*="juicy.bio"]',
+		'header a[href*="hoo.be"]',
 		// General external links
 		'header a[rel*="nofollow"]',
 		'header a[target="_blank"]',
