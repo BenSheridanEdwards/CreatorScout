@@ -268,6 +268,7 @@ export async function runSmartSessionDirect(
 				"SESSION",
 				`📊 Bandwidth: ${proxyStats.estimatedMB.toFixed(1)}MB used, ${proxyStats.savedMB.toFixed(1)}MB saved (${proxyStats.blockedCount} blocked)`,
 			);
+			proxyOptimizer = undefined; // Prevent double-finalize in finally block
 		}
 
 		await updateRun(runId, {
