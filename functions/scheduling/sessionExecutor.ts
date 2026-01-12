@@ -280,12 +280,8 @@ export async function runSmartSessionDirect(
 			try {
 				// Pass controller.shouldContinue as the checkContinue function
 				// This avoids needing cycle tracking from scrape.ts
-				await processFollowingList(
-					seed,
-					page,
-					metricsTracker,
-					!dryRun,
-					() => controller.shouldContinue(),
+				await processFollowingList(seed, page, metricsTracker, !dryRun, () =>
+					controller.shouldContinue(),
 				);
 
 				// Update controller stats
