@@ -20,7 +20,12 @@ import {
 	recalculateSessions,
 	type SessionType,
 } from "./sessionPlanner.ts";
-import { queueAdd, queueCount, queueNext } from "../shared/database/database.ts";
+import {
+	getCreatorsWithUnscrapedFollowing,
+	queueAdd,
+	queueCount,
+	queueNext,
+} from "../shared/database/database.ts";
 import { existsSync, readFileSync } from "fs";
 import {
 	batchEngagements,
@@ -117,6 +122,22 @@ async function preValidateSession(profileId: string): Promise<{
 		const seedsLoaded = await loadSeedsFromFile();
 		if (seedsLoaded > 0) {
 			logger.info("SEED", `Loaded ${seedsLoaded} seeds from data/seeds.txt`);
+			queueSize = await queueCount();
+		}
+	}
+
+	// If still empty, try to expand from confirmed creators
+	if (queueSize === 0) {
+		const unscrapedCreators = await getCreatorsWithUnscrapedFollowing();
+		if (unscrapedCreators.length > 0) {
+			logger.info(
+				"SEED",
+				`Found ${unscrapedCreators.length} confirmed creators to expand`,
+			);
+			// Add up to 10 creators to the queue
+			for (const creator of unscrapedCreators.slice(0, 10)) {
+				await queueAdd(creator, 80, "creator_expansion");
+			}
 			queueSize = await queueCount();
 		}
 	}
