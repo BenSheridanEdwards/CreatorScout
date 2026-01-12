@@ -196,14 +196,22 @@ export class SessionController {
 			evening: "🌙",
 		};
 
+		const isDiscoveryOnly = this.plan.targetDMs === 0;
+		const modeLabel = isDiscoveryOnly ? " [DISCOVERY]" : "";
+
 		logger.info(
 			"SESSION_COMPLETE",
-			`${emoji[this.plan.type]} ${this.plan.type.toUpperCase()} Session Complete`,
+			`${emoji[this.plan.type]} ${this.plan.type.toUpperCase()} Session Complete${modeLabel}`,
 		);
-		logger.info(
-			"SESSION_COMPLETE",
-			`   DMs sent: ${stats.dmsSent} (target: ${this.plan.targetDMs}, range: ${this.plan.minAcceptable}-${this.plan.maxAcceptable})`,
-		);
+
+		// Only show DM stats if DMs were enabled for this session
+		if (!isDiscoveryOnly) {
+			logger.info(
+				"SESSION_COMPLETE",
+				`   DMs sent: ${stats.dmsSent} (target: ${this.plan.targetDMs}, range: ${this.plan.minAcceptable}-${this.plan.maxAcceptable})`,
+			);
+		}
+
 		logger.info(
 			"SESSION_COMPLETE",
 			`   Profiles checked: ${stats.profilesChecked}`,
@@ -221,14 +229,18 @@ export class SessionController {
 			`   Duration: ${stats.elapsedMinutes.toFixed(1)} min (estimated: ${this.plan.estimatedDuration} min)`,
 		);
 
-		// Status check
-		if (stats.dmsSent >= this.plan.minAcceptable) {
-			logger.info("SESSION_COMPLETE", `   Status: ✓ Target met`);
+		// Status check - only relevant when DMs are enabled
+		if (!isDiscoveryOnly) {
+			if (stats.dmsSent >= this.plan.minAcceptable) {
+				logger.info("SESSION_COMPLETE", `   Status: ✓ Target met`);
+			} else {
+				logger.warn(
+					"SESSION_COMPLETE",
+					`   Status: ⚠ Under target (${stats.dmsSent} < ${this.plan.minAcceptable})`,
+				);
+			}
 		} else {
-			logger.warn(
-				"SESSION_COMPLETE",
-				`   Status: ⚠ Under target (${stats.dmsSent} < ${this.plan.minAcceptable})`,
-			);
+			logger.info("SESSION_COMPLETE", `   Status: ✓ Discovery complete`);
 		}
 	}
 
