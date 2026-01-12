@@ -22,11 +22,11 @@ import { createLogger } from "../logger/logger.ts";
 const logger = createLogger();
 
 // Resources to block to save bandwidth
+// NOTE: Do NOT block "stylesheet" - it breaks Instagram's UI completely
 const BLOCKED_RESOURCE_TYPES = [
 	"image",
 	"media",
 	"font",
-	"stylesheet", // Keep disabled for now - might break functionality
 ];
 
 // Domains to block (ads, analytics, tracking)

@@ -28,7 +28,7 @@ async function testProxyOptimizer() {
 	try {
 		// Initialize session with proxy optimizer
 		session = await initializeInstagramSession({
-			headless: true,
+			headless: false, // Visible browser so you can see it working
 			adsPowerProfileId: profile.adsPowerProfileId,
 			profileId: profile.id,
 			blockResources: true, // Enable resource blocking
