@@ -140,30 +140,33 @@ export class ProxyOptimizer {
 			return false;
 		}
 
-		// Never block essential Instagram domains
-		const isEssential = ESSENTIAL_DOMAINS.some((domain) => url.includes(domain));
-		if (isEssential && !this.isTrackingResource(url)) {
-			return false;
-		}
-
-		// Block tracking/ad domains
+		// 1. Always block tracking/ad domains first
 		if (BLOCKED_DOMAINS.some((domain) => url.includes(domain))) {
 			return true;
 		}
 
-		// Block heavy resource types (except on essential pages)
-		if (BLOCKED_RESOURCE_TYPES.includes(resourceType)) {
-			// Allow profile pictures (small) but block story images, feed images, etc.
-			const isProfilePic =
-				url.includes("profile_pic") ||
-				url.includes("150x150") ||
-				url.includes("s150x150");
-			if (isProfilePic) {
-				return false;
-			}
+		// 2. Block tracking resources even from essential domains
+		if (this.isTrackingResource(url)) {
 			return true;
 		}
 
+		// 3. Block heavy resource types (images, videos, fonts) - this is where we save bandwidth!
+		if (BLOCKED_RESOURCE_TYPES.includes(resourceType)) {
+			// Allow small profile pictures (needed for UI)
+			const isProfilePic =
+				url.includes("profile_pic") ||
+				url.includes("150x150") ||
+				url.includes("s150x150") ||
+				url.includes("44x44") ||
+				url.includes("s44x44");
+			if (isProfilePic) {
+				return false;
+			}
+			// Block all other images, videos, media, fonts
+			return true;
+		}
+
+		// 4. Allow essential requests (documents, scripts, XHR, fetch) from Instagram
 		return false;
 	}
 
