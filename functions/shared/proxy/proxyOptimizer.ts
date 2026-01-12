@@ -129,7 +129,7 @@ export class ProxyOptimizer {
 			request.continue();
 		});
 
-		logger.info("PROXY_OPT", `Optimizer attached (blocking: ${this.blockResources})`);
+		logger.info("PROXY", `Optimizer attached (blocking: ${this.blockResources})`);
 	}
 
 	/**
@@ -224,11 +224,11 @@ export class ProxyOptimizer {
 		const stats = this.getStats();
 
 		logger.info(
-			"PROXY_OPT",
+			"PROXY",
 			`Session bandwidth: ${stats.estimatedMB.toFixed(2)}MB (${stats.requestCount} requests)`
 		);
 		logger.info(
-			"PROXY_OPT",
+			"PROXY",
 			`Blocked: ${stats.blockedCount} requests, saved ~${stats.savedMB.toFixed(2)}MB`
 		);
 
@@ -245,7 +245,7 @@ export class ProxyOptimizer {
 				},
 			});
 		} catch (error) {
-			logger.debug("PROXY_OPT", `Could not persist usage: ${error}`);
+			logger.debug("PROXY", `Could not persist usage: ${error}`);
 		}
 
 		return stats;

@@ -13,16 +13,14 @@
 
 import type { Browser, Page } from "puppeteer";
 import { initializeInstagramSession } from "../auth/sessionInitializer/sessionInitializer.ts";
+import type { ProxyOptimizer } from "../shared/proxy/proxyOptimizer.ts";
 import { SessionController } from "./sessionController.ts";
 import {
 	logSessionPlan,
 	recalculateSessions,
 	type SessionType,
 } from "./sessionPlanner.ts";
-import {
-	queueCount,
-	queueNext,
-} from "../shared/database/database.ts";
+import { queueCount, queueNext } from "../shared/database/database.ts";
 import {
 	batchEngagements,
 	EngagementTracker,
@@ -61,7 +59,7 @@ async function preValidateSession(profileId: string): Promise<{
 	reason?: string;
 }> {
 	const profile = await getProfileById(profileId);
-	
+
 	if (!profile) {
 		return { valid: false, reason: `Profile not found: ${profileId}` };
 	}
@@ -74,9 +72,12 @@ async function preValidateSession(profileId: string): Promise<{
 	// Check daily limits
 	const dailyGoal = profile.limits.dmsPerDay;
 	const dmsSentToday = profile.counters.dmsToday;
-	
+
 	if (dmsSentToday >= dailyGoal) {
-		return { valid: false, reason: `Daily DM limit reached: ${dmsSentToday}/${dailyGoal}` };
+		return {
+			valid: false,
+			reason: `Daily DM limit reached: ${dmsSentToday}/${dailyGoal}`,
+		};
 	}
 
 	// Check queue has seeds
@@ -91,7 +92,9 @@ async function preValidateSession(profileId: string): Promise<{
 /**
  * Run a session directly (called by NodeScheduler or manually)
  */
-export async function runSmartSessionDirect(args: SessionExecutorArgs): Promise<SessionResult> {
+export async function runSmartSessionDirect(
+	args: SessionExecutorArgs,
+): Promise<SessionResult> {
 	const { profileId, sessionType, dryRun = false } = args;
 	const startTime = Date.now();
 
@@ -133,9 +136,13 @@ export async function runSmartSessionDirect(args: SessionExecutorArgs): Promise<
 	const dailyGoal = profile.limits.dmsPerDay;
 	const dmsSentToday = profile.counters.dmsToday;
 
-	logger.info("SESSION", `Daily progress: ${dmsSentToday}/${dailyGoal} DMs sent`);
+	logger.info(
+		"SESSION",
+		`Daily progress: ${dmsSentToday}/${dailyGoal} DMs sent`,
+	);
 
-	const sessionNumber = sessionType === "morning" ? 1 : sessionType === "afternoon" ? 2 : 3;
+	const sessionNumber =
+		sessionType === "morning" ? 1 : sessionType === "afternoon" ? 2 : 3;
 	const plans = recalculateSessions(dailyGoal, dmsSentToday, sessionNumber - 1);
 	const plan = plans[0];
 
@@ -159,7 +166,7 @@ export async function runSmartSessionDirect(args: SessionExecutorArgs): Promise<
 
 	let browser: Browser | undefined;
 	let page: Page | undefined;
-	let requestCount = 0;
+	let proxyOptimizer: ProxyOptimizer | undefined;
 
 	try {
 		// Initialize Instagram session (this is where proxy connects)
@@ -173,11 +180,7 @@ export async function runSmartSessionDirect(args: SessionExecutorArgs): Promise<
 
 		browser = session.browser;
 		page = session.page;
-
-		// Track network requests for bandwidth estimation
-		page.on("request", () => {
-			requestCount++;
-		});
+		proxyOptimizer = session.proxyOptimizer;
 
 		logger.info("SESSION", "✓ Session initialized");
 
@@ -187,7 +190,10 @@ export async function runSmartSessionDirect(args: SessionExecutorArgs): Promise<
 		logger.info("SESSION", "✓ Warm-up complete");
 
 		// Main discovery loop
-		logger.info("SESSION", `Starting discovery loop (target: ${plan.targetDMs} DMs)`);
+		logger.info(
+			"SESSION",
+			`Starting discovery loop (target: ${plan.targetDMs} DMs)`,
+		);
 
 		// Import processFollowingList dynamically to avoid circular deps
 		const { processFollowingList } = await import("../../scripts/scrape.ts");
@@ -214,7 +220,8 @@ export async function runSmartSessionDirect(args: SessionExecutorArgs): Promise<
 				await processFollowingList(seed, page, metricsTracker, !dryRun);
 
 				// Update controller stats
-				const currentDMs = (await getProfileById(profileId))?.counters.dmsToday || 0;
+				const currentDMs =
+					(await getProfileById(profileId))?.counters.dmsToday || 0;
 				const dmsThisSession = currentDMs - dmsSentToday;
 
 				while (controller.getStats().dmsSent < dmsThisSession) {
@@ -231,7 +238,7 @@ export async function runSmartSessionDirect(args: SessionExecutorArgs): Promise<
 			const stats = controller.getStats();
 			logger.info(
 				"SESSION",
-				`Progress: ${stats.dmsSent}/${plan.targetDMs} DMs, ${stats.profilesChecked} profiles, ${stats.elapsedMinutes.toFixed(1)} min`
+				`Progress: ${stats.dmsSent}/${plan.targetDMs} DMs, ${stats.profilesChecked} profiles, ${stats.elapsedMinutes.toFixed(1)} min`,
 			);
 
 			engagementTracker.recordOutbound("dm");
@@ -252,8 +259,16 @@ export async function runSmartSessionDirect(args: SessionExecutorArgs): Promise<
 		const durationMinutes = (Date.now() - startTime) / 60000;
 		const finalStats = controller.getStats();
 
-		// Estimate bandwidth (rough: ~50KB per request average for Instagram)
-		const bandwidthMB = (requestCount * 50) / 1024;
+		// Finalize proxy optimizer and get actual bandwidth stats
+		let bandwidthMB = 0;
+		if (proxyOptimizer) {
+			const proxyStats = await proxyOptimizer.finalize();
+			bandwidthMB = proxyStats.estimatedMB;
+			logger.info(
+				"SESSION",
+				`📊 Bandwidth: ${proxyStats.estimatedMB.toFixed(1)}MB used, ${proxyStats.savedMB.toFixed(1)}MB saved (${proxyStats.blockedCount} blocked)`,
+			);
+		}
 
 		await updateRun(runId, {
 			status: "completed",
@@ -262,7 +277,6 @@ export async function runSmartSessionDirect(args: SessionExecutorArgs): Promise<
 		});
 
 		logger.info("SESSION", `✓ Session completed successfully`);
-		logger.info("SESSION", `📊 Estimated bandwidth: ~${bandwidthMB.toFixed(1)} MB (${requestCount} requests)`);
 
 		return {
 			success: true,
@@ -274,7 +288,7 @@ export async function runSmartSessionDirect(args: SessionExecutorArgs): Promise<
 	} catch (error) {
 		const errorMessage = error instanceof Error ? error.message : String(error);
 		logger.error("SESSION", `Session failed: ${errorMessage}`);
-		
+
 		await updateRun(runId, {
 			status: "error",
 			errorMessage,
@@ -288,6 +302,15 @@ export async function runSmartSessionDirect(args: SessionExecutorArgs): Promise<
 			error: errorMessage,
 		};
 	} finally {
+		// Finalize proxy optimizer if not already done (e.g., on error)
+		if (proxyOptimizer) {
+			try {
+				await proxyOptimizer.finalize();
+			} catch {
+				// Ignore finalization errors during cleanup
+			}
+		}
+
 		if (browser) {
 			await browser.close();
 			logger.info("SESSION", "Browser closed");

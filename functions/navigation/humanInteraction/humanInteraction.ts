@@ -398,7 +398,7 @@ export async function humanScroll(
 	);
 
 	const timeoutPromise = new Promise<void>((_, reject) =>
-		setTimeout(() => reject(new Error("Scroll timeout")), timeout)
+		setTimeout(() => reject(new Error("Scroll timeout")), timeout),
 	);
 
 	try {

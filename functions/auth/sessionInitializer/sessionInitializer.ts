@@ -12,6 +12,10 @@ import { createBrowser, createPage } from "../../navigation/browser/browser.ts";
 import { IG_PASS, IG_USER } from "../../shared/config/config.ts";
 import { createLogger, type Logger } from "../../shared/logger/logger.ts";
 import {
+	createProductionOptimizer,
+	type ProxyOptimizer,
+} from "../../shared/proxy/proxyOptimizer.ts";
+import {
 	detectIfOnInstagramLogin,
 	waitForInstagramContent,
 } from "../../shared/waitForContent/waitForContent.ts";
@@ -69,12 +73,24 @@ export interface SessionOptions {
 	 * Profile ID for tracking (for multi-profile automation)
 	 */
 	profileId?: string;
+
+	/**
+	 * Block unnecessary resources to save proxy bandwidth
+	 * Blocks images, videos, fonts, and tracking pixels
+	 * @default true in production
+	 */
+	blockResources?: boolean;
 }
 
 export interface SessionResult {
 	browser: Browser;
 	page: Page;
 	logger: Logger;
+	/**
+	 * Proxy optimizer for bandwidth tracking and resource blocking
+	 * Call proxyOptimizer.finalize() at session end to persist stats
+	 */
+	proxyOptimizer?: ProxyOptimizer;
 }
 
 /**
@@ -125,6 +141,7 @@ export async function initializeInstagramSession(
 		loginOptions,
 		adsPowerProfileId,
 		profileId,
+		blockResources = true, // Enable bandwidth optimization by default
 	} = options;
 
 	// 1. Create logger
@@ -158,6 +175,20 @@ export async function initializeInstagramSession(
 		applyStealth: !adsPowerProfileId,
 	});
 	logger.info("SESSION", "✅ Page created successfully");
+
+	// 4. Attach proxy optimizer to save bandwidth (blocks images, videos, fonts, tracking)
+	let proxyOptimizer: ProxyOptimizer | undefined;
+	if (blockResources && profileId) {
+		const sessionId = `session_${Date.now()}`;
+		proxyOptimizer = createProductionOptimizer(profileId, sessionId);
+		await proxyOptimizer.attachToPage(page);
+		logger.info(
+			"SESSION",
+			"✅ Proxy optimizer attached (blocking unnecessary resources)",
+		);
+	} else if (blockResources) {
+		logger.warn("SESSION", "⚠️ Proxy optimizer skipped - no profileId provided");
+	}
 
 	try {
 		// 4. Navigate to Instagram with networkidle0 (proven to work with browserless)
@@ -193,7 +224,7 @@ export async function initializeInstagramSession(
 		if (skipLogin) {
 			logger.info("SESSION", "⚠️  Skipping login as requested");
 			logger.info("SESSION", "✅ Session initialization complete (no auth)");
-			return { browser, page, logger };
+			return { browser, page, logger, proxyOptimizer };
 		}
 
 		// 7. Check if already logged in (via cookies)
@@ -260,7 +291,7 @@ export async function initializeInstagramSession(
 			// No login form = we're logged in, trust AdsPower session
 			logger.info("SESSION", "✅ No login form found - trusting session");
 			logger.info("SESSION", "🎉 Instagram session initialized successfully");
-			return { browser, page, logger };
+			return { browser, page, logger, proxyOptimizer };
 		}
 
 		const alreadyLoggedIn = await isLoggedIn(page);
@@ -295,7 +326,7 @@ export async function initializeInstagramSession(
 		logger.info("SESSION", "✅ Session verified and stable");
 
 		logger.info("SESSION", "🎉 Instagram session initialized successfully");
-		return { browser, page, logger };
+		return { browser, page, logger, proxyOptimizer };
 	} catch (error) {
 		logger.error("SESSION", `❌ Session initialization failed: ${error}`);
 		logger.warn(
