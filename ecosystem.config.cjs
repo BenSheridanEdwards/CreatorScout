@@ -13,13 +13,14 @@ module.exports = {
 		{
 			name: "adspower",
 			script: "/opt/AdsPower Global/adspower_global",
-			args: "--no-sandbox",
+			args: "--no-sandbox --disable-gpu",
 			instances: 1,
 			autorestart: true,
 			watch: false,
 			max_memory_restart: "1G",
 			env: {
 				DISPLAY: ":99",
+				HEADLESS: "1"
 			},
 			error_file: "logs/adspower-error.log",
 			out_file: "logs/adspower-out.log",
