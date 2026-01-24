@@ -43,6 +43,7 @@ module.exports = {
 				NODE_ENV: "production",
 				SCHEDULER_ENABLED: "true",
 				SCHEDULER_TIMEZONE: "Europe/London",
+				DISPLAY: ":99",
 			},
 			error_file: "logs/pm2-error.log",
 			out_file: "logs/pm2-out.log",
