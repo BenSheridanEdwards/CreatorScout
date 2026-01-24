@@ -18,6 +18,13 @@ import { getPrismaClient } from "../shared/database/database.ts";
 import { createLogger } from "../shared/logger/logger.ts";
 import { getActiveProfiles } from "../shared/profiles/profileManager.ts";
 import type { ProfileConfig } from "../shared/profiles/profileConfig.ts";
+import {
+	checkAdsPower,
+	checkDisplay,
+	filterCatchUpSessions,
+	getCompletedSessionsToday,
+	runPreflightChecks,
+} from "./preflightChecks.ts";
 
 const logger = createLogger();
 
@@ -60,7 +67,7 @@ const DEFAULT_CONFIG: SchedulerConfig = {
 	maxRetries: 2,
 	retryDelayMinutes: 30,
 	retryJitterMinutes: 5, // Add 0-5 min random jitter on retries
-	catchUpMissedSessions: true,
+	catchUpMissedSessions: false,
 	proxyWarmupMinutes: 2,
 	checkIntervalMinutes: 5, // Poll every 5 min, not every minute
 };
@@ -92,6 +99,16 @@ export class NodeScheduler {
 			"SCHEDULER",
 			`Starting Node scheduler (TZ: ${this.config.timezone})`,
 		);
+
+		// Run pre-flight checks before starting
+		const preflightOk = await this.runStartupChecks();
+		if (!preflightOk) {
+			logger.warn(
+				"SCHEDULER",
+				"Pre-flight checks failed - scheduler will start but sessions may fail",
+			);
+		}
+
 		this.isRunning = true;
 
 		// Load persisted jobs from database
@@ -100,7 +117,7 @@ export class NodeScheduler {
 		// Generate today's schedule if needed
 		await this.generateDailySchedule();
 
-		// Check for missed sessions to catch up
+		// Check for missed sessions to catch up (with smart filtering)
 		if (this.config.catchUpMissedSessions) {
 			await this.checkMissedSessions();
 		}
@@ -118,6 +135,32 @@ export class NodeScheduler {
 			"SCHEDULER",
 			`Scheduler started (polling every ${this.config.checkIntervalMinutes} min)`,
 		);
+	}
+
+	/**
+	 * Run startup checks for AdsPower and display
+	 */
+	private async runStartupChecks(): Promise<boolean> {
+		logger.info("SCHEDULER", "Running startup pre-flight checks...");
+
+		const [adspowerResult, displayResult] = await Promise.all([
+			checkAdsPower(),
+			Promise.resolve(checkDisplay()),
+		]);
+
+		if (!adspowerResult.ok) {
+			logger.error("SCHEDULER", `❌ ${adspowerResult.message}`);
+		} else {
+			logger.info("SCHEDULER", `✓ ${adspowerResult.message}`);
+		}
+
+		if (!displayResult.ok) {
+			logger.error("SCHEDULER", `❌ ${displayResult.message}`);
+		} else {
+			logger.info("SCHEDULER", `✓ ${displayResult.message}`);
+		}
+
+		return adspowerResult.ok && displayResult.ok;
 	}
 
 	/**
@@ -307,6 +350,51 @@ export class NodeScheduler {
 			`Running job ${job.id}${mode} (attempt ${job.attempts + 1})`,
 		);
 
+		// Run pre-flight checks before starting
+		const preflight = await runPreflightChecks(job.profileId);
+		if (!preflight.ready) {
+			logger.warn(
+				"SCHEDULER",
+				`Pre-flight failed for ${job.id}: ${preflight.reason}`,
+			);
+
+			// If daily goal reached, mark as skipped instead of failed
+			if (!preflight.checks.dailyProgress.ok) {
+				job.status = "skipped";
+				job.error = preflight.reason;
+				job._dirty = true;
+				await this.flushDirtyJob(job);
+				logger.info("SCHEDULER", `Job ${job.id} skipped (daily goal reached)`);
+				return;
+			}
+
+			// For AdsPower/display failures, treat as temporary failure and retry later
+			if (!preflight.checks.adspower.ok || !preflight.checks.display.ok) {
+				job.attempts++;
+				job.lastAttemptAt = new Date();
+				job.error = preflight.reason;
+				job._dirty = true;
+
+				if (job.attempts < this.config.maxRetries + 1) {
+					// Schedule retry in 5 minutes
+					job.scheduledTime = new Date(Date.now() + 5 * 60 * 1000);
+					await this.flushDirtyJob(job);
+					logger.info(
+						"SCHEDULER",
+						`Job ${job.id} will retry at ${job.scheduledTime.toISOString()}`,
+					);
+				} else {
+					job.status = "failed";
+					await this.flushDirtyJob(job);
+					logger.error(
+						"SCHEDULER",
+						`Job ${job.id} failed: ${preflight.reason}`,
+					);
+				}
+				return;
+			}
+		}
+
 		const prevStatus = job.status;
 		job.status = "running";
 		job.attempts++;
@@ -370,6 +458,12 @@ export class NodeScheduler {
 
 	/**
 	 * Check for missed sessions that should have run today
+	 *
+	 * This is SMART about catch-ups:
+	 * - Checks how many DMs have already been sent today
+	 * - Only catches up sessions that are actually needed
+	 * - Respects time-of-day windows (no morning sessions at 8pm)
+	 * - Skips catch-up if daily goal is nearly reached
 	 */
 	private async checkMissedSessions(): Promise<void> {
 		const now = new Date();
@@ -384,25 +478,71 @@ export class NodeScheduler {
 		);
 
 		if (missedJobs.length === 0) {
+			logger.info("SCHEDULER", "No missed sessions to catch up");
 			return;
 		}
 
 		logger.info(
 			"SCHEDULER",
-			`Found ${missedJobs.length} missed sessions to catch up`,
+			`Found ${missedJobs.length} potentially missed sessions - checking daily progress...`,
 		);
 
-		// Stagger catch-up sessions by 10 minutes each
-		for (let i = 0; i < missedJobs.length; i++) {
-			const job = missedJobs[i];
-			job.scheduledTime = new Date(now.getTime() + i * 10 * 60 * 1000);
-			job._dirty = true;
-			await this.flushDirtyJob(job);
-			logger.info(
-				"SCHEDULER",
-				`Rescheduled missed job ${job.id} to ${job.scheduledTime.toISOString()}`,
-			);
+		// Group missed jobs by profile
+		const jobsByProfile = new Map<string, ScheduledJob[]>();
+		for (const job of missedJobs) {
+			const existing = jobsByProfile.get(job.profileId) || [];
+			existing.push(job);
+			jobsByProfile.set(job.profileId, existing);
 		}
+
+		// For each profile, determine which sessions actually need catching up
+		let rescheduledCount = 0;
+		let skippedCount = 0;
+
+		for (const [profileId, jobs] of jobsByProfile) {
+			// Get which sessions were missed
+			const missedTypes = jobs.map((j) => j.sessionType);
+
+			// Smart filter: which sessions should actually be run?
+			const sessionsToRun = await filterCatchUpSessions(profileId, missedTypes);
+
+			// Mark sessions that shouldn't be caught up as skipped
+			for (const job of jobs) {
+				if (!sessionsToRun.includes(job.sessionType)) {
+					job.status = "skipped";
+					job.error = "Skipped: daily progress or time window";
+					job._dirty = true;
+					await this.flushDirtyJob(job);
+					skippedCount++;
+					logger.info(
+						"SCHEDULER",
+						`Skipped catch-up for ${job.id} (not needed based on daily progress)`,
+					);
+				}
+			}
+
+			// Stagger the sessions that should actually run
+			const jobsToRun = jobs.filter((j) =>
+				sessionsToRun.includes(j.sessionType),
+			);
+			for (let i = 0; i < jobsToRun.length; i++) {
+				const job = jobsToRun[i];
+				// Stagger by 15 minutes to allow sessions to complete
+				job.scheduledTime = new Date(now.getTime() + i * 15 * 60 * 1000);
+				job._dirty = true;
+				await this.flushDirtyJob(job);
+				rescheduledCount++;
+				logger.info(
+					"SCHEDULER",
+					`Rescheduled ${job.id} to ${job.scheduledTime.toISOString()}`,
+				);
+			}
+		}
+
+		logger.info(
+			"SCHEDULER",
+			`Catch-up summary: ${rescheduledCount} rescheduled, ${skippedCount} skipped`,
+		);
 	}
 
 	/**

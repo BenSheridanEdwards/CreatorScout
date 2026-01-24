@@ -19,7 +19,7 @@ module.exports = {
 			watch: false,
 			max_memory_restart: "1G",
 			env: {
-				DISPLAY: ":1",
+				DISPLAY: ":99",
 			},
 			error_file: "logs/adspower-error.log",
 			out_file: "logs/adspower-out.log",
