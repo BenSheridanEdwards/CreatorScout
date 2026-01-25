@@ -228,7 +228,7 @@ async function handleApi(
 				"./functions/scheduling/nodeScheduler.ts"
 			);
 			const scheduler = getNodeScheduler();
-			const status = scheduler.getStatus();
+			const status = await scheduler.getStatus();
 			const todayJobs = scheduler.getTodayJobs();
 			sendJson(res, 200, { ...status, todayJobs });
 		} catch (error) {
@@ -248,7 +248,7 @@ async function handleApi(
 			);
 			const scheduler = getNodeScheduler();
 			await scheduler.generateDailySchedule();
-			const status = scheduler.getStatus();
+			const status = await scheduler.getStatus();
 			const todayJobs = scheduler.getTodayJobs();
 			sendJson(res, 200, {
 				success: true,

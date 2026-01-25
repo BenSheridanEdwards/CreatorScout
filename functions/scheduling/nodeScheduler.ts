@@ -679,15 +679,16 @@ export class NodeScheduler {
 
 	/**
 	 * Get scheduler status
+	 * Checks both in-memory queue and database for accurate counts
 	 */
-	getStatus(): {
+	async getStatus(): Promise<{
 		isRunning: boolean;
 		pendingJobs: number;
 		runningJobs: number;
 		completedToday: number;
 		failedToday: number;
 		nextJob: ScheduledJob | null;
-	} {
+	}> {
 		const today = this.getDateInTimezone();
 		const todayJobs = this.jobQueue.filter((j) =>
 			this.isSameDay(j.scheduledTime, today),
@@ -696,6 +697,34 @@ export class NodeScheduler {
 		const pending = todayJobs.filter((j) => j.status === "pending");
 		const completed = todayJobs.filter((j) => j.status === "completed");
 		const failed = todayJobs.filter((j) => j.status === "failed");
+
+		// Also check database for accurate counts (in case in-memory queue is out of sync)
+		let dbCompletedToday = completed.length;
+		let dbFailedToday = failed.length;
+		try {
+			const prisma = getPrismaClient();
+			const todayStart = new Date(today);
+			todayStart.setHours(0, 0, 0, 0);
+			// @ts-expect-error - ScheduledJob table exists
+			const dbCompleted = await prisma.scheduledJob.count({
+				where: {
+					scheduledTime: { gte: todayStart },
+					status: "completed",
+				},
+			});
+			// @ts-expect-error - ScheduledJob table exists
+			const dbFailed = await prisma.scheduledJob.count({
+				where: {
+					scheduledTime: { gte: todayStart },
+					status: "failed",
+				},
+			});
+			// Use database counts if they're higher (more accurate)
+			dbCompletedToday = Math.max(completed.length, dbCompleted);
+			dbFailedToday = Math.max(failed.length, dbFailed);
+		} catch {
+			// If DB check fails, use in-memory counts
+		}
 
 		// Find next pending job
 		const nextJob =
@@ -707,8 +736,8 @@ export class NodeScheduler {
 			isRunning: this.isRunning,
 			pendingJobs: pending.length,
 			runningJobs: this.runningJobs.size,
-			completedToday: completed.length,
-			failedToday: failed.length,
+			completedToday: dbCompletedToday,
+			failedToday: dbFailedToday,
 			nextJob,
 		};
 	}

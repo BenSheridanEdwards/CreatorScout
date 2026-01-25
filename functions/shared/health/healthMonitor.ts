@@ -82,7 +82,7 @@ export async function checkHealth(): Promise<HealthStatus> {
 	}
 
 	// Check scheduler
-	const schedulerCheck = checkScheduler();
+	const schedulerCheck = await checkScheduler();
 	if (schedulerCheck.status === "error") {
 		alerts.push({
 			level: "error",

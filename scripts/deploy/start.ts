@@ -94,7 +94,7 @@ async function main() {
 			const { getNodeScheduler } = await import(
 				"../../functions/scheduling/nodeScheduler.ts"
 			);
-			const status = getNodeScheduler().getStatus();
+			const status = await getNodeScheduler().getStatus();
 			if (status.nextJob) {
 				logger.info(
 					"STARTUP",
@@ -144,7 +144,7 @@ async function main() {
 					"../../functions/scheduling/nodeScheduler.ts"
 				);
 				const scheduler = getNodeScheduler();
-				const status = scheduler.getStatus();
+				const status = await scheduler.getStatus();
 
 				if (status.runningJobs > 0) {
 					logger.info("STARTUP", `Waiting for ${status.runningJobs} running job(s)...`);
