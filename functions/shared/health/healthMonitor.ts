@@ -269,6 +269,7 @@ function checkScheduler(): CheckResult {
 
 /**
  * Check session health
+ * Checks both scheduledJob table AND runs to get accurate session status
  */
 async function checkSessions(): Promise<CheckResult> {
 	try {
@@ -276,6 +277,27 @@ async function checkSessions(): Promise<CheckResult> {
 		const now = new Date();
 		const today = new Date(now);
 		today.setHours(0, 0, 0, 0);
+
+		// Check completed sessions today from scheduledJob table
+		const completedJobsToday = await prisma.scheduledJob.count({
+			where: {
+				scheduledTime: { gte: today },
+				status: "completed",
+			},
+		});
+
+		// Also check runs table for completed sessions today (in case scheduledJob isn't updated)
+		const { getAllRuns } = await import("../runs/runs.ts");
+		const allRuns = await getAllRuns();
+		const completedRunsToday = allRuns.filter(
+			(run) =>
+				run.status === "completed" &&
+				run.endTime &&
+				new Date(run.endTime) >= today,
+		).length;
+
+		// Use the higher of the two counts (they should match, but runs is more reliable)
+		const completedToday = Math.max(completedJobsToday, completedRunsToday);
 
 		// Check for failed jobs today
 		const failedJobs = await prisma.scheduledJob.count({
@@ -285,45 +307,93 @@ async function checkSessions(): Promise<CheckResult> {
 			},
 		});
 
-		if (failedJobs > 0) {
+		// Also check runs for failed/error status
+		const failedRunsToday = allRuns.filter(
+			(run) =>
+				(run.status === "error" || run.status === "failed") &&
+				run.endTime &&
+				new Date(run.endTime) >= today,
+		).length;
+
+		const totalFailed = Math.max(failedJobs, failedRunsToday);
+
+		// If we have completed sessions today, we're good (unless there are failures)
+		if (completedToday > 0) {
+			if (totalFailed > 0) {
+				return {
+					status: "warning",
+					message: `${completedToday} session(s) completed today, but ${totalFailed} failed`,
+					details: { completedToday, failedJobs: totalFailed },
+				};
+			}
 			return {
-				status: "warning",
-				message: `${failedJobs} session(s) failed today`,
-				details: { failedJobs },
+				status: "ok",
+				message: `${completedToday} session(s) completed today`,
+				details: { completedToday, failedJobs: totalFailed },
 			};
 		}
 
-		// Check hours since last completed session
-		const lastSession = await prisma.scheduledJob.findFirst({
+		// No sessions completed today - check hours since last completed session
+		// Check both scheduledJob and runs
+		const lastScheduledJob = await prisma.scheduledJob.findFirst({
 			where: { status: "completed" },
 			orderBy: { completedAt: "desc" },
 		});
 
-		if (lastSession?.completedAt) {
-			const hoursSinceLastSession =
-				(now.getTime() - lastSession.completedAt.getTime()) / (60 * 60 * 1000);
+		const lastCompletedRun = allRuns
+			.filter((r) => r.status === "completed" && r.endTime)
+			.sort((a, b) => new Date(b.endTime!).getTime() - new Date(a.endTime!).getTime())[0];
 
-			if (hoursSinceLastSession > 8) {
-				return {
-					status: "warning",
-					message: `No sessions completed in ${hoursSinceLastSession.toFixed(1)} hours`,
-					details: { hoursSinceLastSession, lastSession: lastSession.completedAt },
-				};
+		// Use the most recent of the two
+		let lastSessionTime: Date | null = null;
+		if (lastScheduledJob?.completedAt) {
+			lastSessionTime = lastScheduledJob.completedAt;
+		}
+		if (lastCompletedRun?.endTime) {
+			const runTime = new Date(lastCompletedRun.endTime);
+			if (!lastSessionTime || runTime > lastSessionTime) {
+				lastSessionTime = runTime;
 			}
 		}
 
-		// Check completed sessions today
-		const completedToday = await prisma.scheduledJob.count({
-			where: {
-				scheduledTime: { gte: today },
-				status: "completed",
-			},
-		});
+		if (lastSessionTime) {
+			const hoursSinceLastSession =
+				(now.getTime() - lastSessionTime.getTime()) / (60 * 60 * 1000);
 
+			// Only warn if it's been > 8 hours AND no sessions completed today
+			if (hoursSinceLastSession > 8) {
+				return {
+					status: "warning",
+					message: `No sessions completed today (last: ${hoursSinceLastSession.toFixed(1)} hours ago)`,
+					details: {
+						hoursSinceLastSession,
+						lastSession: lastSessionTime,
+						completedToday: 0,
+					},
+				};
+			}
+		} else {
+			// No completed sessions ever
+			return {
+				status: "warning",
+				message: "No sessions completed yet",
+				details: { completedToday: 0, failedJobs: totalFailed },
+			};
+		}
+
+		// If we get here, last session was recent (< 8 hours) but none today
+		// This is OK if we're early in the day
+		const hoursSince = lastSessionTime
+			? ((now.getTime() - lastSessionTime.getTime()) / (60 * 60 * 1000)).toFixed(1)
+			: "N/A";
 		return {
 			status: "ok",
-			message: `${completedToday} session(s) completed today`,
-			details: { completedToday, failedJobs },
+			message: `No sessions completed today yet (last: ${hoursSince} hours ago)`,
+			details: {
+				completedToday: 0,
+				failedJobs: totalFailed,
+				lastSession: lastSessionTime,
+			},
 		};
 	} catch (error) {
 		return {
