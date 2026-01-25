@@ -240,6 +240,31 @@ async function handleApi(
 		return;
 	}
 
+	// Trigger manual schedule generation endpoint
+	if (req.method === "POST" && url.pathname === "/api/scheduler/generate") {
+		try {
+			const { getNodeScheduler } = await import(
+				"./functions/scheduling/nodeScheduler.ts"
+			);
+			const scheduler = getNodeScheduler();
+			await scheduler.generateDailySchedule();
+			const status = scheduler.getStatus();
+			const todayJobs = scheduler.getTodayJobs();
+			sendJson(res, 200, {
+				success: true,
+				message: `Generated schedule: ${todayJobs.length} jobs for today`,
+				jobs: todayJobs.length,
+				nextJob: status.nextJob,
+			});
+		} catch (error) {
+			sendJson(res, 500, {
+				error: "Failed to generate schedule",
+				details: String(error),
+			});
+		}
+		return;
+	}
+
 	// Trigger manual session endpoint
 	if (req.method === "POST" && url.pathname === "/api/scheduler/run") {
 		let body = "";

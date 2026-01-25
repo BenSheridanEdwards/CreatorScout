@@ -15,6 +15,8 @@ import { getPrismaClient } from "../database/database.ts";
 import { createLogger } from "../logger/logger.ts";
 import { getNodeScheduler } from "../../scheduling/nodeScheduler.ts";
 import { estimateMonthlyProxyCost, getTodayProxyUsage } from "../proxy/proxyOptimizer.ts";
+import { checkAdsPower, checkDisplay } from "../../scheduling/preflightChecks.ts";
+import { ADSPOWER_API_KEY, LOCAL_BROWSER } from "../config/config.ts";
 
 const logger = createLogger();
 
@@ -27,8 +29,22 @@ export interface HealthStatus {
 		scheduler: CheckResult;
 		sessions: CheckResult;
 		proxy: CheckResult;
+		adspower?: CheckResult;
+		display?: CheckResult;
+		system?: CheckResult;
 	};
 	alerts: Alert[];
+	systemInfo?: {
+		platform: string;
+		nodeVersion: string;
+		memoryUsage: {
+			used: number;
+			total: number;
+			percentage: number;
+		};
+		display?: string;
+		browserProvider?: string;
+	};
 }
 
 export interface CheckResult {
@@ -95,6 +111,62 @@ export async function checkHealth(): Promise<HealthStatus> {
 		});
 	}
 
+	// Check AdsPower (if configured)
+	let adspowerCheck: CheckResult | undefined;
+	if (ADSPOWER_API_KEY) {
+		try {
+			const adspowerResult = await checkAdsPower();
+			adspowerCheck = {
+				status: adspowerResult.ok ? "ok" : "error",
+				message: adspowerResult.message,
+			};
+			if (!adspowerResult.ok) {
+				alerts.push({
+					level: "error",
+					message: `AdsPower: ${adspowerResult.message}`,
+					timestamp: new Date().toISOString(),
+				});
+			}
+		} catch (error) {
+			adspowerCheck = {
+				status: "error",
+				message: `AdsPower check failed: ${error}`,
+			};
+			alerts.push({
+				level: "error",
+				message: `AdsPower check failed: ${error}`,
+				timestamp: new Date().toISOString(),
+			});
+		}
+	}
+
+	// Check display
+	const displayResult = checkDisplay();
+	const displayCheck: CheckResult = {
+		status: displayResult.ok ? "ok" : "warning",
+		message: displayResult.message,
+	};
+	if (!displayResult.ok) {
+		alerts.push({
+			level: "warning",
+			message: `Display: ${displayResult.message}`,
+			timestamp: new Date().toISOString(),
+		});
+	}
+
+	// System info
+	const memUsage = process.memoryUsage();
+	const systemCheck: CheckResult = {
+		status: "ok",
+		message: `Memory: ${(memUsage.heapUsed / 1024 / 1024).toFixed(1)}MB / ${(memUsage.heapTotal / 1024 / 1024).toFixed(1)}MB`,
+		details: {
+			heapUsed: memUsage.heapUsed,
+			heapTotal: memUsage.heapTotal,
+			rss: memUsage.rss,
+			external: memUsage.external,
+		},
+	};
+
 	// Store new alerts
 	for (const alert of alerts) {
 		alertHistory.push(alert);
@@ -108,7 +180,16 @@ export async function checkHealth(): Promise<HealthStatus> {
 	const healthy =
 		dbCheck.status === "ok" &&
 		schedulerCheck.status === "ok" &&
-		sessionCheck.status !== "error";
+		sessionCheck.status !== "error" &&
+		(!adspowerCheck || adspowerCheck.status === "ok");
+
+	// Determine browser provider
+	let browserProvider = "unknown";
+	if (LOCAL_BROWSER) {
+		browserProvider = "local";
+	} else if (ADSPOWER_API_KEY) {
+		browserProvider = "adspower";
+	}
 
 	return {
 		healthy,
@@ -119,8 +200,22 @@ export async function checkHealth(): Promise<HealthStatus> {
 			scheduler: schedulerCheck,
 			sessions: sessionCheck,
 			proxy: proxyCheck,
+			adspower: adspowerCheck,
+			display: displayCheck,
+			system: systemCheck,
 		},
 		alerts,
+		systemInfo: {
+			platform: process.platform,
+			nodeVersion: process.version,
+			memoryUsage: {
+				used: memUsage.heapUsed,
+				total: memUsage.heapTotal,
+				percentage: Math.round((memUsage.heapUsed / memUsage.heapTotal) * 100),
+			},
+			display: process.env.DISPLAY || undefined,
+			browserProvider,
+		},
 	};
 }
 

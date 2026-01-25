@@ -191,6 +191,7 @@ export class NodeScheduler {
 
 	/**
 	 * Generate daily schedule for all active profiles
+	 * Public method - can be called manually to regenerate schedule
 	 */
 	async generateDailySchedule(): Promise<void> {
 		const profiles = await getActiveProfiles();
@@ -225,6 +226,7 @@ export class NodeScheduler {
 		date: Date,
 	): Promise<void> {
 		const sessionTypes: SessionType[] = ["morning", "afternoon", "evening"];
+		const now = new Date();
 
 		for (const sessionType of sessionTypes) {
 			// Check if we already have this job scheduled
@@ -235,8 +237,20 @@ export class NodeScheduler {
 					this.isSameDay(j.scheduledTime, date),
 			);
 
+			// Only skip if job exists AND is still pending/future
+			// If job is completed/failed or in the past, regenerate it
 			if (existingJob) {
-				continue; // Already scheduled
+				const isStillValid =
+					existingJob.status === "pending" &&
+					existingJob.scheduledTime > now;
+				if (isStillValid) {
+					continue; // Already scheduled and valid
+				}
+				// Remove invalid/old job
+				const index = this.jobQueue.indexOf(existingJob);
+				if (index > -1) {
+					this.jobQueue.splice(index, 1);
+				}
 			}
 
 			// Generate scheduled time with variance
@@ -708,6 +722,7 @@ export class NodeScheduler {
 			.filter((j) => this.isSameDay(j.scheduledTime, today))
 			.sort((a, b) => a.scheduledTime.getTime() - b.scheduledTime.getTime());
 	}
+
 
 	/**
 	 * Force run a specific job now (for testing/manual triggers)

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import AccountFilter from "./components/AccountFilter/AccountFilter";
 import CreatorsTable from "./components/CreatorsTable/CreatorsTable";
+import HealthCheck from "./components/HealthCheck/HealthCheck";
 import RunDetailsModal from "./components/RunDetailsModal/RunDetailsModal";
 import ScreenshotModal from "./components/ScreenshotModal/ScreenshotModal";
 import Screenshots from "./components/Screenshots/Screenshots";
@@ -32,7 +33,7 @@ function App() {
 				);
 				return;
 			}
-			const data = (await res.json()) as { entries?: any[] };
+			const data = (await res.json()) as { entries?: unknown[] };
 			// eslint-disable-next-line no-console
 			console.log("[Scout Studio] Logs loaded:", data.entries?.length ?? 0);
 		} catch {
@@ -66,6 +67,8 @@ function App() {
 			</header>
 
 			<main className="flex-1 grid grid-cols-1 gap-6 p-6">
+				<HealthCheck />
+
 				<StatsCards />
 
 				<CreatorsTable />
