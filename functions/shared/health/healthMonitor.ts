@@ -241,10 +241,10 @@ async function checkDatabase(): Promise<CheckResult> {
 /**
  * Check scheduler status
  */
-function checkScheduler(): CheckResult {
+async function checkScheduler(): Promise<CheckResult> {
 	try {
 		const scheduler = getNodeScheduler();
-		const status = scheduler.getStatus();
+		const status = await scheduler.getStatus();
 
 		if (!status.isRunning) {
 			return {
