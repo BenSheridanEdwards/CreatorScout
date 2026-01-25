@@ -578,7 +578,51 @@ async function handleApi(
 	if (url.pathname === "/api/runs" && req.method === "GET") {
 		try {
 			const runs = await getAllRuns();
-			sendJson(res, 200, runs);
+			
+			// Enrich runs with database metrics if stats are missing
+			const prisma = getPrismaClient();
+			const enrichedRuns = await Promise.all(
+				runs.map(async (run) => {
+					// If run already has complete stats, return as-is
+					if (
+						run.profilesProcessed > 0 ||
+						(run.dmsSent !== undefined && run.profilesChecked !== undefined)
+					) {
+						return run;
+					}
+
+					// Try to find metrics for this run by sessionId (run.id)
+					try {
+						// @ts-expect-error - Metric table exists
+						const metrics = await prisma.metric.findMany({
+							where: {
+								sessionId: run.id,
+							},
+							orderBy: {
+								createdAt: "desc",
+							},
+							take: 1,
+						});
+
+						if (metrics.length > 0) {
+							const metric = metrics[0];
+							return {
+								...run,
+								profilesProcessed: metric.profilesVisited || run.profilesProcessed || 0,
+								creatorsFound: metric.creatorsFound || run.creatorsFound || 0,
+								dmsSent: metric.dmsSent || run.dmsSent || 0,
+								profilesChecked: metric.profilesVisited || run.profilesChecked || 0,
+							};
+						}
+					} catch {
+						// If metrics lookup fails, return run as-is
+					}
+
+					return run;
+				}),
+			);
+
+			sendJson(res, 200, enrichedRuns);
 		} catch {
 			sendJson(res, 500, { error: "Failed to load runs" });
 		}

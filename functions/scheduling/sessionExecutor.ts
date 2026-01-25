@@ -348,6 +348,8 @@ export async function runSmartSessionDirect(
 			status: "completed",
 			dmsSent: finalStats.dmsSent,
 			profilesChecked: finalStats.profilesChecked,
+			profilesProcessed: finalStats.profilesChecked, // Use profilesChecked as profilesProcessed
+			creatorsFound: finalStats.creatorsFound,
 		});
 
 		logger.info("SESSION", `✓ Session completed successfully`);
@@ -363,15 +365,20 @@ export async function runSmartSessionDirect(
 		const errorMessage = error instanceof Error ? error.message : String(error);
 		logger.error("SESSION", `Session failed: ${errorMessage}`);
 
+		const errorStats = controller.getStats();
 		await updateRun(runId, {
 			status: "error",
 			errorMessage,
+			dmsSent: errorStats.dmsSent,
+			profilesChecked: errorStats.profilesChecked,
+			profilesProcessed: errorStats.profilesChecked, // Use profilesChecked as profilesProcessed
+			creatorsFound: errorStats.creatorsFound,
 		});
 
 		return {
 			success: false,
-			dmsSent: controller.getStats().dmsSent,
-			profilesChecked: controller.getStats().profilesChecked,
+			dmsSent: errorStats.dmsSent,
+			profilesChecked: errorStats.profilesChecked,
 			durationMinutes: (Date.now() - startTime) / 60000,
 			error: errorMessage,
 		};
