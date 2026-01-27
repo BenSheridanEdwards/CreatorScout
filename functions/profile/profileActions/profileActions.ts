@@ -383,9 +383,9 @@ export async function addFollowingToQueue(
 
 	// Check if we've hit the soft cap
 	if (queueAddsThisCycle >= MAX_QUEUE_ADDS_PER_CYCLE) {
-		logger.info(
+		logger.warn(
 			"QUEUE",
-			`⚠️ Soft cap reached (${queueAddsThisCycle}/${MAX_QUEUE_ADDS_PER_CYCLE}) - skipping queue expansion`,
+			`⚠️ SOFT CAP REACHED: ${queueAddsThisCycle}/${MAX_QUEUE_ADDS_PER_CYCLE} queue adds this cycle - skipping queue expansion for @${_username} | This limits discovery - consider increasing MAX_QUEUE_ADDS_PER_CYCLE if needed`,
 		);
 		return 0;
 	}
@@ -402,9 +402,9 @@ export async function addFollowingToQueue(
 	for (const followingUsername of followingUsernames) {
 		// Respect soft cap mid-loop
 		if (queueAddsThisCycle >= MAX_QUEUE_ADDS_PER_CYCLE) {
-			logger.info(
+			logger.warn(
 				"QUEUE",
-				`⚠️ Soft cap hit mid-expansion (${queueAddsThisCycle}/${MAX_QUEUE_ADDS_PER_CYCLE})`,
+				`⚠️ SOFT CAP HIT MID-EXPANSION: ${queueAddsThisCycle}/${MAX_QUEUE_ADDS_PER_CYCLE} queue adds - stopping expansion for @${_username} | Added ${added} so far, stopping before adding @${followingUsername}`,
 			);
 			break;
 		}

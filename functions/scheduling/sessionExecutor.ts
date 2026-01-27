@@ -260,24 +260,35 @@ export async function runSmartSessionDirect(
 		const { processFollowingList } = await import("../../scripts/scrape.ts");
 
 		while (controller.shouldContinue()) {
+			const loopStartStats = controller.getStats();
+			logger.debug(
+				"SESSION",
+				`🔄 Loop iteration: ${loopStartStats.dmsSent}/${plan.targetDMs} DMs, ${loopStartStats.profilesChecked} profiles, ${loopStartStats.elapsedMinutes.toFixed(1)} min elapsed`,
+			);
+
 			// Check engagement ratio
 			if (!engagementTracker.canPerformOutbound()) {
 				const needed = engagementTracker.getRequiredEngagements();
-				logger.info("SESSION", `Performing ${needed} engagement actions...`);
+				logger.info("SESSION", `📊 Performing ${needed} engagement actions...`);
 				await batchEngagements(page, engagementTracker, needed);
 			}
 
 			// Get next seed from queue
 			const seed = await queueNext();
 			if (!seed) {
-				logger.info("SESSION", "Queue empty, ending session");
+				const stats = controller.getStats();
+				logger.warn(
+					"SESSION",
+					`⚠️ Queue empty, ending session | Final stats: ${stats.dmsSent} DMs, ${stats.profilesChecked} profiles, ${stats.creatorsFound} creators, ${stats.elapsedMinutes.toFixed(1)} min`,
+				);
 				break;
 			}
 
 			const queueSize = await queueCount();
-			logger.info("SESSION", `Processing seed: @${seed} (queue: ${queueSize})`);
+			logger.info("SESSION", `🌱 Processing seed: @${seed} (queue: ${queueSize} remaining)`);
 
 			try {
+				const beforeProcessing = controller.getStats();
 				// Pass controller.shouldContinue as the checkContinue function
 				// This avoids needing cycle tracking from scrape.ts
 				// Also pass a callback to track each profile processed and engagements
@@ -286,7 +297,16 @@ export async function runSmartSessionDirect(
 					page,
 					metricsTracker,
 					!dryRun,
-					() => controller.shouldContinue(),
+					() => {
+						const shouldContinue = controller.shouldContinue();
+						if (!shouldContinue) {
+							logger.info(
+								"SESSION",
+								`🛑 Processing interrupted: controller.shouldContinue() returned false`,
+							);
+						}
+						return shouldContinue;
+					},
 					(result) => {
 						controller.recordProfileChecked(result.wasCreator);
 						if (result.hadEngagement) {
@@ -294,6 +314,10 @@ export async function runSmartSessionDirect(
 						}
 					},
 				);
+
+				const afterProcessing = controller.getStats();
+				const profilesProcessed = afterProcessing.profilesChecked - beforeProcessing.profilesChecked;
+				const creatorsFound = afterProcessing.creatorsFound - beforeProcessing.creatorsFound;
 
 				// Update controller stats
 				const currentDMs =
@@ -303,20 +327,38 @@ export async function runSmartSessionDirect(
 				while (controller.getStats().dmsSent < dmsThisSession) {
 					controller.recordDM();
 				}
+
+				logger.info(
+					"SESSION",
+					`✅ Seed @${seed} processed: ${profilesProcessed} profiles, ${creatorsFound} creators found`,
+				);
 			} catch (error) {
-				logger.error("SESSION", `Failed to process seed @${seed}: ${error}`);
+				const errorMessage = error instanceof Error ? error.message : String(error);
+				logger.error(
+					"SESSION",
+					`❌ Failed to process seed @${seed}: ${errorMessage}`,
+				);
+				logger.error("SESSION", `Error stack: ${error instanceof Error ? error.stack : "N/A"}`);
 			}
 
 			// Log progress
 			const stats = controller.getStats();
 			logger.info(
 				"SESSION",
-				`Progress: ${stats.dmsSent}/${plan.targetDMs} DMs, ${stats.profilesChecked} profiles, ${stats.elapsedMinutes.toFixed(1)} min`,
+				`📊 Progress: ${stats.dmsSent}/${plan.targetDMs} DMs (target: ${plan.minAcceptable}-${plan.maxAcceptable}), ${stats.profilesChecked} profiles, ${stats.creatorsFound} creators, ${stats.elapsedMinutes.toFixed(1)} min`,
 			);
 
 			engagementTracker.recordOutbound("dm");
 			// Note: controller.recordEngagement() is now called per-profile via the callback
 		}
+
+		// Log why the loop ended
+		const finalStats = controller.getStats();
+		const shouldContinueResult = controller.shouldContinue();
+		logger.info(
+			"SESSION",
+			`🛑 Main loop ended | shouldContinue()=${shouldContinueResult} | Final: ${finalStats.dmsSent} DMs, ${finalStats.profilesChecked} profiles, ${finalStats.creatorsFound} creators, ${finalStats.elapsedMinutes.toFixed(1)} min`,
+		);
 
 		// Session complete
 		controller.logResults();

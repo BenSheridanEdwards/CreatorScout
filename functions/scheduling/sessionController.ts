@@ -84,21 +84,22 @@ export class SessionController {
 		const elapsed = (Date.now() - this.startTime) / 60000; // minutes
 		const maxDuration = this.plan.estimatedDuration * 1.2; // Allow 20% over
 		const remaining = maxDuration - elapsed;
+		const stats = this.getStats();
 
 		// Hard stop if way over max acceptable DMs
 		if (this.stats.dmsSent >= this.plan.maxAcceptable + 2) {
-			logger.debug(
+			logger.info(
 				"SESSION_CONTROL",
-				`Stopping: Exceeded max acceptable (${this.stats.dmsSent} >= ${this.plan.maxAcceptable})`,
+				`🛑 STOPPING: Exceeded max acceptable DMs (${this.stats.dmsSent} >= ${this.plan.maxAcceptable + 2}) | Stats: ${stats.profilesChecked} profiles, ${stats.creatorsFound} creators, ${elapsed.toFixed(1)} min`,
 			);
 			return false;
 		}
 
 		// Hard stop if time's completely up
 		if (remaining < 0) {
-			logger.debug(
+			logger.info(
 				"SESSION_CONTROL",
-				`Stopping: Time exceeded (${elapsed.toFixed(1)} >= ${maxDuration.toFixed(1)} min)`,
+				`🛑 STOPPING: Time exceeded (${elapsed.toFixed(1)} >= ${maxDuration.toFixed(1)} min) | Stats: ${stats.dmsSent} DMs, ${stats.profilesChecked} profiles, ${stats.creatorsFound} creators`,
 			);
 			return false;
 		}
@@ -114,25 +115,33 @@ export class SessionController {
 			if (remaining > 2) {
 				logger.debug(
 					"SESSION_CONTROL",
-					`Continuing: Discovery mode (${this.stats.profilesChecked} profiles checked, ${remaining.toFixed(1)} min left)`,
+					`✅ CONTINUING: Discovery mode (${stats.profilesChecked} profiles checked, ${stats.creatorsFound} creators, ${remaining.toFixed(1)} min left)`,
 				);
 				return true;
 			}
 			// Even if time is low, continue if we haven't checked many profiles yet
-			if (this.stats.profilesChecked < 10 && remaining > 0) {
-				logger.debug(
+			if (stats.profilesChecked < 10 && remaining > 0) {
+				logger.info(
 					"SESSION_CONTROL",
-					`Continuing: Low profile count (${this.stats.profilesChecked} profiles, ${remaining.toFixed(1)} min left)`,
+					`✅ CONTINUING: Low profile count (${stats.profilesChecked} profiles < 10, ${remaining.toFixed(1)} min left) - extending discovery`,
 				);
 				return true;
+			}
+			// If we've checked profiles but time is up
+			if (remaining <= 0) {
+				logger.info(
+					"SESSION_CONTROL",
+					`🛑 STOPPING: Discovery mode but time expired (${stats.profilesChecked} profiles, ${stats.creatorsFound} creators, ${elapsed.toFixed(1)} min elapsed)`,
+				);
+				return false;
 			}
 		}
 
 		// Continue if way under minimum DMs and have time
 		if (this.stats.dmsSent < this.plan.minAcceptable && remaining > 5) {
-			logger.debug(
+			logger.info(
 				"SESSION_CONTROL",
-				`Continuing: Under minimum DMs (${this.stats.dmsSent} < ${this.plan.minAcceptable}), continuing discovery`,
+				`✅ CONTINUING: Under minimum DMs (${this.stats.dmsSent} < ${this.plan.minAcceptable}), continuing discovery | ${stats.profilesChecked} profiles, ${remaining.toFixed(1)} min left`,
 			);
 			return true;
 		}
@@ -147,9 +156,9 @@ export class SessionController {
 			if (progressRatio > timeRatio * 1.1) {
 				// 30% chance to stop early (got lucky, found creators fast)
 				if (Math.random() < 0.3) {
-					logger.debug(
+					logger.info(
 						"SESSION_CONTROL",
-						`Stopping early: Ahead of schedule (${this.stats.dmsSent} DMs in ${elapsed.toFixed(1)} min)`,
+						`🛑 STOPPING: Ahead of schedule (${this.stats.dmsSent} DMs in ${elapsed.toFixed(1)} min, ratio ${progressRatio.toFixed(2)} > ${(timeRatio * 1.1).toFixed(2)}) | ${stats.profilesChecked} profiles, ${stats.creatorsFound} creators`,
 					);
 					return false;
 				}
@@ -159,9 +168,17 @@ export class SessionController {
 			if (remaining > 5) {
 				logger.debug(
 					"SESSION_CONTROL",
-					`Continuing: Behind DM target with time (${this.stats.dmsSent}/${this.plan.targetDMs}, ${remaining.toFixed(1)} min left) - discovery continues`,
+					`✅ CONTINUING: Behind DM target with time (${this.stats.dmsSent}/${this.plan.targetDMs}, ${remaining.toFixed(1)} min left) - discovery continues | ${stats.profilesChecked} profiles`,
 				);
 				return true;
+			}
+			// If behind schedule but low time
+			if (remaining <= 5 && remaining > 2) {
+				logger.info(
+					"SESSION_CONTROL",
+					`⚠️ LOW TIME: Behind DM target (${this.stats.dmsSent}/${this.plan.targetDMs}) but only ${remaining.toFixed(1)} min left | ${stats.profilesChecked} profiles, ${stats.creatorsFound} creators`,
+				);
+				return true; // Still continue for discovery
 			}
 		}
 
@@ -169,9 +186,9 @@ export class SessionController {
 		if (this.stats.dmsSent >= this.plan.targetDMs) {
 			// If low on time, stop
 			if (remaining < 5) {
-				logger.debug(
+				logger.info(
 					"SESSION_CONTROL",
-					`Stopping: Met target, low time (${this.stats.dmsSent} DMs, ${remaining.toFixed(1)} min left)`,
+					`🛑 STOPPING: Met DM target, low time (${this.stats.dmsSent} DMs >= ${this.plan.targetDMs}, ${remaining.toFixed(1)} min left) | ${stats.profilesChecked} profiles, ${stats.creatorsFound} creators`,
 				);
 				return false;
 			}
@@ -181,9 +198,9 @@ export class SessionController {
 				const continueChance =
 					0.5 - (this.stats.dmsSent - this.plan.targetDMs) * 0.1;
 				if (Math.random() > continueChance) {
-					logger.debug(
+					logger.info(
 						"SESSION_CONTROL",
-						`Stopping: Met target, random stop (${this.stats.dmsSent} DMs)`,
+						`🛑 STOPPING: Met target, random stop (${this.stats.dmsSent} DMs, chance ${(continueChance * 100).toFixed(0)}%) | ${stats.profilesChecked} profiles, ${stats.creatorsFound} creators`,
 					);
 					return false;
 				}
@@ -191,13 +208,25 @@ export class SessionController {
 
 			logger.debug(
 				"SESSION_CONTROL",
-				`Continuing: One more try (${this.stats.dmsSent}/${this.plan.targetDMs})`,
+				`✅ CONTINUING: One more try (${this.stats.dmsSent}/${this.plan.targetDMs}) | ${stats.profilesChecked} profiles`,
 			);
 			return true;
 		}
 
 		// Default: continue if time remains (discovery continues)
-		return remaining > 2;
+		if (remaining > 2) {
+			logger.debug(
+				"SESSION_CONTROL",
+				`✅ CONTINUING: Default case (${remaining.toFixed(1)} min remaining) | ${stats.dmsSent} DMs, ${stats.profilesChecked} profiles, ${stats.creatorsFound} creators`,
+			);
+			return true;
+		}
+
+		logger.info(
+			"SESSION_CONTROL",
+			`🛑 STOPPING: Default case - time too low (${remaining.toFixed(1)} min remaining) | ${stats.dmsSent} DMs, ${stats.profilesChecked} profiles, ${stats.creatorsFound} creators`,
+		);
+		return false;
 	}
 
 	/**

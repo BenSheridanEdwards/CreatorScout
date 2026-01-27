@@ -838,9 +838,9 @@ export async function processFollowingList(
 		// Process remaining profiles in batch (direct navigation)
 		for (const username of batchUsernames.slice(1)) {
 			if (!checkContinue()) {
-				logger.info(
+				logger.warn(
 					"PROFILE",
-					`Processing interrupted at batch #${batchNumber}`,
+					`🛑 Processing interrupted at batch #${batchNumber} for seed @${seedUsername} | Reason: checkContinue() returned false | Profile: @${username}`,
 				);
 				return;
 			}
