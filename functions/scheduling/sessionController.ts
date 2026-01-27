@@ -74,9 +74,10 @@ export class SessionController {
 	 * Check if session should continue
 	 *
 	 * Complex logic that mimics human behavior:
-	 * - Stop if maxed out
+	 * - Discovery should continue independently of DM status
+	 * - Stop if maxed out on DMs
 	 * - Stop if time's up
-	 * - Continue if under minimum
+	 * - Continue discovery even if DMs aren't being sent
 	 * - Probabilistic stopping when near target
 	 */
 	shouldContinue(): boolean {
@@ -84,7 +85,7 @@ export class SessionController {
 		const maxDuration = this.plan.estimatedDuration * 1.2; // Allow 20% over
 		const remaining = maxDuration - elapsed;
 
-		// Hard stop if way over max acceptable
+		// Hard stop if way over max acceptable DMs
 		if (this.stats.dmsSent >= this.plan.maxAcceptable + 2) {
 			logger.debug(
 				"SESSION_CONTROL",
@@ -102,11 +103,36 @@ export class SessionController {
 			return false;
 		}
 
-		// Continue if way under minimum and have time
+		// DISCOVERY CONTINUES INDEPENDENTLY: If we're in discovery mode (targetDMs = 0) or haven't sent DMs,
+		// continue based on time and profiles checked, not DM progress
+		const isDiscoveryOnly = this.plan.targetDMs === 0;
+		const noDmsSent = this.stats.dmsSent === 0;
+
+		// If discovery-only or no DMs sent yet, continue based on time and discovery progress
+		if (isDiscoveryOnly || noDmsSent) {
+			// Continue if we have time and are actively discovering
+			if (remaining > 2) {
+				logger.debug(
+					"SESSION_CONTROL",
+					`Continuing: Discovery mode (${this.stats.profilesChecked} profiles checked, ${remaining.toFixed(1)} min left)`,
+				);
+				return true;
+			}
+			// Even if time is low, continue if we haven't checked many profiles yet
+			if (this.stats.profilesChecked < 10 && remaining > 0) {
+				logger.debug(
+					"SESSION_CONTROL",
+					`Continuing: Low profile count (${this.stats.profilesChecked} profiles, ${remaining.toFixed(1)} min left)`,
+				);
+				return true;
+			}
+		}
+
+		// Continue if way under minimum DMs and have time
 		if (this.stats.dmsSent < this.plan.minAcceptable && remaining > 5) {
 			logger.debug(
 				"SESSION_CONTROL",
-				`Continuing: Under minimum (${this.stats.dmsSent} < ${this.plan.minAcceptable})`,
+				`Continuing: Under minimum DMs (${this.stats.dmsSent} < ${this.plan.minAcceptable}), continuing discovery`,
 			);
 			return true;
 		}
@@ -129,11 +155,11 @@ export class SessionController {
 				}
 			}
 
-			// If behind schedule and have time, keep going
+			// If behind schedule and have time, keep going (discovery continues)
 			if (remaining > 5) {
 				logger.debug(
 					"SESSION_CONTROL",
-					`Continuing: Behind target with time (${this.stats.dmsSent}/${this.plan.targetDMs}, ${remaining.toFixed(1)} min left)`,
+					`Continuing: Behind DM target with time (${this.stats.dmsSent}/${this.plan.targetDMs}, ${remaining.toFixed(1)} min left) - discovery continues`,
 				);
 				return true;
 			}
@@ -170,7 +196,7 @@ export class SessionController {
 			return true;
 		}
 
-		// Default: continue if time remains
+		// Default: continue if time remains (discovery continues)
 		return remaining > 2;
 	}
 
