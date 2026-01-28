@@ -26,7 +26,10 @@ ssh -L 4000:localhost:4000 root@142.93.37.203
 # Navigate to Scout directory
 cd /root/scout
 
-# Check current status
+# One-command status check (PM2 + health + scheduler)
+bash scripts/check-vps-status.sh
+
+# Or check manually:
 pm2 list
 pm2 logs scout --lines 50
 ```
@@ -419,7 +422,10 @@ curl http://142.93.37.203:4000/api/health
 ### Most Common Commands
 
 ```bash
-# Check status
+# One-command status check (run after SSH)
+cd /root/scout && bash scripts/check-vps-status.sh
+
+# Or check status manually
 pm2 list && curl http://localhost:4000/api/health
 
 # View logs
