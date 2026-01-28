@@ -231,9 +231,24 @@ export function createStickyProxy(
 		stickySessionMinutes?: number;
 	} = {},
 ): ProxyManager | undefined {
-	const provider = options.provider || "decodo";
+	// Auto-detect provider: use explicit provider, or Decodo if configured, else SmartProxy
+	let provider = options.provider;
+	if (!provider) {
+		// Auto-detect: prefer Decodo if configured, otherwise SmartProxy
+		if (DECODO_USERNAME && DECODO_PASSWORD) {
+			provider = "decodo";
+		} else if (SMARTPROXY_USERNAME && SMARTPROXY_PASSWORD) {
+			provider = "smartproxy";
+		} else {
+			logger.warn(
+				"PROXY",
+				"No proxy credentials configured (Decodo or SmartProxy) - skipping proxy",
+			);
+			return undefined;
+		}
+	}
 
-	// Use Decodo by default
+	// Use Decodo
 	if (provider === "decodo") {
 		if (!DECODO_USERNAME || !DECODO_PASSWORD) {
 			logger.warn(
@@ -255,25 +270,29 @@ export function createStickyProxy(
 		});
 	}
 
-	// Legacy: Smartproxy fallback
-	if (!SMARTPROXY_USERNAME || !SMARTPROXY_PASSWORD) {
-		logger.warn(
-			"PROXY",
-			"Smartproxy credentials not configured - skipping proxy",
-		);
-		return undefined;
+	// Use SmartProxy
+	if (provider === "smartproxy") {
+		if (!SMARTPROXY_USERNAME || !SMARTPROXY_PASSWORD) {
+			logger.warn(
+				"PROXY",
+				"Smartproxy credentials not configured - skipping proxy",
+			);
+			return undefined;
+		}
+
+		return new ProxyManager({
+			provider: "smartproxy",
+			host: SMARTPROXY_HOST,
+			port: SMARTPROXY_PORT,
+			username: SMARTPROXY_USERNAME,
+			password: SMARTPROXY_PASSWORD,
+			country: options.country,
+			city: options.city,
+			stickySessionMinutes: options.stickySessionMinutes,
+		});
 	}
 
-	return new ProxyManager({
-		provider: "smartproxy",
-		host: SMARTPROXY_HOST,
-		port: SMARTPROXY_PORT,
-		username: SMARTPROXY_USERNAME,
-		password: SMARTPROXY_PASSWORD,
-		country: options.country,
-		city: options.city,
-		stickySessionMinutes: options.stickySessionMinutes,
-	});
+	return undefined;
 }
 
 /**
