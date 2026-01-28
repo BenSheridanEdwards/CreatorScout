@@ -203,6 +203,19 @@ export async function processProfile(
 		if (status.notFound) {
 			logger.warn("PROFILE", `Profile not found: @${username}`);
 			await markVisited(username, undefined, undefined, 0);
+			// Ensure session tracking even for error cases
+			if (metricsTracker) {
+				metricsTracker.recordProfileVisit(
+					username,
+					0,
+					source,
+					discoveryDepth,
+					sourceProfile,
+					[],
+					0,
+					0, // bioScore = 0 for not found
+				);
+			}
 			cycleManager.recordWarning(
 				"PROFILE_NOT_FOUND",
 				"Profile not found",
@@ -214,6 +227,19 @@ export async function processProfile(
 		if (status.isPrivate) {
 			logger.warn("PROFILE", `Profile is private: @${username}`);
 			await markVisited(username, undefined, undefined, 0);
+			// Ensure session tracking even for error cases
+			if (metricsTracker) {
+				metricsTracker.recordProfileVisit(
+					username,
+					0,
+					source,
+					discoveryDepth,
+					sourceProfile,
+					[],
+					0,
+					0, // bioScore = 0 for private
+				);
+			}
 			cycleManager.recordWarning(
 				"PROFILE_PRIVATE",
 				"Profile is private",
@@ -496,7 +522,7 @@ export async function processProfile(
 			`${icon} @${username} | Score: ${quickScore}% | Conf: ${confidence}% | Creator: ${creatorStatus} | Time: ${timeStr}s`,
 		);
 
-		// Record profile visit metrics with complete data
+		// Record profile visit metrics with complete data including bio score
 		if (metricsTracker) {
 			metricsTracker.recordProfileVisit(
 				username,
@@ -506,6 +532,7 @@ export async function processProfile(
 				sourceProfile,
 				contentCategories,
 				visionApiCalls,
+				analysis.bioScore, // Include bio score for average calculation
 			);
 		}
 	}

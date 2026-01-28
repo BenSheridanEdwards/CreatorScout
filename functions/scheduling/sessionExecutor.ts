@@ -397,6 +397,10 @@ export async function runSmartSessionDirect(
       proxyOptimizer = undefined; // Prevent double-finalize in finally block
     }
 
+    // Finalize session metrics with calculated averages
+    await metricsTracker.finalizeSessionMetrics();
+    metricsTracker.endSession();
+
     await updateRun(runId, {
       status: 'completed',
       dmsSent: finalStats.dmsSent,
@@ -417,6 +421,14 @@ export async function runSmartSessionDirect(
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     logger.error('SESSION', `Session failed: ${errorMessage}`);
+
+    // Finalize metrics even on error
+    try {
+      await metricsTracker.finalizeSessionMetrics();
+      metricsTracker.endSession();
+    } catch (metricsError) {
+      logger.warn('SESSION', `Failed to finalize metrics: ${metricsError}`);
+    }
 
     const errorStats = controller.getStats();
     await updateRun(runId, {

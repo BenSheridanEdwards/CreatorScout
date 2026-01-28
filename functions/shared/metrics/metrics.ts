@@ -16,6 +16,8 @@ export class MetricsTracker {
 	private sessionId: string;
 	private sessionStartTime: Date;
 	private sessionMetrics: SessionMetrics;
+	private bioScores: number[] = [];
+	private confidences: number[] = [];
 
 	constructor(sessionId?: string) {
 		this.sessionId = sessionId || uuidv4();
@@ -53,9 +55,15 @@ export class MetricsTracker {
 		sourceProfile?: string,
 		contentCategories?: string[],
 		visionApiCalls: number = 0,
+		bioScore?: number,
 	): void {
 		this.sessionMetrics.profilesVisited++;
 		this.sessionMetrics.totalProcessingTime += processingTimeSeconds;
+
+		// Track bio score if provided
+		if (bioScore !== undefined) {
+			this.bioScores.push(bioScore);
+		}
 
 		this.fireAndForget(
 			recordProfileMetrics(username, {
@@ -75,11 +83,13 @@ export class MetricsTracker {
 	// Creator discovery metrics
 	recordCreatorFound(
 		_username: string,
-		_confidence: number,
+		confidence: number,
 		visionApiCalls: number = 0,
 	): void {
 		this.sessionMetrics.creatorsFound++;
 		this.sessionMetrics.visionApiCalls += visionApiCalls;
+		// Track confidence for creators found
+		this.confidences.push(confidence);
 		this.updateSessionMetrics();
 	}
 
@@ -121,7 +131,61 @@ export class MetricsTracker {
 	// Session management
 	endSession(): void {
 		this.sessionMetrics.endTime = new Date();
-		this.updateSessionMetrics();
+		// Finalize with averages calculated from tracked values
+		this.updateSessionMetrics(true);
+	}
+
+	// Finalize session metrics by calculating averages from database
+	async finalizeSessionMetrics(): Promise<void> {
+		try {
+			const { getPrismaClient } = await import("../database/database.ts");
+			const prisma = getPrismaClient();
+
+			// Query profiles visited in this session to calculate accurate averages
+			const profiles = await prisma.profile.findMany({
+				where: {
+					sessionId: this.sessionId,
+				},
+				select: {
+					bioScore: true,
+					confidence: true,
+					isCreator: true,
+				},
+			});
+
+			if (profiles.length > 0) {
+				// Calculate average bio score from all profiles
+				const bioScores = profiles
+					.map((p) => p.bioScore)
+					.filter((score) => score !== null && score !== undefined);
+				const avgBioScore =
+					bioScores.length > 0
+						? bioScores.reduce((a, b) => a + b, 0) / bioScores.length
+						: 0;
+
+				// Calculate average confidence from creators only
+				const creatorConfidences = profiles
+					.filter((p) => p.isCreator)
+					.map((p) => p.confidence)
+					.filter((conf) => conf !== null && conf !== undefined);
+				const avgConfidence =
+					creatorConfidences.length > 0
+						? creatorConfidences.reduce((a, b) => a + b, 0) /
+							creatorConfidences.length
+						: 0;
+
+				// Update session metrics with calculated averages
+				this.fireAndForget(
+					updateSessionMetrics(this.sessionId, {
+						avgBioScore,
+						avgConfidence,
+					}),
+				);
+			}
+		} catch {
+			// Best-effort: if database query fails, use in-memory averages
+			this.updateSessionMetrics(true);
+		}
 	}
 
 	// Getters
@@ -143,19 +207,19 @@ export class MetricsTracker {
 	}
 
 	getAverageBioScore(): number {
-		// This would need to be calculated from profile data
-		// For now, return 0 as placeholder
-		return 0;
+		if (this.bioScores.length === 0) return 0;
+		const sum = this.bioScores.reduce((a, b) => a + b, 0);
+		return sum / this.bioScores.length;
 	}
 
 	getAverageConfidence(): number {
-		// This would need to be calculated from creator profiles
-		// For now, return 0 as placeholder
-		return 0;
+		if (this.confidences.length === 0) return 0;
+		const sum = this.confidences.reduce((a, b) => a + b, 0);
+		return sum / this.confidences.length;
 	}
 
-	private updateSessionMetrics(): void {
-		const metrics = {
+	private updateSessionMetrics(includeAverages: boolean = false): void {
+		const metrics: Partial<SessionMetrics> = {
 			profilesVisited: this.sessionMetrics.profilesVisited,
 			creatorsFound: this.sessionMetrics.creatorsFound,
 			dmsSent: this.sessionMetrics.dmsSent,
@@ -165,6 +229,12 @@ export class MetricsTracker {
 			rateLimitsHit: this.sessionMetrics.rateLimitsHit,
 			visionApiCost: this.sessionMetrics.visionApiCost,
 		};
+
+		// Include averages when finalizing session or when explicitly requested
+		if (includeAverages) {
+			metrics.avgBioScore = this.getAverageBioScore();
+			metrics.avgConfidence = this.getAverageConfidence();
+		}
 
 		this.fireAndForget(updateSessionMetrics(this.sessionId, metrics));
 	}
