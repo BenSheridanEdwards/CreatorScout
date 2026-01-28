@@ -8,7 +8,7 @@
  * - Estimating monthly costs
  *
  * Residential proxy pricing (typical):
- * - Decodo: ~$12/GB
+ * - SmartProxy: ~$8-12/GB
  * - Smartproxy: ~$8-12/GB
  *
  * Average session without optimization: ~150MB

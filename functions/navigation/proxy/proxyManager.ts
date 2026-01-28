@@ -2,26 +2,19 @@
  * Proxy Manager for Residential Sticky Sessions
  *
  * Supports:
- * - Decodo residential proxies (20-30 min sticky)
- * - Smartproxy residential proxies (15-30 min sticky) - LEGACY
+ * - Smartproxy residential proxies (15-30 min sticky)
  * - Session ID tracking for consistent IP
  * - Automatic rotation on expiry
  * - Timezone/geolocation matching
  *
  * Usage:
- *   const proxy = createStickyProxy({ provider: 'decodo' });
+ *   const proxy = createStickyProxy();
  *   const proxyUrl = proxy.getProxyUrl();
  *   // Use in browser args: --proxy-server=proxyUrl
  */
 
 import { randomBytes } from "node:crypto";
 import {
-	DECODO_HOST,
-	DECODO_PASSWORD,
-	DECODO_PORT,
-	DECODO_STICKY_SESSION_MAX,
-	DECODO_STICKY_SESSION_MIN,
-	DECODO_USERNAME,
 	SMARTPROXY_HOST,
 	SMARTPROXY_PASSWORD,
 	SMARTPROXY_PORT,
@@ -33,10 +26,10 @@ import { createLogger } from "../../shared/logger/logger.ts";
 
 const logger = createLogger();
 
-export type ProxyProvider = "decodo" | "smartproxy";
+export type ProxyProvider = "smartproxy";
 
 export interface ProxyConfig {
-	provider?: ProxyProvider; // Default: "decodo"
+	provider?: ProxyProvider; // Default: "smartproxy"
 	host: string;
 	port: number;
 	username: string;
@@ -59,17 +52,11 @@ export class ProxyManager {
 	private currentSession: ProxySession | null = null;
 
 	constructor(config: ProxyConfig) {
-		const provider = config.provider || "decodo";
+		const provider = config.provider || "smartproxy";
 
-		// Set default sticky session duration based on provider
-		const defaultSessionMin =
-			provider === "decodo"
-				? DECODO_STICKY_SESSION_MIN
-				: SMARTPROXY_STICKY_SESSION_MIN;
-		const defaultSessionMax =
-			provider === "decodo"
-				? DECODO_STICKY_SESSION_MAX
-				: SMARTPROXY_STICKY_SESSION_MAX;
+		// Set default sticky session duration
+		const defaultSessionMin = SMARTPROXY_STICKY_SESSION_MIN;
+		const defaultSessionMax = SMARTPROXY_STICKY_SESSION_MAX;
 
 		this.config = {
 			provider,
@@ -220,7 +207,7 @@ export class ProxyManager {
 }
 
 /**
- * Create a sticky proxy manager with Decodo or Smartproxy
+ * Create a sticky proxy manager with SmartProxy
  * Returns undefined if proxy credentials are not configured
  */
 export function createStickyProxy(
@@ -231,68 +218,26 @@ export function createStickyProxy(
 		stickySessionMinutes?: number;
 	} = {},
 ): ProxyManager | undefined {
-	// Auto-detect provider: use explicit provider, or Decodo if configured, else SmartProxy
-	let provider = options.provider;
-	if (!provider) {
-		// Auto-detect: prefer Decodo if configured, otherwise SmartProxy
-		if (DECODO_USERNAME && DECODO_PASSWORD) {
-			provider = "decodo";
-		} else if (SMARTPROXY_USERNAME && SMARTPROXY_PASSWORD) {
-			provider = "smartproxy";
-		} else {
-			logger.warn(
-				"PROXY",
-				"No proxy credentials configured (Decodo or SmartProxy) - skipping proxy",
-			);
-			return undefined;
-		}
+	const provider = options.provider || "smartproxy";
+
+	if (!SMARTPROXY_USERNAME || !SMARTPROXY_PASSWORD) {
+		logger.warn(
+			"PROXY",
+			"SmartProxy credentials not configured - skipping proxy",
+		);
+		return undefined;
 	}
 
-	// Use Decodo
-	if (provider === "decodo") {
-		if (!DECODO_USERNAME || !DECODO_PASSWORD) {
-			logger.warn(
-				"PROXY",
-				"Decodo proxy credentials not configured - skipping proxy",
-			);
-			return undefined;
-		}
-
-		return new ProxyManager({
-			provider: "decodo",
-			host: DECODO_HOST,
-			port: DECODO_PORT,
-			username: DECODO_USERNAME,
-			password: DECODO_PASSWORD,
-			country: options.country,
-			city: options.city,
-			stickySessionMinutes: options.stickySessionMinutes,
-		});
-	}
-
-	// Use SmartProxy
-	if (provider === "smartproxy") {
-		if (!SMARTPROXY_USERNAME || !SMARTPROXY_PASSWORD) {
-			logger.warn(
-				"PROXY",
-				"Smartproxy credentials not configured - skipping proxy",
-			);
-			return undefined;
-		}
-
-		return new ProxyManager({
-			provider: "smartproxy",
-			host: SMARTPROXY_HOST,
-			port: SMARTPROXY_PORT,
-			username: SMARTPROXY_USERNAME,
-			password: SMARTPROXY_PASSWORD,
-			country: options.country,
-			city: options.city,
-			stickySessionMinutes: options.stickySessionMinutes,
-		});
-	}
-
-	return undefined;
+	return new ProxyManager({
+		provider: "smartproxy",
+		host: SMARTPROXY_HOST,
+		port: SMARTPROXY_PORT,
+		username: SMARTPROXY_USERNAME,
+		password: SMARTPROXY_PASSWORD,
+		country: options.country,
+		city: options.city,
+		stickySessionMinutes: options.stickySessionMinutes,
+	});
 }
 
 /**

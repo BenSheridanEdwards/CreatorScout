@@ -29,10 +29,10 @@ services:
       # Use 'postgres' hostname (the service name) instead of localhost
       - DATABASE_URL=postgresql://scout:${POSTGRES_PASSWORD:-scout_secure_password}@postgres:5432/scout?schema=public
       - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - DECODO_USERNAME=${DECODO_USERNAME}
-      - DECODO_PASSWORD=${DECODO_PASSWORD}
-      - DECODO_HOST=${DECODO_HOST:-dc.decodo.com}
-      - DECODO_PORT=${DECODO_PORT:-10000}
+      - SMARTPROXY_USERNAME=${SMARTPROXY_USERNAME}
+      - SMARTPROXY_PASSWORD=${SMARTPROXY_PASSWORD}
+      - SMARTPROXY_HOST=${SMARTPROXY_HOST:-gate.smartproxy.com}
+      - SMARTPROXY_PORT=${SMARTPROXY_PORT:-7000}
       - ADSPOWER_API_KEY=${ADSPOWER_API_KEY}
       - ADSPOWER_API_URL=http://localhost:50325
       - SCHEDULER_ENABLED=${SCHEDULER_ENABLED:-true}

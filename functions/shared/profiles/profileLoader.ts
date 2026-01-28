@@ -4,7 +4,7 @@
  * Loads profile configurations including:
  * - Instagram credentials
  * - AdsPower profile IDs for browser connection
- * - Proxy settings (Decodo or Smartproxy)
+ * - Proxy settings (SmartProxy)
  * - Daily limits
  * - Session schedules
  * - Ramp-up schedules
@@ -17,7 +17,7 @@ import { createLogger } from "../logger/logger.ts";
 const logger = createLogger();
 
 export interface ProxyConfig {
-	provider?: "decodo" | "smartproxy"; // Default: decodo
+	provider?: "smartproxy"; // Default: smartproxy
 	country?: string;
 	city?: string;
 	stickySessionMinutes?: number;
@@ -265,7 +265,7 @@ export function listProfiles(): void {
 		console.log(`   DM Limit: ${dmLimit}/day`);
 		console.log(`   Follow Limit: ${profile.limits.followsPerDay}/day`);
 		console.log(
-			`   Proxy: ${profile.proxyConfig?.provider || "decodo"} - ${profile.proxyConfig?.city || "none"}, ${profile.proxyConfig?.country || "none"}`,
+			`   Proxy: ${profile.proxyConfig?.provider || "smartproxy"} - ${profile.proxyConfig?.city || "none"}, ${profile.proxyConfig?.country || "none"}`,
 		);
 		console.log(
 			`   Sessions: ${Object.values(profile.sessions).filter((s) => s.enabled).length}/3 enabled`,

@@ -180,18 +180,7 @@ export const ADSPOWER_API_BASE =
 export const ADSPOWER_API_KEY = process.env.ADSPOWER_API_KEY;
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// DECODO PROXY CONFIGURATION (RECOMMENDED)
-// ═══════════════════════════════════════════════════════════════════════════════
-
-export const DECODO_USERNAME = process.env.DECODO_USERNAME;
-export const DECODO_PASSWORD = process.env.DECODO_PASSWORD;
-export const DECODO_HOST = process.env.DECODO_HOST || "gate.decodo.net";
-export const DECODO_PORT = parseInt(process.env.DECODO_PORT || "20011", 10);
-export const DECODO_STICKY_SESSION_MIN = 20; // minutes
-export const DECODO_STICKY_SESSION_MAX = 30;
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// SMARTPROXY CONFIGURATION (LEGACY)
+// SMARTPROXY CONFIGURATION
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export const SMARTPROXY_USERNAME = process.env.SMARTPROXY_USERNAME;
