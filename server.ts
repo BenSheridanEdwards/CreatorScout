@@ -1400,9 +1400,10 @@ server.on("upgrade", (request, socket, head) => {
 	}
 });
 
-server.listen(PORT, () => {
+// Listen only on localhost for security (access via SSH tunnel if needed externally)
+server.listen(PORT, "127.0.0.1", () => {
 	// eslint-disable-next-line no-console
-	console.log(`API server listening on http://localhost:${PORT}`);
+	console.log(`API server listening on http://127.0.0.1:${PORT} (localhost only)`);
 	// eslint-disable-next-line no-console
-	console.log(`WebSocket server ready at ws://localhost:${PORT}/ws/runs`);
+	console.log(`WebSocket server ready at ws://127.0.0.1:${PORT}/ws/runs`);
 });
