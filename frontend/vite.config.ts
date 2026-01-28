@@ -13,7 +13,8 @@ export default defineConfig({
 	server: {
 		port: 5173,
 		proxy: {
-			"/api": "http://142.93.37.203:4000",
+			// Proxy to VPS via SSH tunnel (localhost:4001 -> VPS:4000)
+			"/api": "http://localhost:4001",
 		},
 	},
 	test: {

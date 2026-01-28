@@ -23,7 +23,7 @@ const logger = createLogger();
 
 // Resources to block to save bandwidth
 // NOTE: Do NOT block "stylesheet" - it breaks Instagram's UI completely
-const BLOCKED_RESOURCE_TYPES = ["image", "media", "font"];
+const BLOCKED_RESOURCE_TYPES = ["image", "media", "font", "websocket"];
 
 // Domains to block (ads, analytics, tracking)
 const BLOCKED_DOMAINS = [
@@ -40,6 +40,31 @@ const BLOCKED_DOMAINS = [
 	"branch.io", // Attribution
 	"adjust.com", // Attribution
 	"appsflyer", // Attribution
+];
+
+// Instagram API endpoints to block (SAFE - only things we're CERTAIN aren't needed)
+// BE CONSERVATIVE - we extract data from DOM, but some API calls may be needed for stats
+// IMPORTANT: We DO extract story highlights, so don't block story highlight endpoints
+const BLOCKED_API_PATTERNS = [
+	"/api/v1/feed/reels_media/", // Reels feed - definitely not needed
+	"/api/v1/feed/timeline/", // Main feed - definitely not needed
+	"/api/v1/direct_v2/inbox/", // DM inbox - we only send, don't read
+	"/api/v1/stories/reel/", // Story reel content - not needed (we only need highlight titles from DOM)
+	"/api/v1/discover/", // Explore/discover feed - not needed
+	"/api/v1/suggested/", // Suggested users - not needed
+	"/api/v1/accounts/edit_profile/", // Profile editing - not needed
+	"/api/v1/accounts/change_password/", // Account changes - not needed
+	"/api/v1/accounts/logout/", // Logout - not needed
+	"/api/v1/accounts/one_tap_app_login/", // Login endpoints - not needed
+	"/api/v1/accounts/login/", // Login - not needed
+	"/api/v1/qp/", // Quick promotions - not needed
+	"/api/v1/clips/", // Clips/reels - not needed
+	"/api/v1/live/", // Live streams - not needed
+	"/api/v1/igtv/", // IGTV - not needed
+	// NOTE: We DON'T block:
+	// - /api/v1/users/ (may be needed for stats)
+	// - /graphql/query (may be needed for profile/story highlights data)
+	// - Story highlights endpoints (we extract highlight titles from DOM)
 ];
 
 // Note: We don't block by domain anymore - we block by resource type and URL patterns
@@ -109,11 +134,11 @@ export class ProxyOptimizer {
 				this.stats.savedBytes += savedBytes;
 				this.stats.savedMB = this.stats.savedBytes / (1024 * 1024);
 
-				// Log summary every 1000 blocked requests
-				if (this.stats.blockedCount % 1000 === 0) {
-					logger.info(
+				// Log blocked requests periodically (every 500) to monitor what's being blocked
+				if (this.stats.blockedCount % 500 === 0) {
+					logger.debug(
 						"PROXY",
-						`📊 Used: ${this.stats.estimatedMB.toFixed(1)}MB | Saved: ${this.stats.savedMB.toFixed(1)}MB | Blocked: ${this.stats.blockedCount}`,
+						`📊 Used: ${this.stats.estimatedMB.toFixed(1)}MB | Saved: ${this.stats.savedMB.toFixed(1)}MB | Blocked: ${this.stats.blockedCount} | Last blocked: ${resourceType} from ${url.substring(0, 80)}...`,
 					);
 				}
 
@@ -156,12 +181,43 @@ export class ProxyOptimizer {
 			return true;
 		}
 
-		// 2. Block tracking resources from Instagram
+		// 2. Block websockets (real-time updates not needed for discovery)
+		if (resourceType === "websocket") {
+			return true;
+		}
+
+		// 3. Block non-essential Instagram API endpoints
+		if (BLOCKED_API_PATTERNS.some((pattern) => url.includes(pattern))) {
+			return true;
+		}
+
+		// 4. Block GraphQL queries that are definitely not needed (be conservative)
+		// We allow most GraphQL queries as they may be needed for stats/story highlights
+		if (url.includes("/graphql/query")) {
+			// Only block GraphQL queries we're CERTAIN aren't needed
+			// NOTE: We DO extract story highlights, so allow story-related queries
+			const blockedGraphQLPatterns = [
+				"feed_timeline", // Feed content
+				"reels_media", // Reels feed
+				"discover", // Discover feed
+				"suggested_users", // Suggested users
+				// DON'T block "stories" - we extract story highlight titles
+			];
+			const isBlocked = blockedGraphQLPatterns.some((pattern) =>
+				url.toLowerCase().includes(pattern),
+			);
+			if (isBlocked) {
+				return true; // Block only these specific patterns
+			}
+			// Allow all other GraphQL queries (they may be needed for stats/story highlights)
+		}
+
+		// 5. Block tracking resources from Instagram
 		if (this.isTrackingResource(url)) {
 			return true;
 		}
 
-		// 3. Check if this is a profile picture (small, needed for UI) - allow these
+		// 6. Check if this is a profile picture (small, needed for UI) - allow these
 		const isProfilePic =
 			url.includes("profile_pic") ||
 			url.includes("t51.2885-19") || // Instagram profile pic path
@@ -173,17 +229,25 @@ export class ProxyOptimizer {
 			return false;
 		}
 
-		// 4. Block heavy resource types (images, videos, fonts) from Instagram
+		// 7. Block heavy resource types (images, videos, fonts) from Instagram
 		if (BLOCKED_RESOURCE_TYPES.includes(resourceType)) {
 			return true;
 		}
 
-		// 5. Block fetch requests that are loading Instagram media content
+		// 8. Block fetch requests that are loading Instagram media content
 		if (resourceType === "fetch" && this.isInstagramMediaUrl(url)) {
 			return true;
 		}
 
-		// 6. Allow essential requests (documents, scripts, API calls)
+		// 9. Block fetch/XHR requests for non-essential endpoints (conservative)
+		if (
+			(resourceType === "fetch" || resourceType === "xhr") &&
+			this.isNonEssentialEndpoint(url)
+		) {
+			return true;
+		}
+
+		// 10. Allow essential requests (documents, scripts, essential API calls)
 		return false;
 	}
 
@@ -232,8 +296,41 @@ export class ProxyOptimizer {
 			url.includes("/logging/") ||
 			url.includes("/tr/") ||
 			url.includes("batch_log") ||
-			url.includes("events")
+			url.includes("events") ||
+			url.includes("/insights/") || // Analytics
+			url.includes("/analytics/") ||
+			url.includes("telemetry") ||
+			url.includes("metrics") ||
+			url.includes("tracking") ||
+			url.includes("beacon")
 		);
+	}
+
+	/**
+	 * Check if URL is a non-essential endpoint (can be blocked)
+	 * BE CONSERVATIVE - only block things we're CERTAIN aren't needed
+	 * NOTE: We DO extract story highlights, so don't block story highlight endpoints
+	 */
+	private isNonEssentialEndpoint(url: string): boolean {
+		// Block endpoints that are DEFINITELY not needed for profile discovery
+		// We DON'T block:
+		// - /api/v1/users/ (may be needed for stats)
+		// - Story highlights endpoints (we extract highlight titles from DOM)
+		const nonEssentialPatterns = [
+			"/api/v1/feed/timeline", // Feed content - definitely not needed
+			"/api/v1/feed/reels", // Reels feed - definitely not needed
+			"/api/v1/stories/reel", // Story reel content - not needed (we only need highlight titles from DOM)
+			"/api/v1/discover/", // Discover/explore - definitely not needed
+			"/api/v1/suggested/", // Suggested users - definitely not needed
+			"/api/v1/direct_v2/inbox", // DM inbox (we only send, don't read)
+			"/api/v1/accounts/edit", // Profile editing - definitely not needed
+			"/api/v1/qp/", // Quick promotions - definitely not needed
+			"/api/v1/clips/", // Clips - definitely not needed
+			"/api/v1/live/", // Live streams - definitely not needed
+			"/api/v1/igtv/", // IGTV - definitely not needed
+		];
+
+		return nonEssentialPatterns.some((pattern) => url.includes(pattern));
 	}
 
 	/**
@@ -244,11 +341,12 @@ export class ProxyOptimizer {
 			document: 50 * 1024, // 50KB
 			script: 100 * 1024, // 100KB
 			stylesheet: 30 * 1024, // 30KB
-			xhr: 20 * 1024, // 20KB
-			fetch: 20 * 1024, // 20KB
+			xhr: 15 * 1024, // 15KB (reduced - many blocked)
+			fetch: 15 * 1024, // 15KB (reduced - many blocked)
 			image: 200 * 1024, // 200KB
 			media: 2 * 1024 * 1024, // 2MB
 			font: 50 * 1024, // 50KB
+			websocket: 5 * 1024, // 5KB (websockets blocked)
 			other: 10 * 1024, // 10KB
 		};
 		return sizes[resourceType] || 10 * 1024;
@@ -263,6 +361,9 @@ export class ProxyOptimizer {
 			media: 2 * 1024 * 1024, // 2MB average for videos
 			font: 50 * 1024, // 50KB
 			stylesheet: 30 * 1024, // 30KB
+			websocket: 10 * 1024, // 10KB (websocket connections)
+			fetch: 25 * 1024, // 25KB (API responses)
+			xhr: 25 * 1024, // 25KB (API responses)
 		};
 		return sizes[resourceType] || 20 * 1024;
 	}
@@ -290,19 +391,25 @@ export class ProxyOptimizer {
 			`📊 Session complete: Used ${stats.estimatedMB.toFixed(1)}MB | Saved ${stats.savedMB.toFixed(1)}MB (${savingsPercent}% reduction)`,
 		);
 
-		// Persist to database
+		// Persist to database (if ProxyUsage model exists)
 		try {
 			const prisma = getPrismaClient();
-			await prisma.proxyUsage.create({
-				data: {
-					date: new Date(),
-					profileId: this.profileId,
-					sessionId: this.sessionId,
-					requestCount: stats.requestCount,
-					estimatedMB: stats.estimatedMB,
-				},
-			});
+			// Try to persist - if model doesn't exist, that's OK
+			// @ts-expect-error - ProxyUsage may not be in generated client
+			if (prisma.proxyUsage) {
+				// @ts-expect-error
+				await prisma.proxyUsage.create({
+					data: {
+						date: new Date(),
+						profileId: this.profileId,
+						sessionId: this.sessionId,
+						requestCount: stats.requestCount,
+						estimatedMB: stats.estimatedMB,
+					},
+				});
+			}
 		} catch (error) {
+			// Silently fail - proxyUsage tracking is optional
 			logger.debug("PROXY", `Could not persist usage: ${error}`);
 		}
 
@@ -319,40 +426,63 @@ export async function getProxyUsageReport(
 ): Promise<ProxyUsageReport> {
 	const prisma = getPrismaClient();
 
-	const usage = await prisma.proxyUsage.findMany({
-		where: {
-			date: {
-				gte: startDate,
-				lte: endDate,
-			},
-		},
-	});
-
-	const byProfile: Record<string, { mb: number; requests: number }> = {};
-	let totalMB = 0;
-	let totalRequests = 0;
-
-	for (const record of usage) {
-		totalMB += Number(record.estimatedMB);
-		totalRequests += record.requestCount;
-
-		if (!byProfile[record.profileId]) {
-			byProfile[record.profileId] = { mb: 0, requests: 0 };
+	try {
+		// @ts-expect-error - ProxyUsage may not be in generated client
+		if (!prisma.proxyUsage) {
+			return {
+				date: `${startDate.toISOString().split("T")[0]} to ${endDate.toISOString().split("T")[0]}`,
+				totalMB: 0,
+				totalRequests: 0,
+				estimatedCost: 0,
+				byProfile: {},
+			};
 		}
-		byProfile[record.profileId].mb += Number(record.estimatedMB);
-		byProfile[record.profileId].requests += record.requestCount;
+
+		// @ts-expect-error
+		const usage = await prisma.proxyUsage.findMany({
+			where: {
+				date: {
+					gte: startDate,
+					lte: endDate,
+				},
+			},
+		});
+
+		const byProfile: Record<string, { mb: number; requests: number }> = {};
+		let totalMB = 0;
+		let totalRequests = 0;
+
+		for (const record of usage) {
+			totalMB += Number(record.estimatedMB);
+			totalRequests += record.requestCount;
+
+			if (!byProfile[record.profileId]) {
+				byProfile[record.profileId] = { mb: 0, requests: 0 };
+			}
+			byProfile[record.profileId].mb += Number(record.estimatedMB);
+			byProfile[record.profileId].requests += record.requestCount;
+		}
+
+		// Estimate cost at $10/GB
+		const estimatedCost = (totalMB / 1024) * 10;
+
+		return {
+			date: `${startDate.toISOString().split("T")[0]} to ${endDate.toISOString().split("T")[0]}`,
+			totalMB,
+			totalRequests,
+			estimatedCost,
+			byProfile,
+		};
+		} catch {
+			// Return empty report if ProxyUsage model doesn't exist
+			return {
+			date: `${startDate.toISOString().split("T")[0]} to ${endDate.toISOString().split("T")[0]}`,
+			totalMB: 0,
+			totalRequests: 0,
+			estimatedCost: 0,
+			byProfile: {},
+		};
 	}
-
-	// Estimate cost at $10/GB
-	const estimatedCost = (totalMB / 1024) * 10;
-
-	return {
-		date: `${startDate.toISOString().split("T")[0]} to ${endDate.toISOString().split("T")[0]}`,
-		totalMB,
-		totalRequests,
-		estimatedCost,
-		byProfile,
-	};
 }
 
 /**

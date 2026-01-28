@@ -48,6 +48,8 @@ export type LogPrefix =
 	| "SESSION_CONTROL"
 	| "SESSION_COMPLETE"
 	| "SESSION_PLAN"
+	| "DATA_QUALITY"
+	| "NOTIFY"
 	| "LINK_ANALYSIS"
 	| "EXTRACTION"
 	| "PROXY_TEST" 

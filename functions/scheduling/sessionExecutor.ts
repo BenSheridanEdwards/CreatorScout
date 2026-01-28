@@ -33,6 +33,7 @@ import {
 } from '../shared/engagement/engagementTracker.ts';
 import { createLogger } from '../shared/logger/logger.ts';
 import { getGlobalMetricsTracker } from '../shared/metrics/metricsTracker.ts';
+import { sendSessionFailureAlert } from '../shared/notifications/notificationService.ts';
 import {
   getProfileById,
   incrementProfileAction,
@@ -401,6 +402,14 @@ export async function runSmartSessionDirect(
     await metricsTracker.finalizeSessionMetrics();
     metricsTracker.endSession();
 
+    // Check data quality after session
+    try {
+      const { checkDataQualityAfterSession } = await import('../shared/database/dataQualityMonitor.ts');
+      await checkDataQualityAfterSession();
+    } catch (error) {
+      logger.warn('SESSION', `Failed to check data quality: ${error}`);
+    }
+
     await updateRun(runId, {
       status: 'completed',
       dmsSent: finalStats.dmsSent,
@@ -428,6 +437,13 @@ export async function runSmartSessionDirect(
       metricsTracker.endSession();
     } catch (metricsError) {
       logger.warn('SESSION', `Failed to finalize metrics: ${metricsError}`);
+    }
+
+    // Send failure notification
+    try {
+      await sendSessionFailureAlert(args.profileId, args.sessionType, errorMessage);
+    } catch (notifyError) {
+      logger.debug('SESSION', `Failed to send failure notification: ${notifyError}`);
     }
 
     const errorStats = controller.getStats();

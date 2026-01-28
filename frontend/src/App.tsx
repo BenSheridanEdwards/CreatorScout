@@ -1,6 +1,7 @@
 import { useState } from "react";
 import AccountFilter from "./components/AccountFilter/AccountFilter";
 import CreatorsTable from "./components/CreatorsTable/CreatorsTable";
+import DataQuality from "./components/DataQuality/DataQuality";
 import HealthCheck from "./components/HealthCheck/HealthCheck";
 import RunDetailsModal from "./components/RunDetailsModal/RunDetailsModal";
 import ScreenshotModal from "./components/ScreenshotModal/ScreenshotModal";
@@ -68,6 +69,8 @@ function App() {
 
 			<main className="flex-1 grid grid-cols-1 gap-6 p-6">
 				<HealthCheck />
+
+				<DataQuality />
 
 				<StatsCards />
 

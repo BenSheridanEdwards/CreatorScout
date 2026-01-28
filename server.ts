@@ -331,6 +331,23 @@ async function handleApi(
 		return;
 	}
 
+	// Data quality monitoring endpoint
+	if (req.method === "GET" && url.pathname === "/api/data-quality") {
+		try {
+			const { checkDataQuality } = await import(
+				"./functions/shared/database/dataQualityMonitor.ts"
+			);
+			const report = await checkDataQuality();
+			sendJson(res, 200, report);
+		} catch (error) {
+			sendJson(res, 500, {
+				error: "Failed to check data quality",
+				details: String(error),
+			});
+		}
+		return;
+	}
+
 	if (req.method === "GET" && url.pathname === "/api/stats") {
 		try {
 			const prisma = getPrismaClient();
