@@ -273,6 +273,7 @@ export async function markAsCreator(
 export async function updateProfileFromAnalysis(
 	username: string,
 	analysis: {
+		displayName?: string | null;
 		bio: string | null;
 		bioScore: number;
 		confidence: number;
@@ -302,6 +303,7 @@ export async function updateProfileFromAnalysis(
 		where: { username: normalizedUsername },
 		create: {
 			username: normalizedUsername,
+			displayName: analysis.displayName || null,
 			bioText: analysis.bio || null,
 			bioScore: analysis.bioScore,
 			confidence: analysis.confidence,
@@ -312,6 +314,7 @@ export async function updateProfileFromAnalysis(
 			lastSeen: now,
 		},
 		update: {
+			displayName: analysis.displayName !== undefined ? analysis.displayName : undefined,
 			bioText: analysis.bio || undefined,
 			bioScore: analysis.bioScore,
 			confidence: analysis.confidence,

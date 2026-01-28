@@ -6,6 +6,7 @@ import {
 	getBioFromPage,
 	validateBioExtraction,
 } from "../../extraction/getBioFromPage/getBioFromPage.ts";
+import { extractProfile } from "../../extraction/extractProfile/extractProfile.ts";
 import {
 	clickBioLink,
 	getLinkFromBio,
@@ -165,6 +166,25 @@ export async function analyzeProfileComprehensive(
 			completedSteps.length > 0 ? completedSteps.join(" → ") : "none";
 		return new Error(`[${step}] ${msg} (completed: ${completed})`);
 	};
+
+	// Extract profile data (including displayName) - wrap in try-catch for bundler errors
+	currentStep = "profile_extract";
+	let displayName: string | null = null;
+	try {
+		const profileExtraction = await extractProfile(page);
+		displayName = profileExtraction.displayName;
+		completedSteps.push("profile_extract");
+		if (displayName) {
+			logger.info("EXTRACTION", `Display Name: "${displayName}"`);
+		}
+	} catch (profileError) {
+		if (isBundlerError(profileError)) {
+			result.errors?.push(`profile_extract: bundler`);
+		} else {
+			// Non-fatal, continue with bio extraction
+			logger.warn("EXTRACTION", `Profile extraction failed: ${profileError}`);
+		}
+	}
 
 	// Extract bio - wrap in try-catch for bundler errors
 	currentStep = "bio_extract";
@@ -741,6 +761,7 @@ export async function analyzeProfileComprehensive(
 	// Save analysis results to database
 	try {
 		await updateProfileFromAnalysis(username, {
+			displayName: displayName,
 			bio: result.bio,
 			bioScore: result.bioScore,
 			confidence: result.confidence,
