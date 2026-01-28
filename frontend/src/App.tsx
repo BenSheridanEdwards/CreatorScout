@@ -6,6 +6,7 @@ import HealthCheck from "./components/HealthCheck/HealthCheck";
 import RunDetailsModal from "./components/RunDetailsModal/RunDetailsModal";
 import ScreenshotModal from "./components/ScreenshotModal/ScreenshotModal";
 import Screenshots from "./components/Screenshots/Screenshots";
+import Sessions from "./components/Sessions/Sessions";
 import StatsCards from "./components/StatsCards/StatsCards";
 import TimelineCarousel from "./components/TimelineCarousel/TimelineCarousel";
 import type { RunMetadata, Screenshot } from "./types";
@@ -69,6 +70,8 @@ function App() {
 
 			<main className="flex-1 grid grid-cols-1 gap-6 p-6">
 				<HealthCheck />
+
+				<Sessions />
 
 				<DataQuality />
 
