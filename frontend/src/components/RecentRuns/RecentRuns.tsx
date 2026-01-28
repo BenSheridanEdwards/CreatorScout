@@ -1,3 +1,4 @@
+import { apiFetch } from "../../utils/api";
 import { useState } from "react";
 import type { RunMetadata } from "../../types";
 import { getImageUrl } from "../../utils/imageUrl";
@@ -25,7 +26,7 @@ export default function RecentRuns({ onRunSelect }: RecentRunsProps) {
 		setRunsLoading(true);
 		setRunsError(null);
 		try {
-			const res = await fetch("/api/runs");
+			const res = await apiFetch("/api/runs");
 			if (!res.ok) {
 				setRunsError(`Failed to load runs (status ${res.status}).`);
 				return;

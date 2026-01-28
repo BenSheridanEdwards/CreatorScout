@@ -1,3 +1,4 @@
+import { apiFetch } from "../../utils/api";
 import { useEffect, useState } from "react";
 import type { ScheduledRun } from "../../types";
 
@@ -60,7 +61,7 @@ export default function ScheduleForm({
 	useEffect(() => {
 		async function loadProfiles() {
 			try {
-				const res = await fetch("/api/schedule");
+				const res = await apiFetch("/api/schedule");
 				if (res.ok) {
 					const schedules = (await res.json()) as ScheduledRun[];
 					const uniqueProfiles = [

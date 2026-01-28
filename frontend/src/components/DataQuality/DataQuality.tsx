@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { apiFetch } from "../../utils/api";
 
 interface DataQualityReport {
 	timestamp: string;
@@ -41,7 +42,7 @@ export default function DataQuality() {
 		setLoading(true);
 		setError(null);
 		try {
-			const res = await fetch("/api/data-quality");
+			const res = await apiFetch("/api/data-quality");
 			if (!res.ok) {
 				setError(`Failed to load data quality (status ${res.status}).`);
 				return;

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { apiFetch } from "../../utils/api";
 import type { RunMetadata } from "../../types";
 
 export default function Sessions() {
@@ -11,7 +12,7 @@ export default function Sessions() {
 		setLoading(true);
 		setError(null);
 		try {
-			const res = await fetch("/api/runs");
+			const res = await apiFetch("/api/runs");
 			if (!res.ok) {
 				setError(`Failed to load sessions (status ${res.status}).`);
 				return;

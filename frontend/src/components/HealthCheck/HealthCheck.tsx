@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { apiFetch } from "../../utils/api";
 
 interface HealthStatus {
 	healthy: boolean;
@@ -48,7 +49,7 @@ export default function HealthCheck() {
 		setLoading(true);
 		setError(null);
 		try {
-			const res = await fetch("/api/health/detailed");
+			const res = await apiFetch("/api/health/detailed");
 			if (!res.ok) {
 				setError(`Failed to load health (status ${res.status}).`);
 				return;

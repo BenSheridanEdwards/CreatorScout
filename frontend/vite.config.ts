@@ -13,8 +13,8 @@ export default defineConfig({
 	server: {
 		port: 5173,
 		proxy: {
-			// Proxy to VPS via SSH tunnel (localhost:4001 -> VPS:4000)
-			"/api": "http://localhost:4001",
+			// Local dev: proxy to SSH tunnel or local server
+			"/api": process.env.VITE_API_URL || "http://localhost:4001",
 		},
 	},
 	test: {

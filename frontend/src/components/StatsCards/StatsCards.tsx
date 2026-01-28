@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { apiFetch } from "../../utils/api";
 import type { Stats } from "../../types";
 
 export default function StatsCards() {
@@ -10,7 +11,7 @@ export default function StatsCards() {
 		setStatsLoading(true);
 		setStatsError(null);
 		try {
-			const res = await fetch("/api/stats");
+			const res = await apiFetch("/api/stats");
 			if (!res.ok) {
 				setStatsError(`Failed to load stats (status ${res.status}).`);
 				return;

@@ -173,6 +173,10 @@ async function scanScreenshots(): Promise<Screenshot[]> {
 	return screenshots;
 }
 
+// Dashboard API key for secure remote access
+const DASHBOARD_API_KEY = process.env.DASHBOARD_API_KEY || "";
+const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || "").split(",").filter(Boolean);
+
 function sendJson(res: http.ServerResponse, status: number, data: unknown) {
 	const body = JSON.stringify(data);
 	res.writeHead(status, {
@@ -182,10 +186,69 @@ function sendJson(res: http.ServerResponse, status: number, data: unknown) {
 	res.end(body);
 }
 
+/**
+ * Add CORS headers for dashboard access
+ */
+function addCorsHeaders(req: http.IncomingMessage, res: http.ServerResponse): boolean {
+	const origin = req.headers.origin || "";
+	
+	// Allow localhost for development
+	const isLocalhost = origin.includes("localhost") || origin.includes("127.0.0.1");
+	const isAllowedOrigin = ALLOWED_ORIGINS.length === 0 || ALLOWED_ORIGINS.includes(origin) || isLocalhost;
+	
+	if (isAllowedOrigin && origin) {
+		res.setHeader("Access-Control-Allow-Origin", origin);
+		res.setHeader("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS");
+		res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-API-Key");
+		res.setHeader("Access-Control-Allow-Credentials", "true");
+	}
+	
+	// Handle preflight
+	if (req.method === "OPTIONS") {
+		res.writeHead(204);
+		res.end();
+		return true;
+	}
+	
+	return false;
+}
+
+/**
+ * Verify API key for remote access
+ */
+function verifyApiKey(req: http.IncomingMessage): boolean {
+	// If no API key is configured, only allow localhost
+	if (!DASHBOARD_API_KEY) {
+		const host = req.headers.host || "";
+		return host.includes("localhost") || host.includes("127.0.0.1");
+	}
+	
+	// Check Authorization header or X-API-Key header
+	const authHeader = req.headers.authorization || "";
+	const apiKeyHeader = req.headers["x-api-key"] || "";
+	
+	if (authHeader.startsWith("Bearer ")) {
+		return authHeader.slice(7) === DASHBOARD_API_KEY;
+	}
+	
+	return apiKeyHeader === DASHBOARD_API_KEY;
+}
+
 async function handleApi(
 	req: http.IncomingMessage,
 	res: http.ServerResponse,
 ): Promise<void> {
+	// Handle CORS
+	if (addCorsHeaders(req, res)) {
+		return; // Was preflight request
+	}
+	
+	// Verify API key for non-localhost requests
+	if (!verifyApiKey(req)) {
+		sendJson(res, 401, { error: "Unauthorized - Invalid or missing API key" });
+		return;
+	}
+	
 	const url = new URL(req.url ?? "/", `http://${req.headers.host}`);
 
 	// Debug logging for PATCH requests to /api/creators
@@ -1417,10 +1480,17 @@ server.on("upgrade", (request, socket, head) => {
 	}
 });
 
-// Listen only on localhost for security (access via SSH tunnel if needed externally)
-server.listen(PORT, "127.0.0.1", () => {
+// Bind to 0.0.0.0 if DASHBOARD_API_KEY is set (remote access with auth)
+// Otherwise bind to localhost only for security
+const BIND_ADDRESS = DASHBOARD_API_KEY ? "0.0.0.0" : "127.0.0.1";
+
+server.listen(PORT, BIND_ADDRESS, () => {
 	// eslint-disable-next-line no-console
-	console.log(`API server listening on http://127.0.0.1:${PORT} (localhost only)`);
+	if (DASHBOARD_API_KEY) {
+		console.log(`API server listening on http://${BIND_ADDRESS}:${PORT} (remote access enabled with API key)`);
+	} else {
+		console.log(`API server listening on http://${BIND_ADDRESS}:${PORT} (localhost only - set DASHBOARD_API_KEY for remote access)`);
+	}
 	// eslint-disable-next-line no-console
-	console.log(`WebSocket server ready at ws://127.0.0.1:${PORT}/ws/runs`);
+	console.log(`WebSocket server ready at ws://${BIND_ADDRESS}:${PORT}/ws/runs`);
 });

@@ -1,3 +1,4 @@
+import { apiFetch } from "../../utils/api";
 import { useEffect, useState } from "react";
 
 interface AccountFilterProps {
@@ -19,7 +20,7 @@ export default function AccountFilter({ onAccountChange }: AccountFilterProps) {
 		// Fetch available accounts from scheduled runs
 		async function loadAccounts() {
 			try {
-				const res = await fetch("/api/schedule");
+				const res = await apiFetch("/api/schedule");
 				if (res.ok) {
 					const scheduled = (await res.json()) as Array<{ profileId: string }>;
 					const uniqueAccounts = [

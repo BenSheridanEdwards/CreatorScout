@@ -1,3 +1,4 @@
+import { apiFetch } from "../../utils/api";
 import { useState } from "react";
 import type { Screenshot as ScreenshotType } from "../../types";
 import { getImageUrl } from "../../utils/imageUrl";
@@ -18,7 +19,7 @@ export default function Screenshots({ onScreenshotSelect }: ScreenshotsProps) {
 		setScreenshotsLoading(true);
 		setScreenshotsError(null);
 		try {
-			const res = await fetch("/api/screenshots");
+			const res = await apiFetch("/api/screenshots");
 			if (!res.ok) {
 				setScreenshotsError(
 					`Failed to load screenshots (status ${res.status}).`,

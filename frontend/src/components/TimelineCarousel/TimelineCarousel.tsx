@@ -1,3 +1,4 @@
+import { apiFetch } from "../../utils/api";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { RunMetadata, ScheduledRun, TimelineCard } from "../../types";
 import { getImageUrl } from "../../utils/imageUrl";
@@ -147,7 +148,7 @@ export default function TimelineCarousel({
 		setLoading(true);
 		try {
 			// Load actual runs
-			const runsRes = await fetch("/api/runs");
+			const runsRes = await apiFetch("/api/runs");
 			if (runsRes.ok) {
 				const runsData = (await runsRes.json()) as RunMetadata[];
 				setRuns(runsData);
@@ -176,7 +177,7 @@ export default function TimelineCarousel({
 
 			// Load scheduled runs (gracefully handle failures)
 			try {
-				const scheduleRes = await fetch("/api/schedule");
+				const scheduleRes = await apiFetch("/api/schedule");
 				if (scheduleRes.ok) {
 					const scheduleData = (await scheduleRes.json()) as ScheduledRun[];
 					setScheduledRuns(scheduleData);
@@ -205,7 +206,7 @@ export default function TimelineCarousel({
 
 			// Load timezone from config (if available)
 			try {
-				const configRes = await fetch("/api/schedule/config");
+				const configRes = await apiFetch("/api/schedule/config");
 				if (configRes.ok) {
 					const config = (await configRes.json()) as { timezone?: string };
 					if (config.timezone) {
