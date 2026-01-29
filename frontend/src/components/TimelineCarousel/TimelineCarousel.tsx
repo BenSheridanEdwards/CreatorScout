@@ -413,6 +413,19 @@ export default function TimelineCarousel({
           ? Math.floor((Date.now() - new Date(run.startTime).getTime()) / 1000)
           : undefined,
       scriptName: run.scriptName,
+      // Stats for completed runs
+      profilesProcessed: run.profilesProcessed,
+      creatorsFound: run.creatorsFound,
+      dmsSent: run.dmsSent,
+      duration:
+        run.stats?.duration ||
+        (run.endTime && run.startTime
+          ? Math.floor(
+              (new Date(run.endTime).getTime() -
+                new Date(run.startTime).getTime()) /
+                1000,
+            )
+          : undefined),
     })),
     ...filteredScheduled.map((scheduled) => ({
       id: scheduled.id,
@@ -1007,16 +1020,50 @@ export default function TimelineCarousel({
                             </div>
                           )}
                           {isCompleted && (
-                            <div className='text-center mb-3'>
-                              <span
-                                className='text-2xl mb-2'
-                                aria-hidden='true'
-                              >
-                                ✓
-                              </span>
-                              <p className='text-xs text-emerald-300 font-semibold'>
-                                Completed
-                              </p>
+                            <div className='text-center mb-2'>
+                              <div className='flex items-center justify-center gap-1 mb-1'>
+                                <span
+                                  className='text-lg text-emerald-400'
+                                  aria-hidden='true'
+                                >
+                                  ✓
+                                </span>
+                                <p className='text-[10px] text-emerald-300 font-semibold'>
+                                  Completed
+                                </p>
+                              </div>
+                              {card.duration !== undefined &&
+                                card.duration > 0 && (
+                                  <p className='text-xs font-mono text-slate-300 mb-1'>
+                                    {formatDuration(card.duration)}
+                                  </p>
+                                )}
+                              <div className='flex justify-center gap-3 text-[9px] text-slate-400'>
+                                {card.profilesProcessed !== undefined &&
+                                  card.profilesProcessed > 0 && (
+                                    <span title='Profiles checked'>
+                                      👤 {card.profilesProcessed}
+                                    </span>
+                                  )}
+                                {card.creatorsFound !== undefined &&
+                                  card.creatorsFound > 0 && (
+                                    <span
+                                      title='Creators found'
+                                      className='text-emerald-400'
+                                    >
+                                      ⭐ {card.creatorsFound}
+                                    </span>
+                                  )}
+                                {card.dmsSent !== undefined &&
+                                  card.dmsSent > 0 && (
+                                    <span
+                                      title='DMs sent'
+                                      className='text-sky-400'
+                                    >
+                                      ✉️ {card.dmsSent}
+                                    </span>
+                                  )}
+                              </div>
                             </div>
                           )}
                           {isError && (
