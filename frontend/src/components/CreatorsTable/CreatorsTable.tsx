@@ -205,10 +205,6 @@ export default function CreatorsTable() {
       const isCurrentlyHidden = currentStatus === true;
       const newHiddenStatus = !isCurrentlyHidden;
 
-      console.log(
-        `Toggling hidden for ${username}: ${isCurrentlyHidden} -> ${newHiddenStatus}`,
-      );
-
       const res = await apiFetch(`/api/creators/${username}/hide`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -223,9 +219,7 @@ export default function CreatorsTable() {
         return;
       }
 
-      const data = await res.json();
-      console.log('Hide toggle successful:', data);
-
+      await res.json();
       // Remove from list since hidden creators are filtered out
       setCreators((prev) => prev.filter((c) => c.username !== username));
       // Reload to get updated counts
@@ -498,12 +492,6 @@ export default function CreatorsTable() {
                       onClick={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
-                        console.log(
-                          'Hide button clicked for:',
-                          creator.username,
-                          'current hidden:',
-                          creator.hidden,
-                        );
                         toggleHidden(creator.username, creator.hidden ?? false);
                       }}
                       type='button'

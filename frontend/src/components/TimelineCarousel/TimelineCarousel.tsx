@@ -1,4 +1,4 @@
-import { apiFetch } from '../../utils/api';
+import { apiFetch, getWsUrl } from '../../utils/api';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { RunMetadata, ScheduledRun, TimelineCard } from '../../types';
 import { getImageUrl } from '../../utils/imageUrl';
@@ -262,8 +262,7 @@ export default function TimelineCarousel({
     }
 
     // Connect to WebSocket
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}/ws/runs?runId=${runningRun.id}`;
+    const wsUrl = getWsUrl(`/ws/runs?runId=${runningRun.id}`);
     const ws = new WebSocket(wsUrl);
 
     ws.onopen = () => {
@@ -519,66 +518,6 @@ export default function TimelineCarousel({
     new Date(currentTime).toISOString(),
     startTime,
   );
-
-  // Debug logging
-  const scheduledCount = allTimelineCards.filter(
-    (c) => c.type === 'scheduled',
-  ).length;
-  const runCount = allTimelineCards.filter(
-    (c) => c.type !== 'scheduled',
-  ).length;
-  useEffect(() => {
-    console.log('=== Timeline Debug ===');
-    console.log(`Total scheduled runs loaded: ${filteredScheduled.length}`);
-    console.log(
-      `All timeline cards: ${allTimelineCards.length} (${scheduledCount} scheduled, ${runCount} runs)`,
-    );
-    console.log(`Showing after filter: ${timelineCards.length}`);
-    console.log(`Show past runs: ${showPastRuns}`);
-    console.log(`Current time: ${new Date(currentTime).toISOString()}`);
-
-    if (filteredScheduled.length > 0) {
-      console.log(
-        'Scheduled runs details:',
-        filteredScheduled.map((s) => ({
-          id: s.id,
-          name: s.name,
-          accountName: s.accountName,
-          scheduledTime: s.scheduledTime,
-          scheduledTimeISO: new Date(s.scheduledTime).toISOString(),
-          isPast: new Date(s.scheduledTime).getTime() < currentTime,
-          countdown: Math.floor(
-            (new Date(s.scheduledTime).getTime() - currentTime) / 1000,
-          ),
-        })),
-      );
-    }
-
-    const scheduledCards = allTimelineCards.filter(
-      (c) => c.type === 'scheduled',
-    );
-    if (scheduledCards.length > 0) {
-      console.log(
-        'Scheduled timeline cards:',
-        scheduledCards.map((c) => ({
-          id: c.id,
-          timestamp: c.timestamp,
-          timestampISO: new Date(c.timestamp).toISOString(),
-          isPast: new Date(c.timestamp).getTime() < currentTime,
-          willShow:
-            showPastRuns || new Date(c.timestamp).getTime() >= currentTime,
-        })),
-      );
-    }
-  }, [
-    allTimelineCards,
-    timelineCards.length,
-    scheduledCount,
-    runCount,
-    filteredScheduled,
-    currentTime,
-    showPastRuns,
-  ]);
 
   // Update timeline width when content changes
   useEffect(() => {
