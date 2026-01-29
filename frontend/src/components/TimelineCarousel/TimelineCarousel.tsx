@@ -97,8 +97,12 @@ interface TimelineCarouselProps {
 
 function formatDuration(seconds: number): string {
   if (seconds < 60) return `${seconds}s`;
-  const mins = Math.floor(seconds / 60);
+  const hours = Math.floor(seconds / 3600);
+  const mins = Math.floor((seconds % 3600) / 60);
   const secs = seconds % 60;
+  if (hours > 0) {
+    return `${hours}h ${mins}m ${secs}s`;
+  }
   return `${mins}m ${secs}s`;
 }
 
