@@ -294,12 +294,7 @@ export default function HealthCheck() {
 										{health.systemInfo.memoryUsage.percentage}%)
 									</p>
 								</div>
-								<div>
-									<p className="text-slate-500 text-xs mb-1">Browser</p>
-									<p className="text-slate-200 font-medium">
-										{health.systemInfo.browserProvider}
-									</p>
-								</div>
+								{/* Browser provider hidden from UI */}
 							</div>
 							{health.systemInfo.display && (
 								<div className="mt-3 pt-3 border-t border-slate-800">
@@ -318,7 +313,9 @@ export default function HealthCheck() {
 							Component Status
 						</h4>
 						<div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-							{Object.entries(health.checks).map(([key, check]) => (
+							{Object.entries(health.checks)
+								.filter(([key]) => key !== "adspower") // Hide adspower from UI
+								.map(([key, check]) => (
 								<div
 									key={key}
 									className={`rounded-lg border p-3 ${getStatusBg(check.status)}`}
