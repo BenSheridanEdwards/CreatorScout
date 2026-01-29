@@ -5,6 +5,14 @@ import { getImageUrl } from '../../utils/imageUrl';
 import ScheduleModal from '../ScheduleModal/ScheduleModal';
 import { ToastContainer, useToast } from '../Toast/Toast';
 
+/** Format account name from kebab-case to Title Case (e.g., "ria-talisman" -> "Ria Talisman") */
+function formatAccountName(name: string): string {
+  return name
+    .split(/[-_]/)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ');
+}
+
 interface DeleteDialogProps {
   onClose: () => void;
   onConfirm: () => void;
@@ -400,6 +408,7 @@ export default function TimelineCarousel({
         run.status === 'running'
           ? Math.floor((Date.now() - new Date(run.startTime).getTime()) / 1000)
           : undefined,
+      scriptName: run.scriptName,
     })),
     ...filteredScheduled.map((scheduled) => ({
       id: scheduled.id,
@@ -863,17 +872,23 @@ export default function TimelineCarousel({
                       >
                         {/* Card header */}
                         <header className='p-3 border-b border-slate-700/50'>
-                          {card.name && (
-                            <h3
-                              className='text-[10px] font-semibold text-slate-300 mb-1.5 truncate capitalize'
-                              title={card.name}
-                            >
-                              {card.name}
-                            </h3>
-                          )}
+                          {/* Show script type as main title */}
+                          <h3
+                            className='text-xs font-bold text-slate-100 mb-1 truncate capitalize'
+                            title={
+                              card.scriptName || card.name || card.accountName
+                            }
+                          >
+                            {card.scriptName
+                              ? card.scriptName
+                                  .replace(/_/g, ' ')
+                                  .replace(/^discover$/i, 'Discover')
+                                  .replace(/^dm.batch$/i, 'DM Batch')
+                              : card.name || card.accountName}
+                          </h3>
                           <div className='flex items-center justify-between mb-2'>
-                            <span className='text-xs font-bold text-slate-100 truncate'>
-                              {card.accountName}
+                            <span className='text-[10px] font-medium text-slate-400 truncate'>
+                              {formatAccountName(card.accountName)}
                             </span>
                             <div className='flex items-center gap-1'>
                               {card.hasIssues && (
