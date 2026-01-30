@@ -5,7 +5,6 @@ interface DataQualityReport {
 	timestamp: string;
 	totalProfiles: number;
 	profilesWithMissingData: {
-		missingDisplayName: number;
 		missingBio: number;
 		missingFollowers: number;
 		missingStats: number;
@@ -13,13 +12,11 @@ interface DataQualityReport {
 	recentProfilesQuality: {
 		last24Hours: {
 			total: number;
-			missingDisplayName: number;
 			missingBio: number;
 			missingFollowers: number;
 		};
 		lastHour: {
 			total: number;
-			missingDisplayName: number;
 			missingBio: number;
 			missingFollowers: number;
 		};
@@ -207,36 +204,6 @@ export default function DataQuality() {
 						</h4>
 						{report.recentProfilesQuality.last24Hours.total > 0 ? (
 							<div className="space-y-4">
-								{/* Display Name */}
-								{(() => {
-									const rate = getCompletionRate(
-										report.recentProfilesQuality.last24Hours.missingDisplayName,
-										report.recentProfilesQuality.last24Hours.total,
-									);
-									return (
-										<div>
-											<div className="flex justify-between text-sm mb-1">
-												<span className="text-slate-300">Display Name</span>
-												<span className={getStatusColor(rate)}>{rate}%</span>
-											</div>
-											<div className="h-2 bg-slate-800 rounded-full overflow-hidden">
-												<div
-													className={`h-full ${getProgressColor(rate)} transition-all duration-300`}
-													style={{ width: `${rate}%` }}
-												/>
-											</div>
-											<p className="text-xs text-slate-500 mt-1">
-												{report.recentProfilesQuality.last24Hours.total -
-													report.recentProfilesQuality.last24Hours
-														.missingDisplayName}{" "}
-												/{" "}
-												{report.recentProfilesQuality.last24Hours.total}{" "}
-												profiles have display name
-											</p>
-										</div>
-									);
-								})()}
-
 								{/* Bio */}
 								{(() => {
 									const rate = getCompletionRate(
@@ -309,24 +276,7 @@ export default function DataQuality() {
 						<h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">
 							Overall Field Completeness
 						</h4>
-						<div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-							<div
-								className={`rounded-lg border p-3 ${getStatusBg(
-									getCompletionRate(
-										report.profilesWithMissingData.missingDisplayName,
-										report.totalProfiles,
-									),
-								)}`}
-							>
-								<p className="text-slate-500 text-xs mb-1">Display Names</p>
-								<p className="text-slate-200 font-medium">
-									{(
-										report.totalProfiles -
-										report.profilesWithMissingData.missingDisplayName
-									).toLocaleString()}{" "}
-									/ {report.totalProfiles.toLocaleString()}
-								</p>
-							</div>
+						<div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
 							<div
 								className={`rounded-lg border p-3 ${getStatusBg(
 									getCompletionRate(

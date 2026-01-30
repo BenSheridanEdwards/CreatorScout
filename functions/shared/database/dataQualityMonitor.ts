@@ -15,7 +15,6 @@ export interface DataQualityReport {
 	timestamp: Date;
 	totalProfiles: number;
 	profilesWithMissingData: {
-		missingDisplayName: number;
 		missingBio: number;
 		missingFollowers: number;
 		missingStats: number;
@@ -23,13 +22,11 @@ export interface DataQualityReport {
 	recentProfilesQuality: {
 		last24Hours: {
 			total: number;
-			missingDisplayName: number;
 			missingBio: number;
 			missingFollowers: number;
 		};
 		lastHour: {
 			total: number;
-			missingDisplayName: number;
 			missingBio: number;
 			missingFollowers: number;
 		};
@@ -55,16 +52,7 @@ export async function checkDataQuality(): Promise<DataQualityReport> {
 	// Get all profiles
 	const totalProfiles = await prisma.profile.count();
 
-	// Count profiles with missing data
-	const missingDisplayName = await prisma.profile.count({
-		where: {
-			OR: [
-				{ displayName: null },
-				{ displayName: "" },
-			],
-		},
-	});
-
+	// Count profiles with missing data (displayName excluded - not all profiles have one)
 	const missingBio = await prisma.profile.count({
 		where: {
 			OR: [
@@ -96,7 +84,6 @@ export async function checkDataQuality(): Promise<DataQualityReport> {
 			},
 		},
 		select: {
-			displayName: true,
 			bioText: true,
 			followers: true,
 		},
@@ -109,15 +96,11 @@ export async function checkDataQuality(): Promise<DataQualityReport> {
 			},
 		},
 		select: {
-			displayName: true,
 			bioText: true,
 			followers: true,
 		},
 	});
 
-	const recent24hMissingDisplayName = recent24h.filter(
-		(p) => !p.displayName || p.displayName === "",
-	).length;
 	const recent24hMissingBio = recent24h.filter(
 		(p) => !p.bioText || p.bioText === "",
 	).length;
@@ -125,9 +108,6 @@ export async function checkDataQuality(): Promise<DataQualityReport> {
 		(p) => p.followers === null,
 	).length;
 
-	const recent1hMissingDisplayName = recent1h.filter(
-		(p) => !p.displayName || p.displayName === "",
-	).length;
 	const recent1hMissingBio = recent1h.filter(
 		(p) => !p.bioText || p.bioText === "",
 	).length;
@@ -137,29 +117,6 @@ export async function checkDataQuality(): Promise<DataQualityReport> {
 
 	// Generate alerts
 	const alerts: DataQualityReport["alerts"] = [];
-
-	// Alert if >30% of recent profiles missing displayName
-	if (recent24h.length > 0) {
-		const displayNameMissingRate =
-			recent24hMissingDisplayName / recent24h.length;
-		if (displayNameMissingRate > 0.3) {
-			alerts.push({
-				level: "error",
-				message: `High missing displayName rate: ${(displayNameMissingRate * 100).toFixed(1)}% of recent profiles`,
-				field: "displayName",
-				threshold: 0.3,
-				actual: displayNameMissingRate,
-			});
-		} else if (displayNameMissingRate > 0.15) {
-			alerts.push({
-				level: "warning",
-				message: `Elevated missing displayName rate: ${(displayNameMissingRate * 100).toFixed(1)}% of recent profiles`,
-				field: "displayName",
-				threshold: 0.15,
-				actual: displayNameMissingRate,
-			});
-		}
-	}
 
 	// Alert if >20% of recent profiles missing bio
 	if (recent24h.length > 0) {
@@ -214,7 +171,6 @@ export async function checkDataQuality(): Promise<DataQualityReport> {
 		timestamp: now,
 		totalProfiles,
 		profilesWithMissingData: {
-			missingDisplayName,
 			missingBio,
 			missingFollowers,
 			missingStats,
@@ -222,13 +178,11 @@ export async function checkDataQuality(): Promise<DataQualityReport> {
 		recentProfilesQuality: {
 			last24Hours: {
 				total: recent24h.length,
-				missingDisplayName: recent24hMissingDisplayName,
 				missingBio: recent24hMissingBio,
 				missingFollowers: recent24hMissingFollowers,
 			},
 			lastHour: {
 				total: recent1h.length,
-				missingDisplayName: recent1hMissingDisplayName,
 				missingBio: recent1hMissingBio,
 				missingFollowers: recent1hMissingFollowers,
 			},
