@@ -560,6 +560,8 @@ export async function processFollowingList(
 	sendDM: boolean = true,
 	checkContinue: () => boolean = shouldContinue,
 	onProfileProcessed?: (result: ProfileResult) => void,
+	sessionStartTime?: number,
+	maxSessionDurationMs?: number,
 ): Promise<void> {
 	const { closeModal } = await import(
 		"../functions/navigation/modalOperations/modalOperations.ts"
@@ -568,14 +570,41 @@ export async function processFollowingList(
 		"../functions/shared/config/config.ts"
 	);
 
+	// SAFETY: Absolute maximum session duration (45 minutes) regardless of settings
+	const ABSOLUTE_MAX_DURATION_MS = 45 * 60 * 1000;
+	const functionStartTime = Date.now();
+
 	logger.info("PROFILE", `Processing following list of @${seedUsername}`);
 
 	let totalProcessed = 0;
 	let followingListExhausted = false;
 	let batchNumber = 0;
 
+	// Helper to check if we've exceeded time limits
+	const isTimeExceeded = (): boolean => {
+		const now = Date.now();
+		
+		// Check absolute function duration (prevents infinite loops)
+		const functionElapsed = now - functionStartTime;
+		if (functionElapsed > ABSOLUTE_MAX_DURATION_MS) {
+			logger.warn("LIMIT", `⏰ HARD TIMEOUT: processFollowingList exceeded ${ABSOLUTE_MAX_DURATION_MS / 60000} min absolute limit`);
+			return true;
+		}
+		
+		// Check session duration if provided
+		if (sessionStartTime && maxSessionDurationMs) {
+			const sessionElapsed = now - sessionStartTime;
+			if (sessionElapsed > maxSessionDurationMs) {
+				logger.info("LIMIT", `⏰ Session duration exceeded (${Math.floor(sessionElapsed / 60000)} min)`);
+				return true;
+			}
+		}
+		
+		return false;
+	};
+
 	// Keep processing batches until the following list is exhausted
-	while (!followingListExhausted && checkContinue()) {
+	while (!followingListExhausted && checkContinue() && !isTimeExceeded()) {
 		batchNumber++;
 		logger.info("BATCH", `Starting batch #${batchNumber} for @${seedUsername}`);
 
@@ -703,7 +732,8 @@ export async function processFollowingList(
 		while (
 			batchUsernames.length < FOLLOWING_BATCH_SIZE &&
 			consecutiveEmptyBatches < maxConsecutiveEmptyBatches &&
-			checkContinue()
+			checkContinue() &&
+			!isTimeExceeded()
 		) {
 			try {
 				// Extract usernames from current modal view
@@ -864,6 +894,15 @@ export async function processFollowingList(
 
 		// Process remaining profiles in batch (direct navigation)
 		for (const username of batchUsernames.slice(1)) {
+			// Check time limits first (hard safety)
+			if (isTimeExceeded()) {
+				logger.warn(
+					"LIMIT",
+					`⏰ Session time exceeded during batch processing - stopping gracefully`,
+				);
+				followingListExhausted = true;
+				break;
+			}
 			if (!checkContinue()) {
 				logger.warn(
 					"PROFILE",

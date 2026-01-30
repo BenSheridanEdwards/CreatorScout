@@ -221,6 +221,7 @@ export const NEW_BURNER_PERIOD_DAYS = 7;
 
 export const SESSION_DURATION_MIN = 25; // minutes - real users binge
 export const SESSION_DURATION_MAX = 36; // randomized, never same beat
+export const SESSION_ABSOLUTE_MAX = 45; // HARD LIMIT - safety valve, session MUST stop
 export const SESSIONS_PER_DAY = 3;
 export const SESSION_STAGGER_MINUTES = 5; // Between profiles
 export const TOTAL_SESSION_TIME_PER_DAY = 45; // minutes per account

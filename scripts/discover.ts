@@ -249,12 +249,16 @@ async function main() {
 
 			try {
 				// Process their following list with optional DM sending
+				// Pass session timing for hard timeout safety
 				await processFollowingList(
 					target,
 					page,
 					metricsTracker,
 					sendDMs, // sendDM based on flag
 					shouldContinue,
+					undefined, // onProfileProcessed callback
+					sessionStartTime,
+					maxSessionDurationMs,
 				);
 				// Reset error counter on success
 				consecutiveErrors = 0;
