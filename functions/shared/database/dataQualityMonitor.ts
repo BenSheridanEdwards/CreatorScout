@@ -155,6 +155,20 @@ export async function checkDataQuality(): Promise<DataQualityReport> {
 		}
 	}
 
+	// Alert if engagement stats are missing (>70% threshold since not all profiles have visible stats)
+	if (totalProfiles > 0) {
+		const statsMissingRate = missingStats / totalProfiles;
+		if (statsMissingRate > 0.7) {
+			alerts.push({
+				level: "warning",
+				message: `High missing engagement stats: ${(statsMissingRate * 100).toFixed(1)}% of profiles`,
+				field: "engagementMetrics",
+				threshold: 0.7,
+				actual: statsMissingRate,
+			});
+		}
+	}
+
 	// Log alerts
 	for (const alert of alerts) {
 		if (alert.level === "error") {
