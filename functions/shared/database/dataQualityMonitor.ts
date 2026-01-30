@@ -118,38 +118,50 @@ export async function checkDataQuality(): Promise<DataQualityReport> {
 	// Generate alerts
 	const alerts: DataQualityReport["alerts"] = [];
 
-	// Alert if >20% of recent profiles missing bio
+	// Bio should be present 90%+ of the time - critical for creator detection
 	if (recent24h.length > 0) {
 		const bioMissingRate = recent24hMissingBio / recent24h.length;
-		if (bioMissingRate > 0.2) {
+		if (bioMissingRate > 0.1) {
+			// >10% missing = error (we need 90%+ bio data)
 			alerts.push({
 				level: "error",
-				message: `High missing bio rate: ${(bioMissingRate * 100).toFixed(1)}% of recent profiles`,
+				message: `High missing bio rate: ${(bioMissingRate * 100).toFixed(1)}% of recent profiles (need 90%+ coverage)`,
 				field: "bioText",
-				threshold: 0.2,
+				threshold: 0.1,
 				actual: bioMissingRate,
 			});
-		} else if (bioMissingRate > 0.1) {
+		} else if (bioMissingRate > 0.05) {
+			// >5% missing = warning
 			alerts.push({
 				level: "warning",
 				message: `Elevated missing bio rate: ${(bioMissingRate * 100).toFixed(1)}% of recent profiles`,
 				field: "bioText",
-				threshold: 0.1,
+				threshold: 0.05,
 				actual: bioMissingRate,
 			});
 		}
 	}
 
-	// Alert if >50% of recent profiles missing followers (this is more common)
+	// Followers should be present most of the time - needed for filtering
 	if (recent24h.length > 0) {
 		const followersMissingRate =
 			recent24hMissingFollowers / recent24h.length;
-		if (followersMissingRate > 0.5) {
+		if (followersMissingRate > 0.2) {
+			// >20% missing = error
 			alerts.push({
-				level: "warning",
+				level: "error",
 				message: `High missing followers rate: ${(followersMissingRate * 100).toFixed(1)}% of recent profiles`,
 				field: "followers",
-				threshold: 0.5,
+				threshold: 0.2,
+				actual: followersMissingRate,
+			});
+		} else if (followersMissingRate > 0.1) {
+			// >10% missing = warning
+			alerts.push({
+				level: "warning",
+				message: `Elevated missing followers rate: ${(followersMissingRate * 100).toFixed(1)}% of recent profiles`,
+				field: "followers",
+				threshold: 0.1,
 				actual: followersMissingRate,
 			});
 		}
