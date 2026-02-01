@@ -116,6 +116,10 @@ export class NodeScheduler {
 
 		// Generate today's schedule if needed
 		await this.generateDailySchedule();
+		
+		// Track today's date so we know when to regenerate
+		const today = this.getDateInTimezone();
+		this.lastScheduleDate = today.toISOString().split("T")[0];
 
 		// Check for missed sessions to catch up (with smart filtering)
 		if (this.config.catchUpMissedSessions) {
@@ -320,11 +324,27 @@ export class NodeScheduler {
 		return Math.abs(hash);
 	}
 
+	// Track the last day we generated a schedule for
+	private lastScheduleDate: string | null = null;
+
 	/**
 	 * Check for jobs that need to run and execute them
 	 */
 	private async checkAndRunJobs(): Promise<void> {
 		if (!this.isRunning) return;
+
+		// Check if we need to generate a new day's schedule
+		const today = this.getDateInTimezone();
+		const todayStr = today.toISOString().split("T")[0];
+		
+		if (this.lastScheduleDate !== todayStr) {
+			logger.info(
+				"SCHEDULER",
+				`New day detected (${todayStr}) - generating fresh schedule`,
+			);
+			await this.generateDailySchedule();
+			this.lastScheduleDate = todayStr;
+		}
 
 		const now = new Date();
 		const jobsToRun = this.jobQueue.filter(
