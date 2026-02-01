@@ -231,7 +231,7 @@ export const TOTAL_SESSION_TIME_PER_DAY = 45; // minutes per account
 // ═══════════════════════════════════════════════════════════════════════════════
 
 // Soft cap: max new queue adds per cycle (prevents single-network crawl explosion)
-export const MAX_QUEUE_ADDS_PER_CYCLE = 25;
+export const MAX_QUEUE_ADDS_PER_CYCLE = 50;
 
 // Batch size for processing following lists (extract this many, process, repeat)
 export const FOLLOWING_BATCH_SIZE = 30;
