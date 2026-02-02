@@ -38,7 +38,7 @@ import {
   getProfileById,
   incrementProfileAction,
 } from '../shared/profiles/profileManager.ts';
-import { createRun, updateRun } from '../shared/runs/runs.ts';
+import { createRun, updateRun, type RunIssue } from '../shared/runs/runs.ts';
 import { warmUpProfile } from '../timing/warmup/warmup.ts';
 
 const logger = createLogger();
@@ -341,6 +341,9 @@ export async function runSmartSessionDirect(
           'SESSION',
           `✅ Seed @${seed} processed: ${profilesProcessed} profiles, ${creatorsFound} creators found`,
         );
+
+        // Record success - resets consecutive error counter
+        controller.recordSuccess();
       } catch (error) {
         const errorMessage =
           error instanceof Error ? error.message : String(error);
@@ -352,6 +355,16 @@ export async function runSmartSessionDirect(
           'SESSION',
           `Error stack: ${error instanceof Error ? error.stack : 'N/A'}`,
         );
+
+        // Record error and check if session should terminate
+        const shouldTerminate = controller.recordError(errorMessage);
+        if (shouldTerminate) {
+          logger.error(
+            'SESSION',
+            `🚨 FATAL: Session terminating due to unrecoverable error`,
+          );
+          break; // Exit the main loop
+        }
       }
 
       // Log progress
@@ -404,18 +417,43 @@ export async function runSmartSessionDirect(
 
     // Check data quality after session
     try {
-      const { checkDataQualityAfterSession } = await import('../shared/database/dataQualityMonitor.ts');
+      const { checkDataQualityAfterSession } =
+        await import('../shared/database/dataQualityMonitor.ts');
       await checkDataQualityAfterSession();
     } catch (error) {
       logger.warn('SESSION', `Failed to check data quality: ${error}`);
     }
 
+    // Build issues list based on session errors
+    const issues: RunIssue[] = [];
+
+    // Add fatal error as an issue if one occurred
+    if (controller.hasFatalError()) {
+      issues.push({
+        type: 'fatal_error',
+        message: controller.getFatalError() || 'Unknown fatal error',
+        severity: 'critical',
+        detectedAt: new Date().toISOString(),
+      });
+    } else if (finalStats.consecutiveErrors > 2) {
+      issues.push({
+        type: 'consecutive_errors',
+        message: `Session had ${finalStats.consecutiveErrors} consecutive errors. Last: ${finalStats.lastError || 'Unknown'}`,
+        severity: 'warning',
+        detectedAt: new Date().toISOString(),
+      });
+    }
+
     await updateRun(runId, {
-      status: 'completed',
+      status: controller.hasFatalError() ? 'error' : 'completed',
       dmsSent: finalStats.dmsSent,
       profilesChecked: finalStats.profilesChecked,
-      profilesProcessed: finalStats.profilesChecked, // Use profilesChecked as profilesProcessed
+      profilesProcessed: finalStats.profilesChecked,
       creatorsFound: finalStats.creatorsFound,
+      errorMessage: controller.hasFatalError()
+        ? controller.getFatalError() || undefined
+        : undefined,
+      issues: issues.length > 0 ? issues : undefined,
     });
 
     logger.info('SESSION', `✓ Session completed successfully`);
@@ -441,9 +479,16 @@ export async function runSmartSessionDirect(
 
     // Send failure notification
     try {
-      await sendSessionFailureAlert(args.profileId, args.sessionType, errorMessage);
+      await sendSessionFailureAlert(
+        args.profileId,
+        args.sessionType,
+        errorMessage,
+      );
     } catch (notifyError) {
-      logger.debug('SESSION', `Failed to send failure notification: ${notifyError}`);
+      logger.debug(
+        'SESSION',
+        `Failed to send failure notification: ${notifyError}`,
+      );
     }
 
     const errorStats = controller.getStats();

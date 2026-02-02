@@ -8,311 +8,425 @@
  * - Natural stopping probability
  */
 
-import { createLogger } from "../shared/logger/logger.ts";
-import type { SessionPlan } from "./sessionPlanner.ts";
+import { createLogger } from '../shared/logger/logger.ts';
+import type { SessionPlan } from './sessionPlanner.ts';
 
 const logger = createLogger();
 
 export interface SessionStats {
-	dmsSent: number;
-	profilesChecked: number;
-	creatorsFound: number;
-	elapsedMinutes: number;
-	engagementActions: number;
+  dmsSent: number;
+  profilesChecked: number;
+  creatorsFound: number;
+  elapsedMinutes: number;
+  engagementActions: number;
+  consecutiveErrors: number;
+  lastError: string | null;
+  fatalError: string | null;
 }
 
+// Error patterns that indicate unrecoverable states
+const FATAL_ERROR_PATTERNS = [
+  'Could not find or click search input',
+  'Session expired',
+  'redirected to login',
+  'Frame is permanently detached',
+  'Not logged in',
+  'Instagram rate limiting',
+  'Circuit breaker is CLOSED',
+];
+
+// Max consecutive same-errors before termination
+const MAX_CONSECUTIVE_ERRORS = 3;
+
 export class SessionController {
-	private startTime: number;
-	private stats: SessionStats;
-	readonly plan: SessionPlan;
+  private startTime: number;
+  private stats: SessionStats;
+  readonly plan: SessionPlan;
 
-	constructor(plan: SessionPlan) {
-		this.plan = plan;
-		this.startTime = Date.now();
-		this.stats = {
-			dmsSent: 0,
-			profilesChecked: 0,
-			creatorsFound: 0,
-			elapsedMinutes: 0,
-			engagementActions: 0,
-		};
-	}
+  constructor(plan: SessionPlan) {
+    this.plan = plan;
+    this.startTime = Date.now();
+    this.stats = {
+      dmsSent: 0,
+      profilesChecked: 0,
+      creatorsFound: 0,
+      elapsedMinutes: 0,
+      engagementActions: 0,
+      consecutiveErrors: 0,
+      lastError: null,
+      fatalError: null,
+    };
+  }
 
-	/**
-	 * Record a DM sent
-	 */
-	recordDM(): void {
-		this.stats.dmsSent++;
-	}
+  /**
+   * Record an error that occurred during the session
+   * Returns true if session should terminate due to fatal error
+   */
+  recordError(errorMessage: string): boolean {
+    const normalizedError = errorMessage.toLowerCase();
 
-	/**
-	 * Record a profile checked
-	 */
-	recordProfileChecked(wasCreator: boolean = false): void {
-		this.stats.profilesChecked++;
-		if (wasCreator) {
-			this.stats.creatorsFound++;
-		}
-	}
+    // Check if this is the same error as before (consecutive)
+    if (
+      this.stats.lastError &&
+      normalizedError.includes(
+        this.stats.lastError.toLowerCase().substring(0, 30),
+      )
+    ) {
+      this.stats.consecutiveErrors++;
+    } else {
+      // Different error, reset counter
+      this.stats.consecutiveErrors = 1;
+    }
 
-	/**
-	 * Record engagement action
-	 */
-	recordEngagement(): void {
-		this.stats.engagementActions++;
-	}
+    this.stats.lastError = errorMessage;
 
-	/**
-	 * Get current stats
-	 */
-	getStats(): SessionStats {
-		this.stats.elapsedMinutes = (Date.now() - this.startTime) / 60000;
-		return { ...this.stats };
-	}
+    // Check for fatal error patterns
+    for (const pattern of FATAL_ERROR_PATTERNS) {
+      if (errorMessage.toLowerCase().includes(pattern.toLowerCase())) {
+        if (this.stats.consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
+          this.stats.fatalError = `FATAL: ${errorMessage} (occurred ${this.stats.consecutiveErrors} times consecutively)`;
+          logger.error(
+            'SESSION_CONTROL',
+            `🚨 FATAL ERROR DETECTED: ${this.stats.fatalError}`,
+          );
+          return true; // Should terminate
+        }
+        logger.warn(
+          'SESSION_CONTROL',
+          `⚠️ Potential fatal error (${this.stats.consecutiveErrors}/${MAX_CONSECUTIVE_ERRORS}): ${errorMessage}`,
+        );
+      }
+    }
 
-	/**
-	 * Check if session should continue
-	 *
-	 * Complex logic that mimics human behavior:
-	 * - Discovery should continue independently of DM status
-	 * - Stop if maxed out on DMs
-	 * - Stop if time's up
-	 * - Continue discovery even if DMs aren't being sent
-	 * - Probabilistic stopping when near target
-	 */
-	shouldContinue(): boolean {
-		const elapsed = (Date.now() - this.startTime) / 60000; // minutes
-		const maxDuration = this.plan.estimatedDuration * 1.2; // Allow 20% over
-		const remaining = maxDuration - elapsed;
-		const stats = this.getStats();
+    // Any error repeated too many times is fatal
+    if (this.stats.consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
+      this.stats.fatalError = `FATAL: Same error occurred ${this.stats.consecutiveErrors} times: ${errorMessage}`;
+      logger.error(
+        'SESSION_CONTROL',
+        `🚨 CONSECUTIVE ERROR LIMIT: ${this.stats.fatalError}`,
+      );
+      return true; // Should terminate
+    }
 
-		// Hard stop if way over max acceptable DMs
-		if (this.stats.dmsSent >= this.plan.maxAcceptable + 2) {
-			logger.info(
-				"SESSION_CONTROL",
-				`🛑 STOPPING: Exceeded max acceptable DMs (${this.stats.dmsSent} >= ${this.plan.maxAcceptable + 2}) | Stats: ${stats.profilesChecked} profiles, ${stats.creatorsFound} creators, ${elapsed.toFixed(1)} min`,
-			);
-			return false;
-		}
+    return false;
+  }
 
-		// Hard stop if time's completely up
-		if (remaining < 0) {
-			logger.info(
-				"SESSION_CONTROL",
-				`🛑 STOPPING: Time exceeded (${elapsed.toFixed(1)} >= ${maxDuration.toFixed(1)} min) | Stats: ${stats.dmsSent} DMs, ${stats.profilesChecked} profiles, ${stats.creatorsFound} creators`,
-			);
-			return false;
-		}
+  /**
+   * Record a successful operation (resets consecutive error counter)
+   */
+  recordSuccess(): void {
+    this.stats.consecutiveErrors = 0;
+    this.stats.lastError = null;
+  }
 
-		// DISCOVERY CONTINUES INDEPENDENTLY: If we're in discovery mode (targetDMs = 0) or haven't sent DMs,
-		// continue based on time and profiles checked, not DM progress
-		const isDiscoveryOnly = this.plan.targetDMs === 0;
-		const noDmsSent = this.stats.dmsSent === 0;
+  /**
+   * Check if session has a fatal error
+   */
+  hasFatalError(): boolean {
+    return this.stats.fatalError !== null;
+  }
 
-		// If discovery-only or no DMs sent yet, continue based on time and discovery progress
-		if (isDiscoveryOnly || noDmsSent) {
-			// Continue if we have time and are actively discovering
-			if (remaining > 2) {
-				logger.debug(
-					"SESSION_CONTROL",
-					`✅ CONTINUING: Discovery mode (${stats.profilesChecked} profiles checked, ${stats.creatorsFound} creators, ${remaining.toFixed(1)} min left)`,
-				);
-				return true;
-			}
-			// Even if time is low, continue if we haven't checked many profiles yet
-			if (stats.profilesChecked < 10 && remaining > 0) {
-				logger.info(
-					"SESSION_CONTROL",
-					`✅ CONTINUING: Low profile count (${stats.profilesChecked} profiles < 10, ${remaining.toFixed(1)} min left) - extending discovery`,
-				);
-				return true;
-			}
-			// If we've checked profiles but time is up
-			if (remaining <= 0) {
-				logger.info(
-					"SESSION_CONTROL",
-					`🛑 STOPPING: Discovery mode but time expired (${stats.profilesChecked} profiles, ${stats.creatorsFound} creators, ${elapsed.toFixed(1)} min elapsed)`,
-				);
-				return false;
-			}
-		}
+  /**
+   * Get the fatal error message if any
+   */
+  getFatalError(): string | null {
+    return this.stats.fatalError;
+  }
 
-		// Continue if way under minimum DMs and have time
-		if (this.stats.dmsSent < this.plan.minAcceptable && remaining > 5) {
-			logger.info(
-				"SESSION_CONTROL",
-				`✅ CONTINUING: Under minimum DMs (${this.stats.dmsSent} < ${this.plan.minAcceptable}), continuing discovery | ${stats.profilesChecked} profiles, ${remaining.toFixed(1)} min left`,
-			);
-			return true;
-		}
+  /**
+   * Record a DM sent
+   */
+  recordDM(): void {
+    this.stats.dmsSent++;
+  }
 
-		// If under target but within acceptable range
-		if (this.stats.dmsSent < this.plan.targetDMs) {
-			// Check progress vs time ratio
-			const progressRatio = this.stats.dmsSent / this.plan.targetDMs;
-			const timeRatio = elapsed / this.plan.estimatedDuration;
+  /**
+   * Record a profile checked
+   */
+  recordProfileChecked(wasCreator: boolean = false): void {
+    this.stats.profilesChecked++;
+    if (wasCreator) {
+      this.stats.creatorsFound++;
+    }
+  }
 
-			// If ahead of schedule (sent more DMs per minute than expected)
-			if (progressRatio > timeRatio * 1.1) {
-				// 30% chance to stop early (got lucky, found creators fast)
-				if (Math.random() < 0.3) {
-					logger.info(
-						"SESSION_CONTROL",
-						`🛑 STOPPING: Ahead of schedule (${this.stats.dmsSent} DMs in ${elapsed.toFixed(1)} min, ratio ${progressRatio.toFixed(2)} > ${(timeRatio * 1.1).toFixed(2)}) | ${stats.profilesChecked} profiles, ${stats.creatorsFound} creators`,
-					);
-					return false;
-				}
-			}
+  /**
+   * Record engagement action
+   */
+  recordEngagement(): void {
+    this.stats.engagementActions++;
+  }
 
-			// If behind schedule and have time, keep going (discovery continues)
-			if (remaining > 5) {
-				logger.debug(
-					"SESSION_CONTROL",
-					`✅ CONTINUING: Behind DM target with time (${this.stats.dmsSent}/${this.plan.targetDMs}, ${remaining.toFixed(1)} min left) - discovery continues | ${stats.profilesChecked} profiles`,
-				);
-				return true;
-			}
-			// If behind schedule but low time
-			if (remaining <= 5 && remaining > 2) {
-				logger.info(
-					"SESSION_CONTROL",
-					`⚠️ LOW TIME: Behind DM target (${this.stats.dmsSent}/${this.plan.targetDMs}) but only ${remaining.toFixed(1)} min left | ${stats.profilesChecked} profiles, ${stats.creatorsFound} creators`,
-				);
-				return true; // Still continue for discovery
-			}
-		}
+  /**
+   * Get current stats
+   */
+  getStats(): SessionStats {
+    this.stats.elapsedMinutes = (Date.now() - this.startTime) / 60000;
+    return { ...this.stats };
+  }
 
-		// Met target - probabilistic stopping
-		if (this.stats.dmsSent >= this.plan.targetDMs) {
-			// If low on time, stop
-			if (remaining < 5) {
-				logger.info(
-					"SESSION_CONTROL",
-					`🛑 STOPPING: Met DM target, low time (${this.stats.dmsSent} DMs >= ${this.plan.targetDMs}, ${remaining.toFixed(1)} min left) | ${stats.profilesChecked} profiles, ${stats.creatorsFound} creators`,
-				);
-				return false;
-			}
+  /**
+   * Check if session should continue
+   *
+   * Complex logic that mimics human behavior:
+   * - Discovery should continue independently of DM status
+   * - Stop if maxed out on DMs
+   * - Stop if time's up
+   * - Continue discovery even if DMs aren't being sent
+   * - Probabilistic stopping when near target
+   * - STOP IMMEDIATELY if fatal error detected
+   */
+  shouldContinue(): boolean {
+    const elapsed = (Date.now() - this.startTime) / 60000; // minutes
+    const maxDuration = this.plan.estimatedDuration * 1.2; // Allow 20% over
+    const remaining = maxDuration - elapsed;
+    const stats = this.getStats();
 
-			// If within acceptable range, 50% chance to continue "one more"
-			if (this.stats.dmsSent < this.plan.maxAcceptable) {
-				const continueChance =
-					0.5 - (this.stats.dmsSent - this.plan.targetDMs) * 0.1;
-				if (Math.random() > continueChance) {
-					logger.info(
-						"SESSION_CONTROL",
-						`🛑 STOPPING: Met target, random stop (${this.stats.dmsSent} DMs, chance ${(continueChance * 100).toFixed(0)}%) | ${stats.profilesChecked} profiles, ${stats.creatorsFound} creators`,
-					);
-					return false;
-				}
-			}
+    // CRITICAL: Stop immediately if fatal error detected
+    if (this.stats.fatalError) {
+      logger.error(
+        'SESSION_CONTROL',
+        `🛑 STOPPING: Fatal error detected - ${this.stats.fatalError}`,
+      );
+      return false;
+    }
 
-			logger.debug(
-				"SESSION_CONTROL",
-				`✅ CONTINUING: One more try (${this.stats.dmsSent}/${this.plan.targetDMs}) | ${stats.profilesChecked} profiles`,
-			);
-			return true;
-		}
+    // Stop if too many consecutive errors (even if not explicitly fatal)
+    if (this.stats.consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
+      logger.error(
+        'SESSION_CONTROL',
+        `🛑 STOPPING: Too many consecutive errors (${this.stats.consecutiveErrors}) - last error: ${this.stats.lastError}`,
+      );
+      return false;
+    }
 
-		// Default: continue if time remains (discovery continues)
-		if (remaining > 2) {
-			logger.debug(
-				"SESSION_CONTROL",
-				`✅ CONTINUING: Default case (${remaining.toFixed(1)} min remaining) | ${stats.dmsSent} DMs, ${stats.profilesChecked} profiles, ${stats.creatorsFound} creators`,
-			);
-			return true;
-		}
+    // Hard stop if way over max acceptable DMs
+    if (this.stats.dmsSent >= this.plan.maxAcceptable + 2) {
+      logger.info(
+        'SESSION_CONTROL',
+        `🛑 STOPPING: Exceeded max acceptable DMs (${this.stats.dmsSent} >= ${this.plan.maxAcceptable + 2}) | Stats: ${stats.profilesChecked} profiles, ${stats.creatorsFound} creators, ${elapsed.toFixed(1)} min`,
+      );
+      return false;
+    }
 
-		logger.info(
-			"SESSION_CONTROL",
-			`🛑 STOPPING: Default case - time too low (${remaining.toFixed(1)} min remaining) | ${stats.dmsSent} DMs, ${stats.profilesChecked} profiles, ${stats.creatorsFound} creators`,
-		);
-		return false;
-	}
+    // Hard stop if time's completely up
+    if (remaining < 0) {
+      logger.info(
+        'SESSION_CONTROL',
+        `🛑 STOPPING: Time exceeded (${elapsed.toFixed(1)} >= ${maxDuration.toFixed(1)} min) | Stats: ${stats.dmsSent} DMs, ${stats.profilesChecked} profiles, ${stats.creatorsFound} creators`,
+      );
+      return false;
+    }
 
-	/**
-	 * Get session summary for logging
-	 */
-	getSummary(): string {
-		const stats = this.getStats();
-		const targetMet = stats.dmsSent >= this.plan.minAcceptable;
-		const status = targetMet ? "✓" : "⚠";
+    // DISCOVERY CONTINUES INDEPENDENTLY: If we're in discovery mode (targetDMs = 0) or haven't sent DMs,
+    // continue based on time and profiles checked, not DM progress
+    const isDiscoveryOnly = this.plan.targetDMs === 0;
+    const noDmsSent = this.stats.dmsSent === 0;
 
-		return `${status} ${this.plan.type} session: ${stats.dmsSent} DMs (target: ${this.plan.targetDMs}), ${stats.profilesChecked} profiles, ${stats.elapsedMinutes.toFixed(1)} min`;
-	}
+    // If discovery-only or no DMs sent yet, continue based on time and discovery progress
+    if (isDiscoveryOnly || noDmsSent) {
+      // Continue if we have time and are actively discovering
+      if (remaining > 2) {
+        logger.debug(
+          'SESSION_CONTROL',
+          `✅ CONTINUING: Discovery mode (${stats.profilesChecked} profiles checked, ${stats.creatorsFound} creators, ${remaining.toFixed(1)} min left)`,
+        );
+        return true;
+      }
+      // Even if time is low, continue if we haven't checked many profiles yet
+      if (stats.profilesChecked < 10 && remaining > 0) {
+        logger.info(
+          'SESSION_CONTROL',
+          `✅ CONTINUING: Low profile count (${stats.profilesChecked} profiles < 10, ${remaining.toFixed(1)} min left) - extending discovery`,
+        );
+        return true;
+      }
+      // If we've checked profiles but time is up
+      if (remaining <= 0) {
+        logger.info(
+          'SESSION_CONTROL',
+          `🛑 STOPPING: Discovery mode but time expired (${stats.profilesChecked} profiles, ${stats.creatorsFound} creators, ${elapsed.toFixed(1)} min elapsed)`,
+        );
+        return false;
+      }
+    }
 
-	/**
-	 * Log detailed session results
-	 */
-	logResults(): void {
-		const stats = this.getStats();
-		const emoji = {
-			morning: "🌅",
-			afternoon: "☀️",
-			evening: "🌙",
-		};
+    // Continue if way under minimum DMs and have time
+    if (this.stats.dmsSent < this.plan.minAcceptable && remaining > 5) {
+      logger.info(
+        'SESSION_CONTROL',
+        `✅ CONTINUING: Under minimum DMs (${this.stats.dmsSent} < ${this.plan.minAcceptable}), continuing discovery | ${stats.profilesChecked} profiles, ${remaining.toFixed(1)} min left`,
+      );
+      return true;
+    }
 
-		const isDiscoveryOnly = this.plan.targetDMs === 0;
-		const modeLabel = isDiscoveryOnly ? " [DISCOVERY]" : "";
+    // If under target but within acceptable range
+    if (this.stats.dmsSent < this.plan.targetDMs) {
+      // Check progress vs time ratio
+      const progressRatio = this.stats.dmsSent / this.plan.targetDMs;
+      const timeRatio = elapsed / this.plan.estimatedDuration;
 
-		logger.info(
-			"SESSION_COMPLETE",
-			`${emoji[this.plan.type]} ${this.plan.type.toUpperCase()} Session Complete${modeLabel}`,
-		);
+      // If ahead of schedule (sent more DMs per minute than expected)
+      if (progressRatio > timeRatio * 1.1) {
+        // 30% chance to stop early (got lucky, found creators fast)
+        if (Math.random() < 0.3) {
+          logger.info(
+            'SESSION_CONTROL',
+            `🛑 STOPPING: Ahead of schedule (${this.stats.dmsSent} DMs in ${elapsed.toFixed(1)} min, ratio ${progressRatio.toFixed(2)} > ${(timeRatio * 1.1).toFixed(2)}) | ${stats.profilesChecked} profiles, ${stats.creatorsFound} creators`,
+          );
+          return false;
+        }
+      }
 
-		// Only show DM stats if DMs were enabled for this session
-		if (!isDiscoveryOnly) {
-			logger.info(
-				"SESSION_COMPLETE",
-				`   DMs sent: ${stats.dmsSent} (target: ${this.plan.targetDMs}, range: ${this.plan.minAcceptable}-${this.plan.maxAcceptable})`,
-			);
-		}
+      // If behind schedule and have time, keep going (discovery continues)
+      if (remaining > 5) {
+        logger.debug(
+          'SESSION_CONTROL',
+          `✅ CONTINUING: Behind DM target with time (${this.stats.dmsSent}/${this.plan.targetDMs}, ${remaining.toFixed(1)} min left) - discovery continues | ${stats.profilesChecked} profiles`,
+        );
+        return true;
+      }
+      // If behind schedule but low time
+      if (remaining <= 5 && remaining > 2) {
+        logger.info(
+          'SESSION_CONTROL',
+          `⚠️ LOW TIME: Behind DM target (${this.stats.dmsSent}/${this.plan.targetDMs}) but only ${remaining.toFixed(1)} min left | ${stats.profilesChecked} profiles, ${stats.creatorsFound} creators`,
+        );
+        return true; // Still continue for discovery
+      }
+    }
 
-		logger.info(
-			"SESSION_COMPLETE",
-			`   Profiles checked: ${stats.profilesChecked}`,
-		);
-		logger.info(
-			"SESSION_COMPLETE",
-			`   Creators found: ${stats.creatorsFound}`,
-		);
-		logger.info(
-			"SESSION_COMPLETE",
-			`   Engagements: ${stats.engagementActions}`,
-		);
-		logger.info(
-			"SESSION_COMPLETE",
-			`   Duration: ${stats.elapsedMinutes.toFixed(1)} min (estimated: ${this.plan.estimatedDuration} min)`,
-		);
+    // Met target - probabilistic stopping
+    if (this.stats.dmsSent >= this.plan.targetDMs) {
+      // If low on time, stop
+      if (remaining < 5) {
+        logger.info(
+          'SESSION_CONTROL',
+          `🛑 STOPPING: Met DM target, low time (${this.stats.dmsSent} DMs >= ${this.plan.targetDMs}, ${remaining.toFixed(1)} min left) | ${stats.profilesChecked} profiles, ${stats.creatorsFound} creators`,
+        );
+        return false;
+      }
 
-		// Status check - only relevant when DMs are enabled
-		if (!isDiscoveryOnly) {
-			if (stats.dmsSent >= this.plan.minAcceptable) {
-				logger.info("SESSION_COMPLETE", `   Status: ✓ Target met`);
-			} else {
-				logger.warn(
-					"SESSION_COMPLETE",
-					`   Status: ⚠ Under target (${stats.dmsSent} < ${this.plan.minAcceptable})`,
-				);
-			}
-		} else {
-			logger.info("SESSION_COMPLETE", `   Status: ✓ Discovery complete`);
-		}
-	}
+      // If within acceptable range, 50% chance to continue "one more"
+      if (this.stats.dmsSent < this.plan.maxAcceptable) {
+        const continueChance =
+          0.5 - (this.stats.dmsSent - this.plan.targetDMs) * 0.1;
+        if (Math.random() > continueChance) {
+          logger.info(
+            'SESSION_CONTROL',
+            `🛑 STOPPING: Met target, random stop (${this.stats.dmsSent} DMs, chance ${(continueChance * 100).toFixed(0)}%) | ${stats.profilesChecked} profiles, ${stats.creatorsFound} creators`,
+          );
+          return false;
+        }
+      }
 
-	/**
-	 * Calculate hit rate (creators per profile checked)
-	 */
-	getHitRate(): number {
-		if (this.stats.profilesChecked === 0) return 0;
-		return this.stats.creatorsFound / this.stats.profilesChecked;
-	}
+      logger.debug(
+        'SESSION_CONTROL',
+        `✅ CONTINUING: One more try (${this.stats.dmsSent}/${this.plan.targetDMs}) | ${stats.profilesChecked} profiles`,
+      );
+      return true;
+    }
 
-	/**
-	 * Calculate DMs per minute
-	 */
-	getDMsPerMinute(): number {
-		const elapsed = (Date.now() - this.startTime) / 60000;
-		if (elapsed === 0) return 0;
-		return this.stats.dmsSent / elapsed;
-	}
+    // Default: continue if time remains (discovery continues)
+    if (remaining > 2) {
+      logger.debug(
+        'SESSION_CONTROL',
+        `✅ CONTINUING: Default case (${remaining.toFixed(1)} min remaining) | ${stats.dmsSent} DMs, ${stats.profilesChecked} profiles, ${stats.creatorsFound} creators`,
+      );
+      return true;
+    }
+
+    logger.info(
+      'SESSION_CONTROL',
+      `🛑 STOPPING: Default case - time too low (${remaining.toFixed(1)} min remaining) | ${stats.dmsSent} DMs, ${stats.profilesChecked} profiles, ${stats.creatorsFound} creators`,
+    );
+    return false;
+  }
+
+  /**
+   * Get session summary for logging
+   */
+  getSummary(): string {
+    const stats = this.getStats();
+    const targetMet = stats.dmsSent >= this.plan.minAcceptable;
+    const status = targetMet ? '✓' : '⚠';
+
+    return `${status} ${this.plan.type} session: ${stats.dmsSent} DMs (target: ${this.plan.targetDMs}), ${stats.profilesChecked} profiles, ${stats.elapsedMinutes.toFixed(1)} min`;
+  }
+
+  /**
+   * Log detailed session results
+   */
+  logResults(): void {
+    const stats = this.getStats();
+    const emoji = {
+      morning: '🌅',
+      afternoon: '☀️',
+      evening: '🌙',
+    };
+
+    const isDiscoveryOnly = this.plan.targetDMs === 0;
+    const modeLabel = isDiscoveryOnly ? ' [DISCOVERY]' : '';
+
+    logger.info(
+      'SESSION_COMPLETE',
+      `${emoji[this.plan.type]} ${this.plan.type.toUpperCase()} Session Complete${modeLabel}`,
+    );
+
+    // Only show DM stats if DMs were enabled for this session
+    if (!isDiscoveryOnly) {
+      logger.info(
+        'SESSION_COMPLETE',
+        `   DMs sent: ${stats.dmsSent} (target: ${this.plan.targetDMs}, range: ${this.plan.minAcceptable}-${this.plan.maxAcceptable})`,
+      );
+    }
+
+    logger.info(
+      'SESSION_COMPLETE',
+      `   Profiles checked: ${stats.profilesChecked}`,
+    );
+    logger.info(
+      'SESSION_COMPLETE',
+      `   Creators found: ${stats.creatorsFound}`,
+    );
+    logger.info(
+      'SESSION_COMPLETE',
+      `   Engagements: ${stats.engagementActions}`,
+    );
+    logger.info(
+      'SESSION_COMPLETE',
+      `   Duration: ${stats.elapsedMinutes.toFixed(1)} min (estimated: ${this.plan.estimatedDuration} min)`,
+    );
+
+    // Status check - only relevant when DMs are enabled
+    if (!isDiscoveryOnly) {
+      if (stats.dmsSent >= this.plan.minAcceptable) {
+        logger.info('SESSION_COMPLETE', `   Status: ✓ Target met`);
+      } else {
+        logger.warn(
+          'SESSION_COMPLETE',
+          `   Status: ⚠ Under target (${stats.dmsSent} < ${this.plan.minAcceptable})`,
+        );
+      }
+    } else {
+      logger.info('SESSION_COMPLETE', `   Status: ✓ Discovery complete`);
+    }
+  }
+
+  /**
+   * Calculate hit rate (creators per profile checked)
+   */
+  getHitRate(): number {
+    if (this.stats.profilesChecked === 0) return 0;
+    return this.stats.creatorsFound / this.stats.profilesChecked;
+  }
+
+  /**
+   * Calculate DMs per minute
+   */
+  getDMsPerMinute(): number {
+    const elapsed = (Date.now() - this.startTime) / 60000;
+    if (elapsed === 0) return 0;
+    return this.stats.dmsSent / elapsed;
+  }
 }

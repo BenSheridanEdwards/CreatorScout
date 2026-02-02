@@ -1023,13 +1023,15 @@ export default function TimelineCarousel({
                             <div className='text-center mb-2'>
                               <div className='flex items-center justify-center gap-1 mb-1'>
                                 <span
-                                  className='text-lg text-emerald-400'
+                                  className={`text-lg ${card.hasIssues ? 'text-amber-400' : 'text-emerald-400'}`}
                                   aria-hidden='true'
                                 >
-                                  ✓
+                                  {card.hasIssues ? '⚠' : '✓'}
                                 </span>
-                                <p className='text-[10px] text-emerald-300 font-semibold'>
-                                  Completed
+                                <p
+                                  className={`text-[10px] font-semibold ${card.hasIssues ? 'text-amber-300' : 'text-emerald-300'}`}
+                                >
+                                  {card.hasIssues ? 'Issues' : 'Completed'}
                                 </p>
                               </div>
                               {card.duration !== undefined &&
@@ -1067,16 +1069,39 @@ export default function TimelineCarousel({
                             </div>
                           )}
                           {isError && (
-                            <div className='text-center mb-3'>
+                            <div className='text-center mb-3 px-2'>
                               <span
                                 className='text-2xl mb-2'
                                 aria-hidden='true'
                               >
-                                ✗
+                                🚨
                               </span>
-                              <p className='text-xs text-red-300 font-semibold'>
-                                Error
+                              <p className='text-xs text-red-300 font-semibold mb-1'>
+                                {card.hasIssues ? 'Fatal Error' : 'Error'}
                               </p>
+                              {card.duration !== undefined &&
+                                card.duration > 0 && (
+                                  <p className='text-[9px] font-mono text-slate-400 mb-1'>
+                                    {formatDuration(card.duration)}
+                                  </p>
+                                )}
+                              {/* Show stats even for errors */}
+                              <div className='flex justify-center gap-2 text-[9px] text-slate-400 mb-1'>
+                                {card.profilesProcessed !== undefined && (
+                                  <span title='Profiles checked'>
+                                    👤 {card.profilesProcessed}
+                                  </span>
+                                )}
+                                {card.creatorsFound !== undefined &&
+                                  card.creatorsFound > 0 && (
+                                    <span
+                                      title='Creators found'
+                                      className='text-emerald-400'
+                                    >
+                                      ⭐ {card.creatorsFound}
+                                    </span>
+                                  )}
+                              </div>
                             </div>
                           )}
 
