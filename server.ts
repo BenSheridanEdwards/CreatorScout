@@ -746,6 +746,7 @@ async function handleApi(
     const limit = parseInt(url.searchParams.get('limit') || '50', 10);
     const dmFilter = url.searchParams.get('dmFilter') || 'all';
     const maxFollowers = url.searchParams.get('maxFollowers');
+    const showHidden = url.searchParams.get('showHidden') === 'true';
 
     try {
       const prisma = getPrismaClient();
@@ -759,8 +760,13 @@ async function handleApi(
         OR?: Array<{ followers: { lte: number } } | { followers: null }>;
       } = {
         isCreator: true,
-        hidden: false, // Exclude hidden creators by default
       };
+
+      // Only exclude hidden if not explicitly showing all
+      if (!showHidden) {
+        where.hidden = false;
+      }
+
       if (dmFilter === 'pending') {
         where.dmSent = false;
       } else if (dmFilter === 'sent') {

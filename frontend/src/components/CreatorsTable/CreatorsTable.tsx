@@ -35,6 +35,7 @@ export default function CreatorsTable() {
     'pending',
   );
   const [maxFollowers, setMaxFollowers] = useState<number | null>(100000);
+  const [showHidden, setShowHidden] = useState(false);
   const [editingDmSentBy, setEditingDmSentBy] = useState<string | null>(null);
   const [editingDmSentByValue, setEditingDmSentByValue] = useState<string>('');
   const dmSentByInputRefs = useRef<Map<string, HTMLInputElement>>(new Map());
@@ -75,6 +76,7 @@ export default function CreatorsTable() {
     pageNum = 1,
     filter = dmFilter,
     maxFollowersFilter = maxFollowers,
+    showHiddenFilter = showHidden,
   ) {
     setLoading(true);
     setError(null);
@@ -86,6 +88,9 @@ export default function CreatorsTable() {
       });
       if (maxFollowersFilter !== null) {
         params.append('maxFollowers', maxFollowersFilter.toString());
+      }
+      if (showHiddenFilter) {
+        params.append('showHidden', 'true');
       }
       const res = await apiFetch(`/api/creators?${params.toString()}`);
       if (!res.ok) {
@@ -220,10 +225,25 @@ export default function CreatorsTable() {
       }
 
       await res.json();
-      // Remove from list since hidden creators are filtered out
-      setCreators((prev) => prev.filter((c) => c.username !== username));
+      // Remove from list since hidden creators are filtered out (unless showHidden is true)
+      if (!showHidden) {
+        setCreators((prev) => prev.filter((c) => c.username !== username));
+      } else {
+        // Update the hidden status in the list
+        setCreators((prev) =>
+          prev.map((c) =>
+            c.username === username
+              ? {
+                  ...c,
+                  hidden: newHiddenStatus,
+                  hiddenAt: newHiddenStatus ? new Date().toISOString() : null,
+                }
+              : c,
+          ),
+        );
+      }
       // Reload to get updated counts
-      loadCreators(page, dmFilter, maxFollowers);
+      loadCreators(page, dmFilter, maxFollowers, showHidden);
     } catch (err) {
       console.error('Failed to update hidden status:', err);
     }
@@ -248,7 +268,7 @@ export default function CreatorsTable() {
             onChange={(e) => {
               const newFilter = e.target.value as 'all' | 'pending' | 'sent';
               setDmFilter(newFilter);
-              loadCreators(1, newFilter, maxFollowers);
+              loadCreators(1, newFilter, maxFollowers, showHidden);
             }}
             className='rounded-lg border border-slate-700 bg-slate-900/50 px-3 py-1.5 text-xs font-medium text-slate-200 hover:bg-slate-800/50 focus:outline-none focus:ring-2 focus:ring-sky-500/50 focus:border-sky-500/50 transition-colors'
           >
@@ -260,9 +280,13 @@ export default function CreatorsTable() {
             <button
               type='button'
               onClick={() => {
-                const newMaxFollowers = maxFollowers === 100000 ? null : 100000;
+                // Toggle between filtered (100k, no hidden) and unfiltered (all followers, show hidden)
+                const isCurrentlyFiltered = maxFollowers === 100000;
+                const newMaxFollowers = isCurrentlyFiltered ? null : 100000;
+                const newShowHidden = isCurrentlyFiltered; // Show hidden when filter is OFF
                 setMaxFollowers(newMaxFollowers);
-                loadCreators(1, dmFilter, newMaxFollowers);
+                setShowHidden(newShowHidden);
+                loadCreators(1, dmFilter, newMaxFollowers, newShowHidden);
               }}
               className={`relative inline-flex h-6 w-11 items-center rounded-full transition-all duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 ${
                 maxFollowers === 100000
@@ -277,16 +301,18 @@ export default function CreatorsTable() {
               />
             </button>
             <span className='text-xs font-medium text-slate-300'>
-              Followers &lt; 100k
+              {maxFollowers === 100000 ? 'Followers < 100k' : 'All creators'}
             </span>
           </div>
           <button
-            onClick={() => loadCreators(page, dmFilter, maxFollowers)}
+            onClick={() =>
+              loadCreators(page, dmFilter, maxFollowers, showHidden)
+            }
             disabled={loading}
             type='button'
             className='rounded-lg border border-slate-700 bg-slate-900/50 px-3 py-1.5 text-xs font-medium text-slate-200 hover:bg-slate-800/50 hover:border-slate-600 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-sky-500/50 focus:border-sky-500/50 transition-all'
           >
-            {loading ? 'Loading...' : 'Load creators'}
+            {loading ? 'Loading...' : 'Refresh'}
           </button>
         </div>
       </header>
@@ -348,7 +374,9 @@ export default function CreatorsTable() {
               {creators.map((creator) => (
                 <tr
                   key={creator.username}
-                  className='border-b border-slate-800/50 hover:bg-slate-800/30'
+                  className={`border-b border-slate-800/50 hover:bg-slate-800/30 ${
+                    creator.hidden ? 'opacity-50 bg-red-900/10' : ''
+                  }`}
                 >
                   <td className='py-2 pr-3'>
                     <a
@@ -515,7 +543,9 @@ export default function CreatorsTable() {
           </div>
           <div className='flex gap-2'>
             <button
-              onClick={() => loadCreators(page - 1, dmFilter, maxFollowers)}
+              onClick={() =>
+                loadCreators(page - 1, dmFilter, maxFollowers, showHidden)
+              }
               disabled={page === 1 || loading}
               type='button'
               className='px-3 py-1 rounded border border-slate-700 text-slate-200 hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed'
@@ -523,7 +553,9 @@ export default function CreatorsTable() {
               Previous
             </button>
             <button
-              onClick={() => loadCreators(page + 1, dmFilter, maxFollowers)}
+              onClick={() =>
+                loadCreators(page + 1, dmFilter, maxFollowers, showHidden)
+              }
               disabled={page >= totalPages || loading}
               type='button'
               className='px-3 py-1 rounded border border-slate-700 text-slate-200 hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed'

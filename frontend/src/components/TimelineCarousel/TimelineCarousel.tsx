@@ -1003,7 +1003,7 @@ export default function TimelineCarousel({
                             <div className='text-center mb-3'>
                               <p className='text-[10px] text-sky-400 mb-1 flex items-center justify-center gap-1'>
                                 <span
-                                  className='w-1.5 h-1.5 bg-sky-400 rounded-full animate-pulse'
+                                  className='w-2 h-2 bg-sky-400 rounded-full animate-pulse'
                                   aria-hidden='true'
                                 />
                                 <span>Running</span>
