@@ -154,6 +154,13 @@ const pageMock = () =>
 				) => Promise<import("puppeteer").ElementHandle<Element> | null>
 			>()
 			.mockResolvedValue(null),
+		$$: jest
+			.fn<
+				(
+					selector: string,
+				) => Promise<import("puppeteer").ElementHandle<Element>[]>
+			>()
+			.mockResolvedValue([]),
 		keyboard: {
 			type: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
 		},
@@ -201,6 +208,14 @@ describe("profileNavigation", () => {
 					}
 					return Promise.resolve(null);
 				}) as Page["$"];
+			// Mock page.$$ to return array of elements for profile links
+			page.$$ = jest
+				.fn<
+					(
+						selector: string,
+					) => Promise<import("puppeteer").ElementHandle<Element>[]>
+				>()
+				.mockResolvedValue([mockElement]) as Page["$$"];
 			let evaluateCallCount = 0;
 			// Mock evaluate for clicking profile in search results
 			page.evaluate = jest
@@ -278,6 +293,14 @@ describe("profileNavigation", () => {
 					}
 					return Promise.resolve(null);
 				}) as Page["$"];
+			// Mock page.$$ to return array of elements for profile links
+			page.$$ = jest
+				.fn<
+					(
+						selector: string,
+					) => Promise<import("puppeteer").ElementHandle<Element>[]>
+				>()
+				.mockResolvedValue([mockElement]) as Page["$$"];
 			page.evaluate = jest
 				.fn<(pageFunction: unknown, ...args: unknown[]) => Promise<unknown>>()
 				.mockImplementation(async (fn: unknown, ...args: unknown[]) => {
