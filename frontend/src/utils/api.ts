@@ -11,6 +11,13 @@ export const API_BASE_URL = import.meta.env.VITE_API_URL || '';
 // API key for authentication - set via environment variable in Vercel
 const API_KEY = import.meta.env.VITE_API_KEY || '';
 
+// Debug logging - check if env vars were baked in at build time
+console.log('[API Config] VITE_API_URL:', API_BASE_URL || '(empty)');
+console.log(
+  '[API Config] VITE_API_KEY:',
+  API_KEY ? `${API_KEY.substring(0, 8)}...` : '(empty)',
+);
+
 /**
  * Get headers with authentication
  */
@@ -75,13 +82,23 @@ export async function apiFetch(
       ? `${API_BASE_URL}${endpoint}`
       : `${API_BASE_URL}/api${endpoint}`;
 
-  return fetch(url, {
-    ...options,
-    headers: {
-      ...getAuthHeaders(),
-      ...options?.headers,
-    },
-  });
+  console.log('[API Fetch] URL:', url);
+  console.log('[API Fetch] Has API Key:', !!API_KEY);
+
+  try {
+    const response = await fetch(url, {
+      ...options,
+      headers: {
+        ...getAuthHeaders(),
+        ...options?.headers,
+      },
+    });
+    console.log('[API Fetch] Response status:', response.status);
+    return response;
+  } catch (error) {
+    console.error('[API Fetch] Network error:', error);
+    throw error;
+  }
 }
 
 /**
