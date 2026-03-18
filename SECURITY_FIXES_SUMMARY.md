@@ -1,7 +1,7 @@
 # Security Fixes Applied - Summary Report
 
 **Date:** 2026-01-28  
-**Server:** 142.93.37.203
+**Server:** YOUR_SERVER_IP
 
 ## ✅ Successfully Applied Fixes
 
@@ -90,6 +90,6 @@ Your VPS is now significantly more secure! The critical vulnerabilities have bee
 
 **Note:** If you need to access the API from your local machine, use SSH port forwarding:
 ```bash
-ssh -L 4000:localhost:4000 root@142.93.37.203
+ssh -L 4000:localhost:4000 user@YOUR_SERVER_IP
 ```
 Then access the API at `http://localhost:4000` on your local machine.

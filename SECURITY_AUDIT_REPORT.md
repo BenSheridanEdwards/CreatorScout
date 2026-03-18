@@ -1,6 +1,6 @@
 # VPS Security Audit Report
 **Date:** 2026-01-28  
-**Server:** 142.93.37.203  
+**Server:** YOUR_SERVER_IP  
 **OS:** Ubuntu (Linux 6.8.0-71-generic)
 
 ## Executive Summary
@@ -22,7 +22,7 @@ Several critical security issues were identified that require immediate action.
 ### 2. **API Server Exposed to Internet**
 - **Status:** Port 4000 is listening on `0.0.0.0:*` (all interfaces)
 - **Risk:** High - API is accessible from anywhere without authentication
-- **Evidence:** `curl http://142.93.37.203:4000/api/health` returns data
+- **Evidence:** `curl http://YOUR_SERVER_IP:4000/api/health` returns data
 - **Impact:** Anyone can access your API endpoints
 - **Recommendation:** 
   - Restrict to localhost (127.0.0.1) if only accessed via SSH tunnel
@@ -133,7 +133,7 @@ Several critical security issues were identified that require immediate action.
    ```bash
    # On your local machine
    ssh-keygen -t ed25519
-   ssh-copy-id root@142.93.37.203
+   ssh-copy-id user@YOUR_SERVER_IP
    
    # Then on server, edit /etc/ssh/sshd_config:
    # PermitRootLogin prohibit-password

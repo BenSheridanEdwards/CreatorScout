@@ -71,7 +71,6 @@ npm run discover
 
 - ✅ No risk of suspension for automation
 - ✅ Full control over your server
-- ✅ Auto-deploy from GitHub (push to deploy)
 - ✅ Cheaper than Railway
 
 **Quick start guides:**
@@ -368,6 +367,18 @@ SKIP_VISION=false
 ```
 Your Script → AdsPower (fingerprint) → SmartProxy (residential IP) → Instagram
 ```
+
+**Ghost Cursor – Stealth Mouse & Scroll Behavior**
+
+All clicks, scrolls, and mouse movements use [ghost-cursor](https://github.com/Xetera/ghost-cursor) for human-like behavior that reduces bot detection:
+
+- **Bezier curves** – Smooth, curved mouse paths instead of straight-line teleportation
+- **Fitts's Law** – Movement speed varies by distance and target size
+- **Natural imperfections** – Overshoots, hesitations, random pauses
+- **Random click points** – Clicks within elements, not dead-center
+- **performRandomMoves** – Occasional random cursor movements between actions
+
+Combined with AdsPower fingerprints and SmartProxy IPs, this makes automation much harder for behavioral analysis to flag.
 
 **Setup Steps:**
 

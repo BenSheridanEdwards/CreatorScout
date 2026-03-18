@@ -164,7 +164,7 @@ After deployment:
 1. **Set up SSH keys** (recommended next step)
    ```bash
    # On your local machine
-   ssh-copy-id root@142.93.37.203
+   ssh-copy-id user@YOUR_SERVER_IP
    ```
 
 2. **Disable password authentication** (after SSH keys work)

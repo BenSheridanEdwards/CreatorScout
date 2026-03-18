@@ -1,8 +1,8 @@
 # VPS Access & Commands Guide
 
-**Server:** 142.93.37.203  
-**SSH Access:** `ssh root@142.93.37.203`  
-**Password:** `iNFERNO0!`
+**Server:** `YOUR_SERVER_IP`  
+**SSH Access:** `ssh user@YOUR_SERVER_IP`  
+**Auth:** Use SSH keys (disable password auth)
 
 ---
 
@@ -12,12 +12,10 @@
 
 ```bash
 # Basic SSH connection
-ssh root@142.93.37.203
+ssh user@YOUR_SERVER_IP
 
 # With port forwarding (for dashboard access)
-ssh -L 4000:localhost:4000 root@142.93.37.203
-
-# Password: iNFERNO0!
+ssh -L 4000:localhost:4000 user@YOUR_SERVER_IP
 ```
 
 ### After Connecting
@@ -399,7 +397,7 @@ pm2 logs scout | grep -i scheduler
 
 ```bash
 # From your local machine
-ssh -L 4000:localhost:4000 root@142.93.37.203
+ssh -L 4000:localhost:4000 user@YOUR_SERVER_IP
 
 # Then open in browser
 # http://localhost:4000
@@ -409,7 +407,7 @@ ssh -L 4000:localhost:4000 root@142.93.37.203
 
 ```bash
 # Check if API is accessible externally
-curl http://142.93.37.203:4000/api/health
+curl http://YOUR_SERVER_IP:4000/api/health
 
 # Note: API is restricted to localhost for security
 # Use SSH port forwarding instead

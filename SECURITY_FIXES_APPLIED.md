@@ -1,7 +1,7 @@
 # Security Fixes Applied - Summary
 
 **Date:** 2026-01-28  
-**Server:** 142.93.37.203
+**Server:** YOUR_SERVER_IP
 
 ## ✅ Security Fixes Successfully Applied
 
@@ -62,7 +62,7 @@
 
 1. **Set up SSH Key Authentication**
    - Generate SSH keys on your local machine
-   - Copy public key to server: `ssh-copy-id root@142.93.37.203`
+   - Copy public key to server: `ssh-copy-id user@YOUR_SERVER_IP`
    - Then disable password authentication in `/etc/ssh/sshd_config`
 
 2. **Disable Root Password Login**

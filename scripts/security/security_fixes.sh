@@ -80,7 +80,7 @@ echo "   Recommended: PermitRootLogin prohibit-password (after SSH keys are set 
 echo ""
 echo "   To secure SSH:"
 echo "   1. Set up SSH keys on your local machine"
-echo "   2. Copy public key to server: ssh-copy-id root@142.93.37.203"
+echo "   2. Copy public key to server: ssh-copy-id user@YOUR_SERVER_IP"
 echo "   3. Then edit /etc/ssh/sshd_config:"
 echo "      - PermitRootLogin prohibit-password"
 echo "      - PasswordAuthentication no"
