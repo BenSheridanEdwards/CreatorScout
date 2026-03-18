@@ -122,10 +122,6 @@ export const INSTAGRAM_PROFILE_WITH_CREATOR_LINK_HTML = `
 </header>
 `;
 
-/** @deprecated Use INSTAGRAM_PROFILE_WITH_CREATOR_LINK_HTML */
-export const INSTAGRAM_PROFILE_WITH_CREATOR_LINK_HTML =
-	INSTAGRAM_PROFILE_WITH_CREATOR_LINK_HTML;
-
 /**
  * Profile with Linktree link
  */

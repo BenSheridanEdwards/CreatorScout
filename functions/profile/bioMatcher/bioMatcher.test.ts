@@ -4,7 +4,7 @@
  * Bio matching logic for detecting Influencer/influencers:
  *
  * Functions:
- * - countLinkEmojis(text): Counts emojis commonly used by creators
+ * - countLinkEmojis(text): Counts link/content emojis used by creators
  * - findKeywords(text): Finds matching keywords from predefined list
  * - extractLinks(text): Extracts creator/aggregator platform links
  * - calculateScore(bio, username?): Computes creator likelihood score (0-100)
@@ -221,7 +221,7 @@ describe("bioMatcher", () => {
 		});
 
 		test("returns detailed score result for analysis", () => {
-			const [, result] = isLikelyCreator("🔥💋 Check my linktr.ee/user");
+			const [, result] = isLikelyCreator("🔗✨ Check my linktr.ee/user");
 			expect(result).toHaveProperty("score");
 			expect(result).toHaveProperty("reasons");
 			expect(result).toHaveProperty("emojis");

@@ -13,7 +13,7 @@
  * Returns: Array of { title, coverImageUrl, element } objects
  *
  * Helper Functions:
- * - isLinkInBioHighlight(title): Checks for premium content indicators
+ * - isLinkInBioHighlight(title): Checks for link-in-bio content indicators
  * - getHighlightTitlesText(highlights): Combines titles for keyword matching
  */
 
@@ -211,8 +211,8 @@ describe("getStoryHighlights", () => {
 			const highlights = await getStoryHighlights(page);
 
 			// Verify emojis are preserved in titles
-			expect(highlights[0].title).toContain("OF");
-			expect(highlights[0].title).toContain("🤍");
+			expect(highlights[0].title).toContain("Link");
+			expect(highlights[0].title).toContain("🔗");
 			expect(highlights[1].title).toContain("Music");
 			expect(highlights[1].title).toContain("✨");
 		});

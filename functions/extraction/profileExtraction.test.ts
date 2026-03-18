@@ -57,7 +57,7 @@ describe("Complete Profile Extraction", () => {
 			"Art✨",
 		]);
 
-		// Verify highlight "Link 🔗" is detected as link-in-bio - ✅ WORKING
+		// Verify link-in-bio highlights are detected
 		const { isLinkInBioHighlight } = await import(
 			"./getStoryHighlights/getStoryHighlights.ts"
 		);

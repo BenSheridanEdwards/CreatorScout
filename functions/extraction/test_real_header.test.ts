@@ -35,7 +35,7 @@ describe("Real Instagram Header Extraction Test", () => {
 		console.log("\n✨ HIGHLIGHTS:");
 		extraction.highlights.forEach((h, i) => {
 			const isLinkInBio = isLinkInBioHighlight(h.title);
-			console.log(`   ${i + 1}. "${h.title}" (link: ${isLinkInBio})`);
+			console.log(`   ${i + 1}. "${h.title}" (link-in-bio: ${isLinkInBio})`);
 		});
 
 		// Also test individual functions for comparison

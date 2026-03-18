@@ -365,7 +365,7 @@ export async function analyzeProfileComprehensive(
 		);
 		if (linkHighlights.length > 0) {
 			linkHighlights.forEach((h) => {
-				result.indicators.push(`Link highlight: "${h.title}"`);
+				result.indicators.push(`Link-in-bio highlight: "${h.title}"`);
 			});
 
 			// Boost confidence if bio also mentions highlights
@@ -378,7 +378,7 @@ export async function analyzeProfileComprehensive(
 			if (bioMentionsHighlights && linkHighlights.length > 0) {
 				result.confidence = Math.max(result.confidence, 50);
 				result.indicators.push(
-					"Bio directs to highlights with link names",
+					"Bio directs to highlights with link-in-bio names",
 				);
 			} else {
 				result.confidence = Math.max(result.confidence, 30);
@@ -392,7 +392,7 @@ export async function analyzeProfileComprehensive(
 		if (linkCount > 0) {
 			logger.info(
 				"EXTRACTION",
-				`Highlights: ${highlights.length} total, ${linkCount} link | Conf: ${result.confidence}%`,
+				`Highlights: ${highlights.length} total, ${linkCount} link-in-bio | Conf: ${result.confidence}%`,
 			);
 		}
 	}

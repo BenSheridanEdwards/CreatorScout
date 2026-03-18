@@ -4,7 +4,7 @@
  * The getLinkFromBio() function extracts external links from Instagram profile bio:
  *
  * Algorithm:
- * 1. Try selectors for known creator platforms first (Influencer, Ko-fi, etc.)
+ * 1. Try selectors for known creator platforms first (Patreon, Ko-fi, etc.)
  * 2. Then try link aggregators (Linktree, Beacons, etc.)
  * 3. Finally try generic external link selectors
  * 4. Return first valid href found, or null
