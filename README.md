@@ -17,7 +17,7 @@ npm install
 - **[AdsPower](https://adspower.net)** - Browser fingerprinting ($9/month base)
 - **[SmartProxy](https://smartproxy.com)** - Residential proxies ($12.5/GB)
 - **[OpenRouter](https://openrouter.ai)** - Vision AI ($10-30/month)
-- **Postgres Database** - Railway/Supabase/Neon (free tier available)
+- **Postgres Database** - Supabase/Neon (free tier available)
 
 **Detailed setup guide:** See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)
 
@@ -71,14 +71,10 @@ npm run discover
 
 - ✅ No risk of suspension for automation
 - ✅ Full control over your server
-- ✅ Cheaper than Railway
-
 **Quick start guides:**
 - 🚀 **[docs/QUICKSTART_VPS.md](docs/QUICKSTART_VPS.md)** - 15 minute setup (recommended)
 - 📖 **[docs/VPS_SETUP.md](docs/VPS_SETUP.md)** - Detailed walkthrough with troubleshooting
-- 🔧 **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)** - All deployment options (VPS, Railway, Local)
-
-**Why not Railway?** They prohibit scraping/automation in ToS. VPS gives you freedom.
+- 🔧 **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)** - All deployment options (VPS, Local)
 
 ## Configuration
 
@@ -280,7 +276,7 @@ Postgres via Prisma (set `DATABASE_URL`):
 - **following_scraped** - Tracks scroll position for pagination
 - **metrics** - Performance and usage statistics
 
-Apply migrations (Railway-friendly):
+Apply migrations:
 
 ```bash
 npx prisma migrate deploy

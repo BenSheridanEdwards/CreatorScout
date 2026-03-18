@@ -20,7 +20,6 @@
 - MIGRATION_SUMMARY.md - What changed and why
 
 ✅ Configuration:
-- railway.json - Railway config (kept as option)
 - .gitignore - Updated for .env and secrets
 
 ### Updated
@@ -47,10 +46,6 @@ VPS deployment is:
 - 15 min setup with automated scripts
 - Auto-deploy from GitHub
 - No ToS concerns
-
-**Alternative: Railway ($5/mo)**
-- Still supported via railway.json
-- Not recommended for automation (ToS)
 
 ## Quick Start
 
