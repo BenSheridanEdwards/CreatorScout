@@ -75,10 +75,13 @@ npm run discover
 - 🚀 **[docs/QUICKSTART_VPS.md](docs/QUICKSTART_VPS.md)** - 15 minute setup (recommended)
 - 📖 **[docs/VPS_SETUP.md](docs/VPS_SETUP.md)** - Detailed walkthrough with troubleshooting
 - 🔧 **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)** - All deployment options (VPS, Local)
+- 🔒 **[docs/SECURITY.md](docs/SECURITY.md)** - VPS security audit, hardening, and monitoring
 
 ## Configuration
 
 ## The Flow
+
+Discovery uses a **breadth-first search** of the following graph: each seed's following list is fully exhausted before moving to the next, and confirmed creators' following lists are added to the queue for expansion.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
