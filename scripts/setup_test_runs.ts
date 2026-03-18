@@ -59,7 +59,7 @@ async function createTestRuns() {
 			{
 				username: "creator1",
 				confidence: 95,
-				reason: "direct_patreon_link",
+				reason: "direct_creator_link",
 				timestamp: new Date(Date.now() - 3600000).toISOString(),
 			},
 			{

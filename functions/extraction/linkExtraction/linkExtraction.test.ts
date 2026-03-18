@@ -97,7 +97,7 @@ describe("linkExtraction", () => {
 	// ═══════════════════════════════════════════════════════════════════════════
 
 	describe("hasDirectCreatorLink()", () => {
-		test("returns true when creator link is present", () => {
+		test("returns true when Influencer link is present", () => {
 			expect(hasDirectCreatorLink(["https://patreon.com/creator"])).toBe(true);
 		});
 
@@ -105,7 +105,7 @@ describe("linkExtraction", () => {
 			expect(hasDirectCreatorLink(["https://example.com"])).toBe(false);
 		});
 
-		test("returns true for case-insensitive Patreon URLs", () => {
+		test("returns true for case-insensitive creator URLs", () => {
 			expect(hasDirectCreatorLink(["https://PATREON.COM/creator"])).toBe(true);
 		});
 	});
@@ -165,11 +165,11 @@ describe("linkExtraction", () => {
 	});
 
 	// ═══════════════════════════════════════════════════════════════════════════
-	// analyzeExternalLink() - Linktree Creator Signal Detection
+	// analyzeExternalLink() - Definitive Creator Signal Detection
 	// ═══════════════════════════════════════════════════════════════════════════
 
-	describe("analyzeExternalLink() - Content Warning Gates", () => {
-		test("detects Linktree creator signal as definitive creator signal (100% confidence)", async () => {
+	describe("analyzeExternalLink() - Definitive Creator Signals", () => {
+		test("returns 100% confidence when definitive creator signal present (patreon)", async () => {
 			const mockPage: Record<string, unknown> = {
 				url: jest
 					.fn<() => string>()
@@ -187,33 +187,22 @@ describe("linkExtraction", () => {
 							hasSubscribeButton: boolean;
 							hasPricingIndicator: boolean;
 							hasMonetizationIndicator: boolean;
-							hasSensitiveContentGate: boolean;
-							hasMatureContentGate: boolean;
 							creatorPatterns: string[];
 						}>
 					>()
 					.mockResolvedValue({
-						title: "m0mmyashleyy | Instagram, TikTok | Linktree",
-						texts: [
-							"Sensitive Content",
-							"This link may contain content that is not appropriate for all audiences",
-							"Continue",
-							"MOMMY HAS PLANS WITH YOU 🍒⛓",
-						],
-						fullText:
-							"content verification this link may contain content that is not appropriate for all audiences continue support my work 🍒⛓",
+						title: "User Profile | Linktree",
+						texts: ["Support me on Patreon"],
+						fullText: "support me on patreon",
 						imageAlts: [],
 						socialIcons: [],
 						hasEmailForm: false,
 						hasSubscribeButton: false,
 						hasPricingIndicator: false,
 						hasMonetizationIndicator: false,
-						hasSensitiveContentGate: true,
-						hasMatureContentGate: false,
-						creatorPatterns: [],
+						creatorPatterns: ["patreon"],
 					}),
 			};
-			// Add browser() method that returns a mock browser with pages()
 			mockPage.browser = () => ({
 				pages: () => Promise.resolve([mockPage]),
 			});
@@ -225,75 +214,13 @@ describe("linkExtraction", () => {
 
 			expect(result.isCreator).toBe(true);
 			expect(result.confidence).toBe(100);
-			expect(result.reason).toBe("sensitive_content_gate");
+			expect(result.reason).toBe("patreon");
 			expect(result.indicators).toContain(
-				"CONTENT GATE - Linktree premium content warning",
+				"PATREON - definitive creator signal",
 			);
 		});
 
-		test("detects link.me creator signal as definitive creator signal (100% confidence)", async () => {
-			const mockPage: Record<string, unknown> = {
-				url: jest
-					.fn<() => string>()
-					.mockReturnValue("https://link.me/testuser"),
-				goto: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
-				evaluate: jest
-					.fn<
-						() => Promise<{
-							title: string;
-							texts: string[];
-							fullText: string;
-							imageAlts: string[];
-							socialIcons: string[];
-							hasEmailForm: boolean;
-							hasSubscribeButton: boolean;
-							hasPricingIndicator: boolean;
-							hasMonetizationIndicator: boolean;
-							hasSensitiveContentGate: boolean;
-							hasMatureContentGate: boolean;
-							creatorPatterns: string[];
-						}>
-					>()
-					.mockResolvedValue({
-						title: "User Profile | link.me",
-						texts: [
-							"Mature Content",
-							"Mature Content Disclaimer",
-							"This content is requires verification exclusive",
-							"Continue",
-						],
-						fullText:
-							"mature content content disclaimer this content is requires verification exclusive continue",
-						imageAlts: [],
-						socialIcons: [],
-						hasEmailForm: false,
-						hasSubscribeButton: false,
-						hasPricingIndicator: false,
-						hasMonetizationIndicator: false,
-						hasSensitiveContentGate: false,
-						hasMatureContentGate: true,
-						creatorPatterns: [],
-					}),
-			};
-			// Add browser() method that returns a mock browser with pages()
-			mockPage.browser = () => ({
-				pages: () => Promise.resolve([mockPage]),
-			});
-
-			const result = await analyzeExternalLink(
-				mockPage as unknown as Page,
-				"https://link.me/testuser",
-			);
-
-			expect(result.isCreator).toBe(true);
-			expect(result.confidence).toBe(100);
-			expect(result.reason).toBe("mature_content_gate");
-			expect(result.indicators).toContain(
-				"CONTENT GATE - link.me premium content disclaimer",
-			);
-		});
-
-		test("returns lower confidence when no content warning gates present", async () => {
+		test("returns lower confidence when no definitive creator signals present", async () => {
 			const mockPage: Record<string, unknown> = {
 				url: jest
 					.fn<() => string>()
@@ -311,8 +238,6 @@ describe("linkExtraction", () => {
 							hasSubscribeButton: boolean;
 							hasPricingIndicator: boolean;
 							hasMonetizationIndicator: boolean;
-							hasSensitiveContentGate: boolean;
-							hasMatureContentGate: boolean;
 							creatorPatterns: string[];
 						}>
 					>()
@@ -326,8 +251,6 @@ describe("linkExtraction", () => {
 						hasSubscribeButton: false,
 						hasPricingIndicator: false,
 						hasMonetizationIndicator: false,
-						hasSensitiveContentGate: false,
-						hasMatureContentGate: false,
 						creatorPatterns: [],
 					}),
 			};
@@ -341,7 +264,7 @@ describe("linkExtraction", () => {
 				"https://linktr.ee/testuser",
 			);
 
-			// Without content warning gates, should have lower confidence
+			// Without definitive creator signals, should have lower confidence
 			// (Aggregator platform gives 40% base confidence)
 			expect(result.confidence).toBeLessThan(100);
 		});

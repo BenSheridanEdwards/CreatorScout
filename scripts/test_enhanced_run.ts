@@ -20,7 +20,7 @@ async function testEnhancedRun() {
 	await addCreatorToRun(runId, {
 		username: "test_creator_1",
 		confidence: 95,
-		reason: "direct_patreon_link",
+		reason: "direct_creator_link",
 		timestamp: new Date().toISOString(),
 		screenshotPath: "/screenshots/2025-12-24/profile_test_creator_1.png",
 	});
@@ -82,7 +82,7 @@ async function testEnhancedRun() {
 	await addCreatorToRun(runId, {
 		username: "test_creator_3",
 		confidence: 100,
-		reason: "patreon_link_found",
+		reason: "creator_link_found",
 		timestamp: new Date().toISOString(),
 	});
 

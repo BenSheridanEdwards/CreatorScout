@@ -2,7 +2,7 @@
  * Get following list from a specific Instagram profile
  *
  * Usage: tsx scripts/get_following.ts <username> [count]
- * Example: tsx scripts/get_following.ts patreon_creator 50
+ * Example: tsx scripts/get_following.ts influencer_username 50
  */
 
 import { initializeInstagramSession } from "../functions/auth/sessionInitializer/sessionInitializer.ts";
@@ -71,7 +71,7 @@ const count = parseInt(process.argv[3]) || 20;
 if (!username) {
 	console.error("❌ Please provide a username");
 	console.error("Usage: tsx scripts/get_following.ts <username> [count]");
-	console.error("Example: tsx scripts/get_following.ts patreon_creator 50");
+	console.error("Example: tsx scripts/get_following.ts influencer_username 50");
 	process.exit(1);
 }
 

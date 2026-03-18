@@ -676,7 +676,7 @@ export async function runScrapeLoop(
  * Main scrape function - does the full automation flow
  */
 export async function scrape(debug: boolean = false): Promise<void> {
-	logger.info("ACTION", "Scout - Instagram Patreon Creator Discovery Agent");
+	logger.info("ACTION", "Creator Scout - Instagram Influencer Discovery Agent");
 
 	// Initialize metrics tracking
 	const metricsTracker = getGlobalMetricsTracker();

@@ -1,5 +1,5 @@
 /**
- * Scout - Instagram Creator Discovery Agent
+ * Creator Scout - Instagram Influencer Discovery Agent
  *
  * Usage: tsx scripts/discover.ts --profile <profile> [--send-dms] [--debug]
  * Example: tsx scripts/discover.ts --profile test-account
@@ -40,7 +40,7 @@ if (!profileConfig) {
 	process.exit(1);
 }
 
-console.log(`🔍 Scout - Instagram Creator Discovery Agent`);
+console.log(`🔍 Creator Scout - Instagram Influencer Discovery Agent`);
 console.log(`📋 Using profile: @${profileConfig.username}`);
 console.log(`🌐 AdsPower ID: ${profileConfig.adsPowerProfileId}`);
 console.log("");
@@ -79,7 +79,7 @@ async function main() {
 	console.log("🚀 Starting Instagram Creator Discovery...");
 	console.log("📋 This will:");
 	console.log("   • Load seed profiles from data/seeds.txt");
-	console.log("   • Analyze bios for influencer indicators");
+	console.log("   • Analyze bios for Influencer indicators");
 	console.log("   • 🔗 CLICK links in bios and analyze with AI vision");
 	console.log("   • 👥 Follow confirmed creators");
 	if (sendDMs) {

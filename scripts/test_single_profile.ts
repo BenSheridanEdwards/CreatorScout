@@ -76,13 +76,13 @@ interface ProfileTestResult {
 	// Vision analysis (if screenshots taken)
 	vision: {
 		profileAnalysis: {
-			is_adult_creator: boolean;
+			isCreator: boolean;
 			confidence: number;
 			indicators: string[];
 			reason: string;
 		} | null;
 		linkPageAnalysis: {
-			is_adult_creator: boolean;
+			isCreator: boolean;
 			confidence: number;
 			indicators: string[];
 			platform_links: string[];
@@ -264,13 +264,13 @@ async function testProfile(username: string): Promise<ProfileTestResult> {
 			const profileVision = await analyzeProfile(result.screenshots.profile);
 			if (profileVision) {
 				result.vision.profileAnalysis = {
-					is_adult_creator: profileVision.is_adult_creator,
+					isCreator: profileVision.isCreator,
 					confidence: profileVision.confidence,
 					indicators: profileVision.indicators,
 					reason: profileVision.reason,
 				};
 				console.log(
-					`[VISION] Is influencer: ${profileVision.is_adult_creator}`,
+					`[VISION] Is influencer: ${profileVision.isCreator}`,
 				);
 				console.log(`[VISION] Confidence: ${profileVision.confidence}`);
 				console.log(
@@ -346,7 +346,7 @@ async function testProfile(username: string): Promise<ProfileTestResult> {
 					);
 					// Use text analysis results as "vision" results for consistency
 					result.vision.linkPageAnalysis = {
-						is_adult_creator: textAnalysis.isCreator,
+						isCreator: textAnalysis.isCreator,
 						confidence: textAnalysis.confidence,
 						indicators: textAnalysis.indicators,
 						platform_links: [],
@@ -363,14 +363,14 @@ async function testProfile(username: string): Promise<ProfileTestResult> {
 						);
 						if (linkVision) {
 							result.vision.linkPageAnalysis = {
-								is_adult_creator: linkVision.is_adult_creator,
+								isCreator: linkVision.isCreator,
 								confidence: linkVision.confidence,
 								indicators: linkVision.indicators,
 								platform_links: linkVision.platform_links,
 								reason: linkVision.reason,
 							};
 							console.log(
-								`[VISION] Is influencer: ${linkVision.is_adult_creator}`,
+								`[VISION] Is influencer: ${linkVision.isCreator}`,
 							);
 							console.log(`[VISION] Confidence: ${linkVision.confidence}`);
 							console.log(
@@ -498,14 +498,14 @@ async function testProfile(username: string): Promise<ProfileTestResult> {
 
 		const isCreator =
 			result.analysis.isCreator ||
-			result.vision.profileAnalysis?.is_adult_creator ||
-			result.vision.linkPageAnalysis?.is_adult_creator ||
+			result.vision.profileAnalysis?.isCreator ||
+			result.vision.linkPageAnalysis?.isCreator ||
 			maxConfidence >= 70;
 
 		let primaryReason = "No strong indicators found";
-		if (result.vision.linkPageAnalysis?.is_adult_creator) {
+		if (result.vision.linkPageAnalysis?.isCreator) {
 			primaryReason = `Link page confirms: ${result.vision.linkPageAnalysis.reason}`;
-		} else if (result.vision.profileAnalysis?.is_adult_creator) {
+		} else if (result.vision.profileAnalysis?.isCreator) {
 			primaryReason = `Profile analysis confirms: ${result.vision.profileAnalysis.reason}`;
 		} else if (result.analysis.isCreator) {
 			primaryReason =

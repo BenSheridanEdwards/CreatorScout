@@ -4,7 +4,7 @@
  * The getLinkFromBio() function extracts external links from Instagram profile bio:
  *
  * Algorithm:
- * 1. Try selectors for known creator platforms first (Patreon, Ko-fi, etc.)
+ * 1. Try selectors for known creator platforms first (Influencer, Ko-fi, etc.)
  * 2. Then try link aggregators (Linktree, Beacons, etc.)
  * 3. Finally try generic external link selectors
  * 4. Return first valid href found, or null
@@ -55,7 +55,7 @@ describe("getLinkFromBio", () => {
 			expect(result).toBe("https://example.com");
 		});
 
-		test("returns creator link when found first", async () => {
+		test("returns Influencer link when found first", async () => {
 			const page = createPageMock({
 				$: jest.fn<Page["$"]>().mockResolvedValue({
 					evaluate: jest
@@ -92,7 +92,7 @@ describe("getLinkFromBio", () => {
 			expect(link).toContain("l.instagram.com");
 		});
 
-		test("extracts creator link from DOM", async () => {
+		test("extracts Influencer link from DOM", async () => {
 			const page = createPageWithDOM(INSTAGRAM_PROFILE_WITH_CREATOR_LINK_HTML);
 			const link = await getLinkFromBio(page);
 

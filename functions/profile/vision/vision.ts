@@ -35,48 +35,31 @@ function isRateLimitError(error: unknown): boolean {
 
 const LINKTREE_PROMPT = `You are analyzing a screenshot of a link page (linktree, beacons, hoo.be, allmylinks, etc.) for an Instagram user.
 
-Your task: Determine if this person is an creator (Patreon, Ko-fi, etc.) - NOT a regular influencer.
+Your task: Determine if this person is an influencer with monetization links (Patreon, Ko-fi, linktree, etc.) - someone who earns from their audience.
 
 **CRITICAL - READ FIRST**:
-Regular influencers with shopping links, brand deals, and social media are NOT influencers.
-Only mark as influencer if you see EXPLICIT adult platform links or content warnings.
+People with only shopping links or brand deals are still influencers. Look for: Patreon, Ko-fi, "Buy me a coffee", subscription links, tip jars, or link-in-bio with monetization.
 
-**INSTANT DISQUALIFIERS (is_adult_creator = FALSE, confidence = 0)**:
-- Shopping links ONLY: Amazon Storefront, Depop, Poshmark, Etsy, Shopify stores
-- Regular social media ONLY: TikTok, YouTube, Pinterest, Spotify, Twitter/X, Snapchat
-- Brand discount codes (e.g., "Shop Edikted code 'xxx'", "Use code xxx for 10% off")
-- Fashion/lifestyle content without adult platform links
-- Business inquiries/contact info without premium content signals
-- Music/podcast/gaming links
-- If the page has NO adult platform links AND only has shopping/social links = NOT an influencer
+**INSTANT DISQUALIFIERS (isCreator = FALSE, confidence = 0)**:
+- No external links at all
+- Only personal website with no monetization
+- Only music/podcast with no support links
 
-**DEFINITIVE ADULT CREATOR SIGNALS (is_adult_creator = TRUE)**:
-- Direct links to: Patreon, Ko-fi, FanVue, Fanfix, LoyalFans, ManyVids, Pornhub
-- Patreon logo/branding (distinctive "OF" logo with wing element) = 100% confidence
-- Text: "exclusive", "NSFW", "Adults only", "Must be exclusive"
-- Content warning gates: "Sensitive Content", "Mature Content Disclaimer", age verification
-- "Exclusive Content" or "Premium Content" WITH adult platform link
-- "Subscribe to see more" WITH adult platform link
-- Hidden/secret content buttons: "My Hidden", "Hidden Content", "My Secret", "Secret Content" = DEFINITIVE influencer signal
-- Chili pepper emoji button (🌶️) alone or as link = coded "spicy" premium content indicator
-- Buttons with emoji-only text like 🌶️ or "🔥" combined with creator profile pic = influencer
-
-**NOT ENOUGH ON THEIR OWN** (need adult platform link to confirm):
-- Link photos (could be fitness/fashion influencer)
-- "Content creator" label (applies to all influencers)
-- Emojis like 🔥💋🍑 in bio text (common for fashion/beauty too)
-- "DM for collabs" (standard influencer language)
+**DEFINITIVE INFLUENCER SIGNALS (isCreator = TRUE)**:
+- Direct links to: Patreon, Ko-fi, Buy Me a Coffee, Stan Store, Fanhouse
+- "Subscribe", "Support me", "Tip jar", "Exclusive content" with link
+- Linktree/Beacons with multiple monetization buttons
+- "Link in bio" with subscription or payment platform
 
 **DECISION LOGIC**:
-1. If page has adult platform links (Patreon, Ko-fi, etc.) → is_adult_creator = TRUE
-2. If page has "My Hidden", "My Secret", or similar hidden content buttons → is_adult_creator = TRUE
-3. If page has chili pepper emoji (🌶️) button especially with creator profile → is_adult_creator = TRUE  
-4. If page has ONLY shopping + social media links → is_adult_creator = FALSE
-5. If unsure and no adult platform visible → is_adult_creator = FALSE
+1. If page has Patreon, Ko-fi, or similar monetization links → isCreator = TRUE
+2. If page has "Subscribe" or "Support" with payment link → isCreator = TRUE
+3. If page has ONLY shopping + social media links → isCreator = FALSE
+4. If unsure and no monetization visible → isCreator = FALSE
 
 Return EXACTLY this JSON:
 {
-  "is_adult_creator": true or false,
+  "isCreator": true or false,
   "confidence": 0-100,
   "platform_links": ["patreon.com/xxx", "ko-fi.com/xxx"] or [],
   "indicators": ["what you observed"] or [],
@@ -85,41 +68,32 @@ Return EXACTLY this JSON:
 
 const PROFILE_PROMPT = `You are analyzing a screenshot of an Instagram profile page. This includes the bio, story highlights, and profile header.
 
-Determine if this person is an Patreon/premium content creator.
+Determine if this person is an influencer with monetization (Patreon, Ko-fi, link-in-bio, etc.).
 
 STRONG INDICATORS (high confidence if present):
-- Story highlight titles like: "My 🔗", "Official Accounts", "Links", "Menu", "Rates", "Custom", "DM"
+- Story highlight titles like: "My 🔗", "Links", "Menu", "Rates", "Custom", "DM"
 - Bio text directing to highlights: "Check my highlight 🔗", "See highlights for links"
-- Link highlight cover images (lingerie, swimwear, revealing clothing, provocative poses)
-- Bio keywords: "Patreon", "Ko-fi", "Exclusive Content", "Premium", "VIP", "Custom Content"
-- Username contains: "mistress", "goddess", "princess", "model", "creator"
+- Bio keywords: "Patreon", "Ko-fi", "Exclusive Content", "Premium", "VIP", "Link in bio"
+- Username contains: "creator", "artist", "content"
 - High follower count relative to following count
 
 MODERATE INDICATORS (consider with other factors):
-- Link emojis in bio or highlights: 🔥💋🍑🍒💦😈👅🥵🖤
-- Highlight titles with link emoji (🔗) combined with link imagery
+- Highlight titles with link emoji (🔗)
 - Bio mentions: "DM for", "Custom", "Rates", "Menu", "Available", "Booking"
-- Multiple story highlights suggesting multiple platforms/accounts
-- Category label: "Blogger", "Creator", "Model"
-
-VISUAL ANALYSIS:
-- Look at story highlight cover images for link content (lingerie, revealing clothing, provocative poses)
-- Check if highlight titles match link cover images
-- Look for text overlays on highlight covers (e.g., "what you need", "all you need")
-
-IMPORTANT: A profile with "Check my highlight 🔗" + link highlight covers + high follower ratio = HIGH confidence even without explicit creator link in bio.
+- Multiple story highlights suggesting multiple platforms
+- Category label: "Blogger", "Creator", "Artist"
 
 Return EXACTLY this JSON:
 {
-  "is_adult_creator": true or false,
+  "isCreator": true or false,
   "confidence": 0-100,
   "platform_links": [] or ["patreon.com/xxx"] if visible,
-  "indicators": ["Link highlight covers", "Bio directs to highlights", "High follower ratio", ...] or [],
+  "indicators": ["Link in bio", "Bio directs to highlights", "High follower ratio", ...] or [],
   "reason": "brief explanation (max 15 words)"
 }`;
 
 export interface VisionAnalysisResult {
-	is_adult_creator: boolean;
+	isCreator: boolean;
 	confidence: number;
 	platform_links: string[];
 	indicators: string[];
@@ -237,10 +211,6 @@ function _hasExclusiveDiscountSignal(data: VisionAnalysisResult): boolean {
 		"premium content",
 		"vip access",
 		"private content",
-		"uncensored",
-		"unfiltered",
-		"nsfw",
-		"exclusive",
 	]);
 
 	const discount = _containsAny(text, [
@@ -268,13 +238,13 @@ export async function isConfirmedCreator(
 	const allText = [...indicators, reason].join(" ").toLowerCase();
 	const platformLinks = data.platform_links || [];
 
-	// If vision found actual adult platform links, trust it
-	const hasAdultPlatformLink = platformLinks.some((link) =>
-		/patreon|ko-fi|fanvue|loyalfans|manyvids|pornhub/i.test(link),
+	// If vision found actual monetization platform links, trust it
+	const hasMonetizationLink = platformLinks.some((link) =>
+		/patreon|ko-fi|buymeacoffee|linktr\.ee|beacons\.ai|stan\.store|fanhouse/i.test(link),
 	);
 
-	if (hasAdultPlatformLink) {
-		data.is_adult_creator = true;
+	if (hasMonetizationLink) {
+		data.isCreator = true;
 		data.confidence = 100;
 		return [true, data];
 	}
@@ -300,39 +270,32 @@ export async function isConfirmedCreator(
 		"regular influencer",
 		"fashion influencer",
 		"not an influencer",
-		"no adult",
 	];
 
 	for (const disqualifier of disqualifiers) {
 		if (allText.includes(disqualifier)) {
-			data.is_adult_creator = false;
+			data.isCreator = false;
 			data.confidence = 0;
 			return [false, data];
 		}
 	}
 
-	// DEFINITIVE SIGNALS: Only adult platform names (not vague terms)
+	// DEFINITIVE SIGNALS: Monetization platform names
 	const definitiveSignals = [
 		{ text: "patreon", label: "PATREON" },
-		{ text: "creator link", label: "PATREON" },
-		{ text: "patreon logo", label: "PATREON LOGO" },
 		{ text: "ko-fi", label: "KO-FI" },
-		{ text: "fanvue", label: "FANVUE" },
-		{ text: "loyalfans", label: "LOYALFANS" },
-		{ text: "loyal fans", label: "LOYALFANS" },
-		{ text: "manyvids", label: "MANYVIDS" },
-		{ text: "nsfw", label: "NSFW" },
-		{ text: "exclusive", label: "exclusive" },
-		{ text: "+18", label: "exclusive" },
-		{ text: "adults only", label: "ADULTS ONLY" },
-		{ text: "content disclaimer", label: "MATURE CONTENT DISCLAIMER" },
-		{ text: "age verification", label: "AGE VERIFICATION" },
-		{ text: "sensitive content warning", label: "CONTENT WARNING" },
+		{ text: "buy me a coffee", label: "BUY ME A COFFEE" },
+		{ text: "link in bio", label: "LINK IN BIO" },
+		{ text: "linktree", label: "LINKTREE" },
+		{ text: "exclusive content", label: "EXCLUSIVE CONTENT" },
+		{ text: "premium content", label: "PREMIUM CONTENT" },
+		{ text: "subscribe", label: "SUBSCRIBE" },
+		{ text: "support me", label: "SUPPORT" },
 	];
 
 	for (const signal of definitiveSignals) {
 		if (allText.includes(signal.text)) {
-			data.is_adult_creator = true;
+			data.isCreator = true;
 			data.confidence = 100;
 			if (!indicators.some((i) => i.toLowerCase().includes(signal.text))) {
 				indicators.push(`${signal.label} - definitive creator signal`);
@@ -344,7 +307,7 @@ export async function isConfirmedCreator(
 
 	// Trust the vision model's decision if it meets threshold
 	// No more heuristic overrides - they cause false positives
-	const isConfirmed = data.is_adult_creator && data.confidence >= threshold;
+	const isConfirmed = data.isCreator && data.confidence >= threshold;
 
 	return [isConfirmed, data];
 }

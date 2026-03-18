@@ -32,14 +32,14 @@ jest.unstable_mockModule("../../shared/database/database.ts", () => ({
 const analyzeProfileMock = jest
 	.fn<
 		(imagePath: string) => Promise<{
-			is_adult_creator: boolean;
+			isCreator: boolean;
 			confidence: number;
 			indicators?: string[];
 			reason?: string;
 		} | null>
 	>()
 	.mockResolvedValue({
-		is_adult_creator: true,
+		isCreator: true,
 		confidence: 60,
 		indicators: ["vision"],
 		reason: "vision_reason",
@@ -194,7 +194,7 @@ describe("profileAnalysis", () => {
 		jest.clearAllMocks();
 		sleepMock.mockResolvedValue(undefined);
 		analyzeProfileMock.mockResolvedValue({
-			is_adult_creator: true,
+			isCreator: true,
 			confidence: 60,
 			indicators: ["vision"],
 			reason: "vision_reason",
@@ -250,7 +250,7 @@ describe("profileAnalysis", () => {
 								"followers",
 								"200",
 								"following",
-								"influencer bio",
+								"Influencer bio",
 								"Follow",
 							];
 						}
@@ -259,7 +259,7 @@ describe("profileAnalysis", () => {
 							fnStr.includes("statsLinks") ||
 							fnStr.includes("statsContainer")
 						) {
-							return "influencer bio";
+							return "Influencer bio";
 						}
 						return null;
 					}
@@ -353,7 +353,7 @@ describe("profileAnalysis", () => {
 								"followers",
 								"5",
 								"following",
-								"influencer",
+								"Influencer",
 								"Follow",
 							];
 						}
@@ -362,7 +362,7 @@ describe("profileAnalysis", () => {
 							fnStr.includes("statsLinks") ||
 							fnStr.includes("statsContainer")
 						) {
-							return "influencer";
+							return "Influencer";
 						}
 						// Stats extraction (has /followers/ or /following/ patterns)
 						if (
@@ -390,7 +390,7 @@ describe("profileAnalysis", () => {
 			expect(updateProfileFromAnalysisMock).toHaveBeenCalledWith(
 				"user",
 				expect.objectContaining({
-					bio: "influencer",
+					bio: "Influencer",
 					links: expect.arrayContaining(["https://linktr.ee/user"]),
 				}),
 			);
@@ -414,7 +414,7 @@ describe("profileAnalysis", () => {
 								"followers",
 								"50",
 								"following",
-								"Patreon exclusive content",
+								"Influencer exclusive content",
 								"Follow",
 							];
 						}
@@ -423,7 +423,7 @@ describe("profileAnalysis", () => {
 							fnStr.includes("statsLinks") ||
 							fnStr.includes("statsContainer")
 						) {
-							return "Patreon exclusive content";
+							return "Influencer exclusive content";
 						}
 						// Stats extraction (has /followers/ or /following/ patterns)
 						if (
@@ -442,12 +442,12 @@ describe("profileAnalysis", () => {
 			expect(Array.isArray(result.indicators)).toBe(true);
 		});
 
-		test("sets isCreator true when direct creator link found", async () => {
+		test("sets isCreator true when direct Influencer link found", async () => {
 			const page = pageMock();
 			page.content = jest
 				.fn<() => Promise<string>>()
 				.mockResolvedValue(
-					'<html><body><a href="https://patreon.com/user">Patreon</a></body></html>',
+					'<html><body><a href="https://patreon.com/user">Influencer</a></body></html>',
 				);
 			// Mock evaluate - detect function patterns instead of executing
 			page.evaluate = jest
@@ -483,7 +483,7 @@ describe("profileAnalysis", () => {
 
 			const result = await analyzeProfileComprehensive(page, "user");
 
-			// Should detect creator link
+			// Should detect Influencer link
 			expect(result.links.length).toBeGreaterThan(0);
 		});
 

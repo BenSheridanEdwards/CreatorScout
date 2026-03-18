@@ -2,7 +2,7 @@
  * Analyze a single Instagram profile
  *
  * Usage: tsx scripts/analyze_profile.ts <username>
- * Example: tsx scripts/analyze_profile.ts patreon_creator
+ * Example: tsx scripts/analyze_profile.ts influencer_username
  */
 
 import { initializeInstagramSession } from "../functions/auth/sessionInitializer/sessionInitializer.ts";

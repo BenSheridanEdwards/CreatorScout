@@ -14,7 +14,7 @@ const TEST_USERNAME = process.env.TEST_USERNAME;
 const testSuite = TEST_USERNAME ? describe : describe.skip;
 
 testSuite("check_profile", () => {
-	test(`Check if @${TEST_USERNAME} is an Patreon model (app feature)`, async () => {
+	test(`Check if @${TEST_USERNAME} is an Influencer (app feature)`, async () => {
 		console.log(`\n🔍 Starting profile check for @${TEST_USERNAME}...`);
 		console.log("Step 1: Launching browser and logging into Instagram...");
 

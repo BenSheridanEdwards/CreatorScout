@@ -8,7 +8,7 @@ const INSTAGRAM_HOST = "instagram.com";
 const AGGREGATOR_REGEX =
 	/linktr\.ee|link\.me|beacons\.ai|allmylinks|linkin\.bio|bio\.link|stan\.store|fanhouse|juicy\.bio|hoo\.be/i;
 
-const CREATOR_HOST_REGEX = /patreon\.com/i;
+const CREATOR_HOST_REGEX = /patreon\.com|linktr\.ee|beacons\.ai|link\.me|ko-fi\.com/i;
 
 // Domains that should NEVER be considered creator links
 export const BLACKLISTED_DOMAINS = [
@@ -34,25 +34,11 @@ export const BLACKLISTED_DOMAINS = [
 
 const CREATOR_PLATFORMS = [
 	"patreon.com",
-	"ko-fi.com",
-	"fanvue.com",
-	"loyalfans.com",
-	"manyvids.com",
-	"justforfans.com",
-	"patreon.com",
 	"subscribestar.com",
-	"fanfix.io",
-	"hidden.com",
-	"pornhub.com",
-	"xvideos.com",
-	"clips4sale.com",
-	"modelhub.com",
-	"iwantclips.com",
-	"extralunchmoney.com",
-	"admireme.vip",
-	"unlockd.me",
-	"mym.fans",
-	"frisk.chat",
+	"ko-fi.com",
+	"buymeacoffee.com",
+	"stan.store",
+	"fanhouse.app",
 ];
 
 const AGGREGATOR_DOMAINS = [
@@ -66,20 +52,9 @@ const AGGREGATOR_DOMAINS = [
 ];
 
 const CREATOR_KEYWORDS = [
-	"patreon",
-	"ko-fi",
-	"fanvue",
-	"fanfix",
-	"loyal fans",
-	"loyalfans",
-	"manyvids",
-	"justforfans",
 	"subscribe",
 	"exclusive content",
 	"premium content",
-	"nsfw",
-	"premium content",
-	"vip",
 	"patreon",
 	"subscribestar",
 	"buy me a coffee",
@@ -89,19 +64,12 @@ const CREATOR_KEYWORDS = [
 	"private account",
 	"get access",
 	"limited time",
-	"hidden content",
-	"my hidden",
-	"wishlist",
-	"amazon wishlist",
 	"my content",
 	"chat with me",
 	"content",
 	"account",
-	// Hidden/secret content patterns
-	"my hidden",
-	"my secret",
-	"hidden content",
-	"secret content",
+	"link in bio",
+	"linktree",
 ];
 
 /**
@@ -298,14 +266,8 @@ export async function analyzeExternalLink(
 
 		if (isCreatorPlatform) {
 			result.isCreator = true;
-			// Major adult platforms = 100%, others = 95%
-			const majorPlatforms = [
-				"patreon",
-				"ko-fi",
-				"fanvue",
-				"loyalfans",
-				"manyvids",
-			];
+			// Direct monetization platforms = 100%, others = 95%
+			const majorPlatforms = ["patreon", "ko-fi", "subscribestar"];
 			const isMajorPlatform = majorPlatforms.some((p) =>
 				finalUrlLower.includes(p),
 			);
@@ -422,30 +384,6 @@ export async function analyzeExternalLink(
 
 		// Extract and analyze page content for keywords and creator indicators
 		const pageContent = await workingPage.evaluate(() => {
-			// Check for content warning gates (Linktree "Sensitive Content", link.me "Mature Content", etc.)
-			const bodyText = document.body.textContent?.toLowerCase() || "";
-
-			// Linktree pattern: "Sensitive Content" + "not appropriate for all audiences" or "Continue"
-			const hasSensitiveContentGate =
-				(bodyText.includes("sensitive content") &&
-					(bodyText.includes("not appropriate for all audiences") ||
-						bodyText.includes("continue"))) ||
-				// Generic patterns: "This link may contain" + premium content indicators (Linktree style)
-				(bodyText.includes("this link may contain") &&
-					(bodyText.includes("graphic") ||
-						bodyText.includes("adult") ||
-						bodyText.includes("mature") ||
-						bodyText.includes("exclusive")));
-
-			// link.me and other platforms: "Mature Content" + "disclaimer" or "exclusive" or "Continue"
-			const hasMatureContentGate =
-				bodyText.includes("mature content") &&
-				(bodyText.includes("disclaimer") ||
-					bodyText.includes("exclusive") ||
-					bodyText.includes("continue") ||
-					bodyText.includes("graphic") ||
-					bodyText.includes("premium content"));
-
 			// Grab ALL text content from the page (it's not Instagram, so we can be aggressive)
 			// This ensures we capture overlays, dynamic content, and everything visible
 			const fullBodyText =
@@ -474,23 +412,13 @@ export async function analyzeExternalLink(
 					const alt = (img.getAttribute("alt") || "").toLowerCase();
 					return (
 						src.includes("patreon") ||
-						src.includes("fanvue") ||
-						src.includes("loyalfans") ||
-						src.includes("manyvids") ||
-						src.includes("justforfans") ||
-						src.includes("patreon") ||
 						src.includes("subscribestar") ||
 						src.includes("ko-fi") ||
-						src.includes("fanfix") ||
-						src.includes("hidden") ||
-						src.includes("mym") ||
-						src.includes("frisk") ||
-						src.includes("admireme") ||
-						// Also check alt text for platform names
+						src.includes("linktree") ||
+						src.includes("beacons") ||
 						alt.includes("patreon") ||
 						alt.includes("ko-fi") ||
-						alt.includes("fanfix") ||
-						alt.includes("fanvue")
+						alt.includes("linktree")
 					);
 				})
 				.map((img) => img.getAttribute("alt") || "social_icon");
@@ -527,62 +455,32 @@ export async function analyzeExternalLink(
 				);
 			});
 
-			// Look for premium content indicators
+			// Look for monetization indicators
 			const hasMonetizationIndicator = Array.from(
 				document.querySelectorAll("button, a, div, span, p"),
 			).some((el) => {
 				const text = (el as HTMLElement).innerText?.toLowerCase() || "";
 				return (
-					text.includes("🥵") ||
-					text.includes("🌶") || // Chili pepper = "spicy" content
-					text.includes("🔥") || // Fire emoji often indicates premium content on link pages
-					text.includes("my hidden") || // "My Hidden" = hidden/private content
-					text.includes("hidden content") ||
-					text.includes("secret content") ||
-					text.includes("my secret") ||
-					(text.includes("hot") && text.includes("content")) ||
+					text.includes("subscribe") ||
+					text.includes("support me") ||
+					text.includes("patreon") ||
+					text.includes("ko-fi") ||
+					text.includes("exclusive content") ||
+					text.includes("premium content") ||
 					text.includes("chat with me") ||
-					text.includes("don't tell") ||
-					text.includes("dont tell") ||
-					text.includes("you belong to") ||
-					text.includes("belong to me") ||
-					text.includes("belong to mommy") ||
-					(text.includes("mommy") &&
-						(text.includes("% off") ||
-							text.includes("discount") ||
-							text.includes("treatment"))) ||
-					(text.includes("treatment") &&
-						(text.includes("% off") ||
-							text.includes("discount") ||
-							text.includes("$")))
+					text.includes("link in bio")
 				);
 			});
 
 			// Look for creator-specific text patterns
-			// NOTE: These should be DEFINITIVE phrases, not generic words
 			const creatorTextPatterns = [
-				// Definitive creator platform signals
 				"patreon",
-				"creator link",
 				"ko-fi",
-				"fanvue",
-				"fanfix",
-				"loyalfans",
-				"loyal fans",
-				"manyvids",
-				"justforfans",
-				"admireme",
-				"mym.fans",
-				"frisk.chat",
-				// Definitive content signals
+				"link in bio",
+				"linktree",
 				"exclusive content",
 				"premium content",
 				"custom content",
-				"premium content",
-				"nsfw",
-				"exclusive",
-				"+18",
-				// Context-specific signals (must include context)
 				"private account",
 				"get access",
 				"my content",
@@ -592,16 +490,6 @@ export async function analyzeExternalLink(
 				"vip access",
 				"vip content",
 				"wishlist",
-				// Creator/dominant language patterns
-				"you belong to",
-				"belong to me",
-				"mommy treatment",
-				"daddy treatment",
-				// Hidden/secret content patterns (common on link pages)
-				"my hidden",
-				"hidden content",
-				"my secret",
-				"secret content",
 			];
 
 			return {
@@ -614,8 +502,6 @@ export async function analyzeExternalLink(
 				hasSubscribeButton: hasSubscribeButton,
 				hasPricingIndicator: hasPricingIndicator,
 				hasMonetizationIndicator: hasMonetizationIndicator,
-				hasSensitiveContentGate: hasSensitiveContentGate,
-				hasMatureContentGate: hasMatureContentGate,
 				creatorPatterns: creatorTextPatterns.filter(
 					(pattern) => fullBodyText.toLowerCase().includes(pattern), // Check against full body text
 				),
@@ -627,28 +513,13 @@ export async function analyzeExternalLink(
 
 		// Re-check creator patterns with normalized text (in case Unicode chars prevented matching)
 		const creatorTextPatterns = [
-			// Definitive creator platform signals
 			"patreon",
-			"creator link",
 			"ko-fi",
-			"fanvue",
-			"fanfix",
-			"loyalfans",
-			"loyal fans",
-			"manyvids",
-			"justforfans",
-			"admireme",
-			"mym.fans",
-			"frisk.chat",
-			// Definitive content signals
+			"link in bio",
+			"linktree",
 			"exclusive content",
 			"premium content",
 			"custom content",
-			"premium content",
-			"nsfw",
-			"exclusive",
-			"+18",
-			// Context-specific signals (must include context)
 			"private account",
 			"get access",
 			"my content",
@@ -658,16 +529,6 @@ export async function analyzeExternalLink(
 			"vip access",
 			"vip content",
 			"wishlist",
-			// Creator/dominant language patterns
-			"you belong to",
-			"belong to me",
-			"mommy treatment",
-			"daddy treatment",
-			// Hidden/secret content patterns (common on link pages)
-			"my hidden",
-			"hidden content",
-			"my secret",
-			"secret content",
 		];
 
 		const normalizedCreatorPatterns = creatorTextPatterns.filter((pattern) =>
@@ -708,35 +569,6 @@ export async function analyzeExternalLink(
 			);
 		}
 
-		// Check for content warning gates (ULTIMATE signal)
-		// Check Linktree's "Sensitive Content" gate first
-		if (pageContent.hasSensitiveContentGate) {
-			result.isCreator = true;
-			result.confidence = 100;
-			result.reason = "sensitive_content_gate";
-			result.indicators.push(
-				"CONTENT GATE - Linktree premium content warning",
-			);
-			console.log(
-				`[LINK_ANALYSIS] 🔒 Found creator signal (Linktree) - DEFINITIVE creator signal`,
-			);
-			return result;
-		}
-
-		// Check link.me's "Mature Content" gate
-		if (pageContent.hasMatureContentGate) {
-			result.isCreator = true;
-			result.confidence = 100;
-			result.reason = "mature_content_gate";
-			result.indicators.push(
-				"CONTENT GATE - link.me premium content disclaimer",
-			);
-			console.log(
-				`[LINK_ANALYSIS] 🔒 Found creator signal (link.me) - DEFINITIVE creator signal`,
-			);
-			return result;
-		}
-
 		// ULTIMATE SIGNALS: Definitive creator indicators = instant 100% confidence
 		const definitiveSignals = [
 			{
@@ -745,37 +577,18 @@ export async function analyzeExternalLink(
 				reason: "exclusive_content",
 			},
 			{ text: "patreon", label: "PATREON", reason: "patreon" },
-			{ text: "creator link", label: "PATREON", reason: "patreon" },
-			{ text: "ko-fi", label: "KO-FI", reason: "ko-fi" },
+			{ text: "ko-fi", label: "KO-FI", reason: "ko_fi" },
+			{ text: "link in bio", label: "LINK IN BIO", reason: "link_in_bio" },
+			{ text: "linktree", label: "LINKTREE", reason: "linktree" },
 			{
 				text: "premium content",
 				label: "PREMIUM CONTENT",
 				reason: "premium_content",
 			},
-			{ text: "nsfw", label: "NSFW", reason: "nsfw" },
-			{ text: "exclusive", label: "exclusive", reason: "age_restricted" },
-			{ text: "18 +", label: "exclusive", reason: "age_restricted" },
-			{ text: "+18", label: "exclusive", reason: "age_restricted" },
-			{ text: "fanvue", label: "FANVUE", reason: "fanvue" },
 			{
 				text: "custom content",
 				label: "CUSTOM CONTENT",
 				reason: "custom_content",
-			},
-			{ text: "loyalfans", label: "LOYALFANS", reason: "loyalfans" },
-			{ text: "loyal fans", label: "LOYALFANS", reason: "loyalfans" },
-			{ text: "manyvids", label: "MANYVIDS", reason: "manyvids" },
-			{ text: "fanfix", label: "FANFIX", reason: "fanfix" },
-			{ text: "fan fix", label: "FANFIX", reason: "fanfix" },
-			{
-				text: "mature content",
-				label: "MATURE CONTENT",
-				reason: "mature_content_warning",
-			},
-			{
-				text: "content disclaimer",
-				label: "MATURE CONTENT DISCLAIMER",
-				reason: "mature_content_warning",
 			},
 			{ text: "my vip page", label: "VIP PAGE", reason: "vip_page" },
 			{ text: "vip page", label: "VIP PAGE", reason: "vip_page" },
@@ -783,42 +596,6 @@ export async function analyzeExternalLink(
 			{ text: "free trial", label: "FREE TRIAL", reason: "free_trial" },
 			{ text: "free for", label: "FREE PROMO", reason: "free_promo" }, // "Free for 24hrs", "Free for 30 days"
 			{ text: "vip free", label: "VIP FREE", reason: "vip_free" },
-			{
-				text: "mommy treatment",
-				label: "MOMMY TREATMENT",
-				reason: "link_promotional",
-			},
-			{
-				text: "daddy treatment",
-				label: "DADDY TREATMENT",
-				reason: "link_promotional",
-			},
-			{
-				text: "you belong to",
-				label: "CREATOR LANGUAGE",
-				reason: "link_promotional",
-			},
-			// Hidden/secret content patterns (common on link-in-bio pages)
-			{
-				text: "my hidden",
-				label: "HIDDEN CONTENT",
-				reason: "hidden_content",
-			},
-			{
-				text: "hidden content",
-				label: "HIDDEN CONTENT",
-				reason: "hidden_content",
-			},
-			{
-				text: "my secret",
-				label: "SECRET CONTENT",
-				reason: "secret_content",
-			},
-			{
-				text: "secret content",
-				label: "SECRET CONTENT",
-				reason: "secret_content",
-			},
 		];
 
 		for (const signal of definitiveSignals) {
@@ -839,7 +616,7 @@ export async function analyzeExternalLink(
 			}
 		}
 
-		// Check for VIP + promotional patterns (common Patreon pattern: "VIP Free for 24hrs")
+		// Check for VIP + promotional patterns (e.g. "VIP Free for 24hrs")
 		// This catches cases where "vip" appears with time-limited offers or pricing
 		if (
 			normalizedText.includes("vip") &&
@@ -863,48 +640,13 @@ export async function analyzeExternalLink(
 			return result;
 		}
 
-		// Check for creator language + promotional patterns (e.g., "mommy treatment (70% off)")
-		// This catches link/dominant language combined with pricing/discounts
-		if (
-			(normalizedText.includes("mommy") ||
-				normalizedText.includes("daddy") ||
-				normalizedText.includes("mistress") ||
-				normalizedText.includes("goddess")) &&
-			(normalizedText.includes("% off") ||
-				normalizedText.includes("discount") ||
-				normalizedText.includes("treatment") ||
-				normalizedText.includes("you belong to") ||
-				normalizedText.includes("belong to me") ||
-				pageContent.hasPricingIndicator)
-		) {
-			result.isCreator = true;
-			result.confidence = 95; // Very high confidence for creator language + pricing
-			result.reason = "link_promotional";
-			result.indicators.push(
-				"Creator language + promotional offer (pricing/discount) - strong creator signal",
-			);
-			console.log(
-				`[LINK_ANALYSIS] 💎 Found creator language with promotional offer - strong creator signal`,
-			);
-			return result;
-		}
-
 		// Look for social media platform indicators in image alts and icons
 		const platformIndicators = [
 			"patreon",
-			"ko-fi",
-			"fanvue",
-			"fanfix",
-			"loyal fans",
-			"loyalfans",
-			"manyvids",
-			"justforfans",
-			"patreon",
 			"subscribestar",
-			"hidden",
-			"mym",
-			"frisk",
-			"admireme",
+			"ko-fi",
+			"linktree",
+			"beacons",
 		];
 
 		const platformMatches = platformIndicators.filter(
@@ -921,8 +663,7 @@ export async function analyzeExternalLink(
 			);
 		}
 
-		// Check for ADULT/CREATOR-SPECIFIC indicators (not just generic "subscribe" or "fan")
-		// Generic content creators (fitness, gaming, etc.) also use these platforms
+		// Check for creator-specific indicators
 		const hasDefinitiveCreatorIndicators =
 			pageContent.hasMonetizationIndicator ||
 			allCreatorPatterns.some((pattern) =>
@@ -930,28 +671,17 @@ export async function analyzeExternalLink(
 					"exclusive content",
 					"premium content",
 					"patreon",
-					"creator link",
 					"ko-fi",
-					"fanvue",
-					"fanfix",
-					"loyalfans",
-					"manyvids",
-					"justforfans",
+					"link in bio",
+					"linktree",
 					"custom content",
-					"nsfw",
-					"exclusive",
-					"+18",
 					"private account",
 					"chat with me",
-					"you belong to",
-					"belong to me",
-					"hidden content",
-					"my hidden",
-					"mommy treatment",
-					"daddy treatment",
+					"vip access",
+					"vip content",
 				].includes(pattern),
 			) ||
-			platformMatches.length > 0; // Platform icons are still strong signals
+			platformMatches.length > 0;
 
 		// Generic indicators that ANY creator might have (fitness, gaming, etc.)
 		const hasGenericCreatorIndicators =
@@ -966,7 +696,7 @@ export async function analyzeExternalLink(
 			foundIndicators.push("subscribe button");
 		if (pageContent.hasPricingIndicator) foundIndicators.push("pricing");
 		if (pageContent.hasMonetizationIndicator)
-			foundIndicators.push("premium content");
+			foundIndicators.push("monetization");
 		if (allCreatorPatterns.length > 0)
 			foundIndicators.push(`patterns: ${allCreatorPatterns.join(", ")}`);
 
@@ -990,8 +720,8 @@ export async function analyzeExternalLink(
 				);
 			} else if (pageContent.hasMonetizationIndicator) {
 				result.confidence = 85;
-				result.reason = "adult_content_indicator";
-				result.indicators.push("Has premium content indicator");
+				result.reason = "monetization_indicator";
+				result.indicators.push("Has monetization indicator");
 			} else if (allCreatorPatterns.length > 0) {
 				result.confidence = 80;
 				result.reason = "creator_patterns";
@@ -1011,7 +741,7 @@ export async function analyzeExternalLink(
 		}
 
 		// If we ONLY have generic indicators (subscribe button, email form, pricing)
-		// WITHOUT any adult/creator-specific signals, still give moderate confidence
+		// WITHOUT any strong creator-specific signals, still give moderate confidence
 		// Pricing on aggregator platforms is a strong signal for monetized content
 		if (hasGenericCreatorIndicators && isAggregator) {
 			// Pricing is a stronger signal than just email/subscribe
@@ -1028,7 +758,7 @@ export async function analyzeExternalLink(
 				result.confidence = Math.max(result.confidence, 30); // Email/subscribe only = low confidence
 				result.reason = "generic_aggregator_link";
 				result.indicators.push(
-					"Has aggregator link with generic subscription features (no premium content signals)",
+					"Has aggregator link with generic subscription features (no strong creator signals)",
 				);
 				console.log(
 					`[LINK_ANALYSIS] ⚠️  Generic aggregator detected (fitness coach, artist, etc.) - keeping low confidence`,

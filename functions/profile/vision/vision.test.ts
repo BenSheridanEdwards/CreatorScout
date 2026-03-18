@@ -128,7 +128,7 @@ describe("vision", () => {
 		test("VisionAnalysisResult should contain required fields", () => {
 			// Document the expected structure for future reference
 			const expectedFields = [
-				"is_adult_creator",
+				"isCreator",
 				"confidence",
 				"platform_links",
 				"indicators",
@@ -136,7 +136,7 @@ describe("vision", () => {
 			];
 
 			// This test documents the interface contract
-			expect(expectedFields).toContain("is_adult_creator");
+			expect(expectedFields).toContain("isCreator");
 			expect(expectedFields).toContain("confidence");
 			expect(expectedFields).toContain("platform_links");
 			expect(expectedFields).toContain("indicators");

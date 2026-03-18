@@ -1,5 +1,5 @@
 /**
- * Scout - Instagram Patreon Creator Discovery Agent
+ * Creator Scout - Instagram Influencer Discovery Agent
  *
  * OPTIMIZED Flow (streamlined for efficiency):
  * 1. Go to seed profile → click Following → open modal (ONCE)
@@ -1166,7 +1166,7 @@ export async function scrape(
 
 	logger.info(
 		"ACTION",
-		"🚀 Scout - Instagram Patreon Creator Discovery Agent",
+		"🚀 Creator Scout - Instagram Influencer Discovery Agent",
 	);
 	logger.info("SYSTEM", `Debug: ${debug}, Skip warmup: ${skipWarmup}`);
 
@@ -1288,7 +1288,7 @@ export async function scrapeWithoutDM(
 
 	logger.info(
 		"ACTION",
-		"🔍 Scout - Instagram Patreon Creator Discovery Agent (Discovery Mode - No DMs)",
+		"🔍 Creator Scout - Instagram Influencer Discovery Agent (Discovery Mode - No DMs)",
 	);
 	logger.info("SYSTEM", `Debug: ${debug}, Skip warmup: ${skipWarmup}`);
 

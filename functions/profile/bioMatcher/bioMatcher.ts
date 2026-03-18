@@ -10,17 +10,12 @@
 // Tier 1: DEFINITIVE (instant 100%) - explicit platform/content mentions
 const DEFINITIVE_SIGNALS = [
 	"patreon",
-	"creator link",
 	"ko-fi",
-	"fanvue",
-	"loyalfans",
-	"manyvids",
-	"exclusive",
-	"+18",
-	"nsfw",
-	"xxx",
-	"x-rated",
-	"x rated",
+	"link in bio",
+	"linktree",
+	"linktr.ee",
+	"buy me a coffee",
+	"subscribestar",
 ];
 
 // Tier 2: STRONG signals (25-40 points each)
@@ -29,13 +24,13 @@ const STRONG_SIGNALS: Array<{
 	points: number;
 	label: string;
 }> = [
-	// "Yes I have one" / "I have one" - classic creator language meaning "Yes I have an Patreon"
+	// "Yes I have one" / "I have one" - link in bio / monetization hint
 	{ pattern: "yes i have one", points: 50, label: "yes_i_have_one" },
 	{ pattern: "yep i have one", points: 50, label: "yes_i_have_one" },
 	{ pattern: "yeah i have one", points: 50, label: "yes_i_have_one" },
 	{ pattern: "i have one", points: 40, label: "i_have_one" },
 
-	// Highlight redirects - classic creator tactic
+	// Highlight redirects - common influencer tactic
 	{ pattern: "highlight for more", points: 40, label: "highlight_redirect" },
 	{ pattern: "highlights for more", points: 40, label: "highlight_redirect" },
 	{ pattern: "check my highlight", points: 35, label: "highlight_redirect" },
@@ -47,29 +42,12 @@ const STRONG_SIGNALS: Array<{
 	// "The X is in my highlights" pattern - emoji combo pointing to highlights
 	{ pattern: /the\s+.{1,10}\s+is in my highlight/i, points: 45, label: "emoji_highlight_redirect" },
 
-	// Explicit content markers
-	{ pattern: "xxx", points: 40, label: "explicit" },
-	{ pattern: "x rated", points: 40, label: "explicit" },
-	{ pattern: "uncensored", points: 35, label: "explicit" },
-	{ pattern: "explicit", points: 30, label: "explicit" },
-	{ pattern: "uncut", points: 30, label: "explicit" },
-
 	// Premium content
 	{ pattern: "exclusive content", points: 35, label: "premium" },
 	{ pattern: "premium content", points: 35, label: "premium" },
 	{ pattern: "private content", points: 35, label: "premium" },
 	{ pattern: "custom content", points: 35, label: "premium" },
 	{ pattern: "vip", points: 30, label: "premium" },
-
-	// Link "fun" phrases
-	{ pattern: "for all the fun", points: 40, label: "link_fun" },
-	{ pattern: "all the fun", points: 35, label: "link_fun" },
-	{ pattern: "for the fun", points: 30, label: "link_fun" },
-	{ pattern: "more fun", points: 25, label: "link_fun" },
-	{ pattern: "have fun", points: 20, label: "link_fun" },
-	{ pattern: "some fun", points: 20, label: "link_fun" },
-	{ pattern: "come play", points: 30, label: "link_fun" },
-	{ pattern: "come see", points: 25, label: "link_fun" },
 
 	// Creator phrases
 	{ pattern: "you asked", points: 30, label: "creator_phrase" },
@@ -103,57 +81,25 @@ const MEDIUM_SIGNALS: Array<{
 	points: number;
 	label: string;
 }> = [
-	// Body references (link when combined with emojis)
-	{ pattern: "bigger", points: 15, label: "body_ref" },
-	{ pattern: "curves", points: 15, label: "body_ref" },
-	{ pattern: "assets", points: 15, label: "body_ref" },
-	{ pattern: "booty", points: 20, label: "body_ref" },
-	{ pattern: "thicc", points: 20, label: "body_ref" },
-
 	// Backup/alt account (common for creators)
 	{ pattern: "backup", points: 15, label: "alt_account" },
 	{ pattern: "main @", points: 20, label: "alt_account" },
 	{ pattern: "main account", points: 15, label: "alt_account" },
 	{ pattern: "other account", points: 15, label: "alt_account" },
-	{ pattern: "spicy account", points: 25, label: "alt_account" },
-
-	// Link words
-	{ pattern: "spicy", points: 20, label: "link" },
-	{ pattern: "naughty", points: 20, label: "link" },
-	{ pattern: "bad girl", points: 20, label: "link" },
-	{ pattern: "good girl", points: 15, label: "link" },
-	{ pattern: "daddy", points: 15, label: "link" },
-	{ pattern: "baby girl", points: 15, label: "link" },
-	{ pattern: "goddess", points: 15, label: "link" },
-	{ pattern: "queen", points: 10, label: "link" },
-	{ pattern: "princess", points: 10, label: "link" },
-
 	// Content hints
 	{ pattern: "content creator", points: 20, label: "content" },
 	{ pattern: "creator", points: 15, label: "content" },
 	{ pattern: "model", points: 10, label: "content" },
 ];
 
-// Tier 4: LINK EMOJIS (5-15 points each, compound when multiple)
+// Tier 4: EMOJIS (5-15 points each, compound when multiple)
 const EMOJI_SCORES: Record<string, number> = {
-	// High signal emojis (15 points)
-	"🔞": 15,
-	"💦": 15,
-	"🍑": 15,
-	"🍒": 15,
-	"👅": 15,
-	"🫦": 15,
-
-	// Medium signal emojis (10 points)
-	"🔥": 10,
-	"💋": 10,
-	"😈": 10,
-	"🥵": 10,
-	"😏": 10,
+	// Link/content emojis (10 points)
+	"🔗": 10,
 	"👀": 10,
 	"⬇️": 10,
 	"👇": 10,
-	"🔗": 10,
+	"✨": 10,
 
 	// Lower signal emojis (5 points) - common but less specific
 	"💕": 5,
@@ -328,22 +274,6 @@ export function calculateScore(bio: string, username?: string): BioScoreResult {
 
 	// === COMBINATION BONUSES ===
 
-	// Body ref + link emoji = big bonus
-	const hasBodyRef = mediumMatches.some(
-		(m) =>
-			m === "body_ref" ||
-			["bigger", "curves", "assets", "booty", "thicc"].some((b) =>
-				bioLower.includes(b),
-			),
-	);
-	const hasLinkEmoji = ["🍑", "🍒", "💦", "👅", "🫦"].some((e) =>
-		bio.includes(e),
-	);
-	if (hasBodyRef && hasLinkEmoji) {
-		score += 25;
-		reasons.push("COMBO: body reference + link emoji: +25");
-	}
-
 	// Multiple strong signals = compound bonus
 	if (strongMatches.length >= 3) {
 		const bonus = strongMatches.length * 10;
@@ -366,8 +296,7 @@ export function calculateScore(bio: string, username?: string): BioScoreResult {
 		reasons.push("COMBO: highlight redirect + emoji: +15");
 	}
 
-	// "Yes I have one" / "I have one" + highlight redirect = DEFINITIVE creator signal
-	// This phrase specifically means "Yes I have an Patreon"
+	// "Yes I have one" / "I have one" + highlight redirect = strong creator signal
 	const hasIHaveOne = strongMatches.some(
 		(m) =>
 			m === "yes i have one" ||
@@ -382,7 +311,7 @@ export function calculateScore(bio: string, username?: string): BioScoreResult {
 		reasons.push("COMBO: 'i have one' + highlight redirect = DEFINITIVE: +30");
 	}
 
-	// Alt account reference + any link content
+	// Alt account reference + creator signals
 	const hasAltAccount = mediumMatches.some(
 		(m) =>
 			m === "alt_account" ||
@@ -390,7 +319,7 @@ export function calculateScore(bio: string, username?: string): BioScoreResult {
 	);
 	if (hasAltAccount && (strongMatches.length > 0 || emojiCount >= 3)) {
 		score += 20;
-		reasons.push("COMBO: alt account + link content: +20");
+		reasons.push("COMBO: alt account + creator content: +20");
 	}
 
 	// === REFERENCED PROFILES BONUS ===

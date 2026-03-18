@@ -8,7 +8,7 @@
  * 3. Follow Actions → Potentially follow the profile
  * 4. Following Modal → Click "Following" → Extract usernames in batches
  * 5. Pagination → Scroll modal when batch exhausted
- * 6. Bio Analysis → Visit profiles, analyze bio, detect influencer
+ * 6. Bio Analysis → Visit profiles, analyze bio, detect Influencer
  * 7. Queue Management → Add creators to database and queue
  */
 
@@ -383,7 +383,7 @@ describe("Scout E2E Test Suite", () => {
 			expect(link === null || typeof link === "string").toBe(true);
 		}, 30000);
 
-		test("detect creator link (svagtillstark profile)", async () => {
+		test("detect Influencer link (svagtillstark profile)", async () => {
 			const target = "svagtillstark";
 			await page.goto(`https://www.instagram.com/${target}/`, {
 				waitUntil: "domcontentloaded",
@@ -399,8 +399,8 @@ describe("Scout E2E Test Suite", () => {
 
 			expect(uniqueLinks.length).toBeGreaterThan(0);
 
-			const hasPatreon = hasDirectCreatorLink(uniqueLinks);
-			expect(typeof hasPatreon).toBe("boolean");
+			const hasInfluencer = hasDirectCreatorLink(uniqueLinks);
+			expect(typeof hasInfluencer).toBe("boolean");
 		}, 30000);
 
 		test("traverse following and extract bios", async () => {

@@ -114,13 +114,9 @@ async function migrateFalsePositives() {
 		const bio = profile.bioText?.toLowerCase() || "";
 		const hasDefinitiveBioSignal =
 			bio.includes("patreon") ||
-			bio.includes("creator link") ||
 			bio.includes("ko-fi") ||
-			bio.includes("fanvue") ||
-			bio.includes("loyalfans") ||
-			bio.includes("manyvids") ||
-			bio.includes("nsfw") ||
-			/18\+|18 \+|\+18/.test(bio);
+			bio.includes("link in bio") ||
+			bio.includes("linktree");
 
 		if (hasDefinitiveBioSignal) {
 			// Keep as creator - definitive signal

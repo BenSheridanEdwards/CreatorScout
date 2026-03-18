@@ -728,11 +728,11 @@ export async function analyzeProfileComprehensive(
 	// NOT for Instagram profiles - that's wasteful and unreliable
 	// External link vision analysis happens in analyzeExternalLink() above
 
-	// Direct Patreon shortcut (fallback for backward compatibility)
+	// Direct Influencer shortcut (fallback for backward compatibility)
 	if (hasDirectCreatorLink(result.links)) {
 		result.isCreator = true;
 		result.confidence = 100;
-		result.reason = "direct_patreon_link";
+		result.reason = "direct_creator_link";
 	}
 
 	// Final decision - require confidence threshold

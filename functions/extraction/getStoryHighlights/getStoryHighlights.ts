@@ -92,51 +92,38 @@ export async function getStoryHighlights(
 }
 
 /**
- * Check if a highlight title suggests premium content.
+ * Check if a highlight title suggests link-in-bio or monetization.
  */
 export function isLinkInBioHighlight(title: string): boolean {
 	const titleLower = title.toLowerCase();
-	const linkPatterns = [
-		// DEFINITIVE platform mentions
+	const patterns = [
+		// Platform mentions
 		/patreon/i,
 		/ko-fi/i,
-		/fanvue/i,
-		/loyalfans/i,
-		// "OF" abbreviation (common for Patreon)
-		/^of\s+/i, // link pattern
-		/\sof\s+/i, // "OF" as standalone word
-		// Link indicators (must have emoji or very specific)
+		/linktree/i,
+		/linktr\.ee/i,
+		// Link indicators
 		/my\s*🔗/i,
 		/🔗\s*link/i,
 		/link\s*🔗/i,
-		// "its here 🔗" pattern - link emoji suggests premium content link
 		/its?\s+here\s*🔗/i,
 		/here\s*🔗/i,
-		// Chat/DM patterns suggesting direct messaging for premium content
+		// DM/contact patterns
 		/chat\s+w\s+me/i,
 		/chat\s+with\s+me/i,
 		/dm\s+me/i,
 		/message\s+me/i,
-		/telegram/i, // Telegram is commonly used for premium content
-		// Content indicators (must be specific)
+		// Content indicators
 		/exclusive\s+content/i,
 		/premium\s+content/i,
 		/custom\s+content/i,
-		// Service indicators (requires context)
-		/menu/i, // Price menu
-		/rates/i, // Service rates
+		// Service indicators
+		/menu/i,
+		/rates/i,
 		/pricing/i,
-		// Adult emojis (strong signal)
-		/💋/,
-		/🍑/,
-		/💦/,
-		/😈/,
-		/👅/,
-		/🍒/,
-		/🥵/,
 	];
 
-	return linkPatterns.some((pattern) => pattern.test(titleLower));
+	return patterns.some((pattern) => pattern.test(titleLower));
 }
 
 /**

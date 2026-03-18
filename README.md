@@ -1,13 +1,13 @@
-# Scout - Instagram Creator Discovery Agent
+# Creator Scout - Instagram Influencer Discovery Agent
 
-An Instagram automation agent that discovers influencers with monetization links by exploring Following networks, using keyword matching and vision AI.
+An Instagram automation agent that discovers influencers with monetization links (Patreon, Ko-fi, link-in-bio) by exploring Following networks, using keyword matching and vision AI.
 
 ## Quick Start
 
 ### 1. Clone and Install
 ```bash
 git clone <repo>
-cd scout
+cd creator-scout
 npm install
 ```
 
@@ -104,8 +104,7 @@ npm run discover
 │     ├─ Click into profile                                       │
 │     ├─ Read bio text                                            │
 │     └─ Keyword/emoji matching (CHEAP - no API call)             │
-│        • 🔥💋😈 link emojis                               │
-│        • "patreon", "link in bio", "exclusive", etc.           │
+│        • "link in bio", "patreon", "exclusive", etc.           │
 └─────────────────────────┬───────────────────────────────────────┘
                           ▼
               ┌───────────────────────┐
@@ -118,7 +117,7 @@ npm run discover
 │     ├─ Click link to open linktree page                         │
 │     ├─ Screenshot the page                                      │
 │     └─ Vision AI analysis (EXPENSIVE - only when promising)     │
-│        Look for: creator links, "exclusive", "NSFW", etc.            │
+│        Look for: Patreon, Ko-fi, link-in-bio, etc.              │
 └─────────────────────────┬───────────────────────────────────────┘
                           ▼
               ┌───────────────────────┐
@@ -297,8 +296,8 @@ The `functions/profile/bioMatcher/bioMatcher.ts` module scores bios based on:
 
 **Keywords** (50 points max):
 
-- Direct: `patreon`, `ko-fi`, `fanvue`
-- Hints: `link in bio`, `linktree`, `exclusive`, `exclusive`, `spicy`
+- Direct: `patreon`, `ko-fi`, `link in bio`
+- Hints: `link in bio`, `linktree`, `exclusive`
 - Actions: `dm for`, `subscribe`, `free trial`
 
 **Links** (25 points max):

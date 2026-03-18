@@ -3,7 +3,7 @@
  * Re-analyze Visited Profiles
  *
  * This script re-visits all previously visited profiles and re-analyzes them
- * to check for influencer indicators. Useful for:
+ * to check for Influencer indicators. Useful for:
  * - Catching profiles that were visited before link analysis was implemented
  * - Re-checking profiles with updated analysis logic
  * - Auditing the database for missed creators

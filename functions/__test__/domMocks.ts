@@ -115,12 +115,16 @@ export const INSTAGRAM_PROFILE_WITH_CREATOR_LINK_HTML = `
 <header>
   <section>
     <div>
-      <span dir="auto">Creator bio with creator link</span>
+      <span dir="auto">Creator bio with Patreon link</span>
       <a href="https://patreon.com/creator" rel="nofollow" target="_blank">Link</a>
     </div>
   </section>
 </header>
 `;
+
+/** @deprecated Use INSTAGRAM_PROFILE_WITH_CREATOR_LINK_HTML */
+export const INSTAGRAM_PROFILE_WITH_CREATOR_LINK_HTML =
+	INSTAGRAM_PROFILE_WITH_CREATOR_LINK_HTML;
 
 /**
  * Profile with Linktree link
