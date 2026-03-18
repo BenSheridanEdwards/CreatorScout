@@ -100,7 +100,7 @@ echo ""
 
 echo "Testing profile: $PROFILE"
 echo ""
-echo "⚠️  Note: This will connect to GoLogin and Instagram"
+echo "⚠️  Note: This will connect to AdsPower and Instagram"
 echo "   Press Ctrl+C to skip, or wait 5 seconds to continue..."
 sleep 5
 

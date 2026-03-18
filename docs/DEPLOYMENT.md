@@ -19,6 +19,6 @@ Creator Scout can be deployed locally or on a VPS.
 
 - Node.js 18+
 - PostgreSQL (Supabase/Neon free tier or self-hosted)
-- AdsPower or GoLogin (browser fingerprinting)
+- AdsPower (browser fingerprinting)
 - SmartProxy or similar (residential proxies)
 - OpenRouter API key (vision AI)

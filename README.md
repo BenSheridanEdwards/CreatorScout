@@ -1,8 +1,11 @@
 # Creator Scout - Instagram Influencer Discovery Agent
 
+[![CI](https://github.com/BenSheridanEdwards/CreatorScout/actions/workflows/ci.yml/badge.svg)](https://github.com/BenSheridanEdwards/CreatorScout/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 An Instagram automation agent that discovers influencers with monetization links (Patreon, Ko-fi, link-in-bio) by exploring Following networks, using keyword matching and vision AI.
 
-**Contributing:** See [CONTRIBUTING.md](CONTRIBUTING.md) for how to run tests and submit changes.
+**Contributing:** See [CONTRIBUTING.md](CONTRIBUTING.md) for how to run tests and submit changes. We also have a [Code of Conduct](CODE_OF_CONDUCT.md) and [Security Policy](SECURITY.md).
 
 ## Quick Start
 
@@ -78,8 +81,6 @@ npm run discover
 - 🔧 **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)** - Deployment options overview
 - 📖 **[docs/VPS_COMMANDS_GUIDE.md](docs/VPS_COMMANDS_GUIDE.md)** - Commands and troubleshooting
 - 🔒 **[docs/SECURITY.md](docs/SECURITY.md)** - VPS security audit, hardening, and monitoring
-
-## Configuration
 
 ## The Flow
 
@@ -173,28 +174,6 @@ creator-scout/
 └── functions/**/*.test.ts  # Collocated unit tests (505 total)
 ```
 
-## Quick Start
-
-```bash
-# Install dependencies
-npm install
-
-# Configure environment
-cp .env.example .env  # Edit with your credentials
-
-# Add seeds (known creator usernames to start exploring from)
-echo "somemodel" >> seeds.txt
-
-# Test individual components
-npm run analyze some_profile    # Test profile analysis
-npm run follow test_user        # Test following
-npm run dm test_user           # Test DM sending
-
-# Run discovery automation
-npm run discover               # Safe discovery (no DMs, just finds & follows)
-npm run discover:dm            # Full automation (finds, follows, AND sends DMs)
-```
-
 ## 📋 Available Scripts
 
 Creator Scout provides both **individual testing scripts** and **full automation scripts**:
@@ -272,83 +251,6 @@ FAST_MODE=false                        # Reduced delays for testing
 | `MAX_DMS_PER_DAY`      | `120`                         | Daily DM limit                        |
 | `DM_MESSAGE`           | (customizable)                | Message to send                       |
 
-## Database Schema
-
-Postgres via Prisma (set `DATABASE_URL`):
-
-- **profiles** - All visited profiles with bio, score, creator status, DM/follow tracking
-- **queue** - Priority queue with source tracking (seed vs discovered)
-- **following_scraped** - Tracks scroll position for pagination
-- **metrics** - Performance and usage statistics
-
-Apply migrations:
-
-```bash
-npx prisma migrate deploy
-```
-
-## Bio Matching Keywords
-
-The `functions/profile/bioMatcher/bioMatcher.ts` module scores bios based on:
-
-**Emojis** (25 points max):
-🔗 ✨ 👀 ⬇️ 👇 💕 ❤️
-
-**Keywords** (50 points max):
-
-- Direct: `patreon`, `ko-fi`, `link in bio`
-- Hints: `link in bio`, `linktree`, `exclusive`
-- Actions: `dm for`, `subscribe`, `free trial`
-
-**Links** (25 points max):
-
-- `linktr.ee/xxx`, `patreon.com/xxx`, `ko-fi.com/xxx`, etc.
-
-## Configuration
-
-### Environment Variables
-
-Create a `.env` file with the following variables:
-
-```bash
-# ===========================================
-# BROWSER & PROXY CONFIGURATION
-# ===========================================
-
-# BrowserLess.io API token (required for production)
-BROWSERLESS_TOKEN=your_browserless_token_here
-
-# Use local browser instead of BrowserLess (for development)
-LOCAL_BROWSER=false
-
-# ===========================================
-# INSTAGRAM CREDENTIALS
-# ===========================================
-
-INSTAGRAM_USERNAME=your_instagram_username
-INSTAGRAM_PASSWORD=your_instagram_password
-
-# ===========================================
-# AI & VISION API
-# ===========================================
-
-# OpenRouter API key for vision analysis (Gemini models)
-OPENROUTER_API_KEY=your_openrouter_api_key
-
-# ===========================================
-# PERFORMANCE & DEBUGGING
-# ===========================================
-
-# Enable debug logging
-DEBUG_LOGS=false
-
-# Run in fast mode (reduced delays, skip vision - for testing)
-FAST_MODE=false
-
-# Skip vision API calls entirely (for testing)
-SKIP_VISION=false
-```
-
 ### AdsPower + SmartProxy Setup
 
 **Why This Stack?**
@@ -408,6 +310,38 @@ Combined with AdsPower fingerprints and SmartProxy IPs, this makes automation mu
 - **Vision API**: $10-30/month
 - **Total**: ~$150-665/month
 
+## Database Schema
+
+Postgres via Prisma (set `DATABASE_URL`):
+
+- **profiles** - All visited profiles with bio, score, creator status, DM/follow tracking
+- **queue** - Priority queue with source tracking (seed vs discovered)
+- **following_scraped** - Tracks scroll position for pagination
+- **metrics** - Performance and usage statistics
+
+Apply migrations:
+
+```bash
+npx prisma migrate deploy
+```
+
+## Bio Matching Keywords
+
+The `functions/profile/bioMatcher/bioMatcher.ts` module scores bios based on:
+
+**Emojis** (25 points max):
+🔗 ✨ 👀 ⬇️ 👇 💕 ❤️
+
+**Keywords** (50 points max):
+
+- Direct: `patreon`, `ko-fi`, `link in bio`
+- Hints: `link in bio`, `linktree`, `exclusive`
+- Actions: `dm for`, `subscribe`, `free trial`
+
+**Links** (25 points max):
+
+- `linktr.ee/xxx`, `patreon.com/xxx`, `ko-fi.com/xxx`, etc.
+
 ## Tests
 
 ```bash
@@ -437,3 +371,7 @@ Tests cover:
 - Pagination tracking (resume from where you left off)
 - Duplicate visit prevention
 - DM thread check (won't message if conversation exists)
+
+## License
+
+MIT License - see [LICENSE](LICENSE) for details.

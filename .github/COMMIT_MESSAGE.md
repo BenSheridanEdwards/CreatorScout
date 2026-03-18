@@ -3,7 +3,7 @@
 ## Changes Made
 
 ### Removed
-- ❌ Dockerfile - Using remote GoLogin, no Chrome install needed
+- ❌ Dockerfile - Using AdsPower, no Chrome install needed
 - ❌ docker-compose.yml - Simpler with PM2
 
 ### Added
@@ -29,7 +29,7 @@
 ## Why?
 
 Docker was overkill because:
-1. Using remote GoLogin (no Chrome needed)
+1. Using AdsPower (no Chrome needed)
 2. Using managed Postgres (no container needed)
 3. Simple Node.js scripts
 4. PM2 handles restarts

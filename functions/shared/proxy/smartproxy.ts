@@ -151,7 +151,7 @@ export async function rotateProxy(
 }
 
 /**
- * Get proxy URL string for Puppeteer/GoLogin
+ * Get proxy URL string for Puppeteer/AdsPower
  *
  * @param config - Proxy configuration
  * @returns Proxy URL string
