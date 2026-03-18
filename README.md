@@ -2,6 +2,8 @@
 
 An Instagram automation agent that discovers influencers with monetization links (Patreon, Ko-fi, link-in-bio) by exploring Following networks, using keyword matching and vision AI.
 
+**Contributing:** See [CONTRIBUTING.md](CONTRIBUTING.md) for how to run tests and submit changes.
+
 ## Quick Start
 
 ### 1. Clone and Install
@@ -19,7 +21,7 @@ npm install
 - **[OpenRouter](https://openrouter.ai)** - Vision AI ($10-30/month)
 - **Postgres Database** - Supabase/Neon (free tier available)
 
-**Detailed setup guide:** See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)
+**Detailed setup guide:** See [docs/VPS_DEPLOYMENT.md](docs/VPS_DEPLOYMENT.md)
 
 ### 3. Configure Environment
 
@@ -72,9 +74,9 @@ npm run discover
 - ✅ No risk of suspension for automation
 - ✅ Full control over your server
 **Quick start guides:**
-- 🚀 **[docs/QUICKSTART_VPS.md](docs/QUICKSTART_VPS.md)** - 15 minute setup (recommended)
-- 📖 **[docs/VPS_SETUP.md](docs/VPS_SETUP.md)** - Detailed walkthrough with troubleshooting
-- 🔧 **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)** - All deployment options (VPS, Local)
+- 🚀 **[docs/VPS_DEPLOYMENT.md](docs/VPS_DEPLOYMENT.md)** - VPS setup (Quick Setup + Manual Setup)
+- 🔧 **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)** - Deployment options overview
+- 📖 **[docs/VPS_COMMANDS_GUIDE.md](docs/VPS_COMMANDS_GUIDE.md)** - Commands and troubleshooting
 - 🔒 **[docs/SECURITY.md](docs/SECURITY.md)** - VPS security audit, hardening, and monitoring
 
 ## Configuration
@@ -150,12 +152,12 @@ Discovery uses a **breadth-first search** of the following graph: each seed's fo
 | Keyword/emoji matching   | **FREE**      | Every profile                          |
 | Vision AI (Gemini Flash) | ~$0.001/image | Only promising profiles with linktrees |
 
-By doing keyword matching first, Scout avoids expensive vision API calls on 80%+ of profiles.
+By doing keyword matching first, Creator Scout avoids expensive vision API calls on 80%+ of profiles.
 
 ## Project Structure
 
 ```
-scout/
+creator-scout/
 ├── functions/        # Modular TypeScript functions
 │   ├── auth/         # Authentication & login
 │   ├── extraction/   # Bio, links, and content extraction
@@ -167,8 +169,8 @@ scout/
 │   ├── scrape.ts     # Main scraper orchestration
 │   └── login_screenshot.ts
 ├── seeds.txt         # Seed usernames to start from
-├── tests/            # 153 tests covering all logic
-└── functions/**/*.test.ts  # Collocated unit tests
+├── tests/            # E2E tests
+└── functions/**/*.test.ts  # Collocated unit tests (505 total)
 ```
 
 ## Quick Start
@@ -195,7 +197,7 @@ npm run discover:dm            # Full automation (finds, follows, AND sends DMs)
 
 ## 📋 Available Scripts
 
-Scout provides both **individual testing scripts** and **full automation scripts**:
+Creator Scout provides both **individual testing scripts** and **full automation scripts**:
 
 ### Individual Testing Scripts (For Development & Manual Operations)
 ```bash
@@ -398,7 +400,7 @@ Combined with AdsPower fingerprints and SmartProxy IPs, this makes automation mu
    - Creates sticky sessions (15-30 min)
    - Auto-rotates when session expires
 
-**Detailed setup guide:** See [docs/ADSPOWER_SETUP.md](docs/ADSPOWER_SETUP.md) for step-by-step instructions.
+**Detailed setup guide:** See [docs/VPS_DEPLOYMENT.md](docs/VPS_DEPLOYMENT.md) for AdsPower and proxy setup.
 
 **Cost:**
 - **AdsPower**: $9/month base (custom pricing for many profiles)
@@ -409,7 +411,7 @@ Combined with AdsPower fingerprints and SmartProxy IPs, this makes automation mu
 ## Tests
 
 ```bash
-# Run all tests (153 tests)
+# Run all tests (505 tests)
 npm test
 
 # Run specific test suites
