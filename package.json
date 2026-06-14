@@ -62,7 +62,8 @@
 		"cookies:clear": "tsx scripts/clear_cookies.ts",
 		"start:production": "tsx scripts/deploy/start.ts",
 		"scheduler:start": "tsx -e \"import { startScheduler } from './functions/scheduling/nodeScheduler.ts'; startScheduler().then(() => console.log('Scheduler started'))\"",
-		"proxy:usage": "tsx -e \"import { getTodayProxyUsage, estimateMonthlyProxyCost } from './functions/shared/proxy/proxyOptimizer.ts'; Promise.all([getTodayProxyUsage(), estimateMonthlyProxyCost()]).then(([t,m]) => console.log('Today:', t, 'Monthly:', m))\""
+		"proxy:usage": "tsx -e \"import { getTodayProxyUsage, estimateMonthlyProxyCost } from './functions/shared/proxy/proxyOptimizer.ts'; Promise.all([getTodayProxyUsage(), estimateMonthlyProxyCost()]).then(([t,m]) => console.log('Today:', t, 'Monthly:', m))\"",
+		"prepare": "husky"
 	},
 	"dependencies": {
 		"@prisma/adapter-pg": "^7.1.0",
@@ -88,6 +89,8 @@
 		"jest": "^30.2.0",
 		"jsdom": "^27.4.0",
 		"ts-jest": "^29.4.6",
-		"typescript": "^5.9.3"
+		"typescript": "^5.9.3",
+		"husky": "^9.1.7",
+		"fallow": "^2.96.0"
 	}
 }

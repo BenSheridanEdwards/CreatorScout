@@ -4,3 +4,6 @@
 # Run the programmatic actions check
 npx tsx scripts/hooks/check-programmatic-actions.ts --pre-commit
 
+
+# fallow — block the commit on new findings in the changes you're staging
+npx fallow audit --base HEAD
