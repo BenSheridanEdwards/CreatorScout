@@ -1,0 +1,13 @@
+{
+  // Coverage-INDEPENDENT complexity gate. `fallow health` flags functions whose
+  // cyclomatic/cognitive complexity exceeds these thresholds regardless of test
+  // coverage — complexity signals a need for abstraction. CRAP (complexity ×
+  // missing-coverage) is disabled so the gate measures complexity, not test gaps.
+  // The committed .fallow/health-baseline.json grandfathers today's backlog; the
+  // gate fails only on NEW complexity beyond it. Burn the backlog down over time.
+  "health": {
+    "maxCyclomatic": 20,
+    "maxCognitive": 15,
+    "maxCrap": 1000000
+  }
+}
