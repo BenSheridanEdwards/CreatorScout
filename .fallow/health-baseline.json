@@ -1,0 +1,395 @@
+{
+  "finding_counts": {
+    "frontend/src/components/CreatorsTable/CreatorsTable.tsx": {
+      "complexity_moderate": {
+        "count": 1
+      }
+    },
+    "frontend/src/components/RunDetailsModal/RunDetailsModal.tsx": {
+      "complexity_high": {
+        "count": 1
+      }
+    },
+    "frontend/src/components/ScheduleForm/ScheduleForm.tsx": {
+      "complexity_high": {
+        "count": 1
+      }
+    },
+    "frontend/src/components/TimelineCarousel/TimelineCarousel.tsx": {
+      "complexity_critical": {
+        "count": 1
+      },
+      "complexity_high": {
+        "count": 1
+      },
+      "complexity_moderate": {
+        "count": 1
+      }
+    },
+    "functions/auth/login/login.ts": {
+      "complexity_critical": {
+        "count": 1
+      },
+      "complexity_high": {
+        "count": 1
+      },
+      "complexity_moderate": {
+        "count": 1
+      }
+    },
+    "functions/auth/sessionInitializer/sessionInitializer.ts": {
+      "complexity_moderate": {
+        "count": 1
+      }
+    },
+    "functions/extraction/getLinkFromBio/getLinkFromBio.ts": {
+      "complexity_high": {
+        "count": 1
+      },
+      "complexity_moderate": {
+        "count": 1
+      }
+    },
+    "functions/extraction/getProfileStats/getProfileStats.ts": {
+      "complexity_moderate": {
+        "count": 1
+      }
+    },
+    "functions/extraction/getStoryHighlights/getStoryHighlights.ts": {
+      "complexity_moderate": {
+        "count": 1
+      }
+    },
+    "functions/extraction/linkExtraction/linkExtraction.ts": {
+      "complexity_critical": {
+        "count": 1
+      },
+      "complexity_high": {
+        "count": 1
+      }
+    },
+    "functions/extraction/textArrayExtraction.ts": {
+      "complexity_critical": {
+        "count": 1
+      }
+    },
+    "functions/navigation/browser/browser.ts": {
+      "complexity_moderate": {
+        "count": 1
+      }
+    },
+    "functions/navigation/humanInteraction/humanInteraction.ts": {
+      "complexity_moderate": {
+        "count": 1
+      }
+    },
+    "functions/navigation/modalOperations/modalOperations.ts": {
+      "complexity_high": {
+        "count": 1
+      }
+    },
+    "functions/navigation/profileNavigation/profileNavigation.ts": {
+      "complexity_high": {
+        "count": 1
+      }
+    },
+    "functions/profile/bioMatcher/bioMatcher.ts": {
+      "complexity_high": {
+        "count": 1
+      }
+    },
+    "functions/profile/profileActions/dmNavigation.ts": {
+      "complexity_critical": {
+        "count": 1
+      }
+    },
+    "functions/profile/profileActions/follow.ts": {
+      "complexity_moderate": {
+        "count": 2
+      }
+    },
+    "functions/profile/profileActions/profileActions.ts": {
+      "complexity_high": {
+        "count": 1
+      }
+    },
+    "functions/profile/profileAnalysis/profileAnalysis.ts": {
+      "complexity_critical": {
+        "count": 1
+      }
+    },
+    "functions/profile/vision/vision.ts": {
+      "complexity_high": {
+        "count": 1
+      },
+      "complexity_moderate": {
+        "count": 2
+      }
+    },
+    "functions/scheduling/nodeScheduler.ts": {
+      "complexity_high": {
+        "count": 1
+      },
+      "complexity_moderate": {
+        "count": 1
+      }
+    },
+    "functions/scheduling/sessionController.ts": {
+      "complexity_high": {
+        "count": 1
+      }
+    },
+    "functions/scheduling/sessionExecutor.ts": {
+      "complexity_critical": {
+        "count": 1
+      }
+    },
+    "functions/shared/database/database.ts": {
+      "complexity_moderate": {
+        "count": 1
+      }
+    },
+    "functions/shared/health/healthMonitor.ts": {
+      "complexity_moderate": {
+        "count": 1
+      }
+    },
+    "functions/shared/pageVerification/pageVerification.ts": {
+      "complexity_critical": {
+        "count": 1
+      }
+    },
+    "functions/shared/proxy/proxyOptimizer.ts": {
+      "complexity_moderate": {
+        "count": 1
+      }
+    },
+    "functions/shared/runs/crontabParser.ts": {
+      "complexity_moderate": {
+        "count": 1
+      }
+    },
+    "functions/shared/snapshot/snapshot.ts": {
+      "complexity_critical": {
+        "count": 1
+      },
+      "complexity_high": {
+        "count": 1
+      }
+    },
+    "functions/timing/humanize/humanize.ts": {
+      "complexity_moderate": {
+        "count": 1
+      }
+    },
+    "scripts/analyze_profile.ts": {
+      "complexity_moderate": {
+        "count": 1
+      }
+    },
+    "scripts/check-database-fields.ts": {
+      "complexity_critical": {
+        "count": 1
+      }
+    },
+    "scripts/check_manual_creators.ts": {
+      "complexity_moderate": {
+        "count": 1
+      }
+    },
+    "scripts/check_profile.ts": {
+      "complexity_moderate": {
+        "count": 1
+      }
+    },
+    "scripts/configure-adspower-smartproxy.ts": {
+      "complexity_moderate": {
+        "count": 1
+      }
+    },
+    "scripts/cron/sessionRunner.ts": {
+      "complexity_moderate": {
+        "count": 1
+      }
+    },
+    "scripts/cron/smartSessionRunner.ts": {
+      "complexity_moderate": {
+        "count": 1
+      }
+    },
+    "scripts/deploy/start.ts": {
+      "complexity_moderate": {
+        "count": 1
+      }
+    },
+    "scripts/discover.ts": {
+      "complexity_critical": {
+        "count": 1
+      }
+    },
+    "scripts/dm_batch.ts": {
+      "complexity_critical": {
+        "count": 1
+      },
+      "complexity_moderate": {
+        "count": 1
+      }
+    },
+    "scripts/dm_user.ts": {
+      "complexity_moderate": {
+        "count": 1
+      }
+    },
+    "scripts/eval_batch.ts": {
+      "complexity_moderate": {
+        "count": 1
+      }
+    },
+    "scripts/eval_profile.ts": {
+      "complexity_moderate": {
+        "count": 1
+      }
+    },
+    "scripts/follow_user.ts": {
+      "complexity_moderate": {
+        "count": 1
+      }
+    },
+    "scripts/hooks/check-programmatic-actions.ts": {
+      "complexity_moderate": {
+        "count": 1
+      }
+    },
+    "scripts/list_adspower_profiles.ts": {
+      "complexity_moderate": {
+        "count": 1
+      }
+    },
+    "scripts/manual_override.ts": {
+      "complexity_critical": {
+        "count": 1
+      }
+    },
+    "scripts/migrate_false_positives.ts": {
+      "complexity_high": {
+        "count": 1
+      }
+    },
+    "scripts/natural_scroll.ts": {
+      "complexity_high": {
+        "count": 1
+      },
+      "complexity_moderate": {
+        "count": 1
+      }
+    },
+    "scripts/process_profiles.ts": {
+      "complexity_high": {
+        "count": 1
+      }
+    },
+    "scripts/reanalyze_profiles.ts": {
+      "complexity_critical": {
+        "count": 1
+      }
+    },
+    "scripts/scrape.ts": {
+      "complexity_critical": {
+        "count": 2
+      },
+      "complexity_moderate": {
+        "count": 2
+      }
+    },
+    "scripts/scrapeWithLogging.ts": {
+      "complexity_critical": {
+        "count": 2
+      }
+    },
+    "scripts/sync_profiles.ts": {
+      "complexity_high": {
+        "count": 1
+      }
+    },
+    "scripts/test/ramp_up_test.ts": {
+      "complexity_high": {
+        "count": 1
+      }
+    },
+    "scripts/test_like_post.ts": {
+      "complexity_moderate": {
+        "count": 1
+      }
+    },
+    "scripts/test_random_engagement.ts": {
+      "complexity_moderate": {
+        "count": 1
+      }
+    },
+    "scripts/test_single_profile.ts": {
+      "complexity_critical": {
+        "count": 1
+      }
+    },
+    "server.ts": {
+      "complexity_critical": {
+        "count": 1
+      },
+      "complexity_moderate": {
+        "count": 1
+      }
+    },
+    "tests/e2e/check_profile_e2e.puppeteer.test.ts": {
+      "complexity_moderate": {
+        "count": 1
+      }
+    }
+  },
+  "runtime_coverage_findings": [],
+  "target_keys": [
+    "scripts/dm_batch.ts:complexity",
+    "functions/navigation/profileNavigation/profileNavigation.ts:complexity",
+    "functions/shared/pageEval/pageEval.ts:dead code",
+    "scripts/check-database-fields.ts:complexity",
+    "functions/extraction/getLinkFromBio/getLinkFromBio.ts:complexity",
+    "functions/shared/logger/logger.ts:circular dependency",
+    "functions/timing/sleep/sleep.ts:high impact",
+    "functions/shared/runs/timezoneUtils.ts:dead code",
+    "scripts/scrape.ts:dead code",
+    "scripts/scrapeWithLogging.ts:dead code",
+    "scripts/test_single_profile.ts:complexity",
+    "functions/shared/limits/actionLimits.ts:dead code",
+    "functions/shared/profiles/profileLoader.ts:dead code",
+    "functions/shared/logger/loggingIntegration.ts:dead code",
+    "functions/navigation/humanInteraction/humanInteraction.ts:dead code",
+    "functions/shared/notifications/notificationService.ts:dead code",
+    "functions/profile/profileAnalysis/profileAnalysis.ts:complexity",
+    "functions/navigation/proxy/proxyManager.ts:dead code",
+    "functions/profile/profileActions/profileActions.ts:complexity",
+    "functions/__test__/testUtils.ts:circular dependency",
+    "functions/shared/circuitBreaker/circuitBreaker.ts:dead code",
+    "functions/shared/health/healthMonitor.ts:dead code",
+    "functions/__test__/domMocks.ts:circular dependency",
+    "functions/profile/profileActions/dmNavigation.ts:complexity",
+    "functions/shared/snapshot/snapshot.ts:complexity",
+    "functions/scheduling/nodeScheduler.ts:complexity",
+    "functions/shared/pageVerification/pageVerification.ts:complexity",
+    "scripts/discover.ts:complexity",
+    "scripts/process_profiles.ts:complexity",
+    "functions/extraction/textArrayExtraction.ts:complexity",
+    "scripts/reanalyze_profiles.ts:complexity",
+    "functions/auth/login/login.ts:complexity",
+    "functions/extraction/linkExtraction/linkExtraction.ts:complexity",
+    "server.ts:complexity",
+    "scripts/natural_scroll.ts:complexity",
+    "functions/profile/bioMatcher/bioMatcher.ts:complexity",
+    "functions/scheduling/sessionController.ts:complexity",
+    "frontend/src/components/TimelineCarousel/TimelineCarousel.tsx:complexity",
+    "functions/scheduling/sessionExecutor.ts:complexity",
+    "frontend/src/components/ScheduleForm/ScheduleForm.tsx:complexity",
+    "functions/shared/logger/enhancedLogger.ts:circular dependency",
+    "functions/profile/vision/vision.ts:complexity",
+    "functions/shared/logger/cycleManager.ts:circular dependency",
+    "scripts/manual_override.ts:complexity"
+  ]
+}

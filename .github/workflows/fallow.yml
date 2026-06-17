@@ -19,3 +19,15 @@ jobs:
           command: audit
           comment: true
           review-comments: true
+      # Coverage-independent complexity gate. Fails only on NEW functions that exceed
+      # the cyclomatic/cognitive thresholds in .fallowrc.jsonc, beyond the committed
+      # baseline (.fallow/health-baseline.json). Complexity signals a need for
+      # abstraction, so it's flagged regardless of test coverage. Burn the backlog
+      # down over time, then regenerate the baseline to lock the improvement in:
+      #   npx fallow health --save-baseline .fallow/health-baseline.json
+      - name: Complexity gate
+        uses: fallow-rs/fallow@v2
+        with:
+          command: health
+          baseline: .fallow/health-baseline.json
+          fail-on-issues: true
