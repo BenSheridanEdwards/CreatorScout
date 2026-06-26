@@ -11,13 +11,13 @@ on:
       - main
 
 env:
-  RUNNER_TOOL_CACHE: /Users/agents/Agents/Shared/local-ci/toolcache
-  AGENT_TOOLSDIRECTORY: /Users/agents/Agents/Shared/local-ci/toolcache
+  RUNNER_TOOL_CACHE: ${{ runner.tool_cache }}
+  AGENT_TOOLSDIRECTORY: ${{ runner.tool_cache }}
 
 jobs:
   test:
     name: Run Tests
-    runs-on: [self-hosted, macOS, ARM64, chief-mac-mini, CreatorScout]
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
