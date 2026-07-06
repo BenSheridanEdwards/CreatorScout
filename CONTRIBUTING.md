@@ -27,3 +27,11 @@ Thanks for your interest in contributing!
 - TypeScript throughout
 - Follow existing patterns in the codebase
 - Use `npm run test` to verify before submitting
+
+## Licensing of contributions
+
+Unless you explicitly state otherwise, any contribution you intentionally
+submit for inclusion in this project shall be licensed under the MIT
+License (see the LICENSE file), without any additional terms or
+conditions, and you confirm that you have the right to submit it under
+that license.
